@@ -1,0 +1,30 @@
+{
+  "SchemaVersion": 2,
+  "ArtifactName": "sample-image:latest",
+  "ArtifactType": "container_image",
+  "Results": [
+    {
+      "Target": "sample-image:latest (alpine)",
+      "Class": "os-pkgs",
+      "Type": "alpine",
+      "Vulnerabilities": [
+        {
+          "VulnerabilityID": "CVE-2024-0001",
+          "PkgID": "lodash@4.17.21",
+          "Title": "Prototype pollution in lodash",
+          "Description": "A prototype pollution vulnerability in lodash.",
+          "Severity": "HIGH",
+          "CweIDs": ["CWE-400"]
+        },
+        {
+          "VulnerabilityID": "CVE-2023-9999",
+          "PkgID": "github.com/acme/lib@1.2.3",
+          "Title": "Input validation issue in acme/lib",
+          "Description": "Improper input validation could lead to DoS.",
+          "Severity": "MEDIUM",
+          "CweIDs": ["CWE-20"]
+        }
+      ]
+    }
+  ]
+}

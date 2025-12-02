@@ -1,5 +1,6 @@
-// Package trivytypes provides a subset of https://pkg.go.dev/github.com/aquasecurity/trivy@v0.53.0/pkg/types
-package trivytypes
+package types
+
+// Subset of https://pkg.go.dev/github.com/aquasecurity/trivy@v0.67.2/pkg/types
 
 type Report struct {
 	SchemaVersion int      `json:",omitempty"`

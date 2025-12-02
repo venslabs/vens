@@ -8,12 +8,24 @@ import (
 	"time"
 )
 
+// Supported LLM backends and selection helpers
+const (
+	Auto      = "auto"
+	OpenAI    = "openai"
+	Ollama    = "ollama"
+	Anthropic = "anthropic"
+	GoogleAI  = "googleai"
+)
+
+// Names lists the supported backend names for help text and validation.
+var Names = []string{OpenAI, Ollama, Anthropic, GoogleAI}
+
 func RetryOnRateLimit(ctx context.Context, interval time.Duration, maxRetry int, fn func(context.Context) error) error {
 	var err error
 	began := time.Now()
 	for i := 0; i < maxRetry; i++ {
 		err = fn(ctx)
-		if isRateLimit(err) {
+		if !isRateLimit(err) {
 			return err
 		}
 		slog.InfoContext(ctx, "Detected rate limit. Sleeping.", "interval", interval, "error", err)

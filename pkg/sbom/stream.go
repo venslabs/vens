@@ -1,0 +1,331 @@
+package sbom
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"strings"
+
+	trivytypes "github.com/fahedouch/vens/pkg/api/types"
+)
+
+// StreamCycloneDXLibraries performs a single-pass streaming parse of a CycloneDX
+// SBOM JSON file to:
+//  1. Read the parent PURL (metadata.component.purl) once, and
+//  2. Stream the components array, forwarding only entries with type == "library".
+//
+// It never loads the whole SBOM in memory. When decoding metadata, once the
+// component has been decoded, the rest of the metadata section is skipped to
+// minimize work. This keeps both time and space complexity low.
+func StreamCycloneDXLibraries(path string, cb func(trivytypes.SBOMComponent) error) error {
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close() //nolint:errcheck
+
+	dec := json.NewDecoder(f)
+
+	// Expect root object
+	tok, err := dec.Token()
+	if err != nil {
+		return err
+	}
+	if d, ok := tok.(json.Delim); !ok || d != '{' {
+		return fmt.Errorf("invalid CycloneDX JSON: expected object start")
+	}
+
+	parentPURL := ""
+
+	// Iterate root keys; handle metadata (for parent PURL) and components array
+	for dec.More() {
+		t, err := dec.Token()
+		if err != nil {
+			return err
+		}
+		key, ok := t.(string)
+		if !ok {
+			return fmt.Errorf("invalid key token")
+		}
+
+		switch key {
+		case "metadata":
+			// Enter metadata object
+			tok, err := dec.Token()
+			if err != nil {
+				return err
+			}
+			if d, ok := tok.(json.Delim); !ok || d != '{' {
+				return fmt.Errorf("invalid metadata object")
+			}
+			// Walk metadata keys, but stop early after component is decoded.
+			for dec.More() {
+				tk, err := dec.Token()
+				if err != nil {
+					return err
+				}
+				mkey, ok := tk.(string)
+				if !ok {
+					return fmt.Errorf("invalid metadata key")
+				}
+				if mkey == "component" {
+					var tmp struct {
+						PURL string `json:"purl"`
+					}
+					if err := dec.Decode(&tmp); err != nil {
+						return err
+					}
+					parentPURL = tmp.PURL
+					// We can skip the remaining metadata quickly and consume closing '}'
+					for dec.More() {
+						if err := skipAny(dec); err != nil {
+							break
+						}
+					}
+					// Consume '}' for metadata and break out to continue root loop
+					if _, err := dec.Token(); err != nil {
+						return err
+					}
+					continue
+				}
+				// Skip any other metadata fields without decoding
+				if err := skipAny(dec); err != nil {
+					return err
+				}
+			}
+			// Consume '}' for metadata if not already consumed
+			if _, err := dec.Token(); err != nil {
+				return err
+			}
+
+		case "components":
+			// Enter components array
+			tok, err := dec.Token()
+			if err != nil {
+				return err
+			}
+			if d, ok := tok.(json.Delim); !ok || d != '[' {
+				return fmt.Errorf("invalid components array")
+			}
+			for dec.More() {
+				var c trivytypes.SBOMComponent
+				if err := dec.Decode(&c); err != nil {
+					return err
+				}
+				// Only `library`type for now (MVP). See: https://cyclonedx.org/docs/1.7/json/#components_items_type
+				if strings.ToLower(c.Type) != "library" {
+					continue
+				}
+				c.ParentPURL = parentPURL
+				if err := cb(c); err != nil {
+					return err
+				}
+			}
+			// Consume closing ']'
+			if _, err := dec.Token(); err != nil {
+				return err
+			}
+
+		default:
+			// Skip any other root fields
+			if err := skipAny(dec); err != nil {
+				return err
+			}
+		}
+	}
+	// Consume '}' of the root object
+	if _, err := dec.Token(); err != nil {
+		return err
+	}
+	return nil
+}
+
+// ReadParentPURL reads `metadata.component.purl` from a CycloneDX SBOM without
+// loading the entire file. It uses a streaming JSON decoder to keep memory and
+// CPU overhead minimal.
+func ReadParentPURL(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close() //nolint:errcheck
+
+	dec := json.NewDecoder(f)
+	tok, err := dec.Token()
+	if err != nil {
+		return "", err
+	}
+	if d, ok := tok.(json.Delim); !ok || d != '{' {
+		return "", fmt.Errorf("invalid CycloneDX JSON: expected object start")
+	}
+	for dec.More() {
+		t, err := dec.Token()
+		if err != nil {
+			return "", err
+		}
+		key, ok := t.(string)
+		if !ok {
+			return "", fmt.Errorf("invalid key token")
+		}
+		if key != "metadata" {
+			if err := skipAny(dec); err != nil {
+				return "", err
+			}
+			continue
+		}
+		// Enter the metadata object
+		tok, err := dec.Token()
+		if err != nil {
+			return "", err
+		}
+		if d, ok := tok.(json.Delim); !ok || d != '{' {
+			return "", fmt.Errorf("invalid metadata object")
+		}
+		for dec.More() {
+			tk, err := dec.Token()
+			if err != nil {
+				return "", err
+			}
+			mkey, ok := tk.(string)
+			if !ok {
+				return "", fmt.Errorf("invalid metadata key")
+			}
+			if mkey == "component" {
+				var tmp struct {
+					PURL string `json:"purl"`
+				}
+				if err := dec.Decode(&tmp); err != nil {
+					return "", err
+				}
+				// Consume any remaining metadata keys quickly
+				for dec.More() {
+					if err := skipAny(dec); err != nil {
+						return tmp.PURL, nil
+					}
+				}
+				// Consume '}' for metadata
+				_, _ = dec.Token()
+				// Consume the rest of the root object
+				for dec.More() {
+					if err := skipAny(dec); err != nil {
+						break
+					}
+				}
+				// Consume '}' of the root object
+				_, _ = dec.Token()
+				return tmp.PURL, nil
+			}
+			if err := skipAny(dec); err != nil {
+				return "", err
+			}
+		}
+		// Consume '}' for metadata
+		if _, err := dec.Token(); err != nil {
+			return "", err
+		}
+	}
+	// Consume '}' of the root object
+	_, _ = dec.Token()
+	return "", nil
+}
+
+// StreamComponents streams each entry of the `components` array and invokes the
+// provided callback with a minimally decoded SBOMComponent. It never loads the
+// full SBOM into memory.
+func StreamComponents(path string, cb func(trivytypes.SBOMComponent) error) error {
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close() //nolint:errcheck
+
+	dec := json.NewDecoder(f)
+	tok, err := dec.Token()
+	if err != nil {
+		return err
+	}
+	if d, ok := tok.(json.Delim); !ok || d != '{' {
+		return fmt.Errorf("invalid CycloneDX JSON: expected object start")
+	}
+	for dec.More() {
+		t, err := dec.Token()
+		if err != nil {
+			return err
+		}
+		key, ok := t.(string)
+		if !ok {
+			return fmt.Errorf("invalid key token")
+		}
+		if key != "components" {
+			if err := skipAny(dec); err != nil {
+				return err
+			}
+			continue
+		}
+		// Enter the components array
+		tok, err := dec.Token()
+		if err != nil {
+			return err
+		}
+		if d, ok := tok.(json.Delim); !ok || d != '[' {
+			return fmt.Errorf("invalid components array")
+		}
+		for dec.More() {
+			var c trivytypes.SBOMComponent
+			if err := dec.Decode(&c); err != nil {
+				return err
+			}
+			if err := cb(c); err != nil {
+				return err
+			}
+		}
+		// Consume closing ']'
+		if _, err := dec.Token(); err != nil {
+			return err
+		}
+	}
+	// Consume '}' of the root object
+	if _, err := dec.Token(); err != nil {
+		return err
+	}
+	return nil
+}
+
+// skipAny consumes the next JSON value in full (scalar, object, or array).
+// It advances the decoder past the current value while keeping allocations and
+// CPU overhead very low. This is essential to keep streaming fast on large SBOMs.
+func skipAny(dec *json.Decoder) error {
+	tok, err := dec.Token()
+	if err != nil {
+		return err
+	}
+	d, isDelim := tok.(json.Delim)
+	if !isDelim {
+		return nil
+	}
+	// Track nested delimiters using a simple depth counter.
+	var depth int = 1
+	var open, close rune
+	if d == '{' {
+		open, close = '{', '}'
+	} else if d == '[' {
+		open, close = '[', ']'
+	} else {
+		return nil
+	}
+	for depth > 0 {
+		t, err := dec.Token()
+		if err != nil {
+			return err
+		}
+		if dd, ok := t.(json.Delim); ok {
+			switch rune(dd) {
+			case open:
+				depth++
+			case close:
+				depth--
+			}
+		}
+	}
+	return nil
+}

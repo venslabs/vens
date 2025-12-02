@@ -1,0 +1,34 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.5",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2025-12-02T00:00:00Z",
+    "component": {
+      "type": "library",
+      "bom-ref": "metadata-lodash",
+      "name": "lodash",
+      "version": "4.17.21",
+      "purl": "pkg:npm/lodash@4.17.21"
+    }
+  },
+  "components": [
+    {
+      "type": "library",
+      "bom-ref": "pkg:golang/github.com/acme/lib@1.2.3",
+      "name": "acme/lib",
+      "version": "1.2.3",
+      "purl": "pkg:golang/github.com/acme/lib@1.2.3",
+      "properties": [
+        {
+          "name": "aquasecurity:trivy:PkgID",
+          "value": "github.com/acme/lib@1.2.3"
+        },
+        {
+          "name": "aquasecurity:trivy:PkgType",
+          "value": "golang"
+        }
+      ]
+    }
+  ]
+}

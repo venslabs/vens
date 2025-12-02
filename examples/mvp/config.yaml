@@ -1,0 +1,6 @@
+owasp:
+  pkg:npm/lodash:
+    likelihood: 5
+    impact: 9   # score dérivé = 45 (0..81)
+  pkg:golang/github.com/acme/lib:
+    score: 30   # score direct (0..81)

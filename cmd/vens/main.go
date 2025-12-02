@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/fahedouch/vens/cmd/vens/commands/generate"
 	"github.com/fahedouch/vens/cmd/vens/version"
 	"github.com/fahedouch/vens/pkg/envutil"
 	"github.com/spf13/cobra"
@@ -22,10 +23,9 @@ func main() {
 
 func newRootCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "vens",
-		Short: "Evaluate and prioritize vulnerabilities based on context",
-		// TODO add example once the generate command is implemented
-		// Example: generate.Example(),
+		Use:           "vens",
+		Short:         "Evaluate and prioritize vulnerabilities based on context",
+		Example:       generate.Example(),
 		Version:       version.GetVersion(),
 		Args:          cobra.NoArgs,
 		SilenceUsage:  true,
@@ -44,7 +44,7 @@ func newRootCommand() *cobra.Command {
 	}
 
 	// TODO add generate cmd
-	cmd.AddCommand()
+	cmd.AddCommand(generate.New())
 
 	return cmd
 }
