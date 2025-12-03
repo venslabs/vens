@@ -111,7 +111,7 @@ func action(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if inputFormat == "" || inputPath == "auto" {
+	if inputFormat == "" || inputFormat == "auto" {
 		inputFormat = "trivy"
 		slog.DebugContext(ctx, "Automatically choosing input format", "format", inputFormat)
 	}

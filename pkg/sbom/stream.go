@@ -59,6 +59,7 @@ func StreamCycloneDXLibraries(path string, cb func(trivytypes.SBOMComponent) err
 				return fmt.Errorf("invalid metadata object")
 			}
 			// Walk metadata keys, but stop early after component is decoded.
+			consumedEnd := false
 			for dec.More() {
 				tk, err := dec.Token()
 				if err != nil {
@@ -76,26 +77,29 @@ func StreamCycloneDXLibraries(path string, cb func(trivytypes.SBOMComponent) err
 						return err
 					}
 					parentPURL = tmp.PURL
-					// We can skip the remaining metadata quickly and consume closing '}'
+					// Skip the remaining metadata fields (if any)
 					for dec.More() {
 						if err := skipAny(dec); err != nil {
 							break
 						}
 					}
-					// Consume '}' for metadata and break out to continue root loop
+					// Consume '}' for metadata and break out of the metadata loop
 					if _, err := dec.Token(); err != nil {
 						return err
 					}
-					continue
+					consumedEnd = true
+					break
 				}
 				// Skip any other metadata fields without decoding
 				if err := skipAny(dec); err != nil {
 					return err
 				}
 			}
-			// Consume '}' for metadata if not already consumed
-			if _, err := dec.Token(); err != nil {
-				return err
+			// If we didn’t already consume '}', do it now
+			if !consumedEnd {
+				if _, err := dec.Token(); err != nil {
+					return err
+				}
 			}
 
 		case "components":
