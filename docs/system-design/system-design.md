@@ -7,29 +7,34 @@ sequenceDiagram
     autonumber
     actor User as User
     participant CLI as Vens CLI
-    participant FS as Report file (input)
+    participant Risk as Risk Config (config.yaml)
+    participant SBOM as SBOMs CSV (list of SBOM paths)
+    participant Assets as Assets Builder (from SBOMs)
+    participant Vec as Vector Index (HNSW)
+    participant FS as Vulnerabilities Report (input)
     participant Parser as Parser/Deserializer
-    participant Cfg as Context Sources (Configs/Vendors)
-    participant Assets as Assets Builder
     participant Conv as Converter (ext→int)
     participant Batch as Batch Processor
     participant Comm as Community Scoring Engine
     participant LLM as LLM
     participant Sim as Similarity Engine (AI)
     participant Ctx as Contextual Scoring Engine
-    participant Pri as Prioritization Engine
-    participant Out as Output
+    participant Out as CycloneDX VEX Output
 
-    User->>CLI: 1. Run command (with report path)
-    CLI->>FS: 1.a. Read report file
-    FS-->>CLI: Raw content
-    CLI->>Parser: 1.b. Deserialize into Report struct
+    User->>CLI: 1. Run command (with inputs: report, config.yaml, sboms.csv)
+    CLI->>Risk: 1.a. Read Risk config (config.yaml)
+    Risk-->>CLI: Risk settings
+    CLI->>SBOM: 1.b. Read CSV list of SBOMs
+    SBOM-->>Assets: SBOM file paths
+    Assets->>Assets: 1.c. Collect components and related libraries
+    Assets->>Vec: 1.d. Index components/libs into HNSW (in-memory)
+    Vec-->>Assets: Index ready
+    CLI->>FS: 1.e. Read vulnerabilities report file
+    FS-->>CLI: Raw report content
+    CLI->>Parser: 1.f. Deserialize into Report struct
     Parser-->>CLI: Report struct
-    CLI->>Parser: 1.c. Extract Vulnerabilities list
+    CLI->>Parser: 1.g. Extract vulnerabilities → []source.Vulnerability
     Parser-->>CLI: []source.Vulnerability
-    CLI->>Cfg: 1.d. Load context (component scores, libraries)
-    Cfg-->>Assets: Raw context data
-    Assets-->>CLI: generator.Assets (assets + associated libraries)
 
     CLI->>Conv: 2.a. Convert each source.Vulnerability → generator.Vulnerability
     Conv-->>CLI: []generator.Vulnerability
@@ -38,19 +43,19 @@ sequenceDiagram
     loop For each batch (10 vulns by default)
         Batch->>Batch: Scheduling + retry strategy (exponential backoff)
         loop For each Vulnerability in the batch
-            Batch->>Comm: 4. Compute Community Scoring
+            Batch->>Comm: 4. Compute Community Scoring (improvement)
             Comm-->>Batch: community_score
 
             Batch->>Ctx: 5. Compute contextual score (LLM)
-            Note right of Ctx: 5.a. Extract library names via LLM
+            Note right of Ctx: 5.a. Extract library name from vulnerability
             Ctx->>LLM: Prompt to extract libs from the vulnerability
             LLM-->>Ctx: Candidate libs list
 
-            Note right of Sim: 5.b. Match libs (vuln vs assets)
-            Ctx->>Sim: Semantic similarity (AI search)
+            Note right of Sim: 5.b. Match vuln library with components' libraries
+            Ctx->>Sim: Similarity search over HNSW index
             Sim-->>Ctx: Likely library↔component pairs
 
-            Note right of Ctx: 5.c–d. Filter impacted libs + JSON schema
+            Note right of Ctx: 5.c–d. LLM filters and returns impacted libs (JSON schema)
             Ctx->>LLM: Filter and return JSON conforming to the schema
             LLM-->>Ctx: JSON of impacted libs
             Ctx->>Ctx: 5.e. Deserialize LLM output
@@ -59,13 +64,11 @@ sequenceDiagram
             Batch->>Ctx: 5.c (cont.) Compute contextual score
             Ctx-->>Batch: contextual_score
 
-            Batch->>Batch: 6. Global score = f(community_score, contextual_score)
-            Batch-->>Pri: 7. Apply prioritization logic
-            Pri-->>Batch: Adjusted priority/severity
+            %% Final score combination step removed per updated data flow
         end
     end
 
-    Batch-->>Out: 8. Results (scores, priorities, impacted libs)
+    Batch-->>Out: 8. Generate CycloneDX VEX (scores, priorities, impacted libs)
     Out-->>User: Display/Export (console, JSON, etc.)
 ```
 
@@ -75,7 +78,7 @@ Implementation notes:
 - Assets context: built from config files or vendors (SBOM, lockfiles, etc.) into generator.Assets.
 - LLM: structured JSON outputs with a predefined schema for reliable deserialization.
 - Global score: weighted or logical combination (AND/Min) between community and contextual scores.
-- Prioritization: apply business rules (SLAs, component/service criticality, exceptions/VEX, etc.).
+- Output: generate CycloneDX VEX with impacted libraries and computed scores.
 
 
 ## High‑Level Design (Graph) — Vens CLI (exactly aligned with the sequence diagram)
@@ -87,30 +90,34 @@ flowchart LR
     %% Participants (high-level only)
     User([User])
     CLI([Vens CLI])
-    FS[(Report file input)]
+    Risk[(config.yaml — Risk config)]
+    SBOMS[(csv list of SBOMs)]
+    Assets[[Assets Builder (from SBOMs)]]
+    Vec[[Vector Index (HNSW)]]
+    FS[(Vulnerabilities report)]
     Parser[[Parser/Deserializer]]
-    Cfg[[Context Sources: Configs/Vendors]]
-    Assets[[Assets Builder]]
     Conv[[Converter: ext→int]]
     Batch[[Batch Processor]]
     Comm[[Community Scoring Engine]]
     Ctx[[Contextual Scoring Engine]]
-    Pri[[Prioritization Engine]]
-    Out[[Output]]
+    Out[[CycloneDX VEX Output]]
 
     %% High-level steps 1–8
-    User -- "1. Run command with report path" --> CLI
-    CLI -- "2. Parse report and extract vulnerabilities" --> Parser
+    User -- "1. Run command with report, config.yaml, sboms.csv" --> CLI
+    CLI -- "2. Read Risk config" --> Risk
+    CLI -- "3. Read SBOMs list" --> SBOMS
+    SBOMS -->|"Build assets context"| Assets
+    Assets -->|"Index components/libs"| Vec
+    Vec -->|"Index ready"| Assets
+    CLI -- "4. Parse report and extract vulnerabilities" --> Parser
     Parser -- "Vulnerabilities" --> CLI
 
-    CLI -- "3. Load context sources" --> Cfg
-    Cfg -->|"Build assets context"| Assets
     Assets -->|"Assets"| CLI
 
-    CLI -- "4. Convert vulnerabilities to internal model" --> Conv
+    CLI -- "5. Convert vulnerabilities to internal model" --> Conv
     Conv -- "Converted vulnerabilities" --> CLI
 
-    CLI -- "5. Process in batches with retries" --> Batch
+    CLI -- "6. Process in batches with retries" --> Batch
 
     Batch -->|"Compute community scoring"| Comm
     Comm -->|"community_score"| Batch
@@ -118,10 +125,9 @@ flowchart LR
     Batch -->|"Compute contextual scoring"| Ctx
     Ctx -->|"contextual_score + impacted_libs"| Batch
 
-    Batch -->|"7. Global scoring and prioritization"| Pri
-    Pri -->|"prioritized results"| Batch
+    %% Final score combination step removed per updated data flow
 
-    Batch -->|"8. Results (scores, priorities, impacted libs)"| Out
+    Batch -->|"8. Generate CycloneDX VEX (scores, priorities, impacted libs)"| Out
     Out -->|"Display/Export"| User
 ```
 
@@ -131,3 +137,43 @@ flowchart LR
 The following embedded SVG provides a visual system design overview drawn in Excalidraw.
 
 ![Vens System Design — Excalidraw](system-design-2025-11-03.excalidraw.svg)
+
+
+## Score Factory — Steps
+
+`Score Factory` scoring workflow.
+
+```mermaid
+flowchart LR
+    %% Left side: Similarity matching between vulnerability lib and SBOM libs/components
+    subgraph MatchingPhase[AI similarity search to match vulnerability lib with SBOM libs and components]
+        VL[vuln Lib]
+        S1[(SBOMs lib)]
+        S2[(SBOMs lib)]
+        S3[(SBOMs lib)]
+        C1[(Component1 Purl)]
+        C2[(Component2 Purl)]
+        C3[(Component3 Purl)]
+
+        VL -->|similarity search| S1
+        VL -->|similarity search| S2
+        VL -->|similarity search| S3
+
+        S1 --> C1
+        S2 --> C2
+        S3 --> C3
+    end
+
+    %% Pass candidates to LLM to filter SBOM libs
+    VL -.->|"Pass to LLM to filter sboms libs"| LLM[[LLM Filter]]
+    S1 -.-> LLM
+    S2 -.-> LLM
+    S3 -.-> LLM
+
+    %% LLM returns the impacted library and its mapped component
+    LLM --> IL[(Filtered/impacted sboms lib)]
+    IL --> ICP[(Impacted Component Purl)]
+
+    %% Generate VEX from impacted items
+    IL -->|generate VEX| VEX[[VEX with component score]]
+```
