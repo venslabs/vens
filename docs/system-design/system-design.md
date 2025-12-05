@@ -48,8 +48,8 @@ sequenceDiagram
 
             Batch->>Ctx: 5. Compute contextual score (LLM)
             Note right of Ctx: 5.a. Extract library name from vulnerability
-            Ctx->>LLM: Prompt to extract libs from the vulnerability
-            LLM-->>Ctx: Candidate libs list
+            Ctx->>LLM: Prompt to extract the library name from the vulnerability
+            LLM-->>Ctx: Candidate library name
 
             Note right of Sim: 5.b. Match vuln library with components' libraries
             Ctx->>Sim: Similarity search over HNSW index
@@ -57,7 +57,7 @@ sequenceDiagram
 
             Note right of Ctx: 5.c–d. LLM filters and returns impacted libs (JSON schema)
             Ctx->>LLM: Filter and return JSON conforming to the schema
-            LLM-->>Ctx: JSON of impacted libs
+            LLM-->>Ctx: JSON of sboms impacted libs
             Ctx->>Ctx: 5.e. Deserialize LLM output
             Ctx-->>Batch: impacted_libs + context
 
@@ -75,9 +75,9 @@ sequenceDiagram
 Implementation notes:
 - Batch processing: group of 10 vulnerabilities with exponential retries on LLM/IO failures.
 - Community scoring: aggregate EPSS/KEV/CVSS/community signals per your strategy.
-- Assets context: built from config files or vendors (SBOM, lockfiles, etc.) into generator.Assets.
+- Assets context: built from Sboms.
+
 - LLM: structured JSON outputs with a predefined schema for reliable deserialization.
-- Global score: weighted or logical combination (AND/Min) between community and contextual scores.
 - Output: generate CycloneDX VEX with impacted libraries and computed scores.
 
 
@@ -88,19 +88,19 @@ This graph shows the high‑level flow only, aligned with the simplified sequenc
 ```mermaid
 flowchart LR
     %% Participants (high-level only)
-    User([User])
-    CLI([Vens CLI])
-    Risk[(config.yaml — Risk config)]
-    SBOMS[(csv list of SBOMs)]
-    Assets[[Assets Builder (from SBOMs)]]
-    Vec[[Vector Index (HNSW)]]
-    FS[(Vulnerabilities report)]
-    Parser[[Parser/Deserializer]]
-    Conv[[Converter: ext→int]]
-    Batch[[Batch Processor]]
-    Comm[[Community Scoring Engine]]
-    Ctx[[Contextual Scoring Engine]]
-    Out[[CycloneDX VEX Output]]
+    User([User]);
+    CLI([Vens CLI]);
+    Risk[(config.yaml - Risk config)];
+    SBOMS[(csv list of SBOMs)];
+    Assets[[Assets Builder (from SBOMs)]];
+    Vec[[Vector Index (HNSW)]];
+    FS[(Vulnerabilities report)];
+    Parser[[Parser/Deserializer]];
+    Conv[[Converter: ext->int]];
+    Batch[[Batch Processor]];
+    Comm[[Community Scoring Engine]];
+    Ctx[[Contextual Scoring Engine]];
+    Out[[CycloneDX VEX Output]];
 
     %% High-level steps 1–8
     User -- "1. Run command with report, config.yaml, sboms.csv" --> CLI
@@ -146,11 +146,11 @@ The following embedded SVG provides a visual system design overview drawn in Exc
 ```mermaid
 flowchart LR
     %% Left side: Similarity matching between vulnerability lib and SBOM libs/components
-    subgraph MatchingPhase[AI similarity search to match vulnerability lib with SBOM libs and components]
-        VL[vuln Lib]
-        S1[(SBOMs lib)]
-        S2[(SBOMs lib)]
-        S3[(SBOMs lib)]
+    subgraph MatchingPhase[AI similarity search to match vulnerability library with SBOM libraries and components]
+        VL[Vulnerability Library]
+        S1[(SBOM Library)]
+        S2[(SBOM Library)]
+        S3[(SBOM Library)]
         C1[(Component1 Purl)]
         C2[(Component2 Purl)]
         C3[(Component3 Purl)]
@@ -164,14 +164,14 @@ flowchart LR
         S3 --> C3
     end
 
-    %% Pass candidates to LLM to filter SBOM libs
-    VL -.->|"Pass to LLM to filter sboms libs"| LLM[[LLM Filter]]
+    %% Pass candidates to LLM to filter SBOM libraries
+    VL -.->|"Pass to LLM to filter sboms libraries"| LLM[[LLM Filter]]
     S1 -.-> LLM
     S2 -.-> LLM
     S3 -.-> LLM
 
     %% LLM returns the impacted library and its mapped component
-    LLM --> IL[(Filtered/impacted sboms lib)]
+    LLM --> IL[(Filtered/impacted sboms libraries)]
     IL --> ICP[(Impacted Component Purl)]
 
     %% Generate VEX from impacted items
