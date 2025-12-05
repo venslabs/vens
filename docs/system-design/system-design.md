@@ -88,47 +88,47 @@ This graph shows the high‑level flow only, aligned with the simplified sequenc
 ```mermaid
 flowchart LR
     %% Participants (high-level only)
-    User([User])
-    CLI([Vens CLI])
-    Risk[(config.yaml - Risk config)]
-    SBOMS[(csv list of SBOMs)]
-    Assets[[Assets Builder (from SBOMs)]]
-    Vec[[Vector Index (HNSW)]]
-    FS[(Vulnerabilities report)]
-    Parser[[Parser/Deserializer]]
-    Conv[[Converter ext to int]]
-    Batch[[Batch Processor]]
-    Comm[[Community Scoring Engine]]
-    Ctx[[Contextual Scoring Engine]]
-    Out[[CycloneDX VEX Output]]
+    User["User"];
+    CLI["Vens CLI"];
+    Risk["config.yaml - Risk config"];
+    SBOMS["csv list of SBOMs"];
+    Assets["Assets Builder (from SBOMs)"];
+    Vec["Vector Index (HNSW)"];
+    FS["Vulnerabilities report"];
+    Parser["Parser/Deserializer"];
+    Conv["Converter ext to int"];
+    Batch["Batch Processor"];
+    Comm["Community Scoring Engine"];
+    Ctx["Contextual Scoring Engine"];
+    Out["CycloneDX VEX Output"];
 
     %% High-level steps 1–8
-    User -->|1. Run command with report, config.yaml, sboms.csv| CLI
-    CLI -->|2. Read Risk config| Risk
-    CLI -->|3. Read SBOMs list| SBOMS
-    SBOMS -->|Build assets context| Assets
-    Assets -->|Index components/libs| Vec
-    Vec -->|Index ready| Assets
-    CLI -->|4. Parse report and extract vulnerabilities| Parser
-    Parser -->|Vulnerabilities| CLI
+    User -->|1. Run command with report, config.yaml, sboms.csv| CLI;
+    CLI -->|2. Read Risk config| Risk;
+    CLI -->|3. Read SBOMs list| SBOMS;
+    SBOMS -->|Build assets context| Assets;
+    Assets -->|Index components/libs| Vec;
+    Vec -->|Index ready| Assets;
+    CLI -->|4. Parse report and extract vulnerabilities| Parser;
+    Parser -->|Vulnerabilities| CLI;
 
-    Assets -->|Assets| CLI
+    Assets -->|Assets| CLI;
 
-    CLI -->|5. Convert vulnerabilities to internal model| Conv
-    Conv -->|Converted vulnerabilities| CLI
+    CLI -->|5. Convert vulnerabilities to internal model| Conv;
+    Conv -->|Converted vulnerabilities| CLI;
 
-    CLI -->|6. Process in batches with retries| Batch
+    CLI -->|6. Process in batches with retries| Batch;
 
-    Batch -->|Compute community scoring| Comm
-    Comm -->|community_score| Batch
+    Batch -->|Compute community scoring| Comm;
+    Comm -->|community_score| Batch;
 
-    Batch -->|Compute contextual scoring| Ctx
-    Ctx -->|contextual_score + impacted_libs| Batch
+    Batch -->|Compute contextual scoring| Ctx;
+    Ctx -->|contextual_score + impacted_libs| Batch;
 
     %% Final score combination step removed per updated data flow
 
-    Batch -->|8. Generate CycloneDX VEX (scores, priorities, impacted libs)| Out
-    Out -->|Display/Export| User
+    Batch -->|8. Generate CycloneDX VEX (scores, priorities, impacted libs)| Out;
+    Out -->|Display/Export| User;
 ```
 
 
