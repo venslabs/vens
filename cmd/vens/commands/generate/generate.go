@@ -99,11 +99,11 @@ func action(cmd *cobra.Command, args []string) error {
 
 	// Load the SBOMs and build the vector index
 	sbomPaths := strings.Split(sboms, ",")
-	idx, err := g.IndexSBOMLibraries(ctx, sbomPaths)
+	bundle, err := g.IndexSBOMLibraries(ctx, sbomPaths)
 	if err != nil {
 		return err
 	}
-	slog.InfoContext(ctx, "SBOM libraries indexed", "count", idx.Count())
+	slog.InfoContext(ctx, "SBOM libraries indexed", "count", bundle.Count())
 
 	inputPath, outputPath := args[0], args[1]
 	inputFormat, err := flags.GetString("input-format")
@@ -170,7 +170,7 @@ func action(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	if err = g.GenerateScores(ctx, vulns, nil); err != nil {
+	if err = g.GenerateRiskScore(ctx, bundle, vulns, h.HandleScores); err != nil {
 		return err
 	}
 
