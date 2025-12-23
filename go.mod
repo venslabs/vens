@@ -57,3 +57,7 @@ require (
 	google.golang.org/grpc v1.70.0 // indirect
 	google.golang.org/protobuf v1.36.3 // indirect
 )
+
+// llms/ollama: allow specifying JSON Schema
+// https://github.com/tmc/langchaingo/pull/1302
+replace github.com/tmc/langchaingo => github.com/AkihiroSuda/langchaingo v0.0.0-20250606094520-b0b11b6121e8

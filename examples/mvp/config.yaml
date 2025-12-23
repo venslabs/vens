@@ -1,5 +1,5 @@
 owasp:
-  pkg:npm/lodash:
-    score: 30   # score direct (0..81)
+  pkg:test/mvp-sample-app:
+    score: 30
     likelihood: 5
-    impact: 9   # score dérivé = 45 (0..81)
+    impact: 6

@@ -3,32 +3,91 @@
   "specVersion": "1.5",
   "version": 1,
   "metadata": {
-    "timestamp": "2025-12-02T00:00:00Z",
+    "timestamp": "2025-12-22T00:00:00Z",
     "component": {
-      "type": "library",
-      "bom-ref": "metadata-lodash",
-      "name": "lodash",
-      "version": "4.17.21",
-      "purl": "pkg:npm/lodash@4.17.21"
+      "type": "application",
+      "name": "mvp-sample-app",
+      "purl": "pkg:test/mvp-sample-app@4.17.21",
+      "version": "1.0.0"
     }
   },
   "components": [
     {
       "type": "library",
-      "bom-ref": "pkg:golang/github.com/acme/lib@1.2.3",
-      "name": "acme/lib",
-      "version": "1.2.3",
-      "purl": "pkg:golang/github.com/acme/lib@1.2.3",
-      "properties": [
-        {
-          "name": "aquasecurity:trivy:PkgID",
-          "value": "github.com/acme/lib@1.2.3"
-        },
-        {
-          "name": "aquasecurity:trivy:PkgType",
-          "value": "golang"
-        }
-      ]
+      "bom-ref": "pkg:deb/debian/openssl@3.0.11-1",
+      "name": "openssl",
+      "version": "3.0.11-1",
+      "purl": "pkg:deb/debian/openssl@3.0.11-1"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:deb/debian/libssl3@3.0.11-1",
+      "name": "libssl3",
+      "version": "3.0.11-1",
+      "purl": "pkg:deb/debian/libssl3@3.0.11-1"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/openssl@2.0.0",
+      "name": "openssl",
+      "version": "2.0.0",
+      "purl": "pkg:npm/openssl@2.0.0"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:deb/debian/gstreamer1.0-plugins-base@1.20.3-2",
+      "name": "gstreamer1.0-plugins-base",
+      "version": "1.20.3-2",
+      "purl": "pkg:deb/debian/gstreamer1.0-plugins-base@1.20.3-2"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:deb/debian/gstreamer1.0-libav@1.20.3-2",
+      "name": "gstreamer1.0-libav",
+      "version": "1.20.3-2",
+      "purl": "pkg:deb/debian/gstreamer1.0-libav@1.20.3-2"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:golang/github.com/gin-gonic/gin@v1.9.1",
+      "name": "github.com/gin-gonic/gin",
+      "version": "v1.9.1",
+      "purl": "pkg:golang/github.com/gin-gonic/gin@v1.9.1"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/express@4.18.2",
+      "name": "express",
+      "version": "4.18.2",
+      "purl": "pkg:npm/express@4.18.2"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/body-parser@1.20.1",
+      "name": "body-parser",
+      "version": "1.20.1",
+      "purl": "pkg:npm/body-parser@1.20.1"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/log4js@2.0.0",
+      "name": "log4js",
+      "version": "2.0.0",
+      "purl": "pkg:npm/log4js@2.0.0"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:maven/org.apache.logging.log4j/log4j-core@2.14.1",
+      "name": "log4j-core",
+      "version": "2.14.1",
+      "purl": "pkg:maven/org.apache.logging.log4j/log4j-core@2.14.1"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/django@4.2.1",
+      "name": "django",
+      "version": "4.2.1",
+      "purl": "pkg:pypi/django@4.2.1"
     }
   ]
 }

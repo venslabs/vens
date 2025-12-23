@@ -5,6 +5,13 @@ import (
 )
 
 type OutputHandler interface {
-	HandleScores([]cyclonedx.VulnerabilityRating) error
+	// HandleVulnRatings ingests ratings grouped by vulnerability ID (e.g., CVE).
+	HandleVulnRatings([]VulnRating) error
 	Close() error
+}
+
+// VulnRating carries a single CycloneDX rating for one vulnerability ID.
+type VulnRating struct {
+	VulnID string
+	Rating cyclonedx.VulnerabilityRating
 }

@@ -122,7 +122,11 @@ func action(cmd *cobra.Command, args []string) error {
 	default:
 		return fmt.Errorf("unknown input format %q", inputFormat)
 	}
+
+	// TODO the trivy report should be streamed and embbed like sbom libraries
+	// to accelerate proccessing
 	inputB, err := os.ReadFile(inputPath)
+
 	if err != nil {
 		return err
 	}
@@ -156,7 +160,6 @@ func action(cmd *cobra.Command, args []string) error {
 	default:
 		return fmt.Errorf("unknown output format %q", outputFormat)
 	}
-	defer h.Close() //nolint:errcheck
 
 	vulns := make([]generator.Vulnerability, len(input.Results[0].Vulnerabilities))
 	for i, f := range input.Results[0].Vulnerabilities {
@@ -170,7 +173,8 @@ func action(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	if err = g.GenerateRiskScore(ctx, bundle, vulns, h.HandleScores); err != nil {
+	// bundle is computed outside GenerateRiskScore because it is streamed
+	if err = g.GenerateRiskScore(ctx, bundle, vulns, h.HandleVulnRatings); err != nil {
 		return err
 	}
 

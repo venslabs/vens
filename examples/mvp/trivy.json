@@ -1,28 +1,61 @@
 {
   "SchemaVersion": 2,
-  "ArtifactName": "sample-image:latest",
+  "ArtifactName": "mvp-sample-app:latest",
   "ArtifactType": "container_image",
   "Results": [
     {
-      "Target": "sample-image:latest (alpine)",
+      "Target": "mvp-sample-app:latest (debian 11)",
       "Class": "os-pkgs",
-      "Type": "alpine",
+      "Type": "debian",
       "Vulnerabilities": [
         {
-          "VulnerabilityID": "CVE-2024-0001",
-          "PkgID": "lodash@4.17.21",
-          "Title": "Prototype pollution in lodash",
-          "Description": "A prototype pollution vulnerability in lodash.",
-          "Severity": "HIGH",
-          "CweIDs": ["CWE-400"]
+          "VulnerabilityID": "CVE-2023-1111",
+          "PkgID": "openssl@3.0.9",
+          "Title": "Timing attack in OpenSSL component",
+          "Description": "A potential timing side-channel in certain cipher modes. Affects OpenSSL and related SSL libraries.",
+          "Severity": "MEDIUM"
         },
         {
-          "VulnerabilityID": "CVE-2023-9999",
-          "PkgID": "github.com/acme/lib@1.2.3",
-          "Title": "Input validation issue in acme/lib",
-          "Description": "Improper input validation could lead to DoS.",
-          "Severity": "MEDIUM",
-          "CweIDs": ["CWE-20"]
+          "VulnerabilityID": "CVE-2023-1234",
+          "PkgID": "GStreamer@1.20.0",
+          "Title": "Buffer overflow in GStreamer plugins",
+          "Description": "Multiple plugins in GStreamer are affected by a buffer overflow.",
+          "Severity": "HIGH"
+        },
+        {
+          "VulnerabilityID": "CVE-2024-5678",
+          "PkgID": "radeon_rx_6700",
+          "Title": "Hardware vulnerability in Radeon RX 6700",
+          "Description": "Potential data leakage in hardware cache.",
+          "Severity": "LOW"
+        },
+        {
+          "VulnerabilityID": "CVE-2025-3001",
+          "PkgID": "express@4.18.1",
+          "Title": "XSS in express",
+          "Description": "Improper output encoding.",
+          "Severity": "MEDIUM"
+        },
+        {
+          "VulnerabilityID": "CVE-2024-9012",
+          "PkgID": "github.com/gin-gonic/gin@v1.9.0",
+          "Title": "DoS in Gin",
+          "Description": "Uncontrolled resource consumption.",
+          "Severity": "HIGH"
+        },
+        {
+          "VulnerabilityID": "CVE-2021-44228",
+          "PkgID": "Log4j@2.14.1",
+          "Title": "Log4Shell",
+          "Description": "RCE in Log4j via JNDI.",
+          "Severity": "CRITICAL"
+        },
+        {
+          "VulnerabilityID": "CVE-2023-31047",
+          "PkgID": "Django@4.2",
+          "Title": "Potential bypass of validation when uploading multiple files",
+          "Description": "Django 3.2 before 3.2.20, 4.1 before 4.1.10, and 4.2 before 4.2.3...",
+          "Severity": "MEDIUM"
         }
       ]
     }

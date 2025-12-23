@@ -14,10 +14,12 @@ import (
 	"github.com/CycloneDX/cyclonedx-go"
 	trivytypes "github.com/fahedouch/vens/pkg/api/types"
 	"github.com/fahedouch/vens/pkg/llm"
+	outputhandler "github.com/fahedouch/vens/pkg/outputhandler"
 	"github.com/fahedouch/vens/pkg/riskconfig"
 	"github.com/fahedouch/vens/pkg/sbom"
 	"github.com/fahedouch/vens/pkg/vecindex"
 	langemb "github.com/tmc/langchaingo/embeddings"
+	"github.com/tmc/langchaingo/jsonschema"
 	"github.com/tmc/langchaingo/llms"
 )
 
@@ -34,6 +36,15 @@ type Vulnerability struct {
 	Title       string `json:"title"`
 	Description string `json:"description,omitempty"`
 	Severity    string `json:"severity,omitempty"`
+}
+
+type llmOutputEntry struct {
+	Vuln     string   `json:"vuln"`
+	Selected []string `json:"selected"`
+}
+
+type llmOutput struct {
+	Results []llmOutputEntry `json:"results"`
 }
 
 type Opts struct {
@@ -58,8 +69,8 @@ type Generator struct {
 // It contains the in-memory vector index and a minimal resolver from
 // component IDs to normalized ParentPURLs.
 type SBOMIndexBundle struct {
-	sbomIndex vecindex.Index
-	compByID  map[string]string // ID -> normalized ParentPURL
+	sbomIndex      vecindex.Index
+	parentPURLByID map[string]string // ID -> normalized ParentPURL
 }
 
 // Count returns number of indexed vectors.
@@ -97,138 +108,218 @@ func New(o Opts) (*Generator, error) {
 }
 
 // GenerateRiskScore will generate contextual risk score for the given vulnerabilities.
-func (g *Generator) GenerateRiskScore(ctx context.Context, bundle *SBOMIndexBundle, vulns []Vulnerability, h func([]cyclonedx.VulnerabilityRating) error) error {
+// It groups ratings by vulnerability ID for downstream VEX document generation.
+func (g *Generator) GenerateRiskScore(ctx context.Context, bundle *SBOMIndexBundle, vulns []Vulnerability, h func([]outputhandler.VulnRating) error) error {
 	batchSize := g.o.BatchSize // TODO: optimize automatically
 	for i := 0; i < len(vulns); i += batchSize {
 		batch := vulns[i:min(i+batchSize, len(vulns))]
-		if err := llm.RetryOnRateLimit(ctx, g.o.SleepOnRateLimit, g.o.RetryOnRateLimit,
-			func(ctx context.Context) error {
-				return g.generateRiskScore(ctx, bundle, batch, h)
-			}); err != nil {
-
+		if err := g.generateRiskScore(ctx, bundle, batch, h); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (g *Generator) generateRiskScore(ctx context.Context, bundle *SBOMIndexBundle, vulns []Vulnerability, h func([]cyclonedx.VulnerabilityRating) error) error {
+func (g *Generator) generateRiskScore(ctx context.Context, bundle *SBOMIndexBundle, vulnBatch []Vulnerability, h func([]outputhandler.VulnRating) error) error {
 	if bundle == nil || bundle.sbomIndex == nil {
 		return errors.New("SBOM index not initialized; call IndexSBOMLibraries first")
 	}
 
-	// Aggregate all ratings across the batch
-	ratings := make([]cyclonedx.VulnerabilityRating, 0)
+	group := make([]outputhandler.VulnRating, 0, len(vulnBatch))
 
-	for _, v := range vulns {
-		// Find top-k candidate SBOM libraries matching the vulnerability library
-		// Keep k small; we will use LLM to filter further.
-		const topK = 5
-		ids, err := g.MatchVulnLibrary(ctx, bundle.sbomIndex, v, topK)
-		if err != nil {
-			slog.ErrorContext(ctx, "failed to match vuln library to sbom(s) libraries", "vuln", v.VulnID, "error", err)
+	vulnTexts := make([]string, len(vulnBatch))
+	for i, v := range vulnBatch {
+		vulnTexts[i] = vulnLibraryText(v)
+	}
+
+	// 1) Retrieve top-k candidate SBOM libraries for each vuln.
+	const topK = 5
+	candidatesPerVuln, err := g.matchCandidatesForVulns(ctx, bundle.sbomIndex, vulnTexts, topK)
+	if err != nil {
+		return fmt.Errorf("match candidates for vulnerabilities: %w", err)
+	}
+
+	items := make([]VulnCandidates, 0, len(vulnBatch))
+	for i, v := range vulnBatch {
+		candidateIds := candidatesPerVuln[i]
+		// Log the raw vector search candidates for each vulnerability
+		// This shows which SBOM components were returned before LLM filtering.
+		slog.InfoContext(ctx, "vuln_candidates",
+			"vuln", v.VulnID,
+			"pkgId", v.PkgID,
+			"title", v.Title,
+			"candidates", candidateIds,
+		)
+		if len(candidateIds) == 0 {
 			continue
 		}
-		if len(ids) == 0 {
-			continue
-		}
+		items = append(items, VulnCandidates{
+			VulnID:      v.VulnID,
+			VulnLibrary: computeVulnLibrary(v),
+			Candidates:  candidateIds,
+		})
+	}
 
-		vulnName := g.vulnerableLibraryName(v)
+	// If nothing to filter, return early
+	if len(items) == 0 {
+		return nil
+	}
 
-		filteredIDs, err := g.classifyImpactedLibraries(ctx, vulnName, ids)
-		if err != nil {
-			slog.ErrorContext(ctx, "LLM classification failed", "vuln", v.VulnID, "error", err)
-			// If classification fails, skip scoring for this vulnerability.
-			continue
-		}
+	// 2) LLM call to determine impacted libraries for all items
+	impactedLibraries, err := g.determineImpactedLibrariesForVulns(ctx, items)
+	if err != nil {
+		return fmt.Errorf("LLM filtreing failed: %w", err)
+	}
+
+	// 3) Build VulnRating group using selected library IDs and ParentPURLs
+	for vulnID, filteredIDs := range impactedLibraries {
 		if len(filteredIDs) == 0 {
 			continue
 		}
-
-		// 3) Use ParentPURL of selected SBOM components to retrieve risk scores
 		for _, id := range filteredIDs {
-			parent, ok := bundle.compByID[id]
+			parent, ok := bundle.parentPURLByID[id]
+			if !ok || parent == "" {
+				continue
+			}
+			score, ok := g.o.Context.ScoreForPURL(riskconfig.NormalizePURL(parent))
 			if !ok {
 				continue
 			}
-			if parent == "" {
-				continue
-			}
-			score, ok := g.o.Context.ScoreForPURL(parent)
-			if !ok {
-				// no score configured for this parent purl
-				continue
-			}
-			ratings = append(ratings, cyclonedx.VulnerabilityRating{
-				// Per CycloneDX, baseScore is typically 0..10, but our OWASP score is 0..81.
-				// We keep the native score in "severity" textual field and set score as-is.
-				// Consumers of this MVP JSON can interpret accordingly.
-				Method:   cyclonedx.ScoringMethodOther, // OWASP custom risk
-				Score:    &score,
-				Severity: cyclonedx.SeverityUnknown,
-				Vector:   fmt.Sprintf("OWASP(parent=%s) score=%0.2f", parent, score),
-				Source:   &cyclonedx.Source{Name: "vens-owasp"},
-				// Supply an URL-like context pointing to the parent (optional)
-				// Just informational in MVP
+			group = append(group, outputhandler.VulnRating{
+				VulnID: vulnID,
+				Rating: cyclonedx.VulnerabilityRating{
+					Method: cyclonedx.ScoringMethodOWASP,
+					Score:  &score,
+				},
 			})
 		}
 	}
 
-	if len(ratings) == 0 {
+	if len(group) == 0 {
 		return nil
 	}
 	if h != nil {
-		return h(ratings)
+		return h(group)
 	}
 	return nil
 }
 
-// vulnerableLibraryName derives a concise vulnerable library name from vulnerability fields.
-func (g *Generator) vulnerableLibraryName(v Vulnerability) string {
-	// Prefer PkgID when available; otherwise fall back to PkgName, then Title, then VulnID.
-	if s := strings.TrimSpace(v.PkgID); s != "" {
-		return s
-	}
-	if s := strings.TrimSpace(v.PkgName); s != "" {
-		return s
-	}
-	if s := strings.TrimSpace(v.Title); s != "" {
-		return s
-	}
-	return strings.TrimSpace(v.VulnID)
+// VulnCandidates describes one classification unit sent to the LLM in a single call.
+type VulnCandidates struct {
+	VulnID string `json:"vuln"`
+	// vulnLibrary représente la meilleure clé d’association pour la vulnérabilité,
+	// calculée en priorité par PkgID puis par PkgName.
+	VulnLibrary string   `json:"vulnLibrary"`
+	Candidates  []string `json:"candidates"`
 }
 
-// classifyImpactedLibraries calls the LLM to decide which of the candidate SBOM libraries
-// are actually impacted by the vulnerable library name. Returns a filtered subset of candidates.
-func (g *Generator) classifyImpactedLibraries(ctx context.Context, vulnerable string, candidates []string) ([]string, error) {
+// determineImpactedLibrariesForVulns performs a single LLM call to filter all items.
+// It returns a map from VulnID to the subset of Candidates that are actually impacted.
+func (g *Generator) determineImpactedLibrariesForVulns(ctx context.Context, items []VulnCandidates) (map[string][]string, error) {
 	if g.o.LLM == nil {
 		return nil, errors.New("no LLM configured")
 	}
 
-	systemPrompt := "You are an advanced language model that takes in a software library (which has a vulnerability) and a list of software libraries and determines which (if any) of the libraries in the given list of libraries are at risk.\n\nWhen classifying software library names based on input text, follow these guidelines:\n    \n1. **Identify Specificity**: Select the most relevant and specific library name(s) directly associated with the input text.\n    \n2. **Avoid Over-Inclusion**: Do not include unrelated or broader library names that do not directly match the input text.\n    \n3. **Prioritize Primary Libraries**: If the input text refers to a well-known software or tool, prioritize the primary library name(s) associated with it.\n    \n4. **Handle Ambiguity**: If the input text is ambiguous or does not clearly refer to a specific library, return ['No Library'].\n    \n5. **No Library Found**: If no relevant library(s) is found, return ['No Library'].\n    \nExamples:\n    \n- Input: GStreamer, [\"gstreamer1.0-plugins-base\",\"gstreamer1.0-clutter-3.0\",\"gstreamer1.0-gl\",\"gstreamer1.0-pulseaudio\",\"gstreamer1.0-x\",\"gstreamer1.0-libav\",\"gstreamer1.0-plugins-good\"]\n    \n- Output: ['gstreamer1.0-plugins-base', 'gstreamer1.0-clutter-3.0', 'gstreamer1.0-gl', 'gstreamer1.0-pulseaudio', 'gstreamer1.0-x', 'gstreamer1.0-libav', 'gstreamer1.0-plugins-good']\n    \n- Input: radeon_rx_6700, [\"libdrm-radeon1\", \"xserver-xorg-video-radeon\"]\n    \n- Output: ['No Library']\n\nOnly output a JSON array of strings representing the selected library names."
-
-	// Represent candidates as a JSON array to help the model return a proper array.
-	candJ, _ := json.Marshal(candidates)
-	humanPrompt := fmt.Sprintf("Input: %s, %s", vulnerable, string(candJ))
-
 	var buf bytes.Buffer
+	callOpts := []llms.CallOption{
+		llms.WithJSONMode(),
+		llms.WithStreamingFunc(func(ctx context.Context, chunk []byte) error {
+			// Note: printed for debugging; do not parse from stdout.
+			//fmt.Fprint(os.Stdout, string(chunk))
+			buf.Write(chunk)
+			return nil
+		}),
+	}
+
+	if g.o.Temperature > 0.0 {
+		slog.Debug("Using temperature", "temperature", g.o.Temperature)
+		callOpts = append(callOpts, llms.WithTemperature(g.o.Temperature))
+	}
+	if g.o.Seed != 0 {
+		slog.Debug("Using seed", "seed", g.o.Seed)
+		callOpts = append(callOpts, llms.WithSeed(g.o.Seed))
+	}
+
+	// System prompt guiding the model to determine which libraries are at risk.
+	systemPrompt := `You are an advanced language model and a cybersecurity expert specialized in Software Supply Chain analysis.
+Your mission is to determine which software libraries (represented by PURLs) from a given list are at risk based on a vulnerable library name.
+
+Follow these guidelines when classifying software library PURLs:
+
+1. **Identify Specificity**: Select the most relevant and specific library PURL(s) directly associated with the "vulnLibrary".
+2. **Avoid Over-Inclusion**: Do not include unrelated or broader library PURLs that do not directly match the "vulnLibrary".
+3. **Prioritize Primary Libraries**: If "vulnLibrary" refers to a well-known software or tool, prioritize the primary library PURL(s) associated with it.
+4. **Handle Ambiguity**: If the input is ambiguous or does not clearly refer to a specific library, return ["No Library"].
+5. **No Library Found**: If no relevant library PURL is found in the "candidates" list, return ["No Library"].
+
+### Golden Rule:
+Do not guess. If you have reasonable doubt about the match between "vulnLibrary" and a candidate, do not select it.
+`
+
+	schema := &jsonschema.Definition{
+		Type: jsonschema.Object,
+		Properties: map[string]jsonschema.Definition{
+			"results": {
+				Type: jsonschema.Array,
+				Items: &jsonschema.Definition{
+					Type: jsonschema.Object,
+					Properties: map[string]jsonschema.Definition{
+						"vuln": {
+							Type:        jsonschema.String,
+							Description: "Vulnerability ID",
+						},
+						"selected": {
+							Type: jsonschema.Array,
+							Items: &jsonschema.Definition{
+								Type: jsonschema.String,
+							},
+							Description: "List of selected library PURL or ['No Library']",
+						},
+					},
+					Required: []string{"vuln", "selected"},
+				},
+			},
+		},
+		Required: []string{"results"},
+	}
+	schemaJ, err := schema.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+
+	llmInputExample := `items: [
+  {"vuln":"CVE-2023-1234","vulnLibrary":"GStreamer","candidates":["pkg:deb/debian/gstreamer1.0-plugins-base@1.20.3-2","pkg:deb/debian/gstreamer1.0-clutter-3.0@1.20.3-2","pkg:deb/debian/gstreamer1.0-gl@1.20.3-2","pkg:deb/debian/gstreamer1.0-pulseaudio@1.20.3-2","pkg:deb/debian/gstreamer1.0-x@1.20.3-2","pkg:deb/debian/gstreamer1.0-libav@1.20.3-2","pkg:deb/debian/gstreamer1.0-plugins-good@1.20.3-2"]},
+  {"vuln":"CVE-2024-5678","vulnLibrary":"radeon_rx_6700","candidates":["pkg:deb/debian/libdrm-radeon1@2.4.112-3", "pkg:deb/debian/xserver-xorg-video-radeon@1:19.1.0-2"]}
+]`
+
+	llmOutputExample := `{"results":[
+  {"vuln":"CVE-2023-1234","selected":["pkg:deb/debian/gstreamer1.0-plugins-base@1.20.3-2","pkg:deb/debian/gstreamer1.0-clutter-3.0@1.20.3-2","pkg:deb/debian/gstreamer1.0-gl@1.20.3-2","pkg:deb/debian/gstreamer1.0-pulseaudio@1.20.3-2","pkg:deb/debian/gstreamer1.0-x@1.20.3-2","pkg:deb/debian/gstreamer1.0-libav@1.20.3-2","pkg:deb/debian/gstreamer1.0-plugins-good@1.20.3-2"]},
+  {"vuln":"CVE-2024-5678","selected":["No Library"]}
+]}`
+
+	systemPrompt += "#### Input Example\n"
+	systemPrompt += "```json\n" + llmInputExample + "\n```\n"
+	systemPrompt += "#### Output format: JSON Schema\n"
+	systemPrompt += string(schemaJ) + "\n"
+	systemPrompt += "#### Output Example\n"
+	systemPrompt += "```json\n" + llmOutputExample + "\n```\n"
+
+	// Marshal items to JSON for a deterministic and valid payload to the LLM
+	itemsJSON, err := json.Marshal(items)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal items: %w", err)
+	}
+	humanPrompt := fmt.Sprintf("items: %s", string(itemsJSON))
+
+	// Only ollama and openai supports WithJSONSchema
+	// https://github.com/tmc/langchaingo/pull/1302
+	callOpts = append(callOpts, llms.WithJSONSchema(schema))
+
 	msgs := []llms.MessageContent{
 		llms.TextParts(llms.ChatMessageTypeSystem, systemPrompt),
 		llms.TextParts(llms.ChatMessageTypeHuman, humanPrompt),
 	}
 
-	callOpts := []llms.CallOption{
-		llms.WithTemperature(g.o.Temperature),
-		llms.WithStreamingFunc(func(ctx context.Context, chunk []byte) error {
-			buf.Write(chunk)
-			return nil
-		}),
-	}
-	if g.o.Seed != 0 {
-		callOpts = append(callOpts, llms.WithSeed(g.o.Seed))
-	}
-
-	// Retry on rate limit
 	if err := llm.RetryOnRateLimit(ctx, g.o.SleepOnRateLimit, g.o.RetryOnRateLimit, func(c context.Context) error {
 		buf.Reset()
 		_, err := g.o.LLM.GenerateContent(c, msgs, callOpts...)
@@ -237,36 +328,70 @@ func (g *Generator) classifyImpactedLibraries(ctx context.Context, vulnerable st
 		return nil, err
 	}
 
-	// Parse the output as a JSON array of strings. Accept len==0 as no selection.
-	// Some models may wrap in code fences; strip common fences/backticks/newlines.
-	out := strings.TrimSpace(buf.String())
-	out = strings.TrimPrefix(out, "```json")
-	out = strings.TrimPrefix(out, "```")
-	out = strings.TrimSuffix(out, "```")
-	out = strings.TrimSpace(out)
-
-	var arr []string
-	if err := json.Unmarshal([]byte(out), &arr); err != nil {
-		// Try to coerce simple comma-separated values
-		// As a last resort, return no selection to avoid false positives.
-		return nil, fmt.Errorf("unable to parse LLM output as JSON array: %w: %q", err, out)
+	var resp llmOutput
+	if err := json.Unmarshal(buf.Bytes(), &resp); err != nil {
+		return nil, fmt.Errorf("unable to parse LLM output: %w: %q", err, buf.String())
 	}
-	// If model returns ['No Library'], treat as empty selection.
-	filtered := make([]string, 0, len(arr))
-	for _, s := range arr {
-		s = strings.TrimSpace(s)
-		if s == "" || strings.EqualFold(s, "No Library") {
+
+	impactedLibrariesPerVuln := make(map[string][]string)
+	for _, r := range resp.Results {
+		vulnID := strings.TrimSpace(r.Vuln)
+		if vulnID == "" {
 			continue
 		}
-		// Keep only if it exists in candidates to avoid hallucinations.
-		for _, c := range candidates {
-			if s == c {
-				filtered = append(filtered, s)
-				break
+		cleaned := make([]string, 0, len(r.Selected))
+		for _, s := range r.Selected {
+			s = strings.TrimSpace(s)
+			if s == "" {
+				continue
 			}
+			cleaned = append(cleaned, s)
 		}
+		// Log final matching results selected by the LLM for each vulnerability
+		slog.InfoContext(ctx, "vuln_match_selected",
+			"vuln", vulnID,
+			"selected", cleaned,
+		)
+		impactedLibrariesPerVuln[vulnID] = append(impactedLibrariesPerVuln[vulnID], cleaned...)
 	}
-	return filtered, nil
+	return impactedLibrariesPerVuln, nil
+}
+
+// matchCandidatesForVulns embeds vulnerability texts and searches the index for top-k matches per text.
+func (g *Generator) matchCandidatesForVulns(ctx context.Context, idx vecindex.Index, vulnTexts []string, k int) ([][]string, error) {
+	if g.o.LLM == nil {
+		return nil, errors.New("no LLM configured for embeddings")
+	}
+	if k <= 0 {
+		k = 1
+	}
+
+	emb, err := g.newEmbedder()
+	if err != nil {
+		return nil, err
+	}
+
+	var vecs [][]float32
+	if err := llm.RetryOnRateLimit(ctx, g.o.SleepOnRateLimit, g.o.RetryOnRateLimit, func(c context.Context) error {
+		var e error
+		vecs, e = emb.EmbedDocuments(c, vulnTexts)
+		return e
+	}); err != nil {
+		return nil, err
+	}
+	if len(vecs) != len(vulnTexts) {
+		return nil, fmt.Errorf("embedding count mismatch: got %d, want %d", len(vecs), len(vulnTexts))
+	}
+
+	matchedCandidates := make([][]string, len(vulnTexts))
+	for i, vec := range vecs {
+		ids, err := idx.Search(vec, k)
+		if err != nil {
+			return nil, err
+		}
+		matchedCandidates[i] = ids
+	}
+	return matchedCandidates, nil
 }
 
 // IndexSBOMLibraries streams CycloneDX SBOMs and builds an in-memory vector index
@@ -289,7 +414,7 @@ func (g *Generator) IndexSBOMLibraries(ctx context.Context, sbomPaths []string) 
 	go func() {
 		defer close(done)
 		for b := range batches {
-			vecs, err := g.ComponentEmbeddings(ctx, b.comps)
+			vecs, err := g.componentEmbeddings(ctx, b.comps)
 			if err != nil {
 				select {
 				case errCh <- err:
@@ -316,8 +441,8 @@ func (g *Generator) IndexSBOMLibraries(ctx context.Context, sbomPaths []string) 
 			continue
 		}
 
-		curComps := make([]trivytypes.SBOMComponent, 0, g.BatchSize())
-		curIDs := make([]string, 0, g.BatchSize())
+		curComps := make([]trivytypes.SBOMComponent, 0, g.o.BatchSize)
+		curIDs := make([]string, 0, g.o.BatchSize)
 
 		flushSend := func() error {
 			if len(curComps) == 0 {
@@ -356,8 +481,8 @@ func (g *Generator) IndexSBOMLibraries(ctx context.Context, sbomPaths []string) 
 			curComps = append(curComps, c)
 			curIDs = append(curIDs, id)
 			// store normalized ParentPURL mapping now; last seen wins which is fine
-			compByExtID[id] = riskconfig.NormalizePURL(c.ParentPURL)
-			if len(curComps) >= g.BatchSize() {
+			compByExtID[id] = c.ParentPURL
+			if len(curComps) >= g.o.BatchSize {
 				return flushSend()
 			}
 			// if the worker has already failed, stop the stream
@@ -388,16 +513,13 @@ func (g *Generator) IndexSBOMLibraries(ctx context.Context, sbomPaths []string) 
 	default:
 	}
 
-	return &SBOMIndexBundle{sbomIndex: idx, compByID: compByExtID}, nil
+	return &SBOMIndexBundle{sbomIndex: idx, parentPURLByID: compByExtID}, nil
 }
 
-// BatchSize returns the configured batch size for LLM operations.
-func (g *Generator) BatchSize() int { return g.o.BatchSize }
-
-// ComponentEmbeddings generates embeddings for a batch of components using the LLM.
+// componentEmbeddings generates embeddings for a batch of components using the LLM.
 // It retries on rate limit using llm.RetryOnRateLimit and the configured batch size.
 // Returns an error if the LLM call fails or the output cannot be parsed (no fallback).
-func (g *Generator) ComponentEmbeddings(ctx context.Context, comps []trivytypes.SBOMComponent) ([][]float32, error) {
+func (g *Generator) componentEmbeddings(ctx context.Context, comps []trivytypes.SBOMComponent) ([][]float32, error) {
 	if g.o.LLM == nil {
 		return nil, errors.New("no LLM configured")
 	}
@@ -429,16 +551,6 @@ func (g *Generator) ComponentEmbeddings(ctx context.Context, comps []trivytypes.
 		out = append(out, vecs...)
 	}
 	return out, nil
-}
-
-// ComponentEmbedding convenience wrapper for a single component.
-func (g *Generator) ComponentEmbedding(ctx context.Context, c trivytypes.SBOMComponent) []float32 {
-	vecs, err := g.ComponentEmbeddings(ctx, []trivytypes.SBOMComponent{c})
-	if err != nil || len(vecs) == 0 {
-		slog.ErrorContext(ctx, "failed to generate embedding", "error", err, "component", c.PURL)
-		return nil
-	}
-	return vecs[0]
 }
 
 // newEmbedder builds a langchaingo embeddings.Embedder aligned with the selected LLM backend.
@@ -488,32 +600,10 @@ func vulnLibraryText(v Vulnerability) string {
 	return fmt.Sprintf("PkgID=%s | PkgName=%s | title=%s | desc=%s", v.PkgID, v.PkgName, v.Title, desc)
 }
 
-// MatchVulnLibrary embeds the vulnerability library text and searches top-k matches in the index.
-// TODO: the retry on rate limit is handled by the caller.
-func (g *Generator) MatchVulnLibrary(ctx context.Context, idx vecindex.Index, v Vulnerability, k int) ([]string, error) {
-	if g.o.LLM == nil {
-		return nil, errors.New("no LLM configured for embeddings")
+// computeVulnLibrary calcule la clé vulnLibrary en priorité sur PkgID puis PkgName.
+func computeVulnLibrary(v Vulnerability) string {
+	if s := strings.TrimSpace(v.PkgID); s != "" {
+		return s
 	}
-	emb, err := g.newEmbedder()
-	if err != nil {
-		return nil, err
-	}
-
-	vecs, err := emb.EmbedDocuments(ctx, []string{vulnLibraryText(v)})
-	if err != nil {
-		return nil, err
-	}
-	if len(vecs) == 0 {
-		return nil, fmt.Errorf("no embedding returned for vulnerability %s", v.VulnID)
-	}
-
-	if k <= 0 {
-		k = 1
-	}
-
-	ids, err := idx.Search(vecs[0], k)
-	if err != nil {
-		return nil, err
-	}
-	return ids, nil
+	return strings.TrimSpace(v.PkgName)
 }

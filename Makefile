@@ -17,11 +17,11 @@ _output/bin/vens:
 
 .PHONY: mvp-run
 mvp-run:
-	# export OLLAMA_MODEL="all-minilm"
+    # Before executing this target, make sure to set the --llm flag and export the required environment variables (e.g., API_KEY)
 	@mkdir -p _output
 	go run ./cmd/vens generate \
 	  --config-file examples/mvp/config.yaml \
-	  --llm ollama \
+	  --llm openai \
 	  --sboms examples/mvp/sbom.cdx.json \
 	  examples/mvp/trivy.json \
 	  _output/vex_mvp.json
