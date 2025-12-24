@@ -21,22 +21,31 @@ go install github.com/fahedouch/vens/cmd/vens@latest
 
 ### Usage
 
-Generate a VEX report with a single command:
+To generate a VEX report, you will need:
+1.  **Vulnerability Scan**: A JSON report from a supported scanner (e.g., [Trivy](https://github.com/aquasecurity/trivy)).
+2.  **SBOMs**: One or more CycloneDX SBOM files representing your environment.
+3.  **Risk Configuration**: A `config.yaml` file defining your business context.
+
+You can find a complete working example in the [examples/quickstart](examples/quickstart) directory.
 
 ```bash
 export OPENAI_API_KEY="your-key"
 
 vens generate \
-  --config-file examples/mvp/config.yaml \
-  --sboms examples/mvp/sbom.cdx.json \
+  --config-file examples/quickstart/config.yaml \
+  --sboms examples/quickstart/sbom.cdx.json \
   --llm openai \
-  examples/mvp/trivy.json \
+  examples/quickstart/trivy.json \
   output_vex.json
 ```
 
 ## ⚙️ Configuration
 
-**vens** uses a `config.yaml` file to define your custom risk context based on OWASP risk ratings. This allows the tool to prioritize vulnerabilities that affect your most critical components.
+### Risk Context
+**vens** uses a `config.yaml` file to define your custom risk context based on OWASP risk ratings.
+
+> [!IMPORTANT]
+> **vens** uses the component SBOM to match component-specific risk scores to vulnerabilities. Ensure that every component defined in your `config.yaml` has a corresponding SBOM. Refer to the [Quickstart example](examples/quickstart) for further clarification.
 
 ```yaml
 owasp:
@@ -52,6 +61,22 @@ owasp:
 - **likelihood**: Probability of the vulnerability being exploited in your specific environment.
 - **impact**: Potential damage if the vulnerability is exploited.
 - **score**: Direct OWASP risk score (calculated as `likelihood * impact` if not provided).
+
+### LLM Backends
+**vens** supports multiple LLM providers. Configure them using environment variables:
+
+| Backend | Flag `--llm` | Environment Variables |
+|---------|--------------|-----------------------|
+| **OpenAI** (default) | `openai` | `OPENAI_API_KEY` |
+| **Ollama** | `ollama` | `OLLAMA_MODEL` (e.g., `llama3`), `OLLAMA_BASE_URL` (optional) |
+| **Anthropic** | `anthropic` | `ANTHROPIC_API_KEY` |
+| **Google AI** | `googleai` | `GOOGLE_API_KEY`, `GOOGLE_MODEL` (optional) |
+
+**Example for Ollama:**
+```bash
+export OLLAMA_MODEL="llama3"
+vens generate --llm ollama ...
+```
 
 ## 💻 Command Reference
 

@@ -34,7 +34,7 @@ type hnswIndex struct {
 func NewSBOMVecIndex() Index {
 	g := hnsw.NewGraph[uint32]()
 	g.Distance = hnsw.CosineDistance
-	// Reasonable small defaults for MVP; can be tuned later.
+	// Reasonable small defaults; can be tuned later.
 	g.M = 16
 	g.Ml = 0.25
 	g.EfSearch = 20

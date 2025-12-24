@@ -1,5 +1,0 @@
-owasp:
-  pkg:test/mvp-sample-app:
-    score: 30
-    likelihood: 5
-    impact: 6
