@@ -116,7 +116,7 @@ func StreamCycloneDXLibraries(path string, cb func(trivytypes.SBOMComponent) err
 				if err := dec.Decode(&c); err != nil {
 					return err
 				}
-				// Only `library`type for now (MVP). See: https://cyclonedx.org/docs/1.7/json/#components_items_type
+				// Only `library` type for now. See: https://cyclonedx.org/docs/1.7/json/#components_items_type
 				if strings.ToLower(c.Type) != "library" {
 					continue
 				}

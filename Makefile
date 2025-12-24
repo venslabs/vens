@@ -15,13 +15,13 @@ binaries: _output/bin/vens
 _output/bin/vens:
 	$(GO_BUILD) -o $@ ./cmd/vens
 
-.PHONY: mvp-run
-mvp-run:
+.PHONY: quickstart-run
+quickstart-run:
     # Before executing this target, make sure to set the --llm flag and export the required environment variables (e.g., API_KEY)
 	@mkdir -p _output
 	go run ./cmd/vens generate \
-	  --config-file examples/mvp/config.yaml \
+	  --config-file examples/quickstart/config.yaml \
 	  --llm openai \
-	  --sboms examples/mvp/sbom.cdx.json \
-	  examples/mvp/trivy.json \
-	  _output/vex_mvp.json
+	  --sboms examples/quickstart/sbom.cdx.json \
+	  examples/quickstart/trivy.json \
+	  _output/vex_quickstart.json
