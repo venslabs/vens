@@ -1,4 +1,7 @@
-# 🛡️ vens
+<p align="center">
+  <img src="vens-logo.png" alt="vens logo">
+</p>
+
 
 **Vens** is an intelligent vulnerability prioritization tool. It leverages the power of LLMs to analyze your security reports and SBOMs, generating precise and actionable VEX ([Vulnerability Exploitability eXchange](https://www.ntia.gov/files/ntia/publications/vex_one-page_summary.pdf)) documents.
 
