@@ -7,11 +7,11 @@
 
 ## Integration / CLI tests (cmd/*)
 - Run the `vens` binary against real inputs and a real LLM.
-- Target key commands: `prioritize`, etc.
+- Target key commands: `generate`, etc.
 - Goal: validate `vens` integration with real `dependencies`.
 
 ## End-to-end tests (scenarios)
-- Multi-step scenarios (e.g., `read` → `parse` → `prioritize` → `output`).
+- Multi-step scenarios (e.g., `index` → `generate` → `output`).
 - Goal: ensure cross-cutting features work together and remain stable.
 
 ## Regression / issue-driven tests
