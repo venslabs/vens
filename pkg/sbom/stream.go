@@ -322,13 +322,14 @@ func skipAny(dec *json.Decoder) error {
 		return nil
 	}
 	// Track nested delimiters using a simple depth counter.
-	var depth int = 1
+	depth := 1
 	var open, close rune
-	if d == '{' {
+	switch d {
+	case '{':
 		open, close = '{', '}'
-	} else if d == '[' {
+	case '[':
 		open, close = '[', ']'
-	} else {
+	default:
 		return nil
 	}
 	for depth > 0 {
