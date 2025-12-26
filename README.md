@@ -14,6 +14,14 @@ No more endless lists of CVEs without context. **vens** helps you focus on what 
 - 🚀 **Trivy Integration**: Instantly transforms your Trivy scans into VEX reports.
 - 🎯 **Custom Risk Scoring**: Configure your own impact and probability criteria.
 
+## 🌐 Vision & Impact
+
+**Vens** is at the forefront of vulnerability management innovation. 
+
+- **First-of-its-kind Open Source**: We are pioneering the use of LLMs to generate prioritized VEX reports, filling a gap in the open-source ecosystem by providing actionable intelligence for platforms like [Dependency-Track](https://dependencytrack.org/).
+- **Pushing the Standards**: We don't just use CycloneDX; we help shape it. We are actively advocating for the CycloneDX specification to better support risk-based prioritization, ensuring that ratings and risk scores are integrated into the heart of security platforms.
+  - 🔗 Check out our contribution: [CycloneDX Specification PR #722](https://github.com/CycloneDX/specification/pull/722)
+
 ## 🚀 Quick Start
 
 ### Installation
@@ -24,12 +32,7 @@ go install github.com/fahedouch/vens/cmd/vens@latest
 
 ### Usage
 
-To generate a VEX report, you will need:
-1.  **Vulnerability Scan**: A JSON report from a supported scanner (e.g., [Trivy](https://github.com/aquasecurity/trivy)).
-2.  **SBOMs**: One or more CycloneDX SBOM files representing your environment.
-3.  **Risk Configuration**: A `config.yaml` file defining your business context.
-
-You can find a complete working example in the [examples/quickstart](examples/quickstart) directory.
+Run the following command to generate a VEX report using the quickstart files. For a detailed explanation and a complete working example, please refer to the [Quickstart Guide](examples/quickstart).
 
 ```bash
 export OPENAI_API_KEY="your-key"
@@ -96,7 +99,7 @@ vens generate [flags] INPUT OUTPUT
 | Flag | Description | Default |
 |------|-------------|---------|
 | `--config-file` | **(Required)** Path to `config.yaml` | |
-| `--sboms` | **(Required)** Comma-separated list of CycloneDX SBOMs | |
+| `--sboms` | **(Required)** Comma-separated list of CycloneDX SBOMs (assets) | |
 | `--llm` | LLM backend (`openai`, `ollama`) | `auto` |
 | `--llm-temperature` | Sampling temperature | `0.0` |
 | `--llm-batch-size` | Number of CVEs to process per request | `10` |

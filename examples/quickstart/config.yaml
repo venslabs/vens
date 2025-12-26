@@ -1,0 +1,8 @@
+# vens uses the component SBOM to match component scores to vulnerabilities.
+# Ensure that each component here has a corresponding SBOM.
+# Use version-less PURLs as keys.
+owasp:
+  pkg:module/quickstart-sample-app:
+    score: 30
+    likelihood: 5
+    impact: 6

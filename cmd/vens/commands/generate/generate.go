@@ -48,7 +48,7 @@ func New() *cobra.Command {
 	flags.Int("llm-seed", 0, "Seed (0 means no explicit seed)")
 	flags.String("config-file", "", "Path to config.yaml file")
 	// We support CycloneDX SBOMs because they are more application-oriented and lighter in terms of data.
-	flags.String("sboms", "", "Comma-separated list of CycloneDX SBOMs")
+	flags.String("sboms", "", "Comma-separated list of CycloneDX SBOMs (assets)")
 	flags.String("input-format", "auto", "Input format ([auto trivy])")
 	flags.String("output-format", "auto", "Output format ([auto cyclonedxvex])")
 
