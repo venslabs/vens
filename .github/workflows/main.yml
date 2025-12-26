@@ -1,0 +1,21 @@
+name: CI
+on:
+  push:
+    branches:
+      - main
+      - 'release/**'
+  pull_request:
+jobs:
+  main:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+      - run: go test -covermode=atomic -race -v ./...
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v9.2.0
+        with:
+          args: --timeout=10m --verbose
+      - run: go install ./cmd/vens
