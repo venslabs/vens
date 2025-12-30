@@ -47,13 +47,17 @@ func (c *cycloneDxVexWriter) Close() error {
 
 	vulns := make([]cyclonedx.Vulnerability, 0, len(c.r))
 	for _, g := range c.r {
-		id := g.VulnID
 		rs := []cyclonedx.VulnerabilityRating{g.Rating}
-		vulns = append(vulns, cyclonedx.Vulnerability{
-			ID:      id,
+		v := cyclonedx.Vulnerability{
+			ID:      g.VulnID,
 			Ratings: &rs,
-		})
+		}
+		if g.AffectedRef != "" {
+			v.Affects = &[]cyclonedx.Affects{{Ref: g.AffectedRef}}
+		}
+		vulns = append(vulns, v)
 	}
+
 	if len(vulns) > 0 {
 		bom.Vulnerabilities = &vulns
 	}

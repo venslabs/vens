@@ -21,7 +21,7 @@ import (
 	"os"
 	"strings"
 
-	trivytypes "github.com/fahedouch/vens/pkg/api/types"
+	"github.com/fahedouch/vens/pkg/api/types"
 	"github.com/fahedouch/vens/pkg/generator"
 	"github.com/fahedouch/vens/pkg/llm"
 	"github.com/fahedouch/vens/pkg/llm/llmfactory"
@@ -144,7 +144,7 @@ func action(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	var input trivytypes.Report
+	var input types.Report
 	if err = json.Unmarshal(inputB, &input); err != nil {
 		return err
 	}

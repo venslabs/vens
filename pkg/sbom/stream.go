@@ -20,7 +20,7 @@ import (
 	"os"
 	"strings"
 
-	trivytypes "github.com/fahedouch/vens/pkg/api/types"
+	types "github.com/fahedouch/vens/pkg/api/types"
 )
 
 // StreamCycloneDXLibraries performs a single-pass streaming parse of a CycloneDX
@@ -31,7 +31,7 @@ import (
 // It never loads the whole SBOM in memory. When decoding metadata, once the
 // component has been decoded, the rest of the metadata section is skipped to
 // minimize work. This keeps both time and space complexity low.
-func StreamCycloneDXLibraries(path string, cb func(trivytypes.SBOMComponent) error) error {
+func StreamCycloneDXLibraries(path string, cb func(types.SBOMComponent) error) error {
 	f, err := os.Open(path)
 	if err != nil {
 		return err
@@ -49,7 +49,9 @@ func StreamCycloneDXLibraries(path string, cb func(trivytypes.SBOMComponent) err
 		return fmt.Errorf("invalid CycloneDX JSON: expected object start")
 	}
 
-	parentPURL := ""
+	metadata := types.SBOMMetadata{
+		Version: 1,
+	}
 
 	// Iterate root keys; handle metadata (for parent PURL) and components array
 	for dec.More() {
@@ -63,6 +65,16 @@ func StreamCycloneDXLibraries(path string, cb func(trivytypes.SBOMComponent) err
 		}
 
 		switch key {
+		case "serialNumber":
+			if err := dec.Decode(&metadata.SerialNumber); err != nil {
+				return err
+			}
+			// If it starts with urn:uuid:, strip it according to CycloneDX BOMLink spec
+			metadata.SerialNumber = strings.TrimPrefix(metadata.SerialNumber, "urn:uuid:")
+		case "version":
+			if err := dec.Decode(&metadata.Version); err != nil {
+				return err
+			}
 		case "metadata":
 			// Enter metadata object
 			tok, err := dec.Token()
@@ -90,7 +102,7 @@ func StreamCycloneDXLibraries(path string, cb func(trivytypes.SBOMComponent) err
 					if err := dec.Decode(&tmp); err != nil {
 						return err
 					}
-					parentPURL = tmp.PURL
+					metadata.ParentPURL = tmp.PURL
 					// Skip the remaining metadata fields (if any)
 					for dec.More() {
 						if err := skipAny(dec); err != nil {
@@ -126,7 +138,7 @@ func StreamCycloneDXLibraries(path string, cb func(trivytypes.SBOMComponent) err
 				return fmt.Errorf("invalid components array")
 			}
 			for dec.More() {
-				var c trivytypes.SBOMComponent
+				var c types.SBOMComponent
 				if err := dec.Decode(&c); err != nil {
 					return err
 				}
@@ -134,7 +146,7 @@ func StreamCycloneDXLibraries(path string, cb func(trivytypes.SBOMComponent) err
 				if strings.ToLower(c.Type) != "library" {
 					continue
 				}
-				c.ParentPURL = parentPURL
+				c.Metadata = metadata
 				if err := cb(c); err != nil {
 					return err
 				}
@@ -250,7 +262,7 @@ func ReadParentPURL(path string) (string, error) {
 // StreamComponents streams each entry of the `components` array and invokes the
 // provided callback with a minimally decoded SBOMComponent. It never loads the
 // full SBOM into memory.
-func StreamComponents(path string, cb func(trivytypes.SBOMComponent) error) error {
+func StreamComponents(path string, cb func(types.SBOMComponent) error) error {
 	f, err := os.Open(path)
 	if err != nil {
 		return err
@@ -289,7 +301,7 @@ func StreamComponents(path string, cb func(trivytypes.SBOMComponent) error) erro
 			return fmt.Errorf("invalid components array")
 		}
 		for dec.More() {
-			var c trivytypes.SBOMComponent
+			var c types.SBOMComponent
 			if err := dec.Decode(&c); err != nil {
 				return err
 			}

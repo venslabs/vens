@@ -26,7 +26,7 @@ import (
 	"time"
 
 	"github.com/CycloneDX/cyclonedx-go"
-	trivytypes "github.com/fahedouch/vens/pkg/api/types"
+	"github.com/fahedouch/vens/pkg/api/types"
 	"github.com/fahedouch/vens/pkg/llm"
 	outputhandler "github.com/fahedouch/vens/pkg/outputhandler"
 	"github.com/fahedouch/vens/pkg/riskconfig"
@@ -81,10 +81,15 @@ type Generator struct {
 
 // SBOMIndexBundle is a lightweight wrapper returned by IndexSBOMLibraries.
 // It contains the in-memory vector index and a minimal resolver from
-// component IDs to normalized ParentPURLs.
+// component IDs to normalized ParentPURL and BOMLink.
 type SBOMIndexBundle struct {
-	sbomIndex      vecindex.Index
-	parentPURLByID map[string]string // ID -> normalized ParentPURL
+	sbomIndex vecindex.Index
+	ctxByID   map[string]ComponentContext // ID -> Context
+}
+
+type ComponentContext struct {
+	Metadata types.SBOMMetadata
+	Ref      string
 }
 
 // Count returns number of indexed vectors.
@@ -191,16 +196,17 @@ func (g *Generator) generateRiskScore(ctx context.Context, bundle *SBOMIndexBund
 			continue
 		}
 		for _, id := range filteredIDs {
-			parent, ok := bundle.parentPURLByID[id]
-			if !ok || parent == "" {
+			cCtx, ok := bundle.ctxByID[id]
+			if !ok || cCtx.Metadata.ParentPURL == "" {
 				continue
 			}
-			score, ok := g.o.Context.ScoreForPURL(riskconfig.NormalizePURL(parent))
+			score, ok := g.o.Context.ScoreForPURL(riskconfig.NormalizePURL(cCtx.Metadata.ParentPURL))
 			if !ok {
 				continue
 			}
 			group = append(group, outputhandler.VulnRating{
-				VulnID: vulnID,
+				VulnID:      vulnID,
+				AffectedRef: cCtx.Ref,
 				Rating: cyclonedx.VulnerabilityRating{
 					Method: cyclonedx.ScoringMethodOWASP,
 					Score:  &score,
@@ -413,10 +419,10 @@ func (g *Generator) matchCandidatesForVulns(ctx context.Context, idx vecindex.In
 // with rate-limit retry. Returns the populated index bundle.
 func (g *Generator) IndexSBOMLibraries(ctx context.Context, sbomPaths []string) (*SBOMIndexBundle, error) {
 	idx := vecindex.NewSBOMVecIndex()
-	compByExtID := make(map[string]string)
+	ctxByID := make(map[string]ComponentContext)
 
 	type embBatch struct {
-		comps []trivytypes.SBOMComponent
+		comps []types.SBOMComponent
 		ids   []string
 	}
 
@@ -455,7 +461,7 @@ func (g *Generator) IndexSBOMLibraries(ctx context.Context, sbomPaths []string) 
 			continue
 		}
 
-		curComps := make([]trivytypes.SBOMComponent, 0, g.o.BatchSize)
+		curComps := make([]types.SBOMComponent, 0, g.o.BatchSize)
 		curIDs := make([]string, 0, g.o.BatchSize)
 
 		flushSend := func() error {
@@ -463,7 +469,7 @@ func (g *Generator) IndexSBOMLibraries(ctx context.Context, sbomPaths []string) 
 				return nil
 			}
 			// copier/swapper pour libérer le producteur immédiatement
-			comps := make([]trivytypes.SBOMComponent, len(curComps))
+			comps := make([]types.SBOMComponent, len(curComps))
 			copy(comps, curComps)
 			ids := make([]string, len(curIDs))
 			copy(ids, curIDs)
@@ -480,7 +486,7 @@ func (g *Generator) IndexSBOMLibraries(ctx context.Context, sbomPaths []string) 
 			}
 		}
 
-		if err := sbom.StreamCycloneDXLibraries(p, func(c trivytypes.SBOMComponent) error {
+		if err := sbom.StreamCycloneDXLibraries(p, func(c types.SBOMComponent) error {
 			id := c.PURL
 			if id == "" {
 				if c.Group != "" {
@@ -494,8 +500,24 @@ func (g *Generator) IndexSBOMLibraries(ctx context.Context, sbomPaths []string) 
 			}
 			curComps = append(curComps, c)
 			curIDs = append(curIDs, id)
-			// store normalized ParentPURL mapping now; last seen wins which is fine
-			compByExtID[id] = c.ParentPURL
+
+			// Construct BOMLink if possible: urn:cdx:serialNumber/version#bom-ref
+			// See: https://cyclonedx.org/capabilities/bomlink/
+			ref := ""
+			if c.Metadata.SerialNumber != "" {
+				bomRef := c.BomRef
+				if bomRef == "" {
+					bomRef = id // fallback to id if bom-ref is missing
+				}
+				ref = fmt.Sprintf("urn:cdx:%s/%d#%s", c.Metadata.SerialNumber, c.Metadata.Version, bomRef)
+			}
+
+			// store component context now; last seen wins which is fine
+			ctxByID[id] = ComponentContext{
+				Metadata: c.Metadata,
+				Ref:      ref,
+			}
+
 			if len(curComps) >= g.o.BatchSize {
 				return flushSend()
 			}
@@ -527,13 +549,16 @@ func (g *Generator) IndexSBOMLibraries(ctx context.Context, sbomPaths []string) 
 	default:
 	}
 
-	return &SBOMIndexBundle{sbomIndex: idx, parentPURLByID: compByExtID}, nil
+	return &SBOMIndexBundle{
+		sbomIndex: idx,
+		ctxByID:   ctxByID,
+	}, nil
 }
 
 // componentEmbeddings generates embeddings for a batch of components using the LLM.
 // It retries on rate limit using llm.RetryOnRateLimit and the configured batch size.
 // Returns an error if the LLM call fails or the output cannot be parsed (no fallback).
-func (g *Generator) componentEmbeddings(ctx context.Context, comps []trivytypes.SBOMComponent) ([][]float32, error) {
+func (g *Generator) componentEmbeddings(ctx context.Context, comps []types.SBOMComponent) ([][]float32, error) {
 	if g.o.LLM == nil {
 		return nil, errors.New("no LLM configured")
 	}
@@ -586,7 +611,7 @@ func (g *Generator) newEmbedder() (langemb.Embedder, error) {
 }
 
 // componentText builds a deterministic text for the component to feed the embedder.
-func componentText(c trivytypes.SBOMComponent) string {
+func componentText(c types.SBOMComponent) string {
 	// Prefer PURL when available; include group/name/version for extra signal.
 	base := c.PURL
 	if base == "" {
