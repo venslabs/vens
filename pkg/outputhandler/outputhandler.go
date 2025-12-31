@@ -26,6 +26,7 @@ type OutputHandler interface {
 
 // VulnRating carries a single CycloneDX rating for one vulnerability ID.
 type VulnRating struct {
-	VulnID string
-	Rating cyclonedx.VulnerabilityRating
+	VulnID      string
+	AffectedRef string
+	Rating      cyclonedx.VulnerabilityRating
 }

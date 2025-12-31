@@ -14,6 +14,13 @@
 
 package types
 
+// SBOMMetadata holds metadata about the SBOM document itself.
+type SBOMMetadata struct {
+	ParentPURL   string
+	SerialNumber string
+	Version      int
+}
+
 // SBOMComponent holds only the fields we need from CycloneDX components for indexing.
 type SBOMComponent struct {
 	Type    string `json:"type"`
@@ -21,8 +28,9 @@ type SBOMComponent struct {
 	Name    string `json:"name"`
 	Version string `json:"version,omitempty"`
 	PURL    string `json:"purl,omitempty"`
-	// ParentPURL is the purl of metadata.component (the SBOM's top-level component).
-	// Filled during SBOM streaming/decoding for easy linkage to the parent.
-	// Not part of the original component JSON; kept out of JSON encoding on purpose.
-	ParentPURL string `json:"-"`
+	// BomRef is the bom-ref of the component in the SBOM.
+	BomRef string `json:"bom-ref,omitempty"`
+
+	// Metadata contains information about the SBOM document.
+	Metadata SBOMMetadata `json:"-"`
 }
