@@ -1,0 +1,29 @@
+name: "vens"
+version: "0.1.0"
+repository: github.com/fahedouch/vens
+maintainer: fahedouch
+summary: Intelligent vulnerability prioritization bridge for Trivy
+description: |-
+  A Trivy plugin that enriches scan results with Vens risk scores.
+  It helps in reducing noise by identifying truly exploitable vulnerabilities using LLMs and context.
+  
+  Usage:
+    trivy vens scan --config-file config.yaml --sboms sbom.cdx.json -- image <image>
+    trivy vens generate <trivy_json> <output_json>
+platforms:
+  - selector:
+      os: darwin
+      arch: amd64
+    bin: ./_output/bin/vens
+  - selector:
+      os: darwin
+      arch: arm64
+    bin: ./_output/bin/vens
+  - selector:
+      os: linux
+      arch: amd64
+    bin: ./_output/bin/vens
+  - selector:
+      os: linux
+      arch: arm64
+    bin: ./_output/bin/vens

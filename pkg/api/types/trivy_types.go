@@ -38,5 +38,11 @@ type Vulnerability struct {
 	Severity        string         `json:",omitempty"`
 	CweIDs          []string       `json:",omitempty"`
 	VendorSeverity  map[string]int `json:",omitempty"`
-	// TODO: CVSS
+	VensRating      *VensRating    `json:"vens_rating,omitempty"`
+}
+
+type VensRating struct {
+	Score         float64 `json:"score"`
+	Severity      string  `json:"severity"`
+	Justification string  `json:"justification"`
 }
