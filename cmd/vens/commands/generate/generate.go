@@ -17,6 +17,7 @@ package generate
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"strings"
@@ -27,6 +28,7 @@ import (
 	"github.com/fahedouch/vens/pkg/llm/llmfactory"
 	outputhandler "github.com/fahedouch/vens/pkg/outputhandler"
 	"github.com/fahedouch/vens/pkg/riskconfig"
+	"github.com/fahedouch/vens/pkg/trivypluginutil"
 	"github.com/spf13/cobra"
 )
 
@@ -50,13 +52,22 @@ func New() *cobra.Command {
 	// We support CycloneDX SBOMs because they are more application-oriented and lighter in terms of data.
 	flags.String("sboms", "", "Comma-separated list of CycloneDX SBOMs (assets)")
 	flags.String("input-format", "auto", "Input format ([auto trivy])")
-	flags.String("output-format", "auto", "Output format ([auto cyclonedxvex])")
+	flags.String("output-format", "auto", "Output format ([auto cyclonedxvex trivyjson trivytable])")
 
 	return cmd
 }
 
 func Example() string {
-	return "vens generate --config-file config.yaml --sboms sbom1.cdx.json,sbom2.cdx.json trivy.json output.cdx"
+	exe := "vens"
+	if trivypluginutil.IsTrivyPluginMode() {
+		exe = "trivy " + exe
+	}
+	return fmt.Sprintf(`  # Enrich Trivy JSON report with Vens risk scores
+  trivy image python:3.12.4 --format=json > python.json
+  %s generate --config-file config.yaml --sboms sbom.cdx.json python.json enriched.json
+
+  # Display Vens risk scores in a table
+  %s generate --config-file config.yaml --sboms sbom.cdx.json python.json table.txt --output-format trivytable`, exe, exe)
 }
 
 func action(cmd *cobra.Command, args []string) error {
@@ -153,11 +164,20 @@ func action(cmd *cobra.Command, args []string) error {
 	// In parallel, encourage scanners to consider ratings originating from the VEX.
 	// Request that OpenVEX add support for ratings in the OpenVEX format.
 	var h outputhandler.OutputHandler
-	outputW, err := os.Create(outputPath)
-	if err != nil {
-		return err
+	var outputW io.WriteCloser
+	if outputPath == "-" {
+		outputW = os.Stdout
+	} else {
+		outputW, err = os.Create(outputPath)
+		if err != nil {
+			return err
+		}
 	}
-	defer outputW.Close() //nolint:errcheck
+	defer func() {
+		if outputPath != "-" {
+			outputW.Close()
+		}
+	}()
 	outputFormat, err := flags.GetString("output-format")
 	if err != nil {
 		return err
@@ -165,12 +185,20 @@ func action(cmd *cobra.Command, args []string) error {
 
 	if outputFormat == "" || outputFormat == "auto" {
 		outputFormat = "cyclonedxvex"
+		if strings.HasSuffix(outputPath, ".json") && inputFormat == "trivy" {
+			// If input is trivy and output is json, default to trivyjson for enrichment
+			outputFormat = "trivyjson"
+		}
 		slog.DebugContext(ctx, "Automatically choosing output format", "format", outputFormat)
 	}
 
 	switch outputFormat {
 	case "cyclonedxvex":
 		h = outputhandler.NewCycloneDxVexOutputHandler(outputW)
+	case "trivyjson":
+		h = outputhandler.NewTrivyJsonOutputHandler(outputW, inputB)
+	case "trivytable":
+		h = outputhandler.NewTrivyTableOutputHandler(outputW)
 	default:
 		return fmt.Errorf("unknown output format %q", outputFormat)
 	}
