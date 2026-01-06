@@ -11,7 +11,7 @@ No more endless lists of CVEs without context. **vens** helps you focus on what 
 
 - 🧠 **LLM-Powered Prioritization**: Intelligent contextual analysis of exploitability.
 - 📦 **SBOM Support**: Integrates your CycloneDX files for enhanced accuracy.
-- 🚀 **Trivy Integration**: Instantly transforms your Trivy scans into VEX reports.
+- 🚀 **Trivy Plugin**: Enrich Trivy results with Vens risk scores directly from the CLI.
 - 🎯 **Custom Risk Scoring**: Configure your own impact and probability criteria.
 
 ## 🌐 Vision & Impact
@@ -30,7 +30,28 @@ No more endless lists of CVEs without context. **vens** helps you focus on what 
 go install github.com/fahedouch/vens/cmd/vens@latest
 ```
 
-### Usage
+### Trivy Plugin Integration
+
+**vens** works as a Trivy plugin to enrich scan results with risk scores.
+
+#### 1. Install as a plugin
+```bash
+trivy plugin install github.com/fahedouch/vens
+```
+
+#### 2. Usage
+You can run a scan and enrich it in one command:
+```bash
+export OPENAI_API_KEY="your-key"
+trivy vens scan --config-file config.yaml --sboms sbom.cdx.json -- image python:3.12.4
+```
+
+Or enrich an existing Trivy JSON report:
+```bash
+trivy vens generate --config-file config.yaml --sboms sbom.cdx.json trivy_report.json enriched_report.json
+```
+
+### Manual Usage
 
 Run the following command to generate a VEX report using the quickstart files. For a detailed explanation and a complete working example, please refer to the [Quickstart Guide](examples/quickstart).
 
@@ -105,7 +126,25 @@ vens generate [flags] INPUT OUTPUT
 | `--llm-batch-size` | Number of CVEs to process per request | `10` |
 | `--llm-seed` | Seed for reproducible results | `0` |
 | `--input-format` | Input format (`auto`, `trivy`) | `auto` |
-| `--output-format` | Output format (`auto`, `cyclonedxvex`) | `auto` |
+| `--output-format` | Output format (`auto`, `cyclonedxvex`, `trivyjson`, `trivytable`) | `auto` |
+| `--debug` | Enable debug logging | `false` |
+
+### `vens scan`
+
+Run Trivy scan and enrich results with Vens risk scores.
+
+**Usage:**
+```bash
+vens scan [flags] -- [trivy flags]
+```
+
+**Flags:**
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--config-file` | **(Required)** Path to `config.yaml` | |
+| `--sboms` | **(Required)** Comma-separated list of CycloneDX SBOMs (assets) | |
+| `--llm` | LLM backend (`openai`, `ollama`) | `auto` |
+| `--output-format` | Output format (`trivytable`, `trivyjson`) | `trivytable` |
 | `--debug` | Enable debug logging | `false` |
 
 ## 📖 Documentation

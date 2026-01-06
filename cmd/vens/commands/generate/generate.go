@@ -15,19 +15,24 @@
 package generate
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
 	"strings"
 
-	"github.com/fahedouch/vens/pkg/api/types"
+	cdx "github.com/CycloneDX/cyclonedx-go"
+	"github.com/spf13/cobra"
+
+	trivytypes "github.com/aquasecurity/trivy/pkg/types"
+
 	"github.com/fahedouch/vens/pkg/generator"
 	"github.com/fahedouch/vens/pkg/llm"
 	"github.com/fahedouch/vens/pkg/llm/llmfactory"
-	outputhandler "github.com/fahedouch/vens/pkg/outputhandler"
+	"github.com/fahedouch/vens/pkg/outputhandler"
 	"github.com/fahedouch/vens/pkg/riskconfig"
-	"github.com/spf13/cobra"
+	"github.com/fahedouch/vens/pkg/trivypluginutil"
 )
 
 func New() *cobra.Command {
@@ -50,13 +55,31 @@ func New() *cobra.Command {
 	// We support CycloneDX SBOMs because they are more application-oriented and lighter in terms of data.
 	flags.String("sboms", "", "Comma-separated list of CycloneDX SBOMs (assets)")
 	flags.String("input-format", "auto", "Input format ([auto trivy])")
-	flags.String("output-format", "auto", "Output format ([auto cyclonedxvex])")
+	flags.String("output-format", "auto", "Output format ([auto cyclonedxvex trivyjson trivytable])")
+	flags.StringSlice("severity", nil, "Filter by severities (e.g., CRITICAL,HIGH,MEDIUM,LOW,UNKNOWN) - only for trivytable")
 
 	return cmd
 }
 
 func Example() string {
-	return "vens generate --config-file config.yaml --sboms sbom1.cdx.json,sbom2.cdx.json trivy.json output.cdx"
+	exe := "vens"
+	if trivypluginutil.IsTrivyPluginMode() {
+		exe = "trivy " + exe
+	}
+	return fmt.Sprintf(`  # Generate VEX with Vens risk scores
+  trivy image python:3.12.4 --format=json > python.json
+  %s generate --config-file config.yaml --sboms sbom.cdx.json python.json vex.cdx.json
+
+  # Enrich Trivy JSON report with Vens risk scores
+  %s generate --config-file config.yaml --sboms sbom.cdx.json python.json enriched.json --output-format trivyjson
+
+  # Display Vens risk scores in Trivy table format
+  %s generate --config-file config.yaml --sboms sbom.cdx.json python.json /dev/stdout --output-format trivytable
+
+  # Complete workflow: SBOM -> Scan -> Enrich
+  trivy image alpine:3.15 --format cyclonedx --output sbom.json
+  trivy sbom sbom.json --format json --output report.json
+  %s generate --config-file config.yaml --sboms sbom.json report.json enriched.json --output-format trivyjson`, exe, exe, exe, exe)
 }
 
 func action(cmd *cobra.Command, args []string) error {
@@ -73,6 +96,7 @@ func action(cmd *cobra.Command, args []string) error {
 	// Load `config.yaml` before `sboms`
 	// If the configuration file is invalid or missing, fail fast before starting the expensive SBOM processing.
 	// This follows the "fail fast" principle and improves the user experience.
+	slog.Info("Loading Vens configuration...", "path", configPath)
 	ctxFile, err := riskconfig.Load(configPath)
 	if err != nil {
 		return fmt.Errorf("failed to load config file %q: %w", configPath, err)
@@ -89,6 +113,7 @@ func action(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	slog.Info("Initializing LLM...", "backend", llmName)
 	o.LLM, err = llmfactory.New(ctx, llmName)
 	if err != nil {
 		return err
@@ -112,6 +137,7 @@ func action(cmd *cobra.Command, args []string) error {
 	}
 
 	// Load the SBOMs and build the vector index
+	slog.Info("Indexing SBOM libraries...")
 	sbomPaths := strings.Split(sboms, ",")
 	bundle, err := g.IndexSBOMLibraries(ctx, sbomPaths)
 	if err != nil {
@@ -139,25 +165,17 @@ func action(cmd *cobra.Command, args []string) error {
 
 	// TODO the trivy report should be streamed and embbed like sbom libraries
 	// to accelerate proccessing
+	slog.Info("Reading Trivy report...", "path", inputPath)
 	inputB, err := os.ReadFile(inputPath)
-
 	if err != nil {
 		return err
 	}
-	var input types.Report
-	if err = json.Unmarshal(inputB, &input); err != nil {
+
+	var trivyReport trivytypes.Report
+	if err = json.Unmarshal(inputB, &trivyReport); err != nil {
 		return err
 	}
 
-	// For now, use CycloneDX VEX as the output.
-	// In parallel, encourage scanners to consider ratings originating from the VEX.
-	// Request that OpenVEX add support for ratings in the OpenVEX format.
-	var h outputhandler.OutputHandler
-	outputW, err := os.Create(outputPath)
-	if err != nil {
-		return err
-	}
-	defer outputW.Close() //nolint:errcheck
 	outputFormat, err := flags.GetString("output-format")
 	if err != nil {
 		return err
@@ -168,29 +186,56 @@ func action(cmd *cobra.Command, args []string) error {
 		slog.DebugContext(ctx, "Automatically choosing output format", "format", outputFormat)
 	}
 
-	switch outputFormat {
-	case "cyclonedxvex":
-		h = outputhandler.NewCycloneDxVexOutputHandler(outputW)
-	default:
-		return fmt.Errorf("unknown output format %q", outputFormat)
-	}
+	// Generate VEX with risk scores
+	slog.Info("Generating VEX with Vens risk scores...")
+	var vexBuf bytes.Buffer
+	vexHandler := outputhandler.NewCycloneDxVexOutputHandler(&vexBuf)
 
-	vulns := make([]generator.Vulnerability, len(input.Results[0].Vulnerabilities))
-	for i, f := range input.Results[0].Vulnerabilities {
-		vulns[i] = generator.Vulnerability{
-			VulnID:      f.VulnerabilityID,
-			PkgID:       f.PkgID,
-			Title:       f.Title,
-			Description: f.Description,
-			Severity:    f.Severity,
-			// TODO: CVSS
+	// Collect all vulnerabilities from all results
+	var allVulns []generator.Vulnerability
+	for _, result := range trivyReport.Results {
+		for _, vuln := range result.Vulnerabilities {
+			allVulns = append(allVulns, generator.Vulnerability{
+				VulnID:      vuln.VulnerabilityID,
+				PkgID:       vuln.PkgID,
+				Title:       vuln.Title,
+				Description: vuln.Description,
+				Severity:    vuln.Severity,
+			})
 		}
 	}
 
-	// bundle is computed outside GenerateRiskScore because it is streamed
-	if err = g.GenerateRiskScore(ctx, bundle, vulns, h.HandleVulnRatings); err != nil {
-		return err
+	if len(allVulns) == 0 {
+		slog.Info("No vulnerabilities found in the report")
+		return nil
 	}
 
-	return h.Close()
+	// Generate risk scores
+	if err := g.GenerateRiskScore(ctx, bundle, allVulns, vexHandler.HandleVulnRatings); err != nil {
+		return fmt.Errorf("failed to generate risk scores: %w", err)
+	}
+	if err := vexHandler.Close(); err != nil {
+		return fmt.Errorf("failed to close VEX handler: %w", err)
+	}
+
+	// Parse the generated VEX
+	var vex cdx.BOM
+	if err := json.Unmarshal(vexBuf.Bytes(), &vex); err != nil {
+		return fmt.Errorf("failed to unmarshal VEX: %w", err)
+	}
+
+	// Handle output based on format
+	switch outputFormat {
+	case "cyclonedxvex":
+		// Output VEX only
+		return outputhandler.WriteVEX(outputPath, &vex)
+
+	case "trivyjson", "trivytable":
+		// Apply VEX to Trivy report and output in Trivy format
+		severity, _ := flags.GetStringSlice("severity")
+		return outputhandler.ApplyVEXAndOutputTrivyReport(ctx, outputPath, outputFormat, &trivyReport, &vex, severity)
+
+	default:
+		return fmt.Errorf("unknown output format %q", outputFormat)
+	}
 }
