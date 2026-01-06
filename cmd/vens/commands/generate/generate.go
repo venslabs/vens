@@ -170,7 +170,8 @@ func action(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("unknown input format %q", inputFormat)
 	}
 
-	// Read Trivy report
+	// TODO the trivy report should be streamed and embbed like sbom libraries
+	// to accelerate proccessing
 	slog.Info("Reading Trivy report...", "path", inputPath)
 	inputB, err := os.ReadFile(inputPath)
 	if err != nil {
@@ -189,10 +190,6 @@ func action(cmd *cobra.Command, args []string) error {
 
 	if outputFormat == "" || outputFormat == "auto" {
 		outputFormat = "cyclonedxvex"
-		if strings.HasSuffix(outputPath, ".json") && inputFormat == "trivy" {
-			// If input is trivy and output is json, default to trivyjson for enrichment
-			outputFormat = "trivyjson"
-		}
 		slog.DebugContext(ctx, "Automatically choosing output format", "format", outputFormat)
 	}
 
