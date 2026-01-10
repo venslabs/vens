@@ -417,6 +417,8 @@ func (g *Generator) matchCandidatesForVulns(ctx context.Context, idx vecindex.In
 // IndexSBOMLibraries streams CycloneDX SBOMs and builds an in-memory vector index
 // of their components. Embeddings are generated via the configured LLM, in batches,
 // with rate-limit retry. Returns the populated index bundle.
+// TODO: Allow indexing directly from a Trivy report using github.com/aquasecurity/trivy/pkg/sbom/io,
+// which would eliminate the need for a separate SBOM file.
 func (g *Generator) IndexSBOMLibraries(ctx context.Context, sbomPaths []string) (*SBOMIndexBundle, error) {
 	idx := vecindex.NewSBOMVecIndex()
 	ctxByID := make(map[string]ComponentContext)

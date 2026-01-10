@@ -18,6 +18,7 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/fahedouch/vens/cmd/vens/commands/enrich"
 	"github.com/fahedouch/vens/cmd/vens/commands/generate"
 	"github.com/fahedouch/vens/cmd/vens/version"
 	"github.com/fahedouch/vens/pkg/envutil"
@@ -57,8 +58,11 @@ func newRootCommand() *cobra.Command {
 		return nil
 	}
 
-	// TODO add generate cmd
-	cmd.AddCommand(generate.New())
+	// Add commands
+	cmd.AddCommand(
+		generate.New(),
+		enrich.New(),
+	)
 
 	return cmd
 }

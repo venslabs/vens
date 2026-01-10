@@ -21,20 +21,22 @@ import (
 	"os"
 	"strings"
 
-	"github.com/fahedouch/vens/pkg/api/types"
+	trivytypes "github.com/aquasecurity/trivy/pkg/types"
 	"github.com/fahedouch/vens/pkg/generator"
 	"github.com/fahedouch/vens/pkg/llm"
 	"github.com/fahedouch/vens/pkg/llm/llmfactory"
 	outputhandler "github.com/fahedouch/vens/pkg/outputhandler"
 	"github.com/fahedouch/vens/pkg/riskconfig"
+	"github.com/fahedouch/vens/pkg/trivypluginutil"
 	"github.com/spf13/cobra"
 )
 
 func New() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:                   "generate INPUT OUTPUT",
-		Short:                 "Generate VEX using LLM",
-		Long:                  "Generate Vulnerability-Exploitability eXchange (VEX) information using an LLM to prioritize CVEs based on risk.",
+		Use:   "generate INPUT OUTPUT",
+		Short: "Generate VEX using LLM",
+		Long:  "Generate Vulnerability-Exploitability eXchange (VEX) information using an LLM to prioritize CVEs based on risk.",
+		// TODO: Support multiple input reports in a single command to improve UX,
 		Example:               Example(),
 		Args:                  cobra.ExactArgs(2),
 		RunE:                  action,
@@ -56,7 +58,18 @@ func New() *cobra.Command {
 }
 
 func Example() string {
-	return "vens generate --config-file config.yaml --sboms sbom1.cdx.json,sbom2.cdx.json trivy.json output.cdx"
+	exe := "vens"
+	if trivypluginutil.IsTrivyPluginMode() {
+		exe = "trivy " + exe
+	}
+	return fmt.Sprintf(`  # Basic usage
+  export OPENAI_API_KEY=...
+  export OPENAI_MODEL=gpt-4o-mini
+
+  trivy image python:3.12.4 --format=json --severity HIGH,CRITICAL >python.json
+
+  %s generate --config-file config.yaml --sboms sbom1.cdx.json,sbom2.cdx.json python.json output.cdx
+`, exe)
 }
 
 func action(cmd *cobra.Command, args []string) error {
@@ -144,7 +157,7 @@ func action(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	var input types.Report
+	var input trivytypes.Report
 	if err = json.Unmarshal(inputB, &input); err != nil {
 		return err
 	}
@@ -183,7 +196,6 @@ func action(cmd *cobra.Command, args []string) error {
 			Title:       f.Title,
 			Description: f.Description,
 			Severity:    f.Severity,
-			// TODO: CVSS
 		}
 	}
 

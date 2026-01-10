@@ -11,6 +11,10 @@ all: binaries
 .PHONY: binaries
 binaries: _output/bin/vens
 
+.PHONY: test
+test:
+	$(GO) test -v ./...
+
 .PHONY: _output/bin/vens
 _output/bin/vens:
 	$(GO_BUILD) -o $@ ./cmd/vens
@@ -25,3 +29,11 @@ quickstart-run:
 	  --sboms examples/quickstart/sbom.cdx.json \
 	  examples/quickstart/trivy.json \
 	  _output/vex_quickstart.json
+
+.PHONY: quickstart-enrich
+quickstart-enrich:
+	@mkdir -p _output
+	go run ./cmd/vens enrich \
+	  --vex _output/vex_quickstart.json \
+	  --output _output/enriched_trivy.json \
+	  examples/quickstart/trivy.json

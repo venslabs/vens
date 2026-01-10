@@ -108,6 +108,22 @@ vens generate [flags] INPUT OUTPUT
 | `--output-format` | Output format (`auto`, `cyclonedxvex`) | `auto` |
 | `--debug` | Enable debug logging | `false` |
 
+### `vens enrich`
+
+Enrich a Trivy vulnerability report with OWASP scores from a VEX document.
+
+**Usage:**
+```bash
+vens enrich --vex VEX_FILE [flags] REPORT_FILE
+```
+
+**Flags:**
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--vex` | **(Required)** Path to the VEX file (CycloneDX) | |
+| `--output` | Output file path (if not specified, prints to stdout) | |
+| `--debug` | Enable debug logging | `false` |
+
 ## 📖 Documentation
 
 - [System Design](docs/system-design/system-design.md): Understand how vens works under the hood.
