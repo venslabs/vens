@@ -3,9 +3,9 @@
 </p>
 
 
-**Vens** is an intelligent vulnerability prioritization tool. Its main purpose is to generate a **CycloneDX VEX** report that serves as a standard base for prioritizing your vulnerabilities. By leveraging the power of LLMs to analyze your security reports and SBOMs, it generates precise and actionable VEX ([Vulnerability Exploitability eXchange](https://www.ntia.gov/files/ntia/publications/vex_one-page_summary.pdf)) documents.
+**Vens** is an AI-powered vulnerability prioritizer. It transforms massive security reports into precise, actionable **CycloneDX VEX** documents using LLMs.
 
-No more endless lists of CVEs without context. **vens** helps you focus on what truly matters.
+Stop wasting time on contextless CVE lists. Focus on the risks that actually matter.
 
 ## 🌐 Vision & Impact
 
