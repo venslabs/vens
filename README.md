@@ -26,8 +26,15 @@ No more endless lists of CVEs without context. **vens** helps you focus on what 
 
 ### Installation
 
+Option 1: As a standalone program:
 ```bash
 go install github.com/venslabs/vens/cmd/vens@latest
+```
+
+Option 2: As a Trivy [plugin](https://aquasecurity.github.io/trivy/latest/docs/plugin/) (see [TRIVY_PLUGIN.md](docs/TRIVY_PLUGIN.md) for details):
+```bash
+trivy plugin install github.com/venslabs/vens
+alias vens="trivy vens"
 ```
 
 ### Usage
