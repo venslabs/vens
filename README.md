@@ -3,16 +3,9 @@
 </p>
 
 
-**Vens** is an intelligent vulnerability prioritization tool. It leverages the power of LLMs to analyze your security reports and SBOMs, generating precise and actionable VEX ([Vulnerability Exploitability eXchange](https://www.ntia.gov/files/ntia/publications/vex_one-page_summary.pdf)) documents.
+**Vens** is an intelligent vulnerability prioritization tool. Its main purpose is to generate a **CycloneDX VEX** report that serves as a standard base for prioritizing your vulnerabilities. By leveraging the power of LLMs to analyze your security reports and SBOMs, it generates precise and actionable VEX ([Vulnerability Exploitability eXchange](https://www.ntia.gov/files/ntia/publications/vex_one-page_summary.pdf)) documents.
 
 No more endless lists of CVEs without context. **vens** helps you focus on what truly matters.
-
-## ✨ Key Features
-
-- 🧠 **LLM-Powered Prioritization**: Intelligent contextual analysis of exploitability.
-- 📦 **SBOM Support**: Integrates your CycloneDX files for enhanced accuracy.
-- 🚀 **Trivy Integration**: Instantly transforms your Trivy scans into VEX reports.
-- 🎯 **Custom Risk Scoring**: Configure your own impact and probability criteria.
 
 ## 🌐 Vision & Impact
 
