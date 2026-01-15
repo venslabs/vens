@@ -19,6 +19,19 @@ test:
 _output/bin/vens:
 	$(GO_BUILD) -o $@ ./cmd/vens
 
+.PHONY: artifacts
+artifacts:
+	@mkdir -p _output
+	@for os in linux darwin; do \
+		for arch in amd64 arm64; do \
+			ext=""; [ "$$os" = "windows" ] && ext=".exe"; \
+			echo "Building vens-$$os-$$arch$$ext"; \
+			GOOS=$$os GOARCH=$$arch $(GO_BUILD) -o _output/vens-$$os-$$arch$$ext ./cmd/vens; \
+			tar -czf _output/vens-$(VERSION)-$$os-$$arch.tar.gz -C _output vens-$$os-$$arch$$ext; \
+			rm _output/vens-$$os-$$arch$$ext; \
+		done; \
+	done
+
 .PHONY: quickstart-run
 quickstart-run:
     # Before executing this target, make sure to set the --llm flag and export the required environment variables (e.g., API_KEY)
@@ -41,4 +54,5 @@ quickstart-enrich:
 .PHONY: install-plugin
 install-plugin:
 	$(GO_BUILD) -o vens ./cmd/vens
+	-trivy plugin uninstall vens
 	trivy plugin install .

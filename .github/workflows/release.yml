@@ -1,0 +1,53 @@
+# Forked from https://github.com/containerd/nerdctl/blob/v2.2.1/.github/workflows/release.yml
+# Apache License 2.0
+
+name: Release
+on:
+  push:
+    tags:
+    - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+    - uses: actions/checkout@v4
+    - name: "Install go"
+      uses: actions/setup-go@v5
+      with:
+        go-version: "1.25"
+        check-latest: true
+    - name: "Compile binaries"
+      run: make artifacts
+    - name: "SHA256SUMS"
+      run: |
+        ( cd _output; sha256sum vens-*.tar.gz ) | tee /tmp/SHA256SUMS
+        mv /tmp/SHA256SUMS _output/SHA256SUMS
+    - name: "The sha256sum of the SHA256SUMS file"
+      run: (cd _output; sha256sum SHA256SUMS)
+    - name: "Prepare the release note"
+      run: |
+        shasha=$(sha256sum _output/SHA256SUMS | awk '{print $1}')
+        cat <<-EOF | tee /tmp/release-note.txt
+        $(hack/generate-release-note.sh)
+        - - -
+        The binaries were built automatically on GitHub Actions.
+        The build log is available for 90 days: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        The sha256sum of the SHA256SUMS file itself is \`${shasha}\` .
+        EOF
+    - name: "Generate artifact attestation"
+      uses: actions/attest-build-provenance@v2
+      if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+      with:
+        subject-path: _output/*
+    - name: "Create release"
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        tag="${GITHUB_REF##*/}"
+        gh release create -F /tmp/release-note.txt --draft --title "${tag}" "${tag}" _output/*
