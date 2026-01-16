@@ -16,7 +16,7 @@ jobs:
       id-token: write
       attestations: write
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: "Install go"
       uses: actions/setup-go@v5
       with:
