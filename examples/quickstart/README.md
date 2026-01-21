@@ -85,7 +85,7 @@ After running vens, `output_vex.cdx.json` contains a CycloneDX VEX document with
       ]
     },
     {
-      "id": "CVE-2016-2781",
+      "id": "CVE-2017-18018",
       "ratings": [
         {
           "score": 36,

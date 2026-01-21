@@ -1,0 +1,2668 @@
+{
+  "$schema": "http://cyclonedx.org/schema/bom-1.6.schema.json",
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "version": 1,
+  "vulnerabilities": [
+    {
+      "id": "CVE-2011-3374",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/apt@2.2.4?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2017-18018",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/coreutils@8.32-4%2Bb1?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-5278",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/coreutils@8.32-4%2Bb1?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2022-3715",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/bash@5.1-2%2Bb3?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "TEMP-0841856-B18BAF",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/bash@5.1-2%2Bb3?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2024-28085",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/bsdutils@2.36.1-8%2Bdeb11u1?arch=amd64\u0026distro=debian-11.3\u0026epoch=1"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-14104",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/bsdutils@2.36.1-8%2Bdeb11u1?arch=amd64\u0026distro=debian-11.3\u0026epoch=1"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2016-2781",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/coreutils@8.32-4%2Bb1?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-30258",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/gpgv@2.2.27-2%2Bdeb11u1?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2011-3374",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libapt-pkg6.0@2.2.4?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2023-4039",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/gcc-10-base@10.2.1-6?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2023-4039",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/gcc-9-base@9.3.0-22?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-68973",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/gpgv@2.2.27-2%2Bdeb11u1?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2022-34903",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/gpgv@2.2.27-2%2Bdeb11u1?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-68972",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/gpgv@2.2.27-2%2Bdeb11u1?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2022-3219",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/gpgv@2.2.27-2%2Bdeb11u1?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2022-1304",
+      "ratings": [
+        {
+          "score": 12,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:b49d12cd-ed5e-48f3-9e74-3c67ed9c3ffe/1#pkg:deb/debian/libext2fs2@1.47.0-2%2Bb2?arch=amd64\u0026distro=debian-12.13"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2022-0563",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libc-bin@2.31-13%2Bdeb11u3?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2021-3999",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libc-bin@2.31-13%2Bdeb11u3?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2023-4911",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libc-bin@2.31-13%2Bdeb11u3?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2024-2961",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libc-bin@2.31-13%2Bdeb11u3?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2026-0861",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libc-bin@2.31-13%2Bdeb11u3?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2023-4806",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libc-bin@2.31-13%2Bdeb11u3?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2024-33599",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libc-bin@2.31-13%2Bdeb11u3?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-4802",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libc-bin@2.31-13%2Bdeb11u3?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2023-4813",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libc-bin@2.31-13%2Bdeb11u3?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2024-33601",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libc-bin@2.31-13%2Bdeb11u3?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-0395",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libc-bin@2.31-13%2Bdeb11u3?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-8058",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libc-bin@2.31-13%2Bdeb11u3?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2010-4756",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libc-bin@2.31-13%2Bdeb11u3?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2019-1010022",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libc-bin@2.31-13%2Bdeb11u3?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2024-33600",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libc-bin@2.31-13%2Bdeb11u3?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2024-33602",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libc-bin@2.31-13%2Bdeb11u3?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-15281",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libc-bin@2.31-13%2Bdeb11u3?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2026-0915",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libc-bin@2.31-13%2Bdeb11u3?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2018-20796",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libc-bin@2.31-13%2Bdeb11u3?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2019-1010023",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libc-bin@2.31-13%2Bdeb11u3?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2019-1010024",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libc-bin@2.31-13%2Bdeb11u3?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2019-1010025",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libc-bin@2.31-13%2Bdeb11u3?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2019-9192",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libc-bin@2.31-13%2Bdeb11u3?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2024-2961",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libc6@2.31-13%2Bdeb11u3?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2024-33599",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libc6@2.31-13%2Bdeb11u3?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-4802",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libc6@2.31-13%2Bdeb11u3?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2021-3999",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libc6@2.31-13%2Bdeb11u3?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2023-4911",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libc6@2.31-13%2Bdeb11u3?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2026-0861",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libc6@2.31-13%2Bdeb11u3?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2024-33601",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libc6@2.31-13%2Bdeb11u3?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2024-33602",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libc6@2.31-13%2Bdeb11u3?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-0395",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libc6@2.31-13%2Bdeb11u3?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-15281",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libc6@2.31-13%2Bdeb11u3?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-8058",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libc6@2.31-13%2Bdeb11u3?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2023-4806",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libc6@2.31-13%2Bdeb11u3?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2023-4813",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libc6@2.31-13%2Bdeb11u3?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2026-0915",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libc6@2.31-13%2Bdeb11u3?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2010-4756",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libc6@2.31-13%2Bdeb11u3?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2024-33600",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libc6@2.31-13%2Bdeb11u3?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2019-1010023",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libc6@2.31-13%2Bdeb11u3?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2019-9192",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libc6@2.31-13%2Bdeb11u3?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2019-1010022",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libc6@2.31-13%2Bdeb11u3?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2019-1010024",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libc6@2.31-13%2Bdeb11u3?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2019-1010025",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libc6@2.31-13%2Bdeb11u3?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2018-20796",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libc6@2.31-13%2Bdeb11u3?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2022-31782",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libfreetype6@2.10.4%2Bdfsg-1?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2018-6829",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libgcrypt20@1.8.7-6?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2022-27405",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libfreetype6@2.10.4%2Bdfsg-1?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2022-27406",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libfreetype6@2.10.4%2Bdfsg-1?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2023-4039",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libgcc-s1@10.2.1-6?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2021-33560",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libgcrypt20@1.8.7-6?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2022-1304",
+      "ratings": [
+        {
+          "score": 12,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:b49d12cd-ed5e-48f3-9e74-3c67ed9c3ffe/1#pkg:deb/debian/libext2fs2@1.47.0-2%2Bb2?arch=amd64\u0026distro=debian-12.13"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2022-27404",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libfreetype6@2.10.4%2Bdfsg-1?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-27363",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libfreetype6@2.10.4%2Bdfsg-1?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2021-38115",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libgd3@2.3.0-2?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2021-40812",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libgd3@2.3.0-2?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2024-0567",
+      "ratings": [
+        {
+          "score": 12,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:b49d12cd-ed5e-48f3-9e74-3c67ed9c3ffe/1#pkg:deb/debian/libgnutls30@3.7.9-2%2Bdeb12u5?arch=amd64\u0026distro=debian-12.13"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-32990",
+      "ratings": [
+        {
+          "score": 12,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:b49d12cd-ed5e-48f3-9e74-3c67ed9c3ffe/1#pkg:deb/debian/libgnutls30@3.7.9-2%2Bdeb12u5?arch=amd64\u0026distro=debian-12.13"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2024-2236",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libgcrypt20@1.8.7-6?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2021-40145",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libgd3@2.3.0-2?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2023-0361",
+      "ratings": [
+        {
+          "score": 12,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:b49d12cd-ed5e-48f3-9e74-3c67ed9c3ffe/1#pkg:deb/debian/libgnutls30@3.7.9-2%2Bdeb12u5?arch=amd64\u0026distro=debian-12.13"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2024-0553",
+      "ratings": [
+        {
+          "score": 12,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:b49d12cd-ed5e-48f3-9e74-3c67ed9c3ffe/1#pkg:deb/debian/libgnutls30@3.7.9-2%2Bdeb12u5?arch=amd64\u0026distro=debian-12.13"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-32988",
+      "ratings": [
+        {
+          "score": 12,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:b49d12cd-ed5e-48f3-9e74-3c67ed9c3ffe/1#pkg:deb/debian/libgnutls30@3.7.9-2%2Bdeb12u5?arch=amd64\u0026distro=debian-12.13"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2023-5981",
+      "ratings": [
+        {
+          "score": 12,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:b49d12cd-ed5e-48f3-9e74-3c67ed9c3ffe/1#pkg:deb/debian/libgnutls30@3.7.9-2%2Bdeb12u5?arch=amd64\u0026distro=debian-12.13"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2024-12243",
+      "ratings": [
+        {
+          "score": 12,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:b49d12cd-ed5e-48f3-9e74-3c67ed9c3ffe/1#pkg:deb/debian/libgnutls30@3.7.9-2%2Bdeb12u5?arch=amd64\u0026distro=debian-12.13"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2024-28835",
+      "ratings": [
+        {
+          "score": 12,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:b49d12cd-ed5e-48f3-9e74-3c67ed9c3ffe/1#pkg:deb/debian/libgnutls30@3.7.9-2%2Bdeb12u5?arch=amd64\u0026distro=debian-12.13"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2011-3389",
+      "ratings": [
+        {
+          "score": 12,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:b49d12cd-ed5e-48f3-9e74-3c67ed9c3ffe/1#pkg:deb/debian/libgnutls30@3.7.9-2%2Bdeb12u5?arch=amd64\u0026distro=debian-12.13"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2022-42898",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libgssapi-krb5-2@1.18.3-6%2Bdeb11u1?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2021-4209",
+      "ratings": [
+        {
+          "score": 12,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:b49d12cd-ed5e-48f3-9e74-3c67ed9c3ffe/1#pkg:deb/debian/libgnutls30@3.7.9-2%2Bdeb12u5?arch=amd64\u0026distro=debian-12.13"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-6395",
+      "ratings": [
+        {
+          "score": 12,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:b49d12cd-ed5e-48f3-9e74-3c67ed9c3ffe/1#pkg:deb/debian/libgnutls30@3.7.9-2%2Bdeb12u5?arch=amd64\u0026distro=debian-12.13"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-9820",
+      "ratings": [
+        {
+          "score": 12,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:b49d12cd-ed5e-48f3-9e74-3c67ed9c3ffe/1#pkg:deb/debian/libgnutls30@3.7.9-2%2Bdeb12u5?arch=amd64\u0026distro=debian-12.13"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2024-37371",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libgssapi-krb5-2@1.18.3-6%2Bdeb11u1?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2022-1586",
+      "ratings": [
+        {
+          "score": 12,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:b49d12cd-ed5e-48f3-9e74-3c67ed9c3ffe/1#pkg:deb/debian/libpcre2-8-0@10.42-1?arch=amd64\u0026distro=debian-12.13"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2022-1587",
+      "ratings": [
+        {
+          "score": 12,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:b49d12cd-ed5e-48f3-9e74-3c67ed9c3ffe/1#pkg:deb/debian/libpcre2-8-0@10.42-1?arch=amd64\u0026distro=debian-12.13"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2022-41409",
+      "ratings": [
+        {
+          "score": 12,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:b49d12cd-ed5e-48f3-9e74-3c67ed9c3ffe/1#pkg:deb/debian/libpcre2-8-0@10.42-1?arch=amd64\u0026distro=debian-12.13"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-64720",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libpng16-16@1.6.37-3?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-65018",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libpng16-16@1.6.37-3?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2021-36086",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libsepol1@3.1-1?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-66293",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libpng16-16@1.6.37-3?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-64505",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libpng16-16@1.6.37-3?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-64506",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libpng16-16@1.6.37-3?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2026-22695",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libpng16-16@1.6.37-3?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2021-4214",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libpng16-16@1.6.37-3?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2021-36085",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libsepol1@3.1-1?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2021-36087",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libsepol1@3.1-1?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2024-28085",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libsmartcols1@2.36.1-8%2Bdeb11u1?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-14104",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libsmartcols1@2.36.1-8%2Bdeb11u1?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2020-22218",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libssh2-1@1.9.0-2?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2022-2068",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libssl1.1@1.1.1n-0%2Bdeb11u2?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2022-4450",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libssl1.1@1.1.1n-0%2Bdeb11u2?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2023-0215",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libssl1.1@1.1.1n-0%2Bdeb11u2?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2022-0563",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libsmartcols1@2.36.1-8%2Bdeb11u1?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2022-1304",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libss2@1.46.2-2?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2023-0286",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libssl1.1@1.1.1n-0%2Bdeb11u2?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2024-4741",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libssl1.1@1.1.1n-0%2Bdeb11u2?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2024-9143",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libssl1.1@1.1.1n-0%2Bdeb11u2?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-27587",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libssl1.1@1.1.1n-0%2Bdeb11u2?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2024-13176",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libssl1.1@1.1.1n-0%2Bdeb11u2?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2024-5535",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libssl1.1@1.1.1n-0%2Bdeb11u2?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-9230",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libssl1.1@1.1.1n-0%2Bdeb11u2?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2024-2511",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libssl1.1@1.1.1n-0%2Bdeb11u2?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2022-3821",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libsystemd0@247.3-7?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-4598",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libudev1@247.3-7?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2013-4392",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libudev1@247.3-7?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2023-31437",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libsystemd0@247.3-7?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2023-31438",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libsystemd0@247.3-7?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2022-4415",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libsystemd0@247.3-7?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2023-7008",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libudev1@247.3-7?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2020-13529",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libsystemd0@247.3-7?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2023-31439",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libsystemd0@247.3-7?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-13151",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libtasn1-6@4.16.0-2?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2022-2867",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libtiff5@4.2.0-1%2Bdeb11u1?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2022-1623",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libtiff5@4.2.0-1%2Bdeb11u1?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2022-2056",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libtiff5@4.2.0-1%2Bdeb11u1?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2022-2058",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libtiff5@4.2.0-1%2Bdeb11u1?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2022-2521",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libtiff5@4.2.0-1%2Bdeb11u1?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2022-2868",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libtiff5@4.2.0-1%2Bdeb11u1?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2022-1622",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libtiff5@4.2.0-1%2Bdeb11u1?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2022-2057",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libtiff5@4.2.0-1%2Bdeb11u1?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2022-2519",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libtiff5@4.2.0-1%2Bdeb11u1?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2022-2520",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libtiff5@4.2.0-1%2Bdeb11u1?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2023-50495",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libtinfo6@6.2%2B20201114-2?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2023-50387",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libudev1@247.3-7?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2022-4415",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libudev1@247.3-7?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2022-29458",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libtinfo6@6.2%2B20201114-2?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2023-29491",
+      "ratings": [
+        {
+          "score": 12,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:b49d12cd-ed5e-48f3-9e74-3c67ed9c3ffe/1#pkg:deb/debian/libtinfo6@6.4-4?arch=amd64\u0026distro=debian-12.13"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2021-46828",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libtirpc3@1.3.1-1?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2021-46828",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libtirpc3@1.3.1-1?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2023-50868",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libudev1@247.3-7?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2022-3821",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libudev1@247.3-7?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2013-4392",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libudev1@247.3-7?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2020-13529",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libudev1@247.3-7?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2023-31437",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libudev1@247.3-7?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2023-31438",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libudev1@247.3-7?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2022-0563",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libuuid1@2.36.1-8%2Bdeb11u1?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2023-31439",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libudev1@247.3-7?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2024-28085",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libuuid1@2.36.1-8%2Bdeb11u1?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-14104",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libuuid1@2.36.1-8%2Bdeb11u1?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2023-7008",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libudev1@247.3-7?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-4598",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libudev1@247.3-7?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2023-1999",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libwebp6@0.6.1-2.1?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2023-4863",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libwebp6@0.6.1-2.1?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2023-43785",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libx11-6@1.7.2-1?arch=amd64\u0026distro=debian-11.3\u0026epoch=2"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2023-43786",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libx11-6@1.7.2-1?arch=amd64\u0026distro=debian-11.3\u0026epoch=2"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2015-9019",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libxslt1.1@1.1.34-4?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-11731",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libxslt1.1@1.1.34-4?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2021-30560",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libxslt1.1@1.1.34-4?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2024-55549",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libxslt1.1@1.1.34-4?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-7424",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libxslt1.1@1.1.34-4?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-7425",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libxslt1.1@1.1.34-4?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2023-40403",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libxslt1.1@1.1.34-4?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-10911",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libxslt1.1@1.1.34-4?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2024-28085",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/util-linux@2.36.1-8%2Bdeb11u1?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-14104",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/util-linux@2.36.1-8%2Bdeb11u1?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2022-0563",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/util-linux@2.36.1-8%2Bdeb11u1?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-53859",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/nginx@1.21.6-1~bullseye?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2022-2068",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/openssl@1.1.1n-0%2Bdeb11u2?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2022-2068",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libssl1.1@1.1.1n-0%2Bdeb11u2?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2022-4450",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/openssl@1.1.1n-0%2Bdeb11u2?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2022-4450",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libssl1.1@1.1.1n-0%2Bdeb11u2?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2023-0215",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/openssl@1.1.1n-0%2Bdeb11u2?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2023-0215",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libssl1.1@1.1.1n-0%2Bdeb11u2?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2023-0286",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/openssl@1.1.1n-0%2Bdeb11u2?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2023-0286",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libssl1.1@1.1.1n-0%2Bdeb11u2?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2023-0465",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/openssl@1.1.1n-0%2Bdeb11u2?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2023-0465",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libssl1.1@1.1.1n-0%2Bdeb11u2?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2023-44487",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/nginx@1.21.6-1~bullseye?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2023-0464",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/openssl@1.1.1n-0%2Bdeb11u2?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2023-0464",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libssl1.1@1.1.1n-0%2Bdeb11u2?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2022-2097",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/openssl@1.1.1n-0%2Bdeb11u2?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2022-2097",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libssl1.1@1.1.1n-0%2Bdeb11u2?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2022-4304",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/openssl@1.1.1n-0%2Bdeb11u2?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2022-4304",
+      "ratings": [
+        {
+          "score": 36,
+          "method": "OWASP"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/libssl1.1@1.1.1n-0%2Bdeb11u2?arch=amd64\u0026distro=debian-11.3"
+        }
+      ]
+    }
+  ]
+}
