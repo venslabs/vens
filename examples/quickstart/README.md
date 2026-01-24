@@ -1,37 +1,47 @@
 # Quickstart Example
 
-This directory contains a **real-world example** demonstrating how **vens** prioritizes vulnerabilities based on business context.
+This directory contains a **real-world example** demonstrating how **vens** prioritizes vulnerabilities based on business context using OWASP Risk Rating Methodology.
 
 ## Overview
 
-In this example, we scan **2 popular container images** that you might find in a typical production environment:
+In this example, we scan a **production NGINX container image** and use LLM to evaluate each vulnerability's contribution to OWASP risk factors.
 
-| Image | Role | Vulnerabilities | OWASP Score |
-|-------|------|-----------------|-------------|
-| `nginx:1.21` | Public-facing web server | 540 | 36 (CRITICAL) |
-| `redis:6` | Internal cache | 160 | 12 (LOW) |
+| Image | Role | Description |
+|-------|------|-------------|
+| `nginx:1.25` | Public-facing web server | Internet-exposed, high attack surface |
 
-**The key insight**: A vulnerability in `nginx` (your internet-exposed frontend) is more critical than the same vulnerability in `redis` (internal cache). **vens** helps you prioritize based on this business context.
+**The key insight**: vens uses LLM to analyze each CVE and evaluate how much it contributes to your project's risk profile based on the OWASP factors you define.
 
 ## Directory Structure
 
 ```
 quickstart/
-├── config.yaml          # OWASP risk scores for each component
-├── sboms/               # CycloneDX SBOMs for each image
-│   ├── nginx.cdx.json
-│   └── redis.cdx.json
-└── reports/             # Trivy vulnerability reports
-    ├── nginx.trivy.json
-    └── redis.trivy.json
+├── config.yaml          # OWASP risk factors for your project
+├── reports/             # Trivy vulnerability reports
+│   └── nginx.trivy.json
+└── output_vex.cdx.json  # Generated VEX with risk scores
 ```
 
 ## How It Works
 
-1. **SBOMs** (`sboms/`): Each CycloneDX SBOM lists the packages and dependencies in the container image
-2. **Vulnerability Reports** (`reports/`): Trivy scans identify CVEs in each image
-3. **Risk Configuration** (`config.yaml`): You define OWASP risk scores based on business context
-4. **vens**: Combines all inputs to produce a prioritized VEX document
+1. **Vulnerability Report** (`reports/`): Trivy scan identifies CVEs in the image
+2. **Risk Configuration** (`config.yaml`): You define base OWASP risk factors for your project context
+3. **LLM Analysis**: vens uses LLM to evaluate each vulnerability's contribution (0-100%) to each OWASP factor
+4. **Risk Score**: Final weighted score computed using OWASP Risk Rating formula
+
+## Configuration (`config.yaml`)
+
+```yaml
+project:
+  name: "nginx-production"
+  description: "Production NGINX web server exposed to internet"
+
+owasp:
+  threat_agent: 7      # 0-9: Who might attack?
+  vulnerability: 6     # 0-9: How easy to exploit?
+  technical_impact: 7  # 0-9: Damage to systems?
+  business_impact: 8   # 0-9: Business consequences?
+```
 
 ## Running the Example
 
@@ -39,9 +49,10 @@ quickstart/
 
 ```bash
 export OPENAI_API_KEY="sk-..."
+export OPENAI_MODEL="gpt-4o-mini"
+
 vens generate \
   --config-file config.yaml \
-  --sboms sboms/nginx.cdx.json,sboms/redis.cdx.json \
   --llm openai \
   reports/nginx.trivy.json \
   output_vex.cdx.json
@@ -51,17 +62,34 @@ vens generate \
 
 ```bash
 export OLLAMA_MODEL="llama3"
+
 vens generate \
   --config-file config.yaml \
-  --sboms sboms/nginx.cdx.json,sboms/redis.cdx.json \
   --llm ollama \
   reports/nginx.trivy.json \
   output_vex.cdx.json
 ```
 
+## LLM Reasoning Example
+
+For each vulnerability, the LLM evaluates its contribution to OWASP factors:
+
+```
+CVE-2024-1234 in OpenSSL (RCE):
+├── Threat Agent:      90%  → Widely known, public exploits available
+├── Vulnerability:     85%  → POC available, easy to exploit
+├── Technical Impact:  95%  → RCE = full system compromise
+└── Business Impact:  100%  → Frontend server, critical for business
+
+Final Score Calculation:
+  Likelihood = (7 × 0.90 + 6 × 0.85) / 2 = 5.70
+  Impact = (7 × 0.95 + 8 × 1.00) / 2 = 7.33
+  Risk = 5.70 × 7.33 = 41.78 (CRITICAL)
+```
+
 ## Example Output
 
-After running vens, `output_vex.cdx.json` contains a CycloneDX VEX document with prioritized vulnerabilities:
+After running vens, `output_vex.cdx.json` contains a CycloneDX VEX document with OWASP risk scores:
 
 ```json
 {
@@ -71,30 +99,22 @@ After running vens, `output_vex.cdx.json` contains a CycloneDX VEX document with
   "version": 1,
   "vulnerabilities": [
     {
-      "id": "CVE-2011-3374",
+      "id": "CVE-2024-1234",
       "ratings": [
         {
-          "score": 36,
+          "score": 41.78,
+          "severity": "critical",
           "method": "OWASP"
-        }
-      ],
-      "affects": [
-        {
-          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/apt@2.2.4?arch=amd64&distro=debian-11.3"
         }
       ]
     },
     {
-      "id": "CVE-2017-18018",
+      "id": "CVE-2024-5678",
       "ratings": [
         {
-          "score": 36,
+          "score": 12.5,
+          "severity": "low",
           "method": "OWASP"
-        }
-      ],
-      "affects": [
-        {
-          "ref": "urn:cdx:7d3fcbed-5788-4f1c-843c-991003351c90/1#pkg:deb/debian/coreutils@8.32-4+b1?arch=amd64&distro=debian-11.3"
         }
       ]
     }
@@ -104,34 +124,30 @@ After running vens, `output_vex.cdx.json` contains a CycloneDX VEX document with
 
 ### Understanding the Output
 
-Each vulnerability in the output includes an OWASP risk score (36) inherited from the parent component (`nginx`). This score reflects the business context: nginx is internet-exposed with a high attack surface.
+Each vulnerability receives a contextual OWASP risk score based on:
+- The base risk factors you defined in `config.yaml`
+- The LLM's evaluation of how much each CVE contributes to those factors
 
-If you process a report for `redis` instead, vulnerabilities would receive a lower score (12) because redis is an internal cache, not directly accessible.
-
-| Component | Risk Level | Why? |
-|-----------|------------|------|
-| nginx | CRITICAL (36) | Internet-exposed, high attack surface |
-| redis | LOW (12) | Internal cache, not directly accessible |
-
-This is the power of **vens**: it helps you focus on what matters most to your business.
+| Severity | Score Range | Action |
+|----------|-------------|--------|
+| CRITICAL | ≥ 60 | Immediate remediation required |
+| HIGH | 40-59 | Prioritize for next sprint |
+| MEDIUM | 20-39 | Plan remediation |
+| LOW | 5-19 | Monitor |
+| NOTE | < 5 | Informational |
 
 ## Regenerating the Example
 
-To regenerate the SBOMs and vulnerability reports with newer image versions:
+To regenerate the vulnerability report with a newer image version:
 
 ```bash
-# Generate SBOMs
-trivy image nginx:1.21 --format cyclonedx --output sboms/nginx.cdx.json
-trivy image redis:6 --format cyclonedx --output sboms/redis.cdx.json
-
-# Generate vulnerability reports
-trivy image nginx:1.21 --format json --output reports/nginx.trivy.json
-trivy image redis:6 --format json --output reports/redis.trivy.json
+# Generate vulnerability report
+trivy image nginx:1.25 --format json --output reports/nginx.trivy.json
 ```
 
 ## Key Takeaways
 
-1. **Context matters**: Not all vulnerabilities are equally important
-2. **Business impact**: vens uses OWASP risk scoring to reflect real-world priorities
-3. **Actionable output**: The VEX document helps security teams focus remediation efforts
-4. **Scalable**: Works with any number of components and vulnerability reports
+1. **Context matters**: LLM evaluates each CVE based on your project's specific context
+2. **OWASP methodology**: Industry-standard risk rating for consistent prioritization
+3. **Actionable output**: CycloneDX VEX format integrates with security platforms
+4. **Customizable**: Adjust base OWASP factors to match your risk tolerance

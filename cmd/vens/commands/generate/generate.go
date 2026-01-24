@@ -34,8 +34,7 @@ func New() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "generate INPUT OUTPUT",
 		Short: "Generate CycloneDx VEX with OWASP risk scores using LLM",
-		Long: `Generate Vulnerability-Exploitability eXchange (VEX) information using an LLM 
-to evaluate each vulnerability's contribution to OWASP risk factors.
+		Long: `Generate Vulnerability-Exploitability eXchange (VEX) information using an LLM to prioritize CVEs based on risk.
 
 The LLM analyzes each vulnerability and evaluates how much it contributes to:
 - Threat Agent: Who might attack? (skill, motivation, opportunity)
