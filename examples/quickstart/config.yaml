@@ -1,15 +1,45 @@
-# vens configuration file
-# Each component has an OWASP risk score based on its business context.
-# Use version-less PURLs as keys to match components from the SBOMs.
+# vens - Vulnerability Risk Scoring Configuration
+# Documentation: https://github.com/venslabs/vens/docs/config.md
+
+project:
+  name: "nginx-production"
+  description: "Production NGINX web server exposed to internet"
+
+# OWASP Risk Rating (0-9 scale for each factor)
+# Final Risk = Likelihood × Impact
+# Reference: https://owasp.org/www-community/OWASP_Risk_Rating_Methodology
 
 owasp:
-  # NGINX - Public-facing web server (internet exposed)
-  # High likelihood of attack, critical impact if compromised
-  pkg:oci/nginx:
-    likelihood: 6
-    impact: 6
+  # === LIKELIHOOD (How probable is the attack?) ===
+  
+  threat_agent: 7
+  # Who might attack? Their skill, motivation, and opportunity
+  # 0-3: Script kiddies, opportunistic attacks
+  # 4-6: Skilled attackers, moderate resources
+  # 7-9: Organized crime, nation-states, APT groups
+  
+  vulnerability: 6
+  # How easy is it to find and exploit vulnerabilities?
+  # 0-3: Very difficult, requires insider knowledge
+  # 4-6: Public CVEs, some tools available
+  # 7-9: Trivial, automated scanners, known exploits
 
-  # Redis - Internal cache
-  # Not directly exposed, lower attack surface
-  pkg:oci/redis:
-    score: 12
+  # === IMPACT (What damage if successful?) ===
+  
+  technical_impact: 7
+  # Damage to systems, data, and infrastructure
+  # 0-3: Minor data disclosure, limited access
+  # 4-6: Significant data loss, service disruption
+  # 7-9: Complete system compromise, data destruction
+  
+  business_impact: 8
+  # Consequences for the business
+  # 0-3: Minimal financial/reputation loss
+  # 4-6: Moderate losses, customer complaints
+  # 7-9: Bankruptcy risk, regulatory fines, brand destruction
+
+# Calculated Risk Score Example:
+# Likelihood = (threat_agent + vulnerability) / 2 = (7 + 6) / 2 = 6.5
+# Impact = (technical_impact + business_impact) / 2 = (7 + 8) / 2 = 7.5
+# Risk = Likelihood × Impact = 6.5 × 7.5 = 48.75 / 81
+# Severity: CRITICAL (score > 40)

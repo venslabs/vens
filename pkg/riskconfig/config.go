@@ -22,35 +22,71 @@ import (
 )
 
 // Config represents the structure of config.yaml provided by users.
-// The schema is intentionally simple to keep the file easy to edit.
+// The schema follows OWASP Risk Rating Methodology with 4 base factors.
 //
 // Example YAML:
 //
+//	project:
+//	  name: "nginx-production"
+//	  description: "Production NGINX web server"
+//
 //	owasp:
-//	  # Use version-less PURLs as keys (preferred):
-//	  pkg:golang/github.com/acme/lib:
-//	    score: 45      # optionnel; 0..81 (si fourni directement, échelle OWASP native)
-//	    likelihood: 5  # optionnel; 0..9 (OWASP 0..9)
-//	    impact: 9      # optionnel; 0..9 (OWASP 0..9)
+//	  threat_agent: 7      # 0-9: Who might attack?
+//	  vulnerability: 6     # 0-9: How easy to exploit?
+//	  technical_impact: 7  # 0-9: Damage to systems?
+//	  business_impact: 8   # 0-9: Business consequences?
 //
-//	# Remarque: si une version est présente dans la clé ("@version"),
-//	# elle est IGNORÉE lors du chargement. Les clés sont normalisées
-//	# en PURL sans version pour refléter un impact indépendant de la version.
-//
-// If score is not provided, it will be computed from likelihood and impact
-// as OWASP Risk: score = (likelihood * impact). With both factors in [0..9],
-// the computed risk is in [0..81].
-// If neither score nor both likelihood and impact are provided, the entry is invalid.
+// The LLM will evaluate how much each vulnerability contributes to these
+// base factors (as percentages), then compute the final weighted risk score.
 type Config struct {
-	OWASP map[string]OWASPEntry `yaml:"owasp"`
+	Project ProjectConfig `yaml:"project"`
+	OWASP   OWASPFactors  `yaml:"owasp"`
 }
 
-// OWASPEntry holds either a direct score, or the minimal pair of factors
-// (likelihood and impact) to compute a score.
-type OWASPEntry struct {
-	Score      *float64 `yaml:"score,omitempty"`
-	Likelihood *float64 `yaml:"likelihood,omitempty"`
-	Impact     *float64 `yaml:"impact,omitempty"`
+// ProjectConfig holds project metadata for context in LLM analysis.
+type ProjectConfig struct {
+	Name        string `yaml:"name"`
+	Description string `yaml:"description,omitempty"`
+}
+
+// OWASPFactors holds the 4 base OWASP risk factors (0-9 scale each).
+// Reference: https://owasp.org/www-community/OWASP_Risk_Rating_Methodology
+//
+// Likelihood factors:
+//   - ThreatAgent: Skill, motivation, and opportunity of potential attackers
+//   - Vulnerability: Ease of discovery and exploitation
+//
+// Impact factors:
+//   - TechnicalImpact: Damage to systems, data, and infrastructure
+//   - BusinessImpact: Financial, reputation, and compliance consequences
+type OWASPFactors struct {
+	// === LIKELIHOOD FACTORS ===
+
+	// ThreatAgent represents who might attack (0-9)
+	// 0-3: Script kiddies, opportunistic attacks
+	// 4-6: Skilled attackers, moderate resources
+	// 7-9: Organized crime, nation-states, APT groups
+	ThreatAgent float64 `yaml:"threat_agent"`
+
+	// Vulnerability represents how easy it is to find and exploit (0-9)
+	// 0-3: Very difficult, requires insider knowledge
+	// 4-6: Public CVEs, some tools available
+	// 7-9: Trivial, automated scanners, known exploits
+	Vulnerability float64 `yaml:"vulnerability"`
+
+	// === IMPACT FACTORS ===
+
+	// TechnicalImpact represents damage to systems (0-9)
+	// 0-3: Minor data disclosure, limited access
+	// 4-6: Significant data loss, service disruption
+	// 7-9: Complete system compromise, data destruction
+	TechnicalImpact float64 `yaml:"technical_impact"`
+
+	// BusinessImpact represents consequences for the business (0-9)
+	// 0-3: Minimal financial/reputation loss
+	// 4-6: Moderate losses, customer complaints
+	// 7-9: Bankruptcy risk, regulatory fines, brand destruction
+	BusinessImpact float64 `yaml:"business_impact"`
 }
 
 // Load parses a config.yaml file from the given path and validates entries.
@@ -59,71 +95,93 @@ func Load(path string) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	var f Config
-	if err := yaml.Unmarshal(b, &f); err != nil {
+	var cfg Config
+	if err := yaml.Unmarshal(b, &cfg); err != nil {
 		return nil, err
 	}
-	if len(f.OWASP) == 0 {
-		return &f, nil
-	}
-	// Normalize keys to version-less PURLs and validate ranges.
-	normMap := make(map[string]OWASPEntry, len(f.OWASP))
-	for purl, e := range f.OWASP {
-		norm := NormalizePURL(purl)
-		// At least one of: score OR (likelihood and impact) must be provided.
-		hasScore := e.Score != nil
-		hasFactors := e.Likelihood != nil && e.Impact != nil
 
-		if !hasScore && !hasFactors {
-			return nil, fmt.Errorf("owasp entry for %s must have either score or both likelihood and impact", norm)
-		}
-		if hasScore && !inRange0081(*e.Score) {
-			return nil, fmt.Errorf("score for %s must be between 0 and 81 (OWASP native scale)", norm)
-		}
-		if hasFactors {
-			if !inRange09(*e.Likelihood) || !inRange09(*e.Impact) {
-				return nil, fmt.Errorf("likelihood/impact for %s must be between 0 and 9 (OWASP native scale)", norm)
-			}
-		}
-		// Keep the last occurrence in case of duplicates (versioned and unversioned keys).
-		normMap[norm] = e
+	// Validate OWASP factors are in valid range [0, 9]
+	if err := cfg.validate(); err != nil {
+		return nil, err
 	}
-	f.OWASP = normMap
-	return &f, nil
+
+	return &cfg, nil
 }
 
-// ScoreForPURL returns the OWASP score in range [0,81] for the given purl if present.
-func (f *Config) ScoreForPURL(purl string) (float64, bool) {
-	if f == nil || len(f.OWASP) == 0 {
-		return 0, false
+// validate checks that all OWASP factors are within the valid range [0, 9].
+func (c *Config) validate() error {
+	factors := map[string]float64{
+		"threat_agent":     c.OWASP.ThreatAgent,
+		"vulnerability":    c.OWASP.Vulnerability,
+		"technical_impact": c.OWASP.TechnicalImpact,
+		"business_impact":  c.OWASP.BusinessImpact,
 	}
-	// NOTE: Keys were normalized during Load. Callers should pass a version-less PURL here.
-	// No additional normalization is performed at lookup time.
-	e, ok := f.OWASP[purl]
-	if !ok {
-		return 0, false
-	}
-	if e.Score != nil {
-		return *e.Score, true
-	}
-	if e.Likelihood != nil && e.Impact != nil {
-		// OWASP Risk combination: Risk = Likelihood * Impact (0..81)
-		l, i := *e.Likelihood, *e.Impact
-		return (l * i), true
-	}
-	return 0, false
-}
 
-// NormalizePURL returns the PURL without a version part (sub-string after '@').
-// This is a simple best-effort normalization and does not parse full PURL grammar.
-func NormalizePURL(purl string) string {
-	for i := 0; i < len(purl); i++ {
-		if purl[i] == '@' {
-			return purl[:i]
+	for name, value := range factors {
+		if !inRange09(value) {
+			return fmt.Errorf("OWASP factor %q must be between 0 and 9, got %.2f", name, value)
 		}
 	}
-	return purl
+	return nil
 }
 
-func inRange09(v float64) bool   { return v >= 0 && v <= 9 }
-func inRange0081(v float64) bool { return v >= 0 && v <= 81 }
+// ComputeBaseRisk calculates the base OWASP risk score without LLM adjustments.
+// Formula: Risk = Likelihood × Impact
+// Where: Likelihood = (ThreatAgent + Vulnerability) / 2
+//
+//	Impact = (TechnicalImpact + BusinessImpact) / 2
+//
+// Result is in range [0, 81] (9 × 9 max).
+func (c *Config) ComputeBaseRisk() float64 {
+	likelihood := (c.OWASP.ThreatAgent + c.OWASP.Vulnerability) / 2.0
+	impact := (c.OWASP.TechnicalImpact + c.OWASP.BusinessImpact) / 2.0
+	return likelihood * impact
+}
+
+// ComputeWeightedRisk calculates the risk score adjusted by LLM contribution percentages.
+// Each contribution is a percentage (0.0 to 1.0) representing how much the specific
+// vulnerability contributes to each OWASP factor.
+//
+// Formula:
+//
+//	Likelihood = (ThreatAgent × threatAgentContrib + Vulnerability × vulnContrib) / 2
+//	Impact = (TechnicalImpact × techContrib + BusinessImpact × bizContrib) / 2
+//	Risk = Likelihood × Impact
+func (c *Config) ComputeWeightedRisk(contributions OWASPContributions) float64 {
+	weightedThreatAgent := c.OWASP.ThreatAgent * contributions.ThreatAgent
+	weightedVulnerability := c.OWASP.Vulnerability * contributions.Vulnerability
+	weightedTechnicalImpact := c.OWASP.TechnicalImpact * contributions.TechnicalImpact
+	weightedBusinessImpact := c.OWASP.BusinessImpact * contributions.BusinessImpact
+
+	likelihood := (weightedThreatAgent + weightedVulnerability) / 2.0
+	impact := (weightedTechnicalImpact + weightedBusinessImpact) / 2.0
+	return likelihood * impact
+}
+
+// OWASPContributions holds the LLM-evaluated contribution percentages for each factor.
+// Each value is a percentage between 0.0 (0%) and 1.0 (100%).
+type OWASPContributions struct {
+	ThreatAgent     float64 `json:"threat_agent_contribution"`
+	Vulnerability   float64 `json:"vulnerability_contribution"`
+	TechnicalImpact float64 `json:"technical_impact_contribution"`
+	BusinessImpact  float64 `json:"business_impact_contribution"`
+}
+
+// RiskSeverity returns a human-readable severity level based on the risk score.
+// Based on OWASP Risk Rating: score range is [0, 81].
+func RiskSeverity(score float64) string {
+	switch {
+	case score >= 60:
+		return "CRITICAL"
+	case score >= 40:
+		return "HIGH"
+	case score >= 20:
+		return "MEDIUM"
+	case score >= 5:
+		return "LOW"
+	default:
+		return "NOTE"
+	}
+}
+
+func inRange09(v float64) bool { return v >= 0 && v <= 9 }

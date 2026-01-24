@@ -53,9 +53,9 @@ func Example() string {
   export OPENAI_API_KEY=...
   export OPENAI_MODEL=gpt-4o-mini
 
-  trivy image python:3.12.4 --format=json --severity HIGH,CRITICAL >report.json
+  trivy image nginx:1.25 --format=json --severity HIGH,CRITICAL > report.json
 
-  %s generate --config-file config.yaml --sboms sbom.cdx.json report.json vex.cdx.json
+  %s generate --config-file config.yaml report.json vex.cdx.json
   %s enrich --vex vex.cdx.json report.json
 
   # With output file
