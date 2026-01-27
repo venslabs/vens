@@ -39,8 +39,7 @@ quickstart-run:
 	go run ./cmd/vens generate \
 	  --config-file examples/quickstart/config.yaml \
 	  --llm openai \
-	  --sboms examples/quickstart/sbom.cdx.json \
-	  examples/quickstart/trivy.json \
+	  examples/quickstart/reports/nginx.trivy.json \
 	  _output/vex_quickstart.json
 
 .PHONY: quickstart-enrich

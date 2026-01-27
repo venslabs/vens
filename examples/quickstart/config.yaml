@@ -1,15 +1,42 @@
-# vens configuration file
-# Each component has an OWASP risk score based on its business context.
-# Use version-less PURLs as keys to match components from the SBOMs.
+# vens - Vulnerability Risk Scoring Configuration
+# Documentation: https://github.com/github.com/venslabs/vens#readme
 
-owasp:
-  # NGINX - Public-facing web server (internet exposed)
-  # High likelihood of attack, critical impact if compromised
-  pkg:oci/nginx:
-    likelihood: 6
-    impact: 6
+project:
+  name: "nginx-production"
+  description: "Production NGINX web server exposed to internet"
 
-  # Redis - Internal cache
-  # Not directly exposed, lower attack surface
-  pkg:oci/redis:
-    score: 12
+# Context hints for OWASP Risk Rating
+# These hints help the LLM calculate accurate risk scores for each vulnerability
+# Reference: https://owasp.org/www-community/OWASP_Risk_Rating_Methodology
+
+context:
+  # === EXPOSURE ===
+  # How is the system exposed to potential attackers?
+  # Values: internal | private | internet
+  #   - internal: Corporate network only, no external access
+  #   - private: Requires VPN or authentication to access
+  #   - internet: Publicly accessible from the internet
+  exposure: "internet"
+
+  # === DATA SENSITIVITY ===
+  # What type of data does the system handle?
+  # Values: low | medium | high | critical
+  #   - low: Public data, no confidentiality requirements
+  #   - medium: Internal data, limited confidentiality
+  #   - high: PII, financial data, customer information
+  #   - critical: Secrets, credentials, PHI, payment card data
+  data_sensitivity: "high"
+
+  # === BUSINESS CRITICALITY ===
+  # How critical is this system for business operations?
+  # Values: low | medium | high | critical
+  #   - low: Development/test environments
+  #   - medium: Internal tools, non-essential services
+  #   - high: Customer-facing services, important operations
+  #   - critical: Revenue-critical, compliance-required, core business
+  business_criticality: "critical"
+
+  # === ADDITIONAL NOTES (optional) ===
+  # Free-form text to provide extra context for the LLM
+  # Examples: compliance requirements, specific threats, architecture details
+  notes: "Handles customer PII, PCI-DSS compliance required, serves as reverse proxy for backend APIs"

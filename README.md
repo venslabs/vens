@@ -3,7 +3,7 @@
 </p>
 
 
-**Vens** is an AI-powered vulnerability prioritizer. It transforms massive security reports into precise, actionable **CycloneDX VEX** documents using LLMs.
+**Vens** is an AI-powered vulnerability risk scorer. It analyzes security reports and calculates **OWASP Risk Rating scores** for each vulnerability using LLMs, generating precise **CycloneDX VEX** documents with contextual risk scores.
 
 Stop wasting time on contextless CVE lists. Focus on the risks that actually matter.
 
@@ -11,9 +11,36 @@ Stop wasting time on contextless CVE lists. Focus on the risks that actually mat
 
 **Vens** is at the forefront of vulnerability management innovation. 
 
-- **First-of-its-kind Open Source**: We are pioneering the use of LLMs to generate prioritized VEX reports, filling a gap in the open-source ecosystem by providing actionable intelligence for platforms like [Dependency-Track](https://dependencytrack.org/).
+- **First-of-its-kind Open Source**: We are pioneering the use of LLMs to generate risk-scored VEX reports based on OWASP methodology, filling a gap in the open-source ecosystem by providing actionable intelligence for platforms like [Dependency-Track](https://dependencytrack.org/).
 - **Pushing the Standards**: We don't just use CycloneDX; we help shape it. We are actively advocating for the CycloneDX specification to better support risk-based prioritization, ensuring that ratings and risk scores are integrated into the heart of security platforms.
   - 🔗 Check out our contribution: [CycloneDX Specification PR #722](https://github.com/CycloneDX/specification/pull/722)
+
+## 🎯 How It Works
+
+Vens uses the **OWASP Risk Rating Methodology** to compute contextual risk scores:
+
+1. **You define your project's context** in `config.yaml` using simple hints:
+   - **Exposure**: How is the system exposed? (internal, private, internet)
+   - **Data Sensitivity**: What type of data is handled? (low, medium, high, critical)
+   - **Business Criticality**: How critical is the system? (low, medium, high, critical)
+
+2. **The LLM analyzes each vulnerability** using your context and calculates the OWASP risk score:
+   ```
+   CVE-2024-1234 in OpenSSL (RCE):
+   ├── Context: internet-exposed, high data sensitivity, critical business
+   ├── Threat Agent: 8/9 (public exploits, APT target)
+   ├── Vulnerability: 7/9 (easy to exploit, POC available)
+   ├── Technical Impact: 8/9 (RCE, data compromise)
+   ├── Business Impact: 9/9 (revenue-critical, compliance)
+   └── OWASP Score: 63.75/81 → CRITICAL
+   ```
+
+3. **Risk score formula** (OWASP Risk Rating Methodology):
+   ```
+   Likelihood = (Threat Agent + Vulnerability Factor) / 2
+   Impact = (Technical Impact + Business Impact) / 2
+   Risk = Likelihood × Impact  (range: 0-81)
+   ```
 
 ## 🚀 Quick Start
 
@@ -32,48 +59,70 @@ alias vens="trivy vens"
 
 ### Usage
 
-Run the following command to generate a VEX report using the quickstart files. For a detailed explanation and a complete working example, please refer to the [Quickstart Guide](examples/quickstart).
-
 ```bash
 export OPENAI_API_KEY="your-key"
 
-vens generate \
-  --config-file examples/quickstart/config.yaml \
-  --sboms examples/quickstart/sbom.cdx.json \
-  --llm openai \
-  examples/quickstart/trivy.json \
-  output_vex.json
+# 1. Scan your image/project with Trivy
+trivy image nginx:1.25 --format=json --severity HIGH,CRITICAL > report.json
+
+# 2. Generate OWASP risk scores using LLM
+vens generate --config-file config.yaml report.json output_vex.json
 ```
 
 ## ⚙️ Configuration
 
-### Risk Context
-**vens** uses a `config.yaml` file to define your custom risk context based on OWASP risk ratings.
+### Risk Context (`config.yaml`)
 
-> [!IMPORTANT]
-> **vens** uses the component SBOM to match component-specific risk scores to vulnerabilities. Ensure that every component defined in your `config.yaml` has a corresponding SBOM. Refer to the [Quickstart example](examples/quickstart) for further clarification.
+Define your project's context using simple hints. The LLM uses these to calculate accurate OWASP risk scores:
 
 ```yaml
-owasp:
-  # Use version-less PURLs as keys
-  pkg:golang/github.com/acme/lib:
-    likelihood: 7  # 0 to 9 (OWASP native scale)
-    impact: 9      # 0 to 9 (OWASP native scale)
-  
-  pkg:npm/react:
-    score: 45      # 0 to 81 (likelihood * impact)
+# vens - Vulnerability Risk Scoring Configuration
+project:
+  name: "nginx-production"
+  description: "Production NGINX web server exposed to internet"
+
+# Context hints for OWASP Risk Rating
+# Reference: https://owasp.org/www-community/OWASP_Risk_Rating_Methodology
+context:
+  # How is the system exposed to potential attackers?
+  # Values: internal | private | internet
+  exposure: "internet"
+
+  # What type of data does the system handle?
+  # Values: low | medium | high | critical
+  data_sensitivity: "high"
+
+  # How critical is this system for business operations?
+  # Values: low | medium | high | critical
+  business_criticality: "critical"
+
+  # Additional context (optional)
+  notes: "Handles customer PII, PCI-DSS compliance required"
 ```
 
-- **likelihood**: Probability of the vulnerability being exploited in your specific environment.
-- **impact**: Potential damage if the vulnerability is exploited.
-- **score**: Direct OWASP risk score (calculated as `likelihood * impact` if not provided).
+### Context Values Guide
+
+| Field | Value | Description |
+|-------|-------|-------------|
+| **exposure** | `internal` | Corporate network only, no external access |
+| | `private` | Requires VPN or authentication |
+| | `internet` | Publicly accessible |
+| **data_sensitivity** | `low` | Public data |
+| | `medium` | Internal data |
+| | `high` | PII, financial data |
+| | `critical` | Secrets, credentials, PHI |
+| **business_criticality** | `low` | Dev/test environments |
+| | `medium` | Internal tools |
+| | `high` | Customer-facing services |
+| | `critical` | Revenue-critical, compliance |
 
 ### LLM Backends
+
 **vens** supports multiple LLM providers. Configure them using environment variables:
 
 | Backend | Flag `--llm` | Environment Variables |
 |---------|--------------|-----------------------|
-| **OpenAI** (default) | `openai` | `OPENAI_API_KEY` |
+| **OpenAI** (default) | `openai` | `OPENAI_API_KEY`, `OPENAI_MODEL` (optional) |
 | **Ollama** | `ollama` | `OLLAMA_MODEL` (e.g., `llama3`), `OLLAMA_BASE_URL` (optional) |
 | **Anthropic** | `anthropic` | `ANTHROPIC_API_KEY` |
 | **Google AI** | `googleai` | `GOOGLE_API_KEY`, `GOOGLE_MODEL` (optional) |
@@ -81,14 +130,14 @@ owasp:
 **Example for Ollama:**
 ```bash
 export OLLAMA_MODEL="llama3"
-vens generate --llm ollama ...
+vens generate --llm ollama --config-file config.yaml report.json output.json
 ```
 
 ## 💻 Command Reference
 
 ### `vens generate`
 
-Generate a VEX report by analyzing security scans and SBOMs.
+Generate a VEX report with OWASP risk scores by analyzing vulnerabilities using LLM.
 
 **Usage:**
 ```bash
@@ -98,15 +147,14 @@ vens generate [flags] INPUT OUTPUT
 **Flags:**
 | Flag | Description | Default |
 |------|-------------|---------|
-| `--config-file` | **(Required)** Path to `config.yaml` | |
-| `--sboms` | **(Required)** Comma-separated list of CycloneDX SBOMs (assets) | |
-| `--llm` | LLM backend (`openai`, `ollama`) | `auto` |
+| `--config-file` | **(Required)** Path to `config.yaml` with context hints | |
+| `--llm` | LLM backend (`openai`, `ollama`, `anthropic`, `googleai`) | `auto` |
 | `--llm-temperature` | Sampling temperature | `0.0` |
 | `--llm-batch-size` | Number of CVEs to process per request | `10` |
 | `--llm-seed` | Seed for reproducible results | `0` |
 | `--input-format` | Input format (`auto`, `trivy`) | `auto` |
 | `--output-format` | Output format (`auto`, `cyclonedxvex`) | `auto` |
-| `--debug` | Enable debug logging | `false` |
+| `--debug-dir` | Directory to save debug files (prompts, responses) | |
 
 ### `vens enrich`
 
@@ -122,7 +170,6 @@ vens enrich --vex VEX_FILE [flags] REPORT_FILE
 |------|-------------|---------|
 | `--vex` | **(Required)** Path to the VEX file (CycloneDX) | |
 | `--output` | Output file path (if not specified, prints to stdout) | |
-| `--debug` | Enable debug logging | `false` |
 
 ## 📖 Documentation
 

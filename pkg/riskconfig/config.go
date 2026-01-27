@@ -17,41 +17,71 @@ package riskconfig
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"go.yaml.in/yaml/v3"
 )
 
 // Config represents the structure of config.yaml provided by users.
-// The schema is intentionally simple to keep the file easy to edit.
+// The schema uses textual context hints that help the LLM calculate
+// accurate OWASP risk scores for each vulnerability.
 //
 // Example YAML:
 //
-//	owasp:
-//	  # Use version-less PURLs as keys (preferred):
-//	  pkg:golang/github.com/acme/lib:
-//	    score: 45      # optionnel; 0..81 (si fourni directement, échelle OWASP native)
-//	    likelihood: 5  # optionnel; 0..9 (OWASP 0..9)
-//	    impact: 9      # optionnel; 0..9 (OWASP 0..9)
+//	project:
+//	  name: "nginx-production"
+//	  description: "Production NGINX web server"
 //
-//	# Remarque: si une version est présente dans la clé ("@version"),
-//	# elle est IGNORÉE lors du chargement. Les clés sont normalisées
-//	# en PURL sans version pour refléter un impact indépendant de la version.
+//	context:
+//	  exposure: "internet"           # internal | private | internet
+//	  data_sensitivity: "high"       # low | medium | high | critical
+//	  business_criticality: "critical" # low | medium | high | critical
+//	  notes: "Handles customer PII, PCI-DSS compliance required"
 //
-// If score is not provided, it will be computed from likelihood and impact
-// as OWASP Risk: score = (likelihood * impact). With both factors in [0..9],
-// the computed risk is in [0..81].
-// If neither score nor both likelihood and impact are provided, the entry is invalid.
+// The LLM uses these context hints to evaluate the OWASP risk score
+// for each vulnerability according to the OWASP Risk Rating Methodology.
 type Config struct {
-	OWASP map[string]OWASPEntry `yaml:"owasp"`
+	Project ProjectConfig `yaml:"project"`
+	Context ContextHints  `yaml:"context"`
 }
 
-// OWASPEntry holds either a direct score, or the minimal pair of factors
-// (likelihood and impact) to compute a score.
-type OWASPEntry struct {
-	Score      *float64 `yaml:"score,omitempty"`
-	Likelihood *float64 `yaml:"likelihood,omitempty"`
-	Impact     *float64 `yaml:"impact,omitempty"`
+// ProjectConfig holds project metadata for context in LLM analysis.
+type ProjectConfig struct {
+	Name        string `yaml:"name"`
+	Description string `yaml:"description,omitempty"`
 }
+
+// ContextHints holds textual hints that describe the project's risk context.
+// These hints help the LLM calculate accurate OWASP risk scores.
+// Reference: https://owasp.org/www-community/OWASP_Risk_Rating_Methodology
+type ContextHints struct {
+	// Exposure describes how the system is exposed to potential attackers.
+	// Values: "internal" (corporate network only), "private" (VPN/authenticated),
+	//         "internet" (publicly accessible)
+	Exposure string `yaml:"exposure"`
+
+	// DataSensitivity describes the sensitivity of data handled by the system.
+	// Values: "low" (public data), "medium" (internal data),
+	//         "high" (PII, financial), "critical" (secrets, credentials, PHI)
+	DataSensitivity string `yaml:"data_sensitivity"`
+
+	// BusinessCriticality describes how critical the system is for business operations.
+	// Values: "low" (dev/test), "medium" (internal tools),
+	//         "high" (customer-facing), "critical" (revenue-critical, compliance)
+	BusinessCriticality string `yaml:"business_criticality"`
+
+	// Notes provides additional context in free-form text (optional).
+	// Examples: "PCI-DSS compliance required", "Handles authentication tokens",
+	//           "Connected to production database"
+	Notes string `yaml:"notes,omitempty"`
+}
+
+// Valid values for context hints
+var (
+	validExposure            = []string{"internal", "private", "internet"}
+	validDataSensitivity     = []string{"low", "medium", "high", "critical"}
+	validBusinessCriticality = []string{"low", "medium", "high", "critical"}
+)
 
 // Load parses a config.yaml file from the given path and validates entries.
 func Load(path string) (*Config, error) {
@@ -59,71 +89,95 @@ func Load(path string) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	var f Config
-	if err := yaml.Unmarshal(b, &f); err != nil {
+	var cfg Config
+	if err := yaml.Unmarshal(b, &cfg); err != nil {
 		return nil, err
 	}
-	if len(f.OWASP) == 0 {
-		return &f, nil
-	}
-	// Normalize keys to version-less PURLs and validate ranges.
-	normMap := make(map[string]OWASPEntry, len(f.OWASP))
-	for purl, e := range f.OWASP {
-		norm := NormalizePURL(purl)
-		// At least one of: score OR (likelihood and impact) must be provided.
-		hasScore := e.Score != nil
-		hasFactors := e.Likelihood != nil && e.Impact != nil
 
-		if !hasScore && !hasFactors {
-			return nil, fmt.Errorf("owasp entry for %s must have either score or both likelihood and impact", norm)
-		}
-		if hasScore && !inRange0081(*e.Score) {
-			return nil, fmt.Errorf("score for %s must be between 0 and 81 (OWASP native scale)", norm)
-		}
-		if hasFactors {
-			if !inRange09(*e.Likelihood) || !inRange09(*e.Impact) {
-				return nil, fmt.Errorf("likelihood/impact for %s must be between 0 and 9 (OWASP native scale)", norm)
-			}
-		}
-		// Keep the last occurrence in case of duplicates (versioned and unversioned keys).
-		normMap[norm] = e
+	// Validate context hints
+	if err := cfg.validate(); err != nil {
+		return nil, err
 	}
-	f.OWASP = normMap
-	return &f, nil
+
+	return &cfg, nil
 }
 
-// ScoreForPURL returns the OWASP score in range [0,81] for the given purl if present.
-func (f *Config) ScoreForPURL(purl string) (float64, bool) {
-	if f == nil || len(f.OWASP) == 0 {
-		return 0, false
+// validate checks that all context hints have valid values.
+func (c *Config) validate() error {
+	if c.Project.Name == "" {
+		return fmt.Errorf("project.name is required")
 	}
-	// NOTE: Keys were normalized during Load. Callers should pass a version-less PURL here.
-	// No additional normalization is performed at lookup time.
-	e, ok := f.OWASP[purl]
-	if !ok {
-		return 0, false
+
+	// Normalize values to lowercase
+	c.Context.Exposure = strings.ToLower(strings.TrimSpace(c.Context.Exposure))
+	c.Context.DataSensitivity = strings.ToLower(strings.TrimSpace(c.Context.DataSensitivity))
+	c.Context.BusinessCriticality = strings.ToLower(strings.TrimSpace(c.Context.BusinessCriticality))
+
+	if c.Context.Exposure == "" {
+		return fmt.Errorf("context.exposure is required (valid values: %v)", validExposure)
 	}
-	if e.Score != nil {
-		return *e.Score, true
+	if !contains(validExposure, c.Context.Exposure) {
+		return fmt.Errorf("context.exposure must be one of %v, got %q", validExposure, c.Context.Exposure)
 	}
-	if e.Likelihood != nil && e.Impact != nil {
-		// OWASP Risk combination: Risk = Likelihood * Impact (0..81)
-		l, i := *e.Likelihood, *e.Impact
-		return (l * i), true
+
+	if c.Context.DataSensitivity == "" {
+		return fmt.Errorf("context.data_sensitivity is required (valid values: %v)", validDataSensitivity)
 	}
-	return 0, false
+	if !contains(validDataSensitivity, c.Context.DataSensitivity) {
+		return fmt.Errorf("context.data_sensitivity must be one of %v, got %q", validDataSensitivity, c.Context.DataSensitivity)
+	}
+
+	if c.Context.BusinessCriticality == "" {
+		return fmt.Errorf("context.business_criticality is required (valid values: %v)", validBusinessCriticality)
+	}
+	if !contains(validBusinessCriticality, c.Context.BusinessCriticality) {
+		return fmt.Errorf("context.business_criticality must be one of %v, got %q", validBusinessCriticality, c.Context.BusinessCriticality)
+	}
+
+	return nil
 }
 
-// NormalizePURL returns the PURL without a version part (sub-string after '@').
-// This is a simple best-effort normalization and does not parse full PURL grammar.
-func NormalizePURL(purl string) string {
-	for i := 0; i < len(purl); i++ {
-		if purl[i] == '@' {
-			return purl[:i]
+// FormatForLLM returns a formatted string representation of the context
+// suitable for inclusion in LLM prompts.
+func (c *Config) FormatForLLM() string {
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("Project: %s\n", c.Project.Name))
+	if c.Project.Description != "" {
+		sb.WriteString(fmt.Sprintf("Description: %s\n", c.Project.Description))
+	}
+	sb.WriteString(fmt.Sprintf("Exposure: %s\n", c.Context.Exposure))
+	sb.WriteString(fmt.Sprintf("Data Sensitivity: %s\n", c.Context.DataSensitivity))
+	sb.WriteString(fmt.Sprintf("Business Criticality: %s\n", c.Context.BusinessCriticality))
+	if c.Context.Notes != "" {
+		sb.WriteString(fmt.Sprintf("Additional Notes: %s\n", c.Context.Notes))
+	}
+	return sb.String()
+}
+
+// RiskSeverity returns a human-readable severity level based on the OWASP risk score.
+// Based on OWASP Risk Rating: score range is [0, 81].
+// Returns lowercase severity strings compatible with CycloneDX specification.
+// Reference: https://owasp.org/www-community/OWASP_Risk_Rating_Methodology
+func RiskSeverity(score float64) string {
+	switch {
+	case score >= 60:
+		return "critical"
+	case score >= 40:
+		return "high"
+	case score >= 20:
+		return "medium"
+	case score >= 5:
+		return "low"
+	default:
+		return "info"
+	}
+}
+
+func contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
 		}
 	}
-	return purl
+	return false
 }
-
-func inRange09(v float64) bool   { return v >= 0 && v <= 9 }
-func inRange0081(v float64) bool { return v >= 0 && v <= 81 }
