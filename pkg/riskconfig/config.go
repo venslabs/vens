@@ -156,19 +156,20 @@ func (c *Config) FormatForLLM() string {
 
 // RiskSeverity returns a human-readable severity level based on the OWASP risk score.
 // Based on OWASP Risk Rating: score range is [0, 81].
+// Returns lowercase severity strings compatible with CycloneDX specification.
 // Reference: https://owasp.org/www-community/OWASP_Risk_Rating_Methodology
 func RiskSeverity(score float64) string {
 	switch {
 	case score >= 60:
-		return "CRITICAL"
+		return "critical"
 	case score >= 40:
-		return "HIGH"
+		return "high"
 	case score >= 20:
-		return "MEDIUM"
+		return "medium"
 	case score >= 5:
-		return "LOW"
+		return "low"
 	default:
-		return "NOTE"
+		return "info"
 	}
 }
 

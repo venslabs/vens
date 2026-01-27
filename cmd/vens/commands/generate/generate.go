@@ -178,11 +178,6 @@ func action(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to parse input as Trivy report: %w", err)
 	}
 
-	if len(input.Results) == 0 {
-		slog.WarnContext(ctx, "No results in the report")
-		return nil
-	}
-
 	// Setup output handler
 	var h outputhandler.OutputHandler
 	outputW, err := os.Create(outputPath)
@@ -225,7 +220,10 @@ func action(cmd *cobra.Command, args []string) error {
 
 	if len(vulns) == 0 {
 		slog.WarnContext(ctx, "No vulnerabilities found in the report")
-		return h.Close()
+		if err := h.Close(); err != nil {
+			return fmt.Errorf("failed to close output: %w", err)
+		}
+		return nil
 	}
 
 	slog.InfoContext(ctx, "Processing vulnerabilities", "count", len(vulns))
