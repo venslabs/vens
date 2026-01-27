@@ -1,5 +1,5 @@
 # vens - Vulnerability Risk Scoring Configuration
-# Documentation: https://github.com/venslabs/vens/docs/config.md
+# Documentation: https://github.com/github.com/venslabs/vens#readme
 
 project:
   name: "nginx-production"
