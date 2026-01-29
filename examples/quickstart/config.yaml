@@ -1,87 +1,96 @@
 # vens - Vulnerability Risk Scoring Configuration
-# Documentation: https://github.com/github.com/venslabs/vens#readme
+# Documentation: https://github.com/venslabs/vens#readme
+#
+# This config provides context for OWASP Risk Rating of vulnerabilities.
+# The LLM scores EACH vulnerability based on its specific characteristics
+# within YOUR system context (not a direct mapping from context to score).
+# Reference: https://owasp.org/www-community/OWASP_Risk_Rating_Methodology
 
 project:
   name: "nginx-production"
   description: "Production NGINX web server exposed to internet"
 
-# Context hints for OWASP Risk Rating
-# These hints help the LLM calculate accurate risk scores for each vulnerability
-# Reference: https://owasp.org/www-community/OWASP_Risk_Rating_Methodology
-
 context:
-  # === EXPOSURE ===
-  # How is the system exposed to potential attackers?
+  # ============================================================================
+  # MANDATORY FIELDS - Define your system's risk profile
+  # ============================================================================
+
+  # EXPOSURE: How is the system exposed to attackers?
   # Values: internal | private | internet
   #   - internal: Corporate network only, no external access
   #   - private: Requires VPN or authentication to access
   #   - internet: Publicly accessible from the internet
+  # Impact: Affects Threat Agent score for remote vulnerabilities
   exposure: "internet"
 
-  # === DATA SENSITIVITY ===
-  # What type of data does the system handle?
+  # DATA SENSITIVITY: What type of data does the system handle?
   # Values: low | medium | high | critical
   #   - low: Public data, no confidentiality requirements
   #   - medium: Internal data, limited confidentiality
   #   - high: PII, financial data, customer information
   #   - critical: Secrets, credentials, PHI, payment card data
+  # Impact: Affects Technical Impact score for confidentiality/integrity vulnerabilities
   data_sensitivity: "high"
 
-  # === BUSINESS CRITICALITY ===
-  # How critical is this system for business operations?
+  # BUSINESS CRITICALITY: How critical is this system for business?
   # Values: low | medium | high | critical
   #   - low: Development/test environments
   #   - medium: Internal tools, non-essential services
   #   - high: Customer-facing services, important operations
   #   - critical: Revenue-critical, compliance-required, core business
+  # Impact: Affects Business Impact score (all vulnerabilities)
   business_criticality: "critical"
 
-  # === AVAILABILITY REQUIREMENT (optional) ===
-  # How critical is system availability? Affects DoS/Availability vulnerability scores.
+  # ============================================================================
+  # OPTIONAL FIELDS - Provide additional context for precise scoring
+  # ============================================================================
+
+  # AVAILABILITY REQUIREMENT: How critical is uptime? (optional)
   # Values: low | medium | high | critical
   # Default: Inherits from business_criticality if not specified
-  # Uncomment and set explicitly if availability requirements differ from business criticality
+  # When to use: Set explicitly if availability needs differ from business criticality
+  # Impact: Affects Technical Impact score for DoS/availability vulnerabilities
   # availability_requirement: "critical"
 
-  # === COMPLIANCE REQUIREMENTS (optional) ===
-  # List of regulatory/compliance frameworks that apply to this system.
-  # Used to increase business impact scores for compliance-related vulnerabilities.
-  # Supported frameworks: PCI-DSS, HIPAA, GDPR, SOC2, ISO27001, FISMA, FedRAMP
-  # Default: Empty (no compliance requirements)
-  # Uncomment and specify if compliance frameworks apply
+  # COMPLIANCE REQUIREMENTS: What regulations apply? (optional)
+  # Supported: PCI-DSS, HIPAA, GDPR, SOC2, ISO27001, FISMA, FedRAMP, SOX, NIST, CCPA, CMMC, ITAR
+  # Default: Empty (no compliance)
+  # When to use: If non-compliance has legal/financial consequences
+  # Impact: Increases Business Impact score for compliance-relevant vulnerabilities (+2)
   # compliance_requirements:
   #   - "PCI-DSS"
   #   - "GDPR"
 
-  # === AUDIT REQUIREMENT (optional) ===
-  # How critical are audit logs and accountability? Affects accountability vulnerability scores.
+  # AUDIT REQUIREMENT: How critical is audit logging? (optional)
   # Values: low | medium | high
-  # Default: "low" if not specified
-  # Uncomment and set if audit/accountability is critical (e.g., financial systems)
+  # Default: Not specified (accountability vulnerabilities scored lower)
+  # When to use: Financial systems, compliance-critical systems requiring forensic logs
+  # Impact: Affects Technical Impact score for accountability vulnerabilities
   # audit_requirement: "high"
 
-  # === SECURITY CONTROLS (optional) ===
-  # Specify which security controls are in place. These reduce vulnerability scores
-  # by making attacks harder to discover and exploit.
-  # All controls default to false (not present) if not specified.
+  # SECURITY CONTROLS: What defenses are in place? (optional)
+  # Default: All false (no controls assumed)
+  # When to use: You have active security controls that reduce exploitability
+  # Impact: Reduces Vulnerability score when controls block specific attack types
   # controls:
   #   # Perimeter controls
-  #   waf: true                    # Web Application Firewall (blocks common attacks)
-  #   ddos_protection: false       # DDoS mitigation service
+  #   waf: true                    # Web Application Firewall (reduces web exploit scores)
+  #   ddos_protection: false       # DDoS mitigation (reduces DoS scores)
   #
   #   # Detection controls
-  #   ids: false                   # Intrusion Detection System
+  #   ids: false                   # Intrusion Detection System (reduces network exploit scores)
   #   siem: false                  # Security Information & Event Management
   #
   #   # Endpoint controls
-  #   edr: false                   # Endpoint Detection & Response
+  #   edr: false                   # Endpoint Detection & Response (reduces malware scores)
   #   antivirus: false             # Antivirus/Anti-malware
   #
   #   # Network controls
-  #   segmentation: false          # Network micro-segmentation
+  #   segmentation: false          # Network micro-segmentation (reduces lateral movement)
   #   zero_trust: false            # Zero-trust architecture
 
-  # === ADDITIONAL NOTES (optional) ===
-  # Free-form text to provide extra context for the LLM
-  # Examples: compliance requirements, specific threats, architecture details
+  # ADDITIONAL NOTES: Free-form context (optional)
+  # Default: Empty
+  # When to use: Provide extra details that help understand risk (architecture, threat model, etc.)
+  # Impact: Helps LLM make better decisions on edge cases
   notes: "Handles customer PII, PCI-DSS compliance required, serves as reverse proxy for backend APIs"

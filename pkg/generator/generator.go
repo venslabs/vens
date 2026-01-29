@@ -299,82 +299,71 @@ func (g *Generator) evaluateOWASPScores(ctx context.Context, vulns []Vulnerabili
 // buildSystemPrompt creates the system prompt for OWASP score calculation.
 // Inspired by github.com/AkihiroSuda/vexllm prompt structure.
 func (g *Generator) buildSystemPrompt() string {
-	prompt := `You are a security analyst evaluating vulnerabilities in the following system:
+	prompt := `You are a security analyst scoring vulnerabilities using OWASP Risk Rating Methodology.
 
+SYSTEM CONTEXT:
 `
 	if g.o.Config != nil {
 		prompt += g.o.Config.FormatForLLM()
 	}
 
 	prompt += `
-For EACH vulnerability, analyze its description/title and rate 4 OWASP factors (0-9):
+TASK: For EACH vulnerability, analyze its specific characteristics and score 4 factors (0-9):
 
-1. THREAT_AGENT: Who can exploit this?
-   - Read vulnerability type and consider system exposure
-   - Base: exposure (internal:2-3, private:4-6, internet:7-9)
-   - Adjust: +1 if critical business attracts skilled attackers
+1. THREAT_AGENT (Who can exploit THIS vuln in THIS system?)
+   - Consider: Does system exposure match vuln attack vector?
+   - Internet-exposed remote vuln: 7-9 | Private network local vuln: 3-5 | Mismatch: lower
+   - Adjust for attacker motivation based on business value
 
-2. VULNERABILITY: How easy to exploit THIS specific vulnerability?
-   IMPORTANT: Analyze the actual vulnerability, not just severity label
-   - Read description: Is it a known issue? Exploit available? Common weakness?
-   - Discovery: 1-3=obscure/needs source, 4-6=scanner finds it, 7-9=trivial/public advisory
-   - Exploitability: 1-3=complex/theoretical, 4-6=requires skill, 7-9=PoC exists/tool automates it
-   - Formula: avg(discovery, exploit) + severity_bonus (CRITICAL:+2, HIGH:+1, MEDIUM:0, LOW:-1)`
+2. VULNERABILITY (How exploitable is THIS specific vuln?)
+   CRITICAL: Score the ACTUAL vulnerability, not the system
+   - Analyze: CVE/description reveals public exploits? Known PoC? Automated scanners detect it?
+   - Easy discovery + exploit available: 7-9 | Requires expertise: 4-6 | Theoretical/complex: 1-3`
 
-	// Add controls adjustment only if any controls are present
 	if g.o.Config != nil {
 		controls := g.o.Config.Context.Controls
 		hasControls := controls.WAF || controls.IDS || controls.EDR || controls.Segmentation || controls.ZeroTrust
 		if hasControls {
 			prompt += `
-   - Controls reduce score: WAF/IDS/EDR:-2, Segmentation/ZeroTrust:-1`
+   - Reduce if controls block this vuln type (WAF blocks web exploits, IDS detects network attacks)`
 		}
 	}
 
 	prompt += `
-   - Clamp result to 1-9
 
-3. TECHNICAL_IMPACT: What can attacker access if exploited?
-   - Identify vulnerability type from title/description:
-     * Data breach (SQLi, Path Traversal, XXE): affects Confidentiality + Integrity
-     * Code execution (RCE, Deserialization): affects all CIA
-     * Denial of Service (DoS, Resource Exhaustion): affects Availability
-     * Auth bypass (IDOR, broken access): affects Confidentiality + Accountability
-   - Score using system sensitivity:`
+3. TECHNICAL_IMPACT (What does THIS vuln compromise?)
+   - Identify what the vulnerability exposes (confidentiality/integrity/availability/accountability)
+   - Map impact to system sensitivity:`
 
-	// Show mapping based on what's available
 	prompt += `
-     * Confidentiality/Integrity: data_sensitivity (low:1-3, medium:4-6, high:7-8, critical:9)`
-
+     * C/I breach: score = data_sensitivity`
 	if g.o.Config != nil && g.o.Config.Context.AvailabilityRequirement != nil {
 		prompt += `
-     * Availability: availability_requirement (low:1-3, medium:4-6, high:7-8, critical:9)`
+     * Availability loss: score = availability_requirement`
 	} else {
 		prompt += `
-     * Availability: use business_criticality (low:1-3, medium:4-6, high:7-8, critical:9)`
+     * Availability loss: score = business_criticality`
 	}
-
 	if g.o.Config != nil && g.o.Config.Context.AuditRequirement != nil {
 		prompt += `
-     * Accountability: audit_requirement (low:1-3, medium:4-6, high:7-9)`
+     * Accountability loss: score = audit_requirement`
 	}
 
 	prompt += `
-   - Return the HIGHEST applicable impact score
+   - Return highest applicable score
 
-4. BUSINESS_IMPACT: Business consequences if exploited?
-   - Base: business_criticality (low:1-3, medium:4-6, high:7-8, critical:9)`
+4. BUSINESS_IMPACT (Business damage if THIS vuln exploited?)
+   - Base: business_criticality`
 
 	if g.o.Config != nil && len(g.o.Config.Context.ComplianceRequirements) > 0 {
 		prompt += `
-   - Add +2 if vulnerability affects compliance (data breach, audit failure, etc.)`
+   - +2 if vuln triggers compliance violation (data breach/audit failure)`
 	}
-
 	prompt += `
    - Cap at 9
 
-CRITICAL: Score based on the SPECIFIC vulnerability characteristics, not just its severity label.
-Output: 4 integer scores (0-9) + concise reasoning explaining your analysis of THIS vulnerability.
+SCORING SCALE: low:1-3, medium:4-6, high:7-8, critical:9
+OUTPUT: 4 scores (0-9) + brief reasoning for THIS specific vulnerability in THIS context.
 `
 	return prompt
 }
