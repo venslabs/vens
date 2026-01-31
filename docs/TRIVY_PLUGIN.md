@@ -13,7 +13,7 @@ trivy plugin install github.com/venslabs/vens
 ```bash
 # 1. Set up LLM
 export OPENAI_API_KEY="sk-..."
-export OPENAI_MODEL="gpt-4o-mini"
+export OPENAI_MODEL="gpt-4o"
 
 # 2. Scan with Trivy
 trivy image nginx:1.25 --format json --severity HIGH,CRITICAL > report.json
@@ -75,7 +75,7 @@ context:
 
 | Provider | Environment Variable | Example |
 |----------|---------------------|---------|
-| OpenAI (recommended) | `OPENAI_API_KEY` | `export OPENAI_MODEL="gpt-4o-mini"` |
+| OpenAI (recommended) | `OPENAI_API_KEY` | `export OPENAI_MODEL="gpt-4o"` |
 | Anthropic | `ANTHROPIC_API_KEY` | `export ANTHROPIC_MODEL="claude-3-5-sonnet-20241022"` |
 | Ollama (local) | `OLLAMA_MODEL` | `export OLLAMA_MODEL="llama3"` |
 | Google AI | `GOOGLE_API_KEY` | `export GOOGLE_MODEL="gemini-pro"` |

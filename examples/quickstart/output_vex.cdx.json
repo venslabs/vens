@@ -1,0 +1,948 @@
+{
+  "$schema": "http://cyclonedx.org/schema/bom-1.6.schema.json",
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "version": 1,
+  "vulnerabilities": [
+    {
+      "id": "CVE-2011-3374",
+      "ratings": [
+        {
+          "score": 25,
+          "severity": "medium",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "TEMP-0841856-B18BAF",
+      "ratings": [
+        {
+          "score": 14,
+          "severity": "low",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-14104",
+      "ratings": [
+        {
+          "score": 35,
+          "severity": "medium",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2022-0563",
+      "ratings": [
+        {
+          "score": 17.5,
+          "severity": "low",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2017-18018",
+      "ratings": [
+        {
+          "score": 14,
+          "severity": "low",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-5278",
+      "ratings": [
+        {
+          "score": 14,
+          "severity": "low",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2026-0861",
+      "ratings": [
+        {
+          "score": 46.75,
+          "severity": "high",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-15281",
+      "ratings": [
+        {
+          "score": 27,
+          "severity": "medium",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2026-0915",
+      "ratings": [
+        {
+          "score": 48.75,
+          "severity": "high",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2010-4756",
+      "ratings": [
+        {
+          "score": 15.75,
+          "severity": "low",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2018-20796",
+      "ratings": [
+        {
+          "score": 8.75,
+          "severity": "low",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2019-1010022",
+      "ratings": [
+        {
+          "score": 8.75,
+          "severity": "low",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2019-1010023",
+      "ratings": [
+        {
+          "score": 8.75,
+          "severity": "low",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2019-1010024",
+      "ratings": [
+        {
+          "score": 8.75,
+          "severity": "low",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2019-1010025",
+      "ratings": [
+        {
+          "score": 8.75,
+          "severity": "low",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2019-9192",
+      "ratings": [
+        {
+          "score": 8.75,
+          "severity": "low",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2026-0861",
+      "ratings": [
+        {
+          "score": 40,
+          "severity": "high",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-15281",
+      "ratings": [
+        {
+          "score": 33,
+          "severity": "medium",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2026-0915",
+      "ratings": [
+        {
+          "score": 45.5,
+          "severity": "high",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2010-4756",
+      "ratings": [
+        {
+          "score": 18,
+          "severity": "low",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2018-20796",
+      "ratings": [
+        {
+          "score": 10.5,
+          "severity": "low",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2019-1010022",
+      "ratings": [
+        {
+          "score": 8.75,
+          "severity": "low",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2019-1010023",
+      "ratings": [
+        {
+          "score": 8.75,
+          "severity": "low",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2019-1010024",
+      "ratings": [
+        {
+          "score": 8.75,
+          "severity": "low",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2019-1010025",
+      "ratings": [
+        {
+          "score": 8.75,
+          "severity": "low",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2019-9192",
+      "ratings": [
+        {
+          "score": 8.75,
+          "severity": "low",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-14104",
+      "ratings": [
+        {
+          "score": 27,
+          "severity": "medium",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2022-0563",
+      "ratings": [
+        {
+          "score": 17.5,
+          "severity": "low",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-14104",
+      "ratings": [
+        {
+          "score": 28,
+          "severity": "medium",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2022-0563",
+      "ratings": [
+        {
+          "score": 17.5,
+          "severity": "low",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-6141",
+      "ratings": [
+        {
+          "score": 14,
+          "severity": "low",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-14104",
+      "ratings": [
+        {
+          "score": 28,
+          "severity": "medium",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2022-0563",
+      "ratings": [
+        {
+          "score": 17.5,
+          "severity": "low",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-7709",
+      "ratings": [
+        {
+          "score": 28,
+          "severity": "medium",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2021-45346",
+      "ratings": [
+        {
+          "score": 17.5,
+          "severity": "low",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-15467",
+      "ratings": [
+        {
+          "score": 76.5,
+          "severity": "critical",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-69419",
+      "ratings": [
+        {
+          "score": 60,
+          "severity": "critical",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-11187",
+      "ratings": [
+        {
+          "score": 38.5,
+          "severity": "medium",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-15468",
+      "ratings": [
+        {
+          "score": 31.5,
+          "severity": "medium",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-15469",
+      "ratings": [
+        {
+          "score": 22.75,
+          "severity": "medium",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-66199",
+      "ratings": [
+        {
+          "score": 35,
+          "severity": "medium",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-68160",
+      "ratings": [
+        {
+          "score": 24.5,
+          "severity": "medium",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-69418",
+      "ratings": [
+        {
+          "score": 19.5,
+          "severity": "low",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-69420",
+      "ratings": [
+        {
+          "score": 24.5,
+          "severity": "medium",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-69421",
+      "ratings": [
+        {
+          "score": 24.5,
+          "severity": "medium",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2026-22795",
+      "ratings": [
+        {
+          "score": 24.5,
+          "severity": "medium",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2026-22796",
+      "ratings": [
+        {
+          "score": 24.5,
+          "severity": "medium",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2013-4392",
+      "ratings": [
+        {
+          "score": 17.5,
+          "severity": "low",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2023-31437",
+      "ratings": [
+        {
+          "score": 12,
+          "severity": "low",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2023-31438",
+      "ratings": [
+        {
+          "score": 12,
+          "severity": "low",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2023-31439",
+      "ratings": [
+        {
+          "score": 12,
+          "severity": "low",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-6141",
+      "ratings": [
+        {
+          "score": 14,
+          "severity": "low",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-14104",
+      "ratings": [
+        {
+          "score": 20,
+          "severity": "medium",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2022-0563",
+      "ratings": [
+        {
+          "score": 31.5,
+          "severity": "medium",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-14104",
+      "ratings": [
+        {
+          "score": 35,
+          "severity": "medium",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2007-5686",
+      "ratings": [
+        {
+          "score": 13.5,
+          "severity": "low",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2024-56433",
+      "ratings": [
+        {
+          "score": 20,
+          "severity": "medium",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-6141",
+      "ratings": [
+        {
+          "score": 12,
+          "severity": "low",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-15467",
+      "ratings": [
+        {
+          "score": 72.25,
+          "severity": "critical",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-69419",
+      "ratings": [
+        {
+          "score": 38.5,
+          "severity": "medium",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-11187",
+      "ratings": [
+        {
+          "score": 27,
+          "severity": "medium",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-15468",
+      "ratings": [
+        {
+          "score": 17.5,
+          "severity": "low",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-15469",
+      "ratings": [
+        {
+          "score": 17.5,
+          "severity": "low",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-66199",
+      "ratings": [
+        {
+          "score": 22.5,
+          "severity": "medium",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-68160",
+      "ratings": [
+        {
+          "score": 12,
+          "severity": "low",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-69418",
+      "ratings": [
+        {
+          "score": 12,
+          "severity": "low",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-69420",
+      "ratings": [
+        {
+          "score": 12,
+          "severity": "low",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-69421",
+      "ratings": [
+        {
+          "score": 12,
+          "severity": "low",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2026-22795",
+      "ratings": [
+        {
+          "score": 15,
+          "severity": "low",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2026-22796",
+      "ratings": [
+        {
+          "score": 15,
+          "severity": "low",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-15467",
+      "ratings": [
+        {
+          "score": 72,
+          "severity": "critical",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-69419",
+      "ratings": [
+        {
+          "score": 58.5,
+          "severity": "high",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-11187",
+      "ratings": [
+        {
+          "score": 17.5,
+          "severity": "low",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-15468",
+      "ratings": [
+        {
+          "score": 15,
+          "severity": "low",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-15469",
+      "ratings": [
+        {
+          "score": 15,
+          "severity": "low",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-66199",
+      "ratings": [
+        {
+          "score": 15,
+          "severity": "low",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-68160",
+      "ratings": [
+        {
+          "score": 15,
+          "severity": "low",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-69418",
+      "ratings": [
+        {
+          "score": 15,
+          "severity": "low",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-69420",
+      "ratings": [
+        {
+          "score": 15.75,
+          "severity": "low",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-69421",
+      "ratings": [
+        {
+          "score": 15.75,
+          "severity": "low",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2026-22795",
+      "ratings": [
+        {
+          "score": 15.75,
+          "severity": "low",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2026-22796",
+      "ratings": [
+        {
+          "score": 15.75,
+          "severity": "low",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2007-5686",
+      "ratings": [
+        {
+          "score": 6,
+          "severity": "low",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2024-56433",
+      "ratings": [
+        {
+          "score": 6,
+          "severity": "low",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "TEMP-0628843-DBAD28",
+      "ratings": [
+        {
+          "score": 6,
+          "severity": "low",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2011-4116",
+      "ratings": [
+        {
+          "score": 6,
+          "severity": "low",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "TEMP-0517018-A83CE6",
+      "ratings": [
+        {
+          "score": 6,
+          "severity": "low",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2005-2541",
+      "ratings": [
+        {
+          "score": 6,
+          "severity": "low",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "TEMP-0290435-0B57B5",
+      "ratings": [
+        {
+          "score": 10,
+          "severity": "low",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-14104",
+      "ratings": [
+        {
+          "score": 31.5,
+          "severity": "medium",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2022-0563",
+      "ratings": [
+        {
+          "score": 17.5,
+          "severity": "low",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2026-23949",
+      "ratings": [
+        {
+          "score": 63.75,
+          "severity": "critical",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-8869",
+      "ratings": [
+        {
+          "score": 38.5,
+          "severity": "medium",
+          "method": "OWASP"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2026-24049",
+      "ratings": [
+        {
+          "score": 63.75,
+          "severity": "critical",
+          "method": "OWASP"
+        }
+      ]
+    }
+  ]
+}

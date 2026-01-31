@@ -299,7 +299,7 @@ func (g *Generator) evaluateOWASPScores(ctx context.Context, vulns []Vulnerabili
 // buildSystemPrompt creates the system prompt for OWASP score calculation.
 // Inspired by github.com/AkihiroSuda/vexllm prompt structure.
 func (g *Generator) buildSystemPrompt() string {
-	prompt := `You are a security analyst scoring vulnerabilities using OWASP Risk Rating Methodology.
+	prompt := `You are a talented security expert scoring vulnerabilities using OWASP Risk Rating Methodology.
 
 SYSTEM CONTEXT:
 `
