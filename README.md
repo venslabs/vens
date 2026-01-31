@@ -1,189 +1,134 @@
-<p align="center">
-  <img src="vens-logo.png" alt="vens logo">
-</p>
+# vens - Context-Aware Vulnerability Risk Scoring
 
+**Stop treating all vulnerabilities equally.** Vens transforms generic CVSS scores into **contextual OWASP risk scores** tailored to YOUR system using LLM intelligence.
 
-**Vens** is an AI-powered vulnerability risk scorer. It analyzes security reports and calculates **OWASP Risk Rating scores** for each vulnerability using LLMs, generating precise **CycloneDX VEX** documents with contextual risk scores.
+## Why vens?
 
-Stop wasting time on contextless CVE lists. Focus on the risks that actually matter.
+Traditional scanners treat all vulnerabilities the same. Vens analyzes each CVE in **your specific context** to calculate real risk:
 
-## 🌐 Vision & Impact
+```
+Risk = Likelihood × Impact (0-81 scale)
+```
 
-**Vens** is at the forefront of vulnerability management innovation. 
+**Real example:**
 
-- **First-of-its-kind Open Source**: We are pioneering the use of LLMs to generate risk-scored VEX reports based on OWASP methodology, filling a gap in the open-source ecosystem by providing actionable intelligence for platforms like [Dependency-Track](https://dependencytrack.org/).
-- **Pushing the Standards**: We don't just use CycloneDX; we help shape it. We are actively advocating for the CycloneDX specification to better support risk-based prioritization, ensuring that ratings and risk scores are integrated into the heart of security platforms.
-  - 🔗 Check out our contribution: [CycloneDX Specification PR #722](https://github.com/CycloneDX/specification/pull/722)
+| CVE | CVSS (Generic) | OWASP (Contextual) | Why? |
+|-----|----------------|-------------------|------|
+| CVE-2019-1010023 | 8.8 HIGH | **10.0 LOW** ⬇️ | Not exploitable in your runtime |
+| CVE-2026-0915 | 5.3 MEDIUM | **52.0 HIGH** ⬆️ | PII leak + GDPR impact |
 
-## 🎯 How It Works
+**Result**: Fix what actually matters in YOUR system.
 
-Vens uses the **OWASP Risk Rating Methodology** to compute contextual risk scores:
+## Installation
 
-1. **You define your project's context** in `config.yaml` using simple hints:
-   - **Exposure**: How is the system exposed? (internal, private, internet)
-   - **Data Sensitivity**: What type of data is handled? (low, medium, high, critical)
-   - **Business Criticality**: How critical is the system? (low, medium, high, critical)
-
-2. **The LLM analyzes each vulnerability** using your context and calculates the OWASP risk score:
-   ```
-   CVE-2024-1234 in OpenSSL (RCE):
-   ├── Context: internet-exposed, high data sensitivity, critical business
-   ├── Threat Agent: 8/9 (public exploits, APT target)
-   ├── Vulnerability: 7/9 (easy to exploit, POC available)
-   ├── Technical Impact: 8/9 (RCE, data compromise)
-   ├── Business Impact: 9/9 (revenue-critical, compliance)
-   └── OWASP Score: 63.75/81 → CRITICAL
-   ```
-
-3. **Risk score formula** (OWASP Risk Rating Methodology):
-   ```
-   Likelihood = (Threat Agent + Vulnerability Factor) / 2
-   Impact = (Technical Impact + Business Impact) / 2
-   Risk = Likelihood × Impact  (range: 0-81)
-   ```
-
-## 🚀 Quick Start
-
-### Installation
-
-Option 1: As a standalone program:
+**Standalone:**
 ```bash
 go install github.com/venslabs/vens/cmd/vens@latest
 ```
 
-Option 2: As a Trivy [plugin](https://aquasecurity.github.io/trivy/latest/docs/plugin/) (see [TRIVY_PLUGIN.md](docs/TRIVY_PLUGIN.md) for details):
+**[Trivy Plugin](https://trivy.dev/docs/latest/plugin/):**
 ```bash
 trivy plugin install github.com/venslabs/vens
-alias vens="trivy vens"
 ```
 
-### Usage
+## Quick Example
 
 ```bash
-export OPENAI_API_KEY="your-key"
+# 1. Set up LLM
+export OPENAI_API_KEY="sk-..."
+export OPENAI_MODEL="gpt-4o"
 
-# 1. Scan your image/project with Trivy
-trivy image nginx:1.25 --format=json --severity HIGH,CRITICAL > report.json
+# 2. Scan with Trivy
+trivy image python:3.11-slim --format json --output report.json
 
-# 2. Generate OWASP risk scores using LLM
-vens generate --config-file config.yaml report.json output_vex.json
+# 3. Generate contextual risk scores
+vens generate --config-file config.yaml report.json output.vex.json
 ```
 
-## ⚙️ Configuration
+Output of [CycloneDX VEX](https://cyclonedx.org/capabilities/vex/) with OWASP scores:
 
-### Risk Context (`config.yaml`)
+```json
+{
+  "vulnerabilities": [{
+    "id": "CVE-2026-0915",
+    "ratings": [{
+      "method": "OWASP",
+      "score": 52.0,
+      "severity": "high"
+    }],
+    "analysis": {
+      "detail": "High risk: Exposes PII in GDPR-regulated environment"
+    }
+  }]
+}
+```
 
-Define your project's context using simple hints. The LLM uses these to calculate accurate OWASP risk scores:
+## Configuration
+
+Create `config.yaml`:
 
 ```yaml
-# vens - Vulnerability Risk Scoring Configuration
 project:
-  name: "nginx-production"
-  description: "Production NGINX web server exposed to internet"
+  name: "my-api"
+  description: "Customer-facing REST API"
 
-# Context hints for OWASP Risk Rating
-# Reference: https://owasp.org/www-community/OWASP_Risk_Rating_Methodology
 context:
-  # How is the system exposed to potential attackers?
-  # Values: internal | private | internet
-  exposure: "internet"
-
-  # What type of data does the system handle?
-  # Values: low | medium | high | critical
-  data_sensitivity: "high"
-
-  # How critical is this system for business operations?
-  # Values: low | medium | high | critical
-  business_criticality: "critical"
-
-  # Additional context (optional)
-  notes: "Handles customer PII, PCI-DSS compliance required"
+  exposure: "internet"              # internal | private | internet
+  data_sensitivity: "high"          # low | medium | high | critical
+  business_criticality: "high"      # low | medium | high | critical
+  compliance_requirements: ["GDPR", "SOC2"]
+  controls:
+    waf: true
 ```
 
-### Context Values Guide
+**LLM Providers:**
 
-| Field | Value | Description |
-|-------|-------|-------------|
-| **exposure** | `internal` | Corporate network only, no external access |
-| | `private` | Requires VPN or authentication |
-| | `internet` | Publicly accessible |
-| **data_sensitivity** | `low` | Public data |
-| | `medium` | Internal data |
-| | `high` | PII, financial data |
-| | `critical` | Secrets, credentials, PHI |
-| **business_criticality** | `low` | Dev/test environments |
-| | `medium` | Internal tools |
-| | `high` | Customer-facing services |
-| | `critical` | Revenue-critical, compliance |
+| Provider | Environment Variable |
+|----------|---------------------|
+| OpenAI (recommended) | `OPENAI_API_KEY` |
+| Anthropic | `ANTHROPIC_API_KEY` |
+| Ollama (local) | `OLLAMA_MODEL` |
+| Google AI | `GOOGLE_API_KEY` |
 
-### LLM Backends
-
-**vens** supports multiple LLM providers. Configure them using environment variables:
-
-| Backend | Flag `--llm` | Environment Variables |
-|---------|--------------|-----------------------|
-| **OpenAI** (default) | `openai` | `OPENAI_API_KEY`, `OPENAI_MODEL` (optional) |
-| **Ollama** | `ollama` | `OLLAMA_MODEL` (e.g., `llama3`), `OLLAMA_BASE_URL` (optional) |
-| **Anthropic** | `anthropic` | `ANTHROPIC_API_KEY` |
-| **Google AI** | `googleai` | `GOOGLE_API_KEY`, `GOOGLE_MODEL` (optional) |
-
-**Example for Ollama:**
-```bash
-export OLLAMA_MODEL="llama3"
-vens generate --llm ollama --config-file config.yaml report.json output.json
-```
-
-## 💻 Command Reference
+## Command Reference
 
 ### `vens generate`
 
-Generate a VEX report with OWASP risk scores by analyzing vulnerabilities using LLM.
+Generate VEX with contextual OWASP scores:
 
-**Usage:**
 ```bash
-vens generate [flags] INPUT OUTPUT
+vens generate --config-file config.yaml INPUT OUTPUT
 ```
 
-**Flags:**
-| Flag | Description | Default |
-|------|-------------|---------|
-| `--config-file` | **(Required)** Path to `config.yaml` with context hints | |
-| `--llm` | LLM backend (`openai`, `ollama`, `anthropic`, `googleai`) | `auto` |
-| `--llm-temperature` | Sampling temperature | `0.0` |
-| `--llm-batch-size` | Number of CVEs to process per request | `10` |
-| `--llm-seed` | Seed for reproducible results | `0` |
-| `--input-format` | Input format (`auto`, `trivy`) | `auto` |
-| `--output-format` | Output format (`auto`, `cyclonedxvex`) | `auto` |
-| `--debug-dir` | Directory to save debug files (prompts, responses) | |
+**Key flags:**
+- `--config-file` (required) - Path to config.yaml
+- `--llm` - LLM provider: `openai` | `anthropic` | `ollama` | `googleai` (default: `auto`)
+- `--llm-batch-size` - CVEs per request (default: `10`)
+- `--debug-dir` - Save prompts/responses for debugging
 
 ### `vens enrich`
 
-Enrich a Trivy vulnerability report with OWASP scores from a VEX document.
+Enrich Trivy report with OWASP scores:
 
-**Usage:**
 ```bash
-vens enrich --vex VEX_FILE [flags] REPORT_FILE
+vens enrich --vex output.vex.json report.json
 ```
 
-**Flags:**
-| Flag | Description | Default |
-|------|-------------|---------|
-| `--vex` | **(Required)** Path to the VEX file (CycloneDX) | |
-| `--output` | Output file path (if not specified, prints to stdout) | |
+---
 
-## 📖 Documentation
+## Learn More
 
-- [System Design](docs/system-design/system-design.md): Understand how vens works under the hood.
-- [Input Processing](docs/inputs/input-processing.md): Supported formats and data flow.
-- [Testing Strategy](docs/testing.md): How we ensure the tool's reliability.
+- [Complete Example](examples/quickstart/) - 107 real CVEs comparison
+- [Trivy Plugin Guide](docs/TRIVY_PLUGIN.md) - Plugin usage
 
-## 🤝 Contributing
+## Contributing
 
-Contributions are welcome! Feel free to open an issue or submit a pull request.
+Contributions welcome! Open an issue or submit a PR.
 
-## 📄 License
+## License
 
-This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
+Apache License 2.0 - See [LICENSE](LICENSE)
 
 ---
-Made with ❤️ for smarter security.
+
+**Focus on what matters. Patch smarter, not harder.**
