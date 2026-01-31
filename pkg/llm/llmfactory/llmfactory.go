@@ -46,6 +46,11 @@ func New(ctx context.Context, name string) (llms.Model, error) {
 		ollamaModel = os.Getenv("OLLAMA_MODEL")
 		return ollama.New(ollama.WithModel(ollamaModel))
 	case llm.Anthropic:
+		var anthropicModel string
+		anthropicModel = os.Getenv("ANTHROPIC_MODEL")
+		if anthropicModel != "" {
+			return anthropic.New(anthropic.WithModel(anthropicModel))
+		}
 		return anthropic.New()
 	case llm.GoogleAI:
 		var defaultModel string
