@@ -1,6 +1,6 @@
 # Trivy plugin manifest <https://aquasecurity.github.io/trivy/v0.56/docs/plugin/developer-guide/>
 name: "vens"
-version: "0.1.0"
+version: "0.2.0"
 repository: github.com/venslabs/vens
 maintainer: fahedouch
 summary: Evaluate and prioritize vulnerabilities based on context
