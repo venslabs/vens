@@ -1,3 +1,9 @@
+[![GitHub Release][release-img]][release]
+[![CI][ci-img]][ci]
+[![Go Report Card][go-report-img]][go-report]
+[![License: Apache-2.0][license-img]][license]
+[![GitHub Downloads][github-downloads-img]][release]
+
 # vens - Context-Aware Vulnerability Risk Scoring
 
 **Stop treating all vulnerabilities equally.** Vens transforms generic CVSS scores into **contextual OWASP risk scores** tailored to YOUR system using LLM intelligence.
@@ -132,3 +138,13 @@ Apache License 2.0 - See [LICENSE](LICENSE)
 ---
 
 **Focus on what matters. Patch smarter, not harder.**
+
+[release-img]: https://img.shields.io/github/release/venslabs/vens.svg?logo=github
+[release]: https://github.com/venslabs/vens/releases
+[ci-img]: https://github.com/venslabs/vens/actions/workflows/main.yml/badge.svg
+[ci]: https://github.com/venslabs/vens/actions/workflows/main.yml
+[go-report-img]: https://goreportcard.com/badge/github.com/venslabs/vens
+[go-report]: https://goreportcard.com/report/github.com/venslabs/vens
+[license-img]: https://img.shields.io/badge/License-Apache%202.0-blue.svg
+[license]: https://github.com/venslabs/vens/blob/main/LICENSE
+[github-downloads-img]: https://img.shields.io/github/downloads/venslabs/vens/total?logo=github
