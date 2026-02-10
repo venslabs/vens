@@ -32,6 +32,7 @@ import (
 	"github.com/tmc/langchaingo/llms"
 	"github.com/venslabs/vens/pkg/llm"
 	outputhandler "github.com/venslabs/vens/pkg/outputhandler"
+	"github.com/venslabs/vens/pkg/owasp"
 	"github.com/venslabs/vens/pkg/riskconfig"
 )
 
@@ -156,6 +157,15 @@ func (g *Generator) generateRiskScore(ctx context.Context, vulnBatch []Vulnerabi
 		score := clampScore(owaspScore)
 		severity := riskconfig.RiskSeverity(score)
 
+		// Generate OWASP RR vector in standard format
+		vector := owasp.FromAggregatedScores(
+			entry.ThreatAgentScore,
+			entry.VulnerabilityScore,
+			entry.TechnicalImpact,
+			entry.BusinessImpact,
+		)
+		vectorString := vector.String()
+
 		slog.InfoContext(ctx, "vuln_risk_score",
 			"vuln", entry.VulnID,
 			"threat_agent", entry.ThreatAgentScore,
@@ -166,6 +176,7 @@ func (g *Generator) generateRiskScore(ctx context.Context, vulnBatch []Vulnerabi
 			"impact", fmt.Sprintf("%.2f", impactScore),
 			"score", fmt.Sprintf("%.2f", score),
 			"severity", severity,
+			"vector", vectorString,
 		)
 
 		group = append(group, outputhandler.VulnRating{
@@ -174,6 +185,7 @@ func (g *Generator) generateRiskScore(ctx context.Context, vulnBatch []Vulnerabi
 				Method:   cyclonedx.ScoringMethodOWASP,
 				Score:    &score,
 				Severity: cyclonedx.Severity(severity),
+				Vector:   vectorString,
 			},
 		})
 	}
