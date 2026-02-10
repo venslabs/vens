@@ -60,7 +60,8 @@ Output of [CycloneDX VEX](https://cyclonedx.org/capabilities/vex/) with OWASP sc
     "ratings": [{
       "method": "OWASP",
       "score": 52.0,
-      "severity": "high"
+      "severity": "high",
+      "vector": "SL:7/M:7/O:7/S:7/ED:6/EE:6/A:6/ID:3/LC:7/LI:7/LAV:7/LAC:7/FD:7/RD:7/NC:7/PV:7"
     }],
     "analysis": {
       "detail": "High risk: Exposes PII in GDPR-regulated environment"
