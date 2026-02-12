@@ -6,7 +6,7 @@
 
 # vens - Context-Aware Vulnerability Risk Scoring
 
-**Stop treating all vulnerabilities equally.** Vens transforms generic CVSS scores into **contextual OWASP risk scores** tailored to YOUR system using LLM intelligence.
+**Stop treating all vulnerabilities equally.** Vens transforms generic CVSS scores into **contextual OWASP risk scores** tailored to YOUR system using LLM intelligence, and outputs standards-compliant **[CycloneDX VEX](https://www.ntia.gov/files/ntia/publications/vex_one-page_summary.pdf)**.
 
 ## Why vens?
 
