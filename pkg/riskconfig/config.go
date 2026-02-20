@@ -229,27 +229,27 @@ func (c *Config) validate() error {
 // suitable for inclusion in LLM prompts.
 func (c *Config) FormatForLLM() string {
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("Project: %s\n", c.Project.Name))
+	fmt.Fprintf(&sb, "Project: %s\n", c.Project.Name)
 	if c.Project.Description != "" {
-		sb.WriteString(fmt.Sprintf("Description: %s\n", c.Project.Description))
+		fmt.Fprintf(&sb, "Description: %s\n", c.Project.Description)
 	}
 
 	// Required fields
-	sb.WriteString(fmt.Sprintf("Exposure: %s\n", c.Context.Exposure))
-	sb.WriteString(fmt.Sprintf("Data Sensitivity: %s\n", c.Context.DataSensitivity))
-	sb.WriteString(fmt.Sprintf("Business Criticality: %s\n", c.Context.BusinessCriticality))
+	fmt.Fprintf(&sb, "Exposure: %s\n", c.Context.Exposure)
+	fmt.Fprintf(&sb, "Data Sensitivity: %s\n", c.Context.DataSensitivity)
+	fmt.Fprintf(&sb, "Business Criticality: %s\n", c.Context.BusinessCriticality)
 
 	// Optional fields - only show if explicitly provided
 	if c.Context.AvailabilityRequirement != nil {
-		sb.WriteString(fmt.Sprintf("Availability Requirement: %s\n", *c.Context.AvailabilityRequirement))
+		fmt.Fprintf(&sb, "Availability Requirement: %s\n", *c.Context.AvailabilityRequirement)
 	}
 
 	if len(c.Context.ComplianceRequirements) > 0 {
-		sb.WriteString(fmt.Sprintf("Compliance Requirements: %s\n", strings.Join(c.Context.ComplianceRequirements, ", ")))
+		fmt.Fprintf(&sb, "Compliance Requirements: %s\n", strings.Join(c.Context.ComplianceRequirements, ", "))
 	}
 
 	if c.Context.AuditRequirement != nil {
-		sb.WriteString(fmt.Sprintf("Audit Requirement: %s\n", *c.Context.AuditRequirement))
+		fmt.Fprintf(&sb, "Audit Requirement: %s\n", *c.Context.AuditRequirement)
 	}
 
 	// Format security controls if any are enabled
@@ -281,11 +281,11 @@ func (c *Config) FormatForLLM() string {
 	}
 
 	if len(activeControls) > 0 {
-		sb.WriteString(fmt.Sprintf("Security Controls: %s\n", strings.Join(activeControls, ", ")))
+		fmt.Fprintf(&sb, "Security Controls: %s\n", strings.Join(activeControls, ", "))
 	}
 
 	if c.Context.Notes != "" {
-		sb.WriteString(fmt.Sprintf("Additional Notes: %s\n", c.Context.Notes))
+		fmt.Fprintf(&sb, "Additional Notes: %s\n", c.Context.Notes)
 	}
 	return sb.String()
 }
