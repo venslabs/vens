@@ -1,6 +1,6 @@
 # Trivy plugin manifest <https://aquasecurity.github.io/trivy/v0.56/docs/plugin/developer-guide/>
 name: "vens"
-version: "0.1.0"
+version: "0.2.1"
 repository: github.com/venslabs/vens
 maintainer: fahedouch
 summary: Evaluate and prioritize vulnerabilities based on context
@@ -11,20 +11,20 @@ platforms:
   - selector:
       os: darwin
       arch: amd64
-    uri: https://github.com/venslabs/vens/releases/download/v0.1.0/vens-v0.1.0-darwin-amd64.tar.gz
+    uri: https://github.com/venslabs/vens/releases/download/v0.2.1/vens-v0.2.1-darwin-amd64.tar.gz
     bin: ./vens
   - selector:
       os: darwin
       arch: arm64
-    uri: https://github.com/venslabs/vens/releases/download/v0.1.0/vens-v0.1.0-darwin-arm64.tar.gz
+    uri: https://github.com/venslabs/vens/releases/download/v0.2.1/vens-v0.2.1-darwin-arm64.tar.gz
     bin: ./vens
   - selector:
       os: linux
       arch: amd64
-    uri: https://github.com/venslabs/vens/releases/download/v0.1.0/vens-v0.1.0-linux-amd64.tar.gz
+    uri: https://github.com/venslabs/vens/releases/download/v0.2.1/vens-v0.2.1-linux-amd64.tar.gz
     bin: ./vens
   - selector:
       os: linux
       arch: arm64
-    uri: https://github.com/venslabs/vens/releases/download/v0.1.0/vens-v0.1.0-linux-arm64.tar.gz
+    uri: https://github.com/venslabs/vens/releases/download/v0.2.1/vens-v0.2.1-linux-arm64.tar.gz
     bin: ./vens

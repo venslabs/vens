@@ -26,9 +26,9 @@ artifacts:
 		for arch in amd64 arm64; do \
 			ext=""; [ "$$os" = "windows" ] && ext=".exe"; \
 			echo "Building vens-$$os-$$arch$$ext"; \
-			GOOS=$$os GOARCH=$$arch $(GO_BUILD) -o _output/vens-$$os-$$arch$$ext ./cmd/vens; \
-			tar -czf _output/vens-$(VERSION)-$$os-$$arch.tar.gz -C _output vens-$$os-$$arch$$ext; \
-			rm _output/vens-$$os-$$arch$$ext; \
+			GOOS=$$os GOARCH=$$arch $(GO_BUILD) -o _output/vens$$ext ./cmd/vens; \
+			tar -czf _output/vens-$(VERSION)-$$os-$$arch.tar.gz -C _output vens$$ext; \
+			rm _output/vens$$ext; \
 		done; \
 	done
 
