@@ -1,6 +1,12 @@
+[![GitHub Release][release-img]][release]
+[![CI][ci-img]][ci]
+[![Go Report Card][go-report-img]][go-report]
+[![License: Apache-2.0][license-img]][license]
+[![GitHub Downloads][github-downloads-img]][release]
+
 # vens - Context-Aware Vulnerability Risk Scoring
 
-**Stop treating all vulnerabilities equally.** Vens transforms generic CVSS scores into **contextual OWASP risk scores** tailored to YOUR system using LLM intelligence.
+**Stop treating all vulnerabilities equally.** Vens transforms generic CVSS scores into **contextual OWASP risk scores** tailored to YOUR system using LLM intelligence, and outputs standards-compliant **[CycloneDX VEX](https://www.ntia.gov/files/ntia/publications/vex_one-page_summary.pdf)**.
 
 ## Why vens?
 
@@ -54,7 +60,8 @@ Output of [CycloneDX VEX](https://cyclonedx.org/capabilities/vex/) with OWASP sc
     "ratings": [{
       "method": "OWASP",
       "score": 52.0,
-      "severity": "high"
+      "severity": "high",
+      "vector": "SL:7/M:7/O:7/S:7/ED:6/EE:6/A:6/ID:3/LC:7/LI:7/LAV:7/LAC:7/FD:7/RD:7/NC:7/PV:7"
     }],
     "analysis": {
       "detail": "High risk: Exposes PII in GDPR-regulated environment"
@@ -132,3 +139,13 @@ Apache License 2.0 - See [LICENSE](LICENSE)
 ---
 
 **Focus on what matters. Patch smarter, not harder.**
+
+[release-img]: https://img.shields.io/github/release/venslabs/vens.svg?logo=github
+[release]: https://github.com/venslabs/vens/releases
+[ci-img]: https://github.com/venslabs/vens/actions/workflows/main.yml/badge.svg
+[ci]: https://github.com/venslabs/vens/actions/workflows/main.yml
+[go-report-img]: https://goreportcard.com/badge/github.com/venslabs/vens
+[go-report]: https://goreportcard.com/report/github.com/venslabs/vens
+[license-img]: https://img.shields.io/badge/License-Apache%202.0-blue.svg
+[license]: https://github.com/venslabs/vens/blob/main/LICENSE
+[github-downloads-img]: https://img.shields.io/github/downloads/venslabs/vens/total?logo=github

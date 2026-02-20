@@ -1,10 +1,10 @@
 module github.com/venslabs/vens
 
-go 1.25.5
+go 1.25.6
 
 require (
-	github.com/CycloneDX/cyclonedx-go v0.9.3
-	github.com/aquasecurity/trivy v0.69.0
+	github.com/CycloneDX/cyclonedx-go v0.10.0
+	github.com/aquasecurity/trivy v0.69.1
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
 	github.com/tmc/langchaingo v0.1.14
