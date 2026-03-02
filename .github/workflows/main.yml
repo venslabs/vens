@@ -11,11 +11,14 @@ permissions:
 
 jobs:
   main:
+    permissions:
+      contents: read  # for actions/checkout to fetch code
+      pull-requests: read  # for golangci/golangci-lint-action to fetch pull requests
     runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
-      - name: Harden Runner
+      - name: Harden the runner (Audit all outbound calls)
         uses: step-security/harden-runner@a90bcbc6539c36a85cdfeb73f7e2f433735f215b # v2.15.0
         with:
           egress-policy: audit
