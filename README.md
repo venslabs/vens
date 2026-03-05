@@ -49,6 +49,9 @@ trivy image python:3.11-slim --format json --output report.json
 
 # 3. Generate contextual risk scores
 vens generate --config-file config.yaml report.json output.vex.json
+
+# 4. Apply scores back to report (while waiting for native VEX support in Trivy, Grype, Dependency-Track)
+vens enrich --vex output.vex.json report.json
 ```
 
 Output of [CycloneDX VEX](https://cyclonedx.org/capabilities/vex/) with OWASP scores:
@@ -115,7 +118,7 @@ vens generate --config-file config.yaml INPUT OUTPUT
 
 ### `vens enrich`
 
-Enrich Trivy report with OWASP scores:
+Apply VEX scores to your Trivy report:
 
 ```bash
 vens enrich --vex output.vex.json report.json
