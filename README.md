@@ -44,10 +44,12 @@ trivy plugin install github.com/venslabs/vens
 export OPENAI_API_KEY="sk-..."
 export OPENAI_MODEL="gpt-4o"
 
-# 2. Scan with Trivy
+# 2. Scan with Trivy or Grype
 trivy image python:3.11-slim --format json --output report.json
+# or
+grype python:3.11-slim --output json --file report.json
 
-# 3. Generate contextual risk scores
+# 3. Generate contextual risk scores (auto-detects format)
 vens generate --config-file config.yaml report.json output.vex.json
 
 # 4. Apply scores back to report (while waiting for native VEX support in Trivy, Grype, Dependency-Track)
@@ -110,8 +112,13 @@ Generate VEX with contextual OWASP scores:
 vens generate --config-file config.yaml INPUT OUTPUT
 ```
 
+**Supported scanners:**
+- ✅ **Trivy** - Auto-detected from JSON report format
+- ✅ **Grype** - Auto-detected from JSON report format
+
 **Key flags:**
 - `--config-file` (required) - Path to config.yaml
+- `--input-format` - Scanner format: `auto` | `trivy` | `grype` (default: `auto`)
 - `--llm` - LLM provider: `openai` | `anthropic` | `ollama` | `googleai` (default: `auto`)
 - `--llm-batch-size` - CVEs per request (default: `10`)
 - `--debug-dir` - Save prompts/responses for debugging
