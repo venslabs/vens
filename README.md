@@ -49,7 +49,7 @@ trivy image python:3.11-slim --format json --output report.json
 # or
 grype python:3.11-slim --output json --file report.json
 
-# 3. Generate contextual risk scores (auto-detects format)
+# 3. Generate contextual risk scores
 vens generate --config-file config.yaml report.json output.vex.json
 
 # 4. Apply scores back to report (while waiting for native VEX support in Trivy, Grype, Dependency-Track)

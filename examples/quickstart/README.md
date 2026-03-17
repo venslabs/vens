@@ -13,7 +13,7 @@ This example demonstrates how **vens** transforms generic CVSS scores into conte
 export OPENAI_API_KEY="sk-..."
 export OPENAI_MODEL="gpt-4o"
 
-# Using Trivy report
+# Using Trivy report (auto-detected)
 vens generate \
   --config-file config.yaml \
   --llm openai \
@@ -24,7 +24,7 @@ vens generate \
 vens generate \
   --config-file config.yaml \
   --llm openai \
-  reports/python-slim-grype.json \
+  reports/python-slim.grype.json \
   output_vex.cdx.json
 ```
 
