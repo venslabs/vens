@@ -13,10 +13,18 @@ This example demonstrates how **vens** transforms generic CVSS scores into conte
 export OPENAI_API_KEY="sk-..."
 export OPENAI_MODEL="gpt-4o"
 
+# Using Trivy report (auto-detected)
 vens generate \
   --config-file config.yaml \
   --llm openai \
   reports/python-slim.trivy.json \
+  output_vex.cdx.json
+
+# Or using Grype report (auto-detected)
+vens generate \
+  --config-file config.yaml \
+  --llm openai \
+  reports/python-slim.grype.json \
   output_vex.cdx.json
 ```
 
@@ -25,7 +33,7 @@ vens generate \
 ## How It Works
 
 ```
-Trivy Scan → 107 CVEs with CVSS scores
+Trivy/Grype Scan → CVEs with CVSS scores
      ↓
 vens + LLM → Analyzes each CVE with your context
      ↓
@@ -33,6 +41,10 @@ OWASP Scores → Risk = Likelihood × Impact
      ↓
 Prioritized List → Fix what matters for YOU
 ```
+
+**Supported Scanners:**
+- ✅ Trivy (auto-detected)
+- ✅ Grype (auto-detected)
 
 ## Value Comparison: Before vs After
 

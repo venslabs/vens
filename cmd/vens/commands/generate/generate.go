@@ -17,13 +17,11 @@
 package generate
 
 import (
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
 	"strings"
 
-	trivytypes "github.com/aquasecurity/trivy/pkg/types"
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -32,7 +30,7 @@ import (
 	"github.com/venslabs/vens/pkg/llm/llmfactory"
 	outputhandler "github.com/venslabs/vens/pkg/outputhandler"
 	"github.com/venslabs/vens/pkg/riskconfig"
-	"github.com/venslabs/vens/pkg/sbom"
+	"github.com/venslabs/vens/pkg/scanner"
 	"github.com/venslabs/vens/pkg/trivypluginutil"
 )
 
@@ -63,7 +61,7 @@ The LLM calculates the OWASP risk score (0-81) for each vulnerability using:
 	flags.Int("llm-batch-size", generator.DefaultBatchSize, "LLM batch size")
 	flags.Int("llm-seed", 0, "Seed (0 means no explicit seed)")
 	flags.String("config-file", "", "Path to config.yaml file with OWASP factors")
-	flags.String("input-format", "auto", "Input format ([auto trivy])")
+	flags.String("input-format", "auto", "Input format ([auto trivy grype])")
 	flags.String("output-format", "auto", "Output format ([auto cyclonedxvex])")
 	flags.String("debug-dir", "", "Directory to save debug files (prompts, responses)")
 	flags.String("sbom-serial-number", "", "SBOM serial number for BOM-Link (format: urn:uuid:...)")
@@ -158,22 +156,6 @@ func action(cmd *cobra.Command, args []string) error {
 	}
 
 	inputPath, outputPath := args[0], args[1]
-	inputFormat, err := flags.GetString("input-format")
-	if err != nil {
-		return err
-	}
-
-	if inputFormat == "" || inputFormat == "auto" {
-		inputFormat = "trivy"
-		slog.DebugContext(ctx, "Automatically choosing input format", "format", inputFormat)
-	}
-
-	switch inputFormat {
-	case "trivy":
-		// NOP: we currently support only trivy
-	default:
-		return fmt.Errorf("unknown input format %q", inputFormat)
-	}
 
 	// Read vulnerability report
 	inputB, err := os.ReadFile(inputPath)
@@ -181,9 +163,27 @@ func action(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to read input file: %w", err)
 	}
 
-	var input trivytypes.Report
-	if err = json.Unmarshal(inputB, &input); err != nil {
-		return fmt.Errorf("failed to parse input as Trivy report: %w", err)
+	// Detect scanner format
+	inputFormat, err := flags.GetString("input-format")
+	if err != nil {
+		return err
+	}
+
+	var reportScanner scanner.ReportScanner
+	if inputFormat == "" || inputFormat == "auto" {
+		// Auto-detect format
+		reportScanner, err = scanner.DetectFormat(inputB)
+		if err != nil {
+			return fmt.Errorf("failed to detect input format: %w", err)
+		}
+		slog.InfoContext(ctx, "Auto-detected input format", "format", reportScanner.Name())
+	} else {
+		// Use explicit format
+		reportScanner, err = scanner.NewScanner(scanner.ScannerType(inputFormat))
+		if err != nil {
+			return fmt.Errorf("failed to create scanner: %w", err)
+		}
+		slog.DebugContext(ctx, "Using explicit input format", "format", inputFormat)
 	}
 
 	// Setup output handler
@@ -216,31 +216,10 @@ func action(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("unknown output format %q", outputFormat)
 	}
 
-	purlCounts := make(map[string]int)
-	var vulns []generator.Vulnerability
-
-	for _, result := range input.Results {
-		for _, v := range result.Vulnerabilities {
-			if v.PkgIdentifier.PURL != nil {
-				purl := v.PkgIdentifier.PURL.ToString()
-				purlCounts[purl]++
-			}
-
-			// Calculate BOMRef using Trivy's logic
-			bomRef := sbom.CalculateBOMRef(v.PkgIdentifier, v.PkgID, purlCounts)
-
-			vulns = append(vulns, generator.Vulnerability{
-				VulnID:           v.VulnerabilityID,
-				PkgID:            v.PkgID,
-				PkgName:          v.PkgName,
-				InstalledVersion: v.InstalledVersion,
-				FixedVersion:     v.FixedVersion,
-				BOMRef:           bomRef,
-				Title:            v.Title,
-				Description:      v.Description,
-				Severity:         v.Severity,
-			})
-		}
+	// Parse vulnerabilities
+	vulns, err := reportScanner.Parse(inputB)
+	if err != nil {
+		return fmt.Errorf("failed to parse vulnerabilities: %w", err)
 	}
 
 	if len(vulns) == 0 {
