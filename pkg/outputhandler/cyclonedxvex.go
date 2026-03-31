@@ -38,8 +38,8 @@ func NewCycloneDxVexOutputHandler(w io.Writer, sbomUUID string, sbomVersion int)
 type cycloneDxVexWriter struct {
 	w           io.Writer
 	r           []VulnRating
-	sbomUUID    string // SBOM UUID (without urn:uuid: prefix) for BOM-Link reference
-	sbomVersion int    // SBOM version for BOM-Link
+	sbomUUID    string
+	sbomVersion int
 	closed      bool
 }
 
@@ -55,14 +55,9 @@ func (c *cycloneDxVexWriter) Close() error {
 	if c.closed {
 		return nil
 	}
-	// Build a CycloneDX VEX with vulnerabilities and dedicated rating
 	bom := cyclonedx.NewBOM()
-
-	// Set VEX BOM serial number (distinct from the SBOM serial number)
 	bom.SerialNumber = "urn:uuid:" + uuid.New().String()
-	bom.Version = 1
-
-	// Set metadata with timestamp and tool information
+	bom.Version = c.sbomVersion
 	bom.Metadata = &cyclonedx.Metadata{
 		Timestamp: time.Now().UTC().Format(time.RFC3339),
 		Tools: &cyclonedx.ToolsChoice{
@@ -85,14 +80,12 @@ func (c *cycloneDxVexWriter) Close() error {
 			continue
 		}
 
-		rs := []cyclonedx.VulnerabilityRating{g.Rating}
 		v := cyclonedx.Vulnerability{
 			ID:      g.VulnID,
 			Source:  g.Source,
-			Ratings: &rs,
+			Ratings: &[]cyclonedx.VulnerabilityRating{g.Rating},
 		}
 
-		// Construct BOM-Link according to CycloneDX spec: urn:cdx:{uuid}/version#bom-ref
 		bomLink := fmt.Sprintf("urn:cdx:%s/%d#%s", c.sbomUUID, c.sbomVersion, g.BOMRef)
 
 		affects := cyclonedx.Affects{

@@ -55,9 +55,9 @@ func (s *GrypeScanner) Parse(data []byte) ([]generator.Vulnerability, error) {
 			Title:            "", // Grype doesn't provide a separate title
 			Description:      vuln.Description,
 			Severity:         vuln.Severity,
+			SourceName:       grypeNamespaceToSourceName(vuln.Namespace),
 			SourceURL:        vuln.DataSource,
 		}
-		v.SourceName = grypeNamespaceToSourceName(vuln.Namespace)
 		vulns = append(vulns, v)
 	}
 
@@ -86,9 +86,8 @@ func calculateBOMRef(p grypemodels.Package) string {
 	return p.ID
 }
 
-// grypeNamespaceToSourceName maps a Grype namespace to a Dependency-Track
-// compatible source name. Grype namespaces follow the pattern "provider:type"
-// (e.g., "nvd:cpe", "github:language:go", "debian:distro:debian:13").
+// grypeNamespaceToSourceName maps a Grype namespace (e.g., "nvd:cpe",
+// "github:language:go") to a well-known source name.
 func grypeNamespaceToSourceName(namespace string) string {
 	ns := strings.ToLower(namespace)
 	switch {
@@ -99,8 +98,6 @@ func grypeNamespaceToSourceName(namespace string) string {
 	case strings.HasPrefix(ns, "osv"):
 		return "OSV"
 	default:
-		// Distro-based namespaces (debian, ubuntu, alpine, etc.) are
-		// typically NVD-sourced CVEs with vendor-specific tracking.
 		return ""
 	}
 }

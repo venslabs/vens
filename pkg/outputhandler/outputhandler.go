@@ -17,8 +17,6 @@
 package outputhandler
 
 import (
-	"strings"
-
 	"github.com/CycloneDX/cyclonedx-go"
 )
 
@@ -31,46 +29,7 @@ type OutputHandler interface {
 // VulnRating carries a single CycloneDX rating for one vulnerability ID.
 type VulnRating struct {
 	VulnID string
-	BOMRef string // CycloneDX BOM-Ref (calculated using Trivy's logic)
+	BOMRef string
 	Rating cyclonedx.VulnerabilityRating
-	Source *cyclonedx.Source // Vulnerability source (e.g., NVD, GHSA, OSV)
-}
-
-// VulnSource derives a CycloneDX Source from a vulnerability ID prefix.
-// This is used as a fallback when the scanner does not provide source metadata.
-// It maps well-known prefixes to their respective databases. Unknown prefixes
-// return "UNKNOWN" which is accepted by Dependency-Track but will only match
-// vulnerabilities stored with the same source.
-func VulnSource(vulnID string) *cyclonedx.Source {
-	switch {
-	case strings.HasPrefix(vulnID, "CVE-"):
-		return &cyclonedx.Source{
-			Name: "NVD",
-			URL:  "https://nvd.nist.gov/vuln/detail/" + vulnID,
-		}
-	case strings.HasPrefix(vulnID, "GHSA-"):
-		return &cyclonedx.Source{
-			Name: "GITHUB",
-			URL:  "https://github.com/advisories/" + vulnID,
-		}
-	case strings.HasPrefix(vulnID, "GO-"):
-		return &cyclonedx.Source{
-			Name: "OSV",
-			URL:  "https://osv.dev/vulnerability/" + vulnID,
-		}
-	case strings.HasPrefix(vulnID, "PYSEC-"):
-		return &cyclonedx.Source{
-			Name: "OSV",
-			URL:  "https://osv.dev/vulnerability/" + vulnID,
-		}
-	case strings.HasPrefix(vulnID, "RUSTSEC-"):
-		return &cyclonedx.Source{
-			Name: "OSV",
-			URL:  "https://osv.dev/vulnerability/" + vulnID,
-		}
-	default:
-		return &cyclonedx.Source{
-			Name: "UNKNOWN",
-		}
-	}
+	Source *cyclonedx.Source
 }
