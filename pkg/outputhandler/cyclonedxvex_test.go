@@ -199,6 +199,132 @@ func TestCycloneDxVexWriter_Close_VulnerabilitySource(t *testing.T) {
 	}
 }
 
+func TestCycloneDxVexWriter_Close_MergesDuplicateVulnIDs(t *testing.T) {
+	var buf bytes.Buffer
+	h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 1)
+
+	score := 42.0
+	err := h.HandleVulnRatings([]VulnRating{
+		{
+			VulnID: "CVE-2024-1234",
+			BOMRef: "pkg:npm/foo@1.0.0",
+			Rating: cyclonedx.VulnerabilityRating{
+				Method:   cyclonedx.ScoringMethodOWASP,
+				Score:    &score,
+				Severity: cyclonedx.SeverityHigh,
+			},
+			Source: &cyclonedx.Source{Name: "NVD", URL: "https://nvd.nist.gov"},
+		},
+		{
+			VulnID: "CVE-2024-1234",
+			BOMRef: "pkg:npm/bar@2.0.0",
+			Rating: cyclonedx.VulnerabilityRating{
+				Method:   cyclonedx.ScoringMethodOWASP,
+				Score:    &score,
+				Severity: cyclonedx.SeverityHigh,
+			},
+			Source: &cyclonedx.Source{Name: "NVD", URL: "https://nvd.nist.gov"},
+		},
+		{
+			VulnID: "CVE-2024-5678",
+			BOMRef: "pkg:npm/baz@3.0.0",
+			Rating: cyclonedx.VulnerabilityRating{
+				Method:   cyclonedx.ScoringMethodOWASP,
+				Score:    &score,
+				Severity: cyclonedx.SeverityMedium,
+			},
+			Source: &cyclonedx.Source{Name: "NVD", URL: "https://nvd.nist.gov"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleVulnRatings: %v", err)
+	}
+
+	if err := h.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	var bom cyclonedx.BOM
+	if err := json.Unmarshal(buf.Bytes(), &bom); err != nil {
+		t.Fatalf("unmarshal BOM: %v", err)
+	}
+
+	if bom.Vulnerabilities == nil {
+		t.Fatal("vulnerabilities is nil")
+	}
+
+	vulns := *bom.Vulnerabilities
+	if len(vulns) != 2 {
+		t.Fatalf("got %d vulnerabilities, want 2 (duplicates should be merged)", len(vulns))
+	}
+
+	var cve1234 *cyclonedx.Vulnerability
+	for i := range vulns {
+		if vulns[i].ID == "CVE-2024-1234" {
+			cve1234 = &vulns[i]
+			break
+		}
+	}
+
+	if cve1234 == nil {
+		t.Fatal("CVE-2024-1234 not found")
+	}
+
+	if cve1234.Affects == nil || len(*cve1234.Affects) != 2 {
+		t.Errorf("CVE-2024-1234 has %d affects, want 2", len(*cve1234.Affects))
+	}
+}
+
+func TestCycloneDxVexWriter_Close_DeduplicatesAffectsRefs(t *testing.T) {
+	var buf bytes.Buffer
+	h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 1)
+
+	score := 42.0
+	err := h.HandleVulnRatings([]VulnRating{
+		{
+			VulnID: "CVE-2024-1234",
+			BOMRef: "pkg:npm/foo@1.0.0",
+			Rating: cyclonedx.VulnerabilityRating{
+				Method:   cyclonedx.ScoringMethodOWASP,
+				Score:    &score,
+				Severity: cyclonedx.SeverityHigh,
+			},
+			Source: &cyclonedx.Source{Name: "NVD", URL: "https://nvd.nist.gov"},
+		},
+		{
+			VulnID: "CVE-2024-1234",
+			BOMRef: "pkg:npm/foo@1.0.0",
+			Rating: cyclonedx.VulnerabilityRating{
+				Method:   cyclonedx.ScoringMethodOWASP,
+				Score:    &score,
+				Severity: cyclonedx.SeverityHigh,
+			},
+			Source: &cyclonedx.Source{Name: "NVD", URL: "https://nvd.nist.gov"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleVulnRatings: %v", err)
+	}
+
+	if err := h.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	var bom cyclonedx.BOM
+	if err := json.Unmarshal(buf.Bytes(), &bom); err != nil {
+		t.Fatalf("unmarshal BOM: %v", err)
+	}
+
+	vulns := *bom.Vulnerabilities
+	if len(vulns) != 1 {
+		t.Fatalf("got %d vulnerabilities, want 1", len(vulns))
+	}
+
+	if vulns[0].Affects == nil || len(*vulns[0].Affects) != 1 {
+		t.Errorf("got %d affects, want 1 (duplicate refs should be deduplicated)", len(*vulns[0].Affects))
+	}
+}
+
 func TestCycloneDxVexWriter_Close_Idempotent(t *testing.T) {
 	var buf bytes.Buffer
 	h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 1)
