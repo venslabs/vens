@@ -46,7 +46,7 @@ func (s *TrivyScanner) Parse(data []byte) ([]generator.Vulnerability, error) {
 			// Calculate BOMRef using Trivy's logic
 			bomRef := calculateTrivyBOMRef(v.PkgIdentifier, v.PkgID, purlCounts)
 
-			vulns = append(vulns, generator.Vulnerability{
+			vuln := generator.Vulnerability{
 				VulnID:           v.VulnerabilityID,
 				PkgID:            v.PkgID,
 				PkgName:          v.PkgName,
@@ -56,7 +56,12 @@ func (s *TrivyScanner) Parse(data []byte) ([]generator.Vulnerability, error) {
 				Title:            v.Title,
 				Description:      v.Description,
 				Severity:         v.Severity,
-			})
+			}
+			if v.DataSource != nil {
+				vuln.SourceName = string(v.DataSource.ID)
+				vuln.SourceURL = v.DataSource.URL
+			}
+			vulns = append(vulns, vuln)
 		}
 	}
 

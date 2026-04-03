@@ -31,9 +31,10 @@ import (
 	"github.com/tmc/langchaingo/jsonschema"
 	"github.com/tmc/langchaingo/llms"
 	"github.com/venslabs/vens/pkg/llm"
-	outputhandler "github.com/venslabs/vens/pkg/outputhandler"
+	"github.com/venslabs/vens/pkg/outputhandler"
 	"github.com/venslabs/vens/pkg/owasp"
 	"github.com/venslabs/vens/pkg/riskconfig"
+	"github.com/venslabs/vens/pkg/vuln"
 )
 
 const (
@@ -54,6 +55,8 @@ type Vulnerability struct {
 	Title            string
 	Description      string
 	Severity         string // NVD/vendor severity
+	SourceName       string
+	SourceURL        string
 }
 
 // LLMVulnerability contains only the fields needed for LLM analysis.
@@ -199,10 +202,9 @@ func (g *Generator) generateRiskScore(ctx context.Context, vulnBatch []Vulnerabi
 		)
 		vectorString := vector.String()
 
-		// Get the BOMRef from the original vulnerability
 		bomRef := ""
-		if vuln, ok := vulnMap[entry.VulnID]; ok {
-			bomRef = vuln.BOMRef
+		if v, ok := vulnMap[entry.VulnID]; ok {
+			bomRef = v.BOMRef
 		}
 
 		slog.InfoContext(ctx, "Scored vulnerability",
@@ -213,6 +215,16 @@ func (g *Generator) generateRiskScore(ctx context.Context, vulnBatch []Vulnerabi
 			"vector", vectorString,
 		)
 
+		var source *cyclonedx.Source
+		if v, ok := vulnMap[entry.VulnID]; ok && v.SourceName != "" {
+			source = &cyclonedx.Source{
+				Name: v.SourceName,
+				URL:  v.SourceURL,
+			}
+		} else {
+			source = vuln.Source(entry.VulnID)
+		}
+
 		group = append(group, outputhandler.VulnRating{
 			VulnID: entry.VulnID,
 			BOMRef: bomRef,
@@ -222,6 +234,7 @@ func (g *Generator) generateRiskScore(ctx context.Context, vulnBatch []Vulnerabi
 				Severity: cyclonedx.Severity(severity),
 				Vector:   vectorString,
 			},
+			Source: source,
 		})
 	}
 
