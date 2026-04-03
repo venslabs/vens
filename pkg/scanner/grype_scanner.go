@@ -17,6 +17,7 @@ package scanner
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	grypemodels "github.com/anchore/grype/grype/presenter/models"
 	"github.com/package-url/packageurl-go"
@@ -44,7 +45,7 @@ func (s *GrypeScanner) Parse(data []byte) ([]generator.Vulnerability, error) {
 		// Extract fixed version from match details
 		fixedVersion := extractFixedVersion(match)
 
-		vulns = append(vulns, generator.Vulnerability{
+		v := generator.Vulnerability{
 			VulnID:           vuln.ID,
 			PkgID:            match.Artifact.ID,
 			PkgName:          match.Artifact.Name,
@@ -54,7 +55,10 @@ func (s *GrypeScanner) Parse(data []byte) ([]generator.Vulnerability, error) {
 			Title:            "", // Grype doesn't provide a separate title
 			Description:      vuln.Description,
 			Severity:         vuln.Severity,
-		})
+			SourceName:       grypeNamespaceToSourceName(vuln.Namespace),
+			SourceURL:        vuln.DataSource,
+		}
+		vulns = append(vulns, v)
 	}
 
 	return vulns, nil
@@ -80,6 +84,22 @@ func calculateBOMRef(p grypemodels.Package) string {
 	}
 	// fallback is to use strictly the ID if there is no valid pURL
 	return p.ID
+}
+
+// grypeNamespaceToSourceName maps a Grype namespace (e.g., "nvd:cpe",
+// "github:language:go") to a well-known source name.
+func grypeNamespaceToSourceName(namespace string) string {
+	ns := strings.ToLower(namespace)
+	switch {
+	case strings.HasPrefix(ns, "nvd"):
+		return "NVD"
+	case strings.HasPrefix(ns, "github"):
+		return "GITHUB"
+	case strings.HasPrefix(ns, "osv"):
+		return "OSV"
+	default:
+		return ""
+	}
 }
 
 // extractFixedVersion extracts the fixed version from Grype match details.

@@ -18,8 +18,11 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"time"
 
 	"github.com/CycloneDX/cyclonedx-go"
+	"github.com/google/uuid"
+	"github.com/venslabs/vens/cmd/vens/version"
 )
 
 // NewCycloneDxVexOutputHandler returns an OutputHandler that accumulates
@@ -35,8 +38,8 @@ func NewCycloneDxVexOutputHandler(w io.Writer, sbomUUID string, sbomVersion int)
 type cycloneDxVexWriter struct {
 	w           io.Writer
 	r           []VulnRating
-	sbomUUID    string // SBOM UUID (without urn:uuid: prefix) for BOM-Link reference
-	sbomVersion int    // SBOM version for BOM-Link
+	sbomUUID    string
+	sbomVersion int
 	closed      bool
 }
 
@@ -52,33 +55,52 @@ func (c *cycloneDxVexWriter) Close() error {
 	if c.closed {
 		return nil
 	}
-	// Build a CycloneDX VEX with vulnerabilities and dedicated rating
 	bom := cyclonedx.NewBOM()
+	bom.SerialNumber = "urn:uuid:" + uuid.New().String()
+	bom.Version = c.sbomVersion
+	bom.Metadata = &cyclonedx.Metadata{
+		Timestamp: time.Now().UTC().Format(time.RFC3339),
+		Tools: &cyclonedx.ToolsChoice{
+			Components: &[]cyclonedx.Component{
+				{
+					Type:    cyclonedx.ComponentTypeApplication,
+					Name:    "vens",
+					Version: version.GetVersion(),
+				},
+			},
+		},
+	}
 
-	vulns := make([]cyclonedx.Vulnerability, 0, len(c.r))
+	vulnMap := make(map[string]*cyclonedx.Vulnerability)
+	affectsSet := make(map[string]map[string]bool)
 	for _, g := range c.r {
 		if g.BOMRef == "" {
-			slog.Warn("Skipping vulnerability without BOMRef",
-				"vuln", g.VulnID,
-			)
+			slog.Warn("Skipping vulnerability without BOMRef", "vuln", g.VulnID)
 			continue
 		}
 
-		rs := []cyclonedx.VulnerabilityRating{g.Rating}
-		v := cyclonedx.Vulnerability{
-			ID:      g.VulnID,
-			Ratings: &rs,
-		}
-
-		// Construct BOM-Link according to CycloneDX spec: urn:cdx:{uuid}/version#bom-ref
 		bomLink := fmt.Sprintf("urn:cdx:%s/%d#%s", c.sbomUUID, c.sbomVersion, g.BOMRef)
 
-		affects := cyclonedx.Affects{
-			Ref: bomLink,
+		if existing, ok := vulnMap[g.VulnID]; ok {
+			if !affectsSet[g.VulnID][bomLink] {
+				affectsSet[g.VulnID][bomLink] = true
+				*existing.Affects = append(*existing.Affects, cyclonedx.Affects{Ref: bomLink})
+			}
+			continue
 		}
-		v.Affects = &[]cyclonedx.Affects{affects}
 
-		vulns = append(vulns, v)
+		vulnMap[g.VulnID] = &cyclonedx.Vulnerability{
+			ID:      g.VulnID,
+			Source:  g.Source,
+			Ratings: &[]cyclonedx.VulnerabilityRating{g.Rating},
+			Affects: &[]cyclonedx.Affects{{Ref: bomLink}},
+		}
+		affectsSet[g.VulnID] = map[string]bool{bomLink: true}
+	}
+
+	vulns := make([]cyclonedx.Vulnerability, 0, len(vulnMap))
+	for _, v := range vulnMap {
+		vulns = append(vulns, *v)
 	}
 
 	if len(vulns) > 0 {
