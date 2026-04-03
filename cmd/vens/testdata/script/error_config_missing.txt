@@ -1,0 +1,11 @@
+# Test error handling for missing config file
+
+# Try to generate VEX without config file - should fail
+! exec vens generate --llm=mock --sbom-serial-number=urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79 report.json output.cdx.json
+stderr 'config-file is required'
+
+-- report.json --
+{
+  "SchemaVersion": 2,
+  "Results": []
+}

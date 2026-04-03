@@ -29,6 +29,7 @@ const (
 	Ollama    = "ollama"
 	Anthropic = "anthropic"
 	GoogleAI  = "googleai"
+	Mock      = "mock" // For integration testing only
 )
 
 // Names lists the supported backend names for help text and validation.

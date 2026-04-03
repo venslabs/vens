@@ -17,6 +17,10 @@ binaries: _output/bin/vens
 test:
 	$(GO) test -v ./...
 
+.PHONY: test-integration
+test-integration:
+	$(GO) test -v ./cmd/vens/... -run TestScript
+
 .PHONY: _output/bin/vens
 _output/bin/vens:
 	$(GO_BUILD) -o $@ ./cmd/vens

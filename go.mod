@@ -6,8 +6,10 @@ require (
 	github.com/CycloneDX/cyclonedx-go v0.10.0
 	github.com/anchore/grype v0.110.0
 	github.com/aquasecurity/trivy v0.69.3
+	github.com/aquasecurity/trivy-db v0.0.0-20251222105351-a833f47f8f0d
 	github.com/google/uuid v1.6.0
 	github.com/package-url/packageurl-go v0.1.3
+	github.com/rogpeppe/go-internal v1.14.1
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.11.1
@@ -64,7 +66,6 @@ require (
 	github.com/apparentlymart/go-textseg/v15 v15.0.0 // indirect
 	github.com/aquasecurity/go-pep440-version v0.0.1 // indirect
 	github.com/aquasecurity/go-version v0.0.1 // indirect
-	github.com/aquasecurity/trivy-db v0.0.0-20251222105351-a833f47f8f0d // indirect
 	github.com/aws/aws-sdk-go-v2 v1.41.2 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.4 // indirect
 	github.com/aws/aws-sdk-go-v2/config v1.32.10 // indirect

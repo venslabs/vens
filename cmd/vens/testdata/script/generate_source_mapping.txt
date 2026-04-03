@@ -1,0 +1,73 @@
+# Test vulnerability source name mapping
+
+# Test that CVE from github datasource is mapped to NVD (not GITHUB)
+exec vens generate --llm=mock --config-file=config.yaml --sbom-serial-number=urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79 trivy_cve_from_ghsa.json output1.cdx.json
+exists output1.cdx.json
+
+# CVE should be mapped to NVD regardless of datasource
+json-contains output1.cdx.json 'CVE-2024-9999'
+json-contains output1.cdx.json '"name": "NVD"'
+
+# Test GHSA stays as GITHUB
+exec vens generate --llm=mock --config-file=config.yaml --sbom-serial-number=urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79 grype_ghsa.json output2.cdx.json
+exists output2.cdx.json
+json-contains output2.cdx.json 'GHSA-abcd-1234-efgh'
+json-contains output2.cdx.json '"name": "GITHUB"'
+
+-- config.yaml --
+project:
+  name: "source-mapping-test"
+context:
+  exposure: "internet"
+  data_sensitivity: "high"
+  business_criticality: "critical"
+-- trivy_cve_from_ghsa.json --
+{
+  "SchemaVersion": 2,
+  "Results": [
+    {
+      "Target": "test",
+      "Vulnerabilities": [
+        {
+          "VulnerabilityID": "CVE-2024-9999",
+          "PkgID": "pkg@1.0.0",
+          "PkgName": "pkg",
+          "InstalledVersion": "1.0.0",
+          "FixedVersion": "2.0.0",
+          "Title": "Test vulnerability",
+          "Description": "A test CVE that comes from GitHub datasource",
+          "Severity": "HIGH",
+          "DataSource": {
+            "ID": "ghsa",
+            "Name": "GitHub Security Advisory",
+            "URL": "https://github.com/advisories"
+          }
+        }
+      ]
+    }
+  ]
+}
+-- grype_ghsa.json --
+{
+  "matches": [
+    {
+      "vulnerability": {
+        "id": "GHSA-abcd-1234-efgh",
+        "namespace": "github:language:go",
+        "severity": "High",
+        "description": "A GHSA vulnerability"
+      },
+      "artifact": {
+        "id": "xyz789",
+        "name": "go-package",
+        "version": "1.0.0",
+        "type": "go-module",
+        "purl": "pkg:golang/go-package@1.0.0"
+      }
+    }
+  ],
+  "descriptor": {
+    "name": "grype",
+    "version": "0.74.0"
+  }
+}

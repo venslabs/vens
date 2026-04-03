@@ -1,0 +1,61 @@
+# Test VEX generation from Trivy report
+
+# Generate VEX from Trivy report using mock LLM
+exec vens generate --llm=mock --config-file=config.yaml --sbom-serial-number=urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79 report.json output.cdx.json
+stderr 'Processing vulnerabilities'
+
+# Verify output file was created
+exists output.cdx.json
+
+# Verify output contains expected VEX structure
+json-contains output.cdx.json '"bomFormat": "CycloneDX"'
+json-contains output.cdx.json '"specVersion": "1.6"'
+json-contains output.cdx.json 'vulnerabilities'
+json-contains output.cdx.json 'CVE-2024-1234'
+
+# Verify source is mapped to NVD (not raw datasource)
+json-contains output.cdx.json '"name": "NVD"'
+
+-- config.yaml --
+project:
+  name: "test-project"
+  description: "Test project for integration tests"
+context:
+  exposure: "internet"
+  data_sensitivity: "high"
+  business_criticality: "critical"
+-- report.json --
+{
+  "SchemaVersion": 2,
+  "CreatedAt": "2024-01-15T10:00:00Z",
+  "ArtifactName": "nginx:1.25",
+  "ArtifactType": "container_image",
+  "Results": [
+    {
+      "Target": "nginx:1.25 (debian 12.4)",
+      "Class": "os-pkgs",
+      "Type": "debian",
+      "Vulnerabilities": [
+        {
+          "VulnerabilityID": "CVE-2024-1234",
+          "PkgID": "openssl@3.0.11-1~deb12u2",
+          "PkgName": "openssl",
+          "PkgIdentifier": {
+            "PURL": "pkg:deb/debian/openssl@3.0.11-1~deb12u2?arch=amd64&distro=debian-12.4"
+          },
+          "InstalledVersion": "3.0.11-1~deb12u2",
+          "FixedVersion": "3.0.13-1~deb12u1",
+          "Status": "fixed",
+          "Title": "OpenSSL: Buffer overflow in SSL_select_next_proto",
+          "Description": "A buffer overflow vulnerability in OpenSSL.",
+          "Severity": "HIGH",
+          "DataSource": {
+            "ID": "debian",
+            "Name": "Debian Security Tracker",
+            "URL": "https://security-tracker.debian.org/tracker/CVE-2024-1234"
+          }
+        }
+      ]
+    }
+  ]
+}

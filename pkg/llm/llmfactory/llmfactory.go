@@ -27,6 +27,7 @@ import (
 	"github.com/tmc/langchaingo/llms/googleai"
 	"github.com/tmc/langchaingo/llms/ollama"
 	"github.com/tmc/langchaingo/llms/openai"
+	"github.com/venslabs/vens/internal/testutil"
 	"github.com/venslabs/vens/pkg/llm"
 )
 
@@ -56,6 +57,9 @@ func New(ctx context.Context, name string) (llms.Model, error) {
 		var defaultModel string
 		defaultModel = os.Getenv("GOOGLE_MODEL")
 		return googleai.New(ctx, googleai.WithDefaultModel(defaultModel))
+	case llm.Mock:
+		slog.DebugContext(ctx, "Using mock LLM for testing")
+		return testutil.NewMockLLM(), nil
 	default:
 		return nil, fmt.Errorf("unknown LLM %q, make sure to use one of %v", name, llm.Names)
 	}

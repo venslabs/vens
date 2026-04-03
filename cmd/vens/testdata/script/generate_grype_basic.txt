@@ -1,0 +1,78 @@
+# Test VEX generation from Grype report
+
+# Generate VEX from Grype report using mock LLM
+exec vens generate --llm=mock --config-file=config.yaml --sbom-serial-number=urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79 report.json output.cdx.json
+stderr 'Processing vulnerabilities'
+
+# Verify output file was created
+exists output.cdx.json
+
+# Verify output contains expected VEX structure
+json-contains output.cdx.json '"bomFormat": "CycloneDX"'
+json-contains output.cdx.json 'vulnerabilities'
+json-contains output.cdx.json 'GHSA-1234-5678-abcd'
+
+# Verify GHSA source is mapped to GITHUB
+json-contains output.cdx.json '"name": "GITHUB"'
+
+-- config.yaml --
+project:
+  name: "test-project"
+  description: "Test project for integration tests"
+context:
+  exposure: "private"
+  data_sensitivity: "medium"
+  business_criticality: "high"
+-- report.json --
+{
+  "matches": [
+    {
+      "vulnerability": {
+        "id": "GHSA-1234-5678-abcd",
+        "dataSource": "https://github.com/advisories/GHSA-1234-5678-abcd",
+        "namespace": "github:language:python",
+        "severity": "High",
+        "urls": [
+          "https://github.com/advisories/GHSA-1234-5678-abcd"
+        ],
+        "description": "A vulnerability in a Python package",
+        "fix": {
+          "versions": ["2.0.0"],
+          "state": "fixed"
+        }
+      },
+      "relatedVulnerabilities": [],
+      "matchDetails": [
+        {
+          "type": "exact-direct-match",
+          "matcher": "python-matcher",
+          "searchedBy": {
+            "language": "python",
+            "namespace": "github:language:python"
+          },
+          "found": {
+            "versionConstraint": "<2.0.0"
+          }
+        }
+      ],
+      "artifact": {
+        "id": "abc123",
+        "name": "vulnerable-package",
+        "version": "1.0.0",
+        "type": "python",
+        "language": "python",
+        "purl": "pkg:pypi/vulnerable-package@1.0.0"
+      }
+    }
+  ],
+  "source": {
+    "type": "image",
+    "target": {
+      "userInput": "python:3.11"
+    }
+  },
+  "descriptor": {
+    "name": "grype",
+    "version": "0.74.0"
+  }
+}
