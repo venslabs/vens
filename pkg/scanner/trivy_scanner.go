@@ -17,6 +17,7 @@ package scanner
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	ftypes "github.com/aquasecurity/trivy/pkg/fanal/types"
 	trivytypes "github.com/aquasecurity/trivy/pkg/types"
@@ -58,7 +59,7 @@ func (s *TrivyScanner) Parse(data []byte) ([]generator.Vulnerability, error) {
 				Severity:         v.Severity,
 			}
 			if v.DataSource != nil {
-				vuln.SourceName = string(v.DataSource.ID)
+				vuln.SourceName = trivyDataSourceToSourceName(string(v.DataSource.ID), v.VulnerabilityID)
 				vuln.SourceURL = v.DataSource.URL
 			}
 			vulns = append(vulns, vuln)
@@ -103,4 +104,28 @@ func calculateTrivyBOMRef(pkgIdentifier ftypes.PkgIdentifier, pkgID string, purl
 
 	// 4. Otherwise, use PURL
 	return purl
+}
+
+func trivyDataSourceToSourceName(dataSourceID string, vulnID string) string {
+	if src := SourceFromVulnID(vulnID); src != "" {
+		return src
+	}
+	id := strings.ToLower(dataSourceID)
+	switch {
+	case strings.HasPrefix(id, "nvd"):
+		return SourceNVD
+	case strings.HasPrefix(id, "ghsa"), strings.HasPrefix(id, "github"):
+		return SourceGITHUB
+	case strings.HasPrefix(id, "osv"):
+		return SourceOSV
+	case strings.HasPrefix(id, "npm"):
+		return SourceNPM
+	case strings.HasPrefix(id, "ossindex"):
+		return SourceOSSINDEX
+	case strings.HasPrefix(id, "snyk"):
+		return SourceSNYK
+	case strings.HasPrefix(id, "vulndb"):
+		return SourceVULNDB
+	}
+	return SourceUNKNOWN
 }

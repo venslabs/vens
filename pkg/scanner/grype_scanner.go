@@ -55,7 +55,7 @@ func (s *GrypeScanner) Parse(data []byte) ([]generator.Vulnerability, error) {
 			Title:            "", // Grype doesn't provide a separate title
 			Description:      vuln.Description,
 			Severity:         vuln.Severity,
-			SourceName:       grypeNamespaceToSourceName(vuln.Namespace),
+			SourceName:       grypeNamespaceToSourceName(vuln.Namespace, vuln.ID),
 			SourceURL:        vuln.DataSource,
 		}
 		vulns = append(vulns, v)
@@ -88,18 +88,20 @@ func calculateBOMRef(p grypemodels.Package) string {
 
 // grypeNamespaceToSourceName maps a Grype namespace (e.g., "nvd:cpe",
 // "github:language:go") to a well-known source name.
-func grypeNamespaceToSourceName(namespace string) string {
+func grypeNamespaceToSourceName(namespace string, vulnID string) string {
+	if src := SourceFromVulnID(vulnID); src != "" {
+		return src
+	}
 	ns := strings.ToLower(namespace)
 	switch {
 	case strings.HasPrefix(ns, "nvd"):
-		return "NVD"
+		return SourceNVD
 	case strings.HasPrefix(ns, "github"):
-		return "GITHUB"
+		return SourceGITHUB
 	case strings.HasPrefix(ns, "osv"):
-		return "OSV"
-	default:
-		return ""
+		return SourceOSV
 	}
+	return SourceUNKNOWN
 }
 
 // extractFixedVersion extracts the fixed version from Grype match details.
