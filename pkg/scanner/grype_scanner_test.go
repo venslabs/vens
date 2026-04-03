@@ -19,26 +19,28 @@ import "testing"
 func TestGrypeNamespaceToSourceName(t *testing.T) {
 	tests := []struct {
 		namespace string
+		vulnID    string
 		want      string
 	}{
-		{"nvd:cpe", "NVD"},
-		{"NVD:cpe", "NVD"},
-		{"github:language:go", "GITHUB"},
-		{"github:language:python", "GITHUB"},
-		{"GITHUB:language:java", "GITHUB"},
-		{"osv:go", "OSV"},
-		{"debian:distro:debian:13", ""},
-		{"ubuntu:distro:ubuntu:22.04", ""},
-		{"alpine:distro:alpine:3.18", ""},
-		{"amazon:distro:amazonlinux:2", ""},
-		{"", ""},
+		{"nvd:cpe", "CVE-2024-1234", "NVD"},
+		{"NVD:cpe", "CVE-2024-1234", "NVD"},
+		{"github:language:go", "GHSA-xxxx-xxxx-xxxx", "GITHUB"},
+		{"github:language:python", "CVE-2024-1234", "NVD"},
+		{"GITHUB:language:java", "GHSA-xxxx-xxxx-xxxx", "GITHUB"},
+		{"osv:go", "GO-2024-0001", "OSV"},
+		{"debian:distro:debian:13", "CVE-2024-1234", "NVD"},
+		{"ubuntu:distro:ubuntu:22.04", "CVE-2024-5678", "NVD"},
+		{"alpine:distro:alpine:3.18", "GHSA-yyyy-yyyy-yyyy", "GITHUB"},
+		{"amazon:distro:amazonlinux:2", "OTHER-123", "UNKNOWN"},
+		{"", "CVE-2024-9999", "NVD"},
+		{"", "OTHER-456", "UNKNOWN"},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.namespace, func(t *testing.T) {
-			got := grypeNamespaceToSourceName(tt.namespace)
+		t.Run(tt.namespace+"_"+tt.vulnID, func(t *testing.T) {
+			got := grypeNamespaceToSourceName(tt.namespace, tt.vulnID)
 			if got != tt.want {
-				t.Errorf("grypeNamespaceToSourceName(%q) = %q, want %q", tt.namespace, got, tt.want)
+				t.Errorf("grypeNamespaceToSourceName(%q, %q) = %q, want %q", tt.namespace, tt.vulnID, got, tt.want)
 			}
 		})
 	}

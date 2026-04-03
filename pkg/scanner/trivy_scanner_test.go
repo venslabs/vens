@@ -61,8 +61,8 @@ func TestTrivyScanner_Parse_DataSource(t *testing.T) {
 		t.Fatalf("got %d vulns, want 1", len(vulns))
 	}
 
-	if vulns[0].SourceName != "debian-oval" {
-		t.Errorf("SourceName = %q, want %q", vulns[0].SourceName, "debian-oval")
+	if vulns[0].SourceName != "NVD" {
+		t.Errorf("SourceName = %q, want %q", vulns[0].SourceName, "NVD")
 	}
 	if vulns[0].SourceURL != "https://www.debian.org/security/oval/" {
 		t.Errorf("SourceURL = %q, want %q", vulns[0].SourceURL, "https://www.debian.org/security/oval/")
@@ -109,5 +109,40 @@ func TestTrivyScanner_Parse_NilDataSource(t *testing.T) {
 	}
 	if vulns[0].SourceURL != "" {
 		t.Errorf("SourceURL = %q, want empty", vulns[0].SourceURL)
+	}
+}
+
+func TestTrivyDataSourceToSourceName(t *testing.T) {
+	tests := []struct {
+		dataSourceID string
+		vulnID       string
+		want         string
+	}{
+		{"nvd", "CVE-2024-1234", "NVD"},
+		{"NVD", "CVE-2024-1234", "NVD"},
+		{"debian-oval", "CVE-2024-1234", "NVD"},
+		{"debian", "CVE-2024-1234", "NVD"},
+		{"ghsa", "CVE-2024-1234", "NVD"},
+		{"github", "CVE-2024-1234", "NVD"},
+		{"ghsa", "GHSA-xxxx-xxxx-xxxx", "GITHUB"},
+		{"github", "GHSA-xxxx-xxxx-xxxx", "GITHUB"},
+		{"GITHUB", "GHSA-xxxx-xxxx-xxxx", "GITHUB"},
+		{"osv", "OSV-2024-1234", "OSV"},
+		{"npm", "npm-123", "NPM"},
+		{"ossindex", "sonatype-123", "OSSINDEX"},
+		{"snyk", "SNYK-123", "SNYK"},
+		{"vulndb", "VDB-123", "VULNDB"},
+		{"unknown-source", "CVE-2024-5678", "NVD"},
+		{"unknown-source", "GHSA-yyyy-yyyy-yyyy", "GITHUB"},
+		{"unknown-source", "OTHER-123", "UNKNOWN"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.dataSourceID+"_"+tc.vulnID, func(t *testing.T) {
+			got := trivyDataSourceToSourceName(tc.dataSourceID, tc.vulnID)
+			if got != tc.want {
+				t.Errorf("trivyDataSourceToSourceName(%q, %q) = %q, want %q", tc.dataSourceID, tc.vulnID, got, tc.want)
+			}
+		})
 	}
 }
