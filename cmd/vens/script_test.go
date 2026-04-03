@@ -55,25 +55,26 @@ func TestMain(m *testing.M) {
 		if out, err := cmd.CombinedOutput(); err != nil {
 			panic(fmt.Sprintf("building vens: %s: %v", out, err))
 		}
-		os.Setenv("VENS_TEST_BINARY", vensBinary)
+		if err := os.Setenv("VENS_TEST_BINARY", vensBinary); err != nil {
+			panic(err)
+		}
 	}
 
-	os.Exit(testscript.RunMain(m, map[string]func() int{
-		"vens": func() int {
+	testscript.Main(m, map[string]func(){
+		"vens": func() {
 			cmd := exec.Command(vensBinary, os.Args[1:]...)
 			cmd.Stdin = os.Stdin
 			cmd.Stdout = os.Stdout
 			cmd.Stderr = os.Stderr
 			if err := cmd.Run(); err != nil {
 				if exitErr, ok := err.(*exec.ExitError); ok {
-					return exitErr.ExitCode()
+					os.Exit(exitErr.ExitCode())
 				}
 				fmt.Fprintln(os.Stderr, err)
-				return 1
+				os.Exit(1)
 			}
-			return 0
 		},
-	}))
+	})
 }
 
 func TestScript(t *testing.T) {

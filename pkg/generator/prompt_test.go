@@ -56,7 +56,7 @@ func TestPromptStructureOrder(t *testing.T) {
 		t.Fatal("Missing required prompt sections")
 	}
 
-	if !(rolePos < contextPos && contextPos < taskPos && taskPos < outputPos) {
+	if rolePos >= contextPos || contextPos >= taskPos || taskPos >= outputPos {
 		t.Errorf("Prompt structure order incorrect. Expected: Role(%d) < Context(%d) < Task(%d) < Output(%d)",
 			rolePos, contextPos, taskPos, outputPos)
 	}
