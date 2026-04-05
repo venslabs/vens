@@ -1,0 +1,81 @@
+site_name: Vens
+site_description: Context-aware vulnerability risk scoring with LLM-powered CycloneDX VEX
+site_url: https://venslabs.github.io/vens/
+repo_url: https://github.com/venslabs/vens
+repo_name: venslabs/vens
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - navigation.indexes
+    - content.code.copy
+    - content.code.annotate
+    - search.suggest
+    - search.highlight
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
+
+plugins:
+  - search
+  - git-revision-date-localized:
+      enable_creation_date: true
+      fallback_to_build_date: true
+
+exclude_docs: |
+  TRIVY_PLUGIN.md
+  testing.md
+  prompt-testing.md
+  requirements.txt
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Installation: getting-started/installation.md
+      - Quickstart (5 min): getting-started/quickstart.md
+  - Guides:
+      - Prioritize a CVE backlog: guides/prioritize-cves.md
+      - Describe your context: guides/configuration.md
+  - Concepts:
+      - What is a VEX file?: concepts/what-is-vex.md
+      - CVSS vs OWASP contextual: concepts/cvss-vs-owasp.md
+      - Privacy and data flow: concepts/privacy-and-data-flow.md
+      - Vens vs alternatives: concepts/alternatives.md
+      - Limitations: concepts/limitations.md
+  - Reference:
+      - config.yaml schema: reference/config-schema.md
+      - vens generate: reference/generate.md
+      - vens enrich: reference/enrich.md
+  - Troubleshooting: troubleshooting.md
