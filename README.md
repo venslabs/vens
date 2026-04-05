@@ -3,10 +3,15 @@
 [![Go Report Card][go-report-img]][go-report]
 [![License: Apache-2.0][license-img]][license]
 [![GitHub Downloads][github-downloads-img]][release]
+[![Documentation][docs-img]][docs]
 
 # vens - Context-Aware Vulnerability Risk Scoring
 
 **Stop treating all vulnerabilities equally.** Vens transforms generic CVSS scores into **contextual OWASP risk scores** tailored to YOUR system using LLM intelligence, and outputs standards-compliant **[CycloneDX VEX](https://www.ntia.gov/files/ntia/publications/vex_one-page_summary.pdf)**.
+
+> 📖 **[Read the full documentation →](https://venslabs.github.io/vens/)**
+>
+> New to Vens? Start with the [5-minute quickstart](https://venslabs.github.io/vens/getting-started/quickstart/) or learn how to [prioritize a CVE backlog](https://venslabs.github.io/vens/guides/prioritize-cves/).
 
 ## Why vens?
 
@@ -135,6 +140,10 @@ vens enrich --vex output.vex.json report.json
 
 ## Learn More
 
+- **[📖 Full Documentation](https://venslabs.github.io/vens/)** — installation, guides, reference
+- **[5-minute Quickstart](https://venslabs.github.io/vens/getting-started/quickstart/)** — your first VEX
+- **[Prioritize a CVE backlog](https://venslabs.github.io/vens/guides/prioritize-cves/)** — the common use case
+- **[CVSS vs OWASP contextual](https://venslabs.github.io/vens/concepts/cvss-vs-owasp/)** — why the scores move
 - [Complete Example](examples/quickstart/) - 107 real CVEs comparison
 - [Trivy Plugin Guide](docs/TRIVY_PLUGIN.md) - Plugin usage
 
@@ -150,6 +159,8 @@ Apache License 2.0 - See [LICENSE](LICENSE)
 
 **Focus on what matters. Patch smarter, not harder.**
 
+[docs-img]: https://img.shields.io/badge/docs-venslabs.github.io%2Fvens-blue?logo=readthedocs&logoColor=white
+[docs]: https://venslabs.github.io/vens/
 [release-img]: https://img.shields.io/github/release/venslabs/vens.svg?logo=github
 [release]: https://github.com/venslabs/vens/releases
 [ci-img]: https://github.com/venslabs/vens/actions/workflows/main.yml/badge.svg
