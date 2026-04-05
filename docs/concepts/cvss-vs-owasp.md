@@ -51,15 +51,17 @@ Impact     = (Technical Impact + Business Impact)   / 2
 
 Each of the four factors is a number from 0 to 9. Multiply the two averages together and you get a risk score from 0 to 81.
 
-| Score | Severity |
-|---|---|
-| 0–9 | none / info |
-| 10–19 | low |
-| 20–39 | medium |
-| 40–59 | high |
-| 60–81 | critical |
+Vens maps the raw OWASP score onto the CycloneDX `severity` field like this (see `pkg/riskconfig/config.go:RiskSeverity`):
 
-Full methodology: [owasp.org/www-community/OWASP_Risk_Rating_Methodology](https://owasp.org/www-community/OWASP_Risk_Rating_Methodology).
+| Score | Severity (`ratings[].severity`) |
+|---|---|
+| 0–4 | `info` |
+| 5–19 | `low` |
+| 20–39 | `medium` |
+| 40–59 | `high` |
+| 60–81 | `critical` |
+
+Full OWASP methodology: [owasp.org/www-community/OWASP_Risk_Rating_Methodology](https://owasp.org/www-community/OWASP_Risk_Rating_Methodology).
 
 ---
 

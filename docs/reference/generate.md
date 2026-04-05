@@ -104,11 +104,11 @@ ls vens-debug/
 
 ### `--sbom-serial-number <urn:uuid:...>`
 
-Set the BOM-Link `serialNumber` field in the generated VEX. Use when linking the VEX back to a specific SBOM.
+UUID used to build BOM-Link `urn:cdx:<uuid>/<version>#<bom-ref>` references in the generated VEX. Must start with `urn:uuid:` when provided. Default: a fresh random UUID is generated for each run. Set it explicitly when you need a stable identifier to link the VEX back to a specific SBOM in CI.
 
 ### `--sbom-version <int>`
 
-Set the BOM-Link `version` field in the generated VEX. Default: `1`.
+BOM-Link `version` number used alongside `--sbom-serial-number`. Default: `1`.
 
 ---
 

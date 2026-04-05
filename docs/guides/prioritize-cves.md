@@ -94,7 +94,7 @@ jq '[.vulnerabilities[] | {
        id,
        score: .ratings[0].score,
        severity: .ratings[0].severity,
-       why: .analysis.detail
+       vector: .ratings[0].vector
      }]
     | sort_by(-.score)
     | .[0:10]' output.vex.json
@@ -108,24 +108,27 @@ Example output:
     "id": "CVE-2026-0915",
     "score": 64,
     "severity": "critical",
-    "why": "Leaks payment card data. Exposed to internet, no mitigation by WAF."
+    "vector": "SL:8/M:8/O:8/S:8/ED:7/EE:7/A:7/ID:3/LC:9/LI:9/LAV:9/LAC:9/FD:9/RD:9/NC:9/PV:9"
   },
   {
     "id": "CVE-2025-4477",
     "score": 56,
     "severity": "high",
-    "why": "Remote code execution in HTTP parser. Reachable from internet despite WAF."
+    "vector": "SL:7/M:7/O:7/S:7/ED:7/EE:7/A:7/ID:3/LC:8/LI:8/LAV:8/LAC:8/FD:8/RD:8/NC:8/PV:8"
   }
 ]
 ```
 
 **These are the CVEs you patch first.** Everything below a threshold (e.g. score < 20) can be deferred or suppressed.
 
+!!! tip "Where is the reasoning?"
+    Vens prints the LLM's per-CVE reasoning to stderr as it runs, and dumps every prompt and response to disk if you pass `--debug-dir ./debug`. The reasoning is intentionally not embedded in the VEX file — VEX stays a pure CycloneDX document. Use `--debug-dir` for audits.
+
 ---
 
-## Step 5 — Suppress the noise in future scans
+## Step 5 — Feed the VEX back to your scanner / platform
 
-Feed the VEX back into Trivy to hide the CVEs Vens marked as _not relevant_:
+Point Trivy at the VEX so CVEs are displayed with their contextual OWASP rating alongside the native scanner severity:
 
 ```bash
 trivy image my-registry/my-app:v1.2.3 \
@@ -133,10 +136,10 @@ trivy image my-registry/my-app:v1.2.3 \
   --show-suppressed
 ```
 
-CVEs with `analysis.state: not_affected` disappear from the main output. Developers see only what matters.
+Grype supports `--vex` as well. Dependency-Track can ingest the VEX file directly.
 
 !!! note
-    Grype supports `--vex` with a similar flag. Dependency-Track can also ingest the VEX file directly.
+    Vens emits OWASP ratings on every CVE — not a `not_affected` analysis state. To suppress CVEs below a contextual risk threshold, filter the VEX with `jq` as shown in [Put it in CI](#put-it-in-ci) below, or pre-process the VEX in your dashboard to drop low-score entries.
 
 ---
 

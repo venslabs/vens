@@ -71,24 +71,29 @@ You will see progress logs as Vens batches CVEs to the LLM:
 
 ```
 INFO Config loaded project=my-python-api exposure=internet ...
-INFO Parsed scanner report vulnerabilities=47
-INFO Sending batch 1/5 to LLM ...
-INFO VEX written path=output.vex.json
+INFO Processing vulnerabilities count=47
+INFO Scored vulnerability vuln=CVE-... score=52.0 severity=high ...
 ```
 
 Typical runtime: **30 seconds to 2 minutes** depending on CVE count and LLM provider.
+
+!!! tip "Reproducibility"
+    Pass `--sbom-serial-number urn:uuid:<your-uuid>` if you need a stable BOM-Link across runs (for example when linking the VEX back to a specific SBOM in CI). Without it, Vens generates a fresh UUID each run.
 
 ---
 
 ## Step 4 — Read the result
 
-Open `output.vex.json`. Each vulnerability now has an OWASP rating and a human-readable reason:
+Open `output.vex.json`. It is a CycloneDX 1.6 BOM. Each vulnerability carries an OWASP rating:
 
 ```json
 {
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
   "vulnerabilities": [
     {
       "id": "CVE-2026-0915",
+      "source": { "name": "NVD", "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-0915" },
       "ratings": [
         {
           "method": "OWASP",
@@ -97,9 +102,7 @@ Open `output.vex.json`. Each vulnerability now has an OWASP rating and a human-r
           "vector": "SL:7/M:7/O:7/S:7/ED:6/EE:6/A:6/ID:3/LC:7/LI:7/LAV:7/LAC:7/FD:7/RD:7/NC:7/PV:7"
         }
       ],
-      "analysis": {
-        "detail": "Exposes PII in a GDPR-regulated environment behind a WAF. Likelihood is moderate (WAF reduces exploitability); impact is high due to data sensitivity and compliance."
-      }
+      "affects": [{ "ref": "urn:cdx:.../1#pkg:..." }]
     }
   ]
 }
@@ -107,9 +110,12 @@ Open `output.vex.json`. Each vulnerability now has an OWASP rating and a human-r
 
 **The three things to look at:**
 
-1. `ratings[].score` — the OWASP score (0–81)
-2. `ratings[].severity` — bucket: `low` / `medium` / `high` / `critical`
-3. `analysis.detail` — _why_ Vens scored it that way
+1. `ratings[0].score` — the OWASP score (0–81)
+2. `ratings[0].severity` — bucket: `info` / `low` / `medium` / `high` / `critical`
+3. `ratings[0].vector` — the full 16-factor OWASP Risk Rating vector
+
+!!! note "Reasoning"
+    Vens logs the LLM's per-CVE reasoning to stderr as it scores (and to `--debug-dir` if you set it). The reasoning is not written into the VEX file itself — the VEX stays strictly CycloneDX-compliant. See [`vens generate --debug-dir`](../reference/generate.md#--debug-dir-path) to capture every prompt and response for auditing.
 
 ---
 
@@ -139,3 +145,4 @@ You now have a prioritized backlog where the top items are the ones that _actual
 - **[Prioritize a CVE backlog](../guides/prioritize-cves.md)** — the common use case, end to end.
 - **[Describe your context](../guides/configuration.md)** — make scores more accurate.
 - **[CVSS vs OWASP contextual](../concepts/cvss-vs-owasp.md)** — understand why the scores move.
+- **[Troubleshooting](../troubleshooting.md)** — when things don't go as expected.

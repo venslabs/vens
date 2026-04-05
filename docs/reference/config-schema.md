@@ -79,7 +79,7 @@ How critical the system is to the business.
 
 ### `context.availability_requirement`
 
-Strictness of uptime requirements. Defaults to the value of `business_criticality` if omitted.
+Strictness of uptime requirements. If omitted, Vens instructs the LLM to reuse `business_criticality` as the availability score.
 
 | Value | Meaning |
 |---|---|
