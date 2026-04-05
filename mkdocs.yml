@@ -69,7 +69,10 @@ nav:
       - Prioritize a CVE backlog: guides/prioritize-cves.md
       - Describe your context: guides/configuration.md
   - Concepts:
+      - What is a VEX file?: concepts/what-is-vex.md
       - CVSS vs OWASP contextual: concepts/cvss-vs-owasp.md
   - Reference:
       - config.yaml schema: reference/config-schema.md
       - vens generate: reference/generate.md
+      - vens enrich: reference/enrich.md
+  - Troubleshooting: troubleshooting.md

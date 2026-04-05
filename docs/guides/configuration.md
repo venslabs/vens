@@ -117,7 +117,7 @@ How strict is your uptime target?
 | `high` | 24/7 required |
 | `critical` | Zero downtime, lives at risk |
 
-Defaults to `business_criticality` if not set. Use it only when availability needs differ (e.g. an internal tool that absolutely cannot go down during trading hours).
+If omitted, Vens instructs the LLM to reuse `business_criticality` as the availability score. Set it explicitly only when availability needs differ from business criticality (e.g. an internal tool that absolutely cannot go down during trading hours).
 
 ### `audit_requirement`
 
