@@ -77,11 +77,16 @@ This file lives in your repo. You write it **once**, version it with the service
 ## Step 3 — Generate the VEX
 
 ```bash
+SBOM_UUID="urn:uuid:$(uuidgen | tr '[:upper:]' '[:lower:]')"
+
 vens generate \
   --config-file config.yaml \
+  --sbom-serial-number "$SBOM_UUID" \
   report.json \
   output.vex.json
 ```
+
+`--sbom-serial-number` is required — it feeds the BOM-Link references in the VEX. Store the UUID alongside the service if you want stable BOM-Links across runs.
 
 Runtime: ~1 minute for 300 CVEs with `gpt-4o`.
 
@@ -154,7 +159,13 @@ A typical GitHub Actions step:
 - name: Generate contextual VEX
   env:
     OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-  run: vens generate --config-file .vens/config.yaml report.json vex.json
+    # Any stable UUID per service. Pin it as a repo variable so BOM-Links stay stable across builds.
+    SBOM_UUID: urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79
+  run: |
+    vens generate \
+      --config-file .vens/config.yaml \
+      --sbom-serial-number "$SBOM_UUID" \
+      report.json vex.json
 
 - name: Fail on high contextual risk
   run: |

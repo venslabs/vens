@@ -60,9 +60,19 @@ This is the step that makes scores meaningful. A dev/test environment would use 
 
 ## Step 3 — Generate the VEX
 
+`vens generate` needs a `--sbom-serial-number` in `urn:uuid:<uuid>` form (it is used to build BOM-Link references in the VEX). Generate one once:
+
+```bash
+# Linux / macOS
+SBOM_UUID="urn:uuid:$(uuidgen | tr '[:upper:]' '[:lower:]')"
+```
+
+Then run:
+
 ```bash
 vens generate \
   --config-file config.yaml \
+  --sbom-serial-number "$SBOM_UUID" \
   report.json \
   output.vex.json
 ```
@@ -78,7 +88,7 @@ INFO Scored vulnerability vuln=CVE-... score=52.0 severity=high ...
 Typical runtime: **30 seconds to 2 minutes** depending on CVE count and LLM provider.
 
 !!! tip "Reproducibility"
-    Pass `--sbom-serial-number urn:uuid:<your-uuid>` if you need a stable BOM-Link across runs (for example when linking the VEX back to a specific SBOM in CI). Without it, Vens generates a fresh UUID each run.
+    Reuse the same `--sbom-serial-number` UUID across runs when you need a stable BOM-Link (for example when linking the VEX back to a specific SBOM in CI). Generating a fresh UUID per run is fine for ad-hoc scans.
 
 ---
 

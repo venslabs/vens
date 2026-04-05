@@ -27,8 +27,7 @@ go install github.com/venslabs/vens/cmd/vens@latest
 Verify:
 
 ```bash
-vens version
-# or: vens --version
+vens --version
 ```
 
 !!! tip
@@ -50,7 +49,7 @@ trivy plugin install github.com/venslabs/vens
 Verify:
 
 ```bash
-trivy vens version
+trivy vens --version
 ```
 
 From now on, anywhere in this documentation where you see `vens <command>`, you can use `trivy vens <command>` instead.
@@ -68,7 +67,7 @@ Download the latest release for your OS/architecture from the [releases page](ht
     curl -L https://github.com/venslabs/vens/releases/download/VERSION/vens_Linux_x86_64.tar.gz \
       | tar -xz
     sudo mv vens /usr/local/bin/
-    vens version
+    vens --version
     ```
 
 === "macOS (Apple Silicon)"
@@ -77,7 +76,7 @@ Download the latest release for your OS/architecture from the [releases page](ht
     curl -L https://github.com/venslabs/vens/releases/download/VERSION/vens_Darwin_arm64.tar.gz \
       | tar -xz
     sudo mv vens /usr/local/bin/
-    vens version
+    vens --version
     ```
 
 === "macOS (Intel)"
@@ -86,7 +85,7 @@ Download the latest release for your OS/architecture from the [releases page](ht
     curl -L https://github.com/venslabs/vens/releases/download/VERSION/vens_Darwin_x86_64.tar.gz \
       | tar -xz
     sudo mv vens /usr/local/bin/
-    vens version
+    vens --version
     ```
 
 === "Windows"
@@ -94,7 +93,7 @@ Download the latest release for your OS/architecture from the [releases page](ht
     Download `vens_Windows_x86_64.zip` from the releases page, extract it, and add the folder containing `vens.exe` to your `PATH`. Then in PowerShell:
 
     ```powershell
-    vens version
+    vens --version
     ```
 
 !!! note

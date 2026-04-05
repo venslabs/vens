@@ -42,8 +42,10 @@ Path to write the enriched report. Default: stdout.
 ### Enrich a Trivy report in place
 
 ```bash
+SBOM_UUID="urn:uuid:$(uuidgen | tr '[:upper:]' '[:lower:]')"
+
 trivy image nginx:1.25 --format json --output report.json
-vens generate --config-file vens.yaml report.json vex.json
+vens generate --config-file vens.yaml --sbom-serial-number "$SBOM_UUID" report.json vex.json
 vens enrich --vex vex.json --output enriched-report.json report.json
 ```
 
