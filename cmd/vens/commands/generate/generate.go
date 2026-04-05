@@ -241,19 +241,13 @@ func action(cmd *cobra.Command, args []string) error {
 }
 
 // extractSBOMMetadata extracts UUID and version from flags.
-// Returns the raw UUID string without urn:uuid: prefix. When
-// --sbom-serial-number is not provided, a new UUID is generated so
-// that the command works out of the box for ad-hoc scans.
+// Returns the raw UUID string without urn:uuid: prefix.
 func extractSBOMMetadata(flags *pflag.FlagSet) (sbomUUID string, version int, err error) {
 	sbomSerialNumber, _ := flags.GetString("sbom-serial-number")
 	sbomVersion, _ := flags.GetInt("sbom-version")
 
-	if sbomVersion == 0 {
-		sbomVersion = 1
-	}
-
 	if sbomSerialNumber == "" {
-		return uuid.New().String(), sbomVersion, nil
+		return "", 0, fmt.Errorf("sbom-serial-number is required")
 	}
 
 	// Validate format: must start with urn:uuid:
@@ -265,6 +259,10 @@ func extractSBOMMetadata(flags *pflag.FlagSet) (sbomUUID string, version int, er
 	uuidStr := strings.TrimPrefix(sbomSerialNumber, "urn:uuid:")
 	if _, err := uuid.Parse(uuidStr); err != nil {
 		return "", 0, fmt.Errorf("invalid UUID in sbom-serial-number: %w", err)
+	}
+
+	if sbomVersion == 0 {
+		sbomVersion = 1
 	}
 
 	return uuidStr, sbomVersion, nil

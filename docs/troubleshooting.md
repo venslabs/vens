@@ -9,6 +9,7 @@ When in doubt, rerun with debug output:
 DEBUG=1 vens generate \
   --debug-dir ./vens-debug \
   --config-file config.yaml \
+  --sbom-serial-number "urn:uuid:$(uuidgen | tr '[:upper:]' '[:lower:]')" \
   report.json vex.json
 ```
 
@@ -21,8 +22,24 @@ DEBUG=1 vens generate \
 You omitted `--config-file`. Vens refuses to run without a [`config.yaml`](reference/config-schema.md) — the whole point is contextual scoring.
 
 ```bash
-vens generate --config-file config.yaml report.json vex.json
+vens generate --config-file config.yaml --sbom-serial-number "$SBOM_UUID" report.json vex.json
 ```
+
+---
+
+## `sbom-serial-number is required`
+
+`vens generate` needs `--sbom-serial-number` in `urn:uuid:<uuid>` form — it feeds the BOM-Link references in the VEX. Generate one once:
+
+```bash
+SBOM_UUID="urn:uuid:$(uuidgen | tr '[:upper:]' '[:lower:]')"
+vens generate \
+  --config-file config.yaml \
+  --sbom-serial-number "$SBOM_UUID" \
+  report.json vex.json
+```
+
+Pin the UUID as a repository variable when you need stable BOM-Links across CI builds.
 
 ---
 
@@ -79,6 +96,8 @@ vens generate --input-format grype ...
 
 If you use a different scanner, export its output to Trivy or Grype JSON first — Vens only supports those two today.
 
+Note: `--input-format` examples in this page omit `--sbom-serial-number` for brevity, but the flag is still required on every `vens generate` call.
+
 ---
 
 ## "No vulnerabilities found in the report"
@@ -114,7 +133,11 @@ You passed `--sbom-serial-number` but forgot the prefix. The value must look lik
 By design — Vens does not embed the LLM reasoning in the VEX to keep the document strictly CycloneDX-compliant and stable. Capture the reasoning separately with `--debug-dir`:
 
 ```bash
-vens generate --debug-dir ./debug --config-file config.yaml report.json vex.json
+vens generate \
+  --debug-dir ./debug \
+  --config-file config.yaml \
+  --sbom-serial-number "$SBOM_UUID" \
+  report.json vex.json
 ls debug/
 # system.prompt  human.prompt
 ```
@@ -130,6 +153,6 @@ Open an issue with:
 - The exact command line
 - The redacted `config.yaml`
 - The contents of `--debug-dir`
-- Your Vens version (`vens version`)
+- Your Vens version (`vens --version`)
 
 at [github.com/venslabs/vens/issues](https://github.com/venslabs/vens/issues).

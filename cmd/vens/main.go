@@ -15,7 +15,6 @@
 package main
 
 import (
-	"fmt"
 	"log/slog"
 	"os"
 
@@ -47,15 +46,6 @@ func newRootCommand() *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
-
-	versionCmd := &cobra.Command{
-		Use:   "version",
-		Short: "Print the version",
-		Args:  cobra.NoArgs,
-		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Fprintln(cmd.OutOrStdout(), version.GetVersion())
-		},
-	}
 	flags := cmd.PersistentFlags()
 
 	// The debug flag value is determined by: CLI flag > DEBUG env var > default (false)
@@ -71,7 +61,6 @@ func newRootCommand() *cobra.Command {
 	cmd.AddCommand(
 		generate.New(),
 		enrich.New(),
-		versionCmd,
 	)
 
 	return cmd

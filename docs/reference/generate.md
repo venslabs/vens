@@ -10,7 +10,7 @@ For a walkthrough, see **[Quickstart](../getting-started/quickstart.md)**.
 ## Synopsis
 
 ```
-vens generate --config-file CONFIG INPUT OUTPUT [flags]
+vens generate --config-file CONFIG --sbom-serial-number urn:uuid:<uuid> INPUT OUTPUT [flags]
 ```
 
 Generate a CycloneDX VEX document from a Trivy or Grype vulnerability report, with contextual OWASP risk scores computed by an LLM.
@@ -32,8 +32,21 @@ Generate a CycloneDX VEX document from a Trivy or Grype vulnerability report, wi
 
 Path to your [`config.yaml`](config-schema.md) file.
 
+### `--sbom-serial-number <urn:uuid:...>`
+
+UUID used to build the BOM-Link `urn:cdx:<uuid>/<version>#<bom-ref>` references in the generated VEX. **Must** be provided and **must** start with `urn:uuid:`. Reuse the same UUID across runs when you want stable BOM-Links (for example when linking the VEX back to a specific SBOM in CI).
+
 ```bash
-vens generate --config-file ./vens.yaml report.json vex.json
+vens generate \
+  --config-file ./vens.yaml \
+  --sbom-serial-number urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79 \
+  report.json vex.json
+```
+
+Generating an ad-hoc UUID on Linux/macOS:
+
+```bash
+SBOM_UUID="urn:uuid:$(uuidgen | tr '[:upper:]' '[:lower:]')"
 ```
 
 ---
@@ -53,7 +66,7 @@ Force a specific LLM provider. Default: `auto` (detected from exported environme
 | `ollama` | Ollama (local) | `OLLAMA_MODEL` |
 
 ```bash
-vens generate --llm openai --config-file c.yaml in.json out.json
+vens generate --llm openai --config-file c.yaml --sbom-serial-number "$SBOM_UUID" in.json out.json
 ```
 
 ### `--llm-batch-size <int>`
@@ -80,7 +93,7 @@ Seed for LLM sampling (providers that support it). Default: `0` (no explicit see
 Force the input parser. Default: `auto`.
 
 ```bash
-vens generate --input-format grype --config-file c.yaml report.json out.json
+vens generate --input-format grype --config-file c.yaml --sbom-serial-number "$SBOM_UUID" report.json out.json
 ```
 
 ### `--output-format <auto|cyclonedxvex>`
@@ -92,19 +105,17 @@ Output format. Default: `auto`. Currently only `cyclonedxvex` is supported.
 Directory where Vens writes every prompt sent to the LLM and every response received. Useful for auditing scores or debugging unexpected results.
 
 ```bash
-vens generate --debug-dir ./vens-debug --config-file c.yaml report.json out.json
+vens generate \
+  --debug-dir ./vens-debug \
+  --config-file c.yaml \
+  --sbom-serial-number "$SBOM_UUID" \
+  report.json out.json
 ls vens-debug/
-# prompt-batch-1.txt  response-batch-1.json
-# prompt-batch-2.txt  response-batch-2.json
-# ...
+# system.prompt  human.prompt
 ```
 
 !!! warning
     The debug directory may contain CVE identifiers and your context file contents. Do not commit it to a public repository.
-
-### `--sbom-serial-number <urn:uuid:...>`
-
-UUID used to build BOM-Link `urn:cdx:<uuid>/<version>#<bom-ref>` references in the generated VEX. Must start with `urn:uuid:` when provided. Default: a fresh random UUID is generated for each run. Set it explicitly when you need a stable identifier to link the VEX back to a specific SBOM in CI.
 
 ### `--sbom-version <int>`
 
@@ -141,6 +152,12 @@ BOM-Link `version` number used alongside `--sbom-serial-number`. Default: `1`.
 
 ## Examples
 
+All examples assume `$SBOM_UUID` is set, e.g.:
+
+```bash
+SBOM_UUID="urn:uuid:$(uuidgen | tr '[:upper:]' '[:lower:]')"
+```
+
 ### Basic
 
 ```bash
@@ -148,14 +165,14 @@ export OPENAI_API_KEY=sk-...
 export OPENAI_MODEL=gpt-4o
 
 trivy image python:3.11-slim --format json --output report.json
-vens generate --config-file vens.yaml report.json vex.json
+vens generate --config-file vens.yaml --sbom-serial-number "$SBOM_UUID" report.json vex.json
 ```
 
 ### With Grype
 
 ```bash
 grype python:3.11-slim -o json > report.json
-vens generate --config-file vens.yaml report.json vex.json
+vens generate --config-file vens.yaml --sbom-serial-number "$SBOM_UUID" report.json vex.json
 ```
 
 ### With debug output
@@ -163,6 +180,7 @@ vens generate --config-file vens.yaml report.json vex.json
 ```bash
 vens generate \
   --config-file vens.yaml \
+  --sbom-serial-number "$SBOM_UUID" \
   --debug-dir ./debug \
   --llm-batch-size 5 \
   report.json vex.json
@@ -173,7 +191,7 @@ vens generate \
 ```bash
 export ANTHROPIC_API_KEY=sk-ant-...
 export ANTHROPIC_MODEL=claude-sonnet-4-5
-vens generate --llm anthropic --config-file vens.yaml report.json vex.json
+vens generate --llm anthropic --config-file vens.yaml --sbom-serial-number "$SBOM_UUID" report.json vex.json
 ```
 
 ### Air-gapped with Ollama
@@ -181,7 +199,7 @@ vens generate --llm anthropic --config-file vens.yaml report.json vex.json
 ```bash
 # Ollama running on localhost:11434
 export OLLAMA_MODEL=llama3.1
-vens generate --llm ollama --config-file vens.yaml report.json vex.json
+vens generate --llm ollama --config-file vens.yaml --sbom-serial-number "$SBOM_UUID" report.json vex.json
 ```
 
 ### As a Trivy plugin
@@ -189,7 +207,7 @@ vens generate --llm ollama --config-file vens.yaml report.json vex.json
 Every example above also works as `trivy vens` — same flags, same behaviour:
 
 ```bash
-trivy vens generate --config-file vens.yaml report.json vex.json
+trivy vens generate --config-file vens.yaml --sbom-serial-number "$SBOM_UUID" report.json vex.json
 ```
 
 ---
