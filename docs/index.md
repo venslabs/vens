@@ -8,11 +8,13 @@ Give Vens a Trivy or Grype report plus a short description of your system, and i
 
 ## What you get
 
-| | Before Vens | After Vens |
+| Example scenario | Before Vens | After Vens |
 |---|---|---|
-| CVE-2019-1010023 | CVSS **8.8 HIGH** | OWASP **10.0 LOW** — not reachable in your runtime |
-| CVE-2026-0915 | CVSS **5.3 MEDIUM** | OWASP **52.0 HIGH** — leaks PII in a GDPR workload |
+| Generic RCE in a library whose vulnerable code path is never executed in your build | CVSS **8.8 HIGH** | OWASP **10.0 LOW** — not reachable in your runtime |
+| Information leak in a request handler that processes PII under GDPR | CVSS **5.3 MEDIUM** | OWASP **52.0 HIGH** — leaks PII in a GDPR workload |
 | 300 CVEs in your report | All urgent | ~30 actually urgent |
+
+*The two rows above are illustrative scenarios to show how contextual scoring moves a CVSS score in both directions. Actual scores depend on your `config.yaml` and the LLM model you use.*
 
 **Result:** fix what matters. Stop wasting cycles on CVEs that don't apply to your system.
 
@@ -70,6 +72,16 @@ Vens is built for:
 - **Lead security architects** who want risk scores that reflect _business impact_, not generic CVSS.
 
 Vens is **not** a scanner. You still need Trivy or Grype to find CVEs — Vens tells you which ones to care about.
+
+---
+
+## Before you commit
+
+Before adopting Vens in production, read these three short pages — they tell you exactly what you're getting into:
+
+- **[Privacy and data flow](concepts/privacy-and-data-flow.md)** — what is (and isn't) sent to your LLM provider.
+- **[Limitations](concepts/limitations.md)** — the things Vens deliberately does not guarantee (reproducibility, benchmarks, BAA, and more).
+- **[Vens vs alternatives](concepts/alternatives.md)** — where Vens sits in the ecosystem (vexctl, vexllm, Dependency-Track, reachability tools).
 
 ---
 

@@ -82,11 +82,19 @@ vens generate --llm-batch-size 15 ...
 
 ### `--llm-temperature <float>`
 
-LLM sampling temperature. Default: `0.0` (deterministic). Values > 0 introduce randomness; not recommended for production scoring.
+LLM sampling temperature. Default: `0.0` — keeps sampling as close to greedy as each provider supports. Values > 0 introduce randomness and are not recommended for production scoring.
 
 ### `--llm-seed <int>`
 
-Seed for LLM sampling (providers that support it). Default: `0` (no explicit seed). Use a fixed non-zero value together with `--llm-temperature 0.0` for the most reproducible runs.
+Seed forwarded to the LLM when the provider supports it. Default: `0` (no explicit seed sent). Today, OpenAI exposes a `seed` parameter; Anthropic and Google AI do not. On providers without seed support, this flag is silently ignored.
+
+!!! warning "Reproducibility is best-effort, not a guarantee"
+    Even at `--llm-temperature 0.0` with a fixed `--llm-seed`, **byte-identical scores across runs are not guaranteed**. Cloud LLM providers periodically update server-side models without changing the API model name, and most of them do not expose true deterministic decoding. What Vens does do is:
+
+    - Compute the final OWASP score in Go from the LLM's four 0-9 component scores (`pkg/generator/generator.go`). Small drifts in the component scores are absorbed by the arithmetic.
+    - Keep the same prompt, schema and ordering across runs.
+
+    In practice, expect **score drift of ±1–3 points on a minority of CVEs** between runs with the same config and model. If you need strict reproducibility (for audit evidence at a fixed point in time), pin a local Ollama model version **and** archive the `--debug-dir` output — those two together give you a byte-exact record of what was sent and returned.
 
 ### `--input-format <auto|trivy|grype>`
 
@@ -102,7 +110,7 @@ Output format. Default: `auto`. Currently only `cyclonedxvex` is supported.
 
 ### `--debug-dir <path>`
 
-Directory where Vens writes every prompt sent to the LLM and every response received. Useful for auditing scores or debugging unexpected results.
+Directory where Vens writes the prompts it sends to the LLM. Useful for auditing scores, debugging unexpected results, and producing evidence for compliance reviews.
 
 ```bash
 vens generate \
@@ -114,8 +122,44 @@ ls vens-debug/
 # system.prompt  human.prompt
 ```
 
-!!! warning
-    The debug directory may contain CVE identifiers and your context file contents. Do not commit it to a public repository.
+**What you get:**
+
+- `system.prompt` — the full system prompt sent to the LLM, including your `config.yaml` context formatted as text, the OWASP scoring instructions, and the JSON schema the LLM must return. Shape (truncated):
+
+    ```
+    You are a talented security expert scoring vulnerabilities using OWASP Risk Rating Methodology.
+
+    SYSTEM CONTEXT:
+    Project: my-python-api
+    Description: Customer-facing Python API handling user data
+    Exposure: internet
+    Data Sensitivity: high
+    Business Criticality: high
+    Compliance Requirements: GDPR
+    Security Controls: WAF
+    ...
+
+    TASK: For EACH vulnerability, analyze its specific characteristics and score 4 factors (0-9):
+    1. THREAT_AGENT ...
+    ...
+    #### Output format: JSON Schema
+    {...}
+    ```
+
+- `human.prompt` — the JSON array of CVEs sent to the LLM in the last batch (vuln id, pkg, title, description, severity). One file per run; the last batch overwrites earlier ones, so capture these per-batch by running with `--llm-batch-size 1` if you need a full trace.
+
+Per-CVE component scores and the LLM's reasoning are logged to stderr at `INFO`/`DEBUG` level (run with `DEBUG=1` to see them).
+
+!!! warning "Treat `--debug-dir` output as sensitive"
+    These files contain the **full text** of what was sent to the LLM provider:
+
+    - Your `config.yaml` context, including the `notes` field verbatim.
+    - Every CVE identifier from the scanned image, plus titles and descriptions.
+
+    Do **not** commit them to a public repository. In CI, either delete the directory after inspection or upload it to an access-controlled artifact store.
+
+!!! note "Retention for compliance workloads"
+    If you need the debug output as audit evidence (HIPAA-style 6-year retention, SOC 2 change log, PCI-DSS risk decisions), store it in the same encrypted, access-controlled system you use for other security audit logs. Treat each `--debug-dir` directory as one entry in your vulnerability-triage evidence chain, indexed by scan date and by the Git SHA of the `config.yaml` that produced it. Reasoning can only be reconstructed later if **both** the `config.yaml` version and the debug files are preserved — a copy of the VEX alone is not enough.
 
 ### `--sbom-version <int>`
 

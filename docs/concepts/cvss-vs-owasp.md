@@ -15,7 +15,9 @@ A CVE has one CVSS score, forever. It has as many OWASP scores as there are syst
 
 ## A concrete example
 
-Two services both contain `libfoo-1.2.3` with `CVE-2026-0915`. The CVE is a denial-of-service in a CSV parsing function.
+*The CVE id used below is illustrative, not a real published CVE.*
+
+Two services both contain `libfoo-1.2.3` with a hypothetical CVE `CVE-XXXX-YYYY`. The CVE is a denial-of-service in a CSV parsing function.
 
 **CVSS says:** 8.8 HIGH. This is the generic severity of the flaw. Same number for everyone.
 
@@ -51,7 +53,7 @@ Impact     = (Technical Impact + Business Impact)   / 2
 
 Each of the four factors is a number from 0 to 9. Multiply the two averages together and you get a risk score from 0 to 81.
 
-Vens maps the raw OWASP score onto the CycloneDX `severity` field like this (see `pkg/riskconfig/config.go:RiskSeverity`):
+Vens maps the raw OWASP score onto the CycloneDX `severity` field like this:
 
 | Score | Severity (`ratings[].severity`) |
 |---|---|
@@ -128,7 +130,7 @@ A generic 5.3 becomes, say, a contextual 52. **This is the CVE you patch first, 
 ✅ You've described your context honestly and precisely in `config.yaml`
 ✅ Your `controls` reflect reality (no wishful thinking)
 ✅ You've added architectural detail in `notes` for non-obvious systems
-✅ You've reviewed the `analysis.detail` field on the top 10 scores
+✅ You've reviewed the LLM reasoning for the top 10 scores via `--debug-dir`
 
 ---
 

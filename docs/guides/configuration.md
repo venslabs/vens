@@ -153,6 +153,9 @@ notes: |
 
 Anything an engineer would say in a threat modeling session. The LLM reads it and uses it on ambiguous CVEs.
 
+!!! warning "What goes in notes leaves your network"
+    When you use a cloud LLM provider, the `notes` field is sent **verbatim** to that provider alongside every batch of CVEs. Do not paste secrets, credentials, customer data, PHI, PII, or information your NDA/classification policy would forbid sharing with a third party. If any of that could reasonably appear in your `notes`, [use Ollama locally](../getting-started/installation.md#configure-an-llm-provider) — nothing leaves your network. See [Privacy and data flow](../concepts/privacy-and-data-flow.md) for the full list of what is (and isn't) sent to the LLM.
+
 ---
 
 ## A complete, production-ready example
@@ -203,7 +206,33 @@ context:
 
 ---
 
+## Managing multiple services
+
+Once you have more than one service scanned by Vens, copy-pasting the same `config.yaml` everywhere is the first mistake to avoid. A dev sandbox and a production checkout service should **not** share context — different criticality, different exposure, different compliance scope. The scores you get out of Vens are only as accurate as that per-service distinction.
+
+The pattern that works:
+
+- **One `config.yaml` per service, lives in the service's own repository**, typically under `.vens/config.yaml`. It ships and versions with the code it describes.
+- **One stable BOM-Link UUID per service**, stored as a repository/environment variable next to the config file. Reuse it forever on every CI run — see [`--sbom-serial-number`](../reference/generate.md#--sbom-serial-number-urnuuid).
+- If you have genuinely shared defaults across many services (e.g. every fintech service under the same compliance perimeter), maintain a **template** in a central repo and have services vendor it with a short delta file on top. Avoid inheritance engines — YAML merging is a maintenance trap.
+- If you maintain an internal platform, publish a **tiered catalogue** (`dev-sandbox.yaml`, `internal-tool.yaml`, `customer-facing.yaml`, `pci-scope.yaml`) and let service owners pick the closest one as their starting point.
+
+## Governing your context file
+
+`config.yaml` is a security artefact as much as an operational one: a wrong value silently changes the risk scores your team sees. Treat it accordingly.
+
+- **Version it.** It belongs in Git, committed alongside the service.
+- **Review it.** Add a `CODEOWNERS` entry so the security team (or a specific reviewer) must approve any PR touching `.vens/config.yaml`. This is where `exposure: internal → internet` sneaks in.
+- **Log changes.** The PR history on the file is your audit log. Do not edit it out of band.
+- **Restrict who can run Vens with alternate configs.** In CI, pin the path to the repo-committed file (`--config-file .vens/config.yaml`). Do not let ad-hoc configs land in production artefacts.
+- **Tie it to incidents.** When something goes wrong and a CVE is later exploited, the `config.yaml` content at the time of the scan — recoverable from `git show <sha>:.vens/config.yaml` — is your defensible record of what Vens knew about your system.
+
+See [Privacy and data flow](../concepts/privacy-and-data-flow.md) for what this file transmits to your LLM provider.
+
+---
+
 ## Next
 
 - See every field in one place: **[config.yaml reference](../reference/config-schema.md)**
 - Understand how the scores are computed: **[CVSS vs OWASP contextual](../concepts/cvss-vs-owasp.md)**
+- Understand what is sent to the LLM: **[Privacy and data flow](../concepts/privacy-and-data-flow.md)**

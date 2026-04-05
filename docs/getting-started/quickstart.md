@@ -10,8 +10,12 @@ We will scan `python:3.11-slim`, generate a VEX, and read the result.
 ## Prerequisites
 
 - `vens` installed — see [Installation](installation.md)
-- `trivy` installed — [trivy.dev](https://trivy.dev)
-- An LLM provider configured (e.g. `OPENAI_API_KEY` exported)
+- `trivy` (or `grype`) installed — [trivy.dev](https://trivy.dev) / [grype](https://github.com/anchore/grype)
+- An LLM provider configured — **one** of:
+    - `OPENAI_API_KEY` + `OPENAI_MODEL` (cloud, recommended for getting started)
+    - `ANTHROPIC_API_KEY` + `ANTHROPIC_MODEL`
+    - `GOOGLE_API_KEY` + `GOOGLE_MODEL`
+    - `OLLAMA_MODEL` (local, no cloud credentials, zero cost — see the Ollama tab on the install page)
 
 ---
 
@@ -87,8 +91,8 @@ INFO Scored vulnerability vuln=CVE-... score=52.0 severity=high ...
 
 Typical runtime: **30 seconds to 2 minutes** depending on CVE count and LLM provider.
 
-!!! tip "Reproducibility"
-    Reuse the same `--sbom-serial-number` UUID across runs when you need a stable BOM-Link (for example when linking the VEX back to a specific SBOM in CI). Generating a fresh UUID per run is fine for ad-hoc scans.
+!!! tip "Pin the UUID per service, not per run"
+    For ad-hoc exploration it is fine to generate a fresh UUID on every run. In CI or for any service you will rescan regularly, **pin a single UUID per service** (as a repo/environment variable) and reuse it forever. BOM-Link references stay stable across scans, which is what downstream tools (Trivy, Dependency-Track, custom dashboards) expect when correlating VEX documents back to the same service over time.
 
 ---
 
@@ -102,8 +106,8 @@ Open `output.vex.json`. It is a CycloneDX 1.6 BOM. Each vulnerability carries an
   "specVersion": "1.6",
   "vulnerabilities": [
     {
-      "id": "CVE-2026-0915",
-      "source": { "name": "NVD", "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-0915" },
+      "id": "CVE-XXXX-YYYY",
+      "source": { "name": "NVD", "url": "https://nvd.nist.gov/vuln/detail/CVE-XXXX-YYYY" },
       "ratings": [
         {
           "method": "OWASP",

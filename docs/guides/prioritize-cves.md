@@ -110,7 +110,7 @@ Example output:
 ```json
 [
   {
-    "id": "CVE-2026-0915",
+    "id": "CVE-XXXX-YYYY",
     "score": 64,
     "severity": "critical",
     "vector": "SL:8/M:8/O:8/S:8/ED:7/EE:7/A:7/ID:3/LC:9/LI:9/LAV:9/LAC:9/FD:9/RD:9/NC:9/PV:9"
@@ -153,13 +153,18 @@ Grype supports `--vex` as well. Dependency-Track can ingest the VEX file directl
 A typical GitHub Actions step:
 
 ```yaml
+- name: Install Vens
+  run: go install github.com/venslabs/vens/cmd/vens@v0.3.0
+
 - name: Scan image
   run: trivy image $IMAGE --format json --output report.json
 
 - name: Generate contextual VEX
   env:
     OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-    # Any stable UUID per service. Pin it as a repo variable so BOM-Links stay stable across builds.
+    OPENAI_MODEL: gpt-4o               # required alongside OPENAI_API_KEY
+    # Stable per-service UUID so BOM-Links don't churn between builds.
+    # Store it as a repo variable instead of hardcoding once you have more than one service.
     SBOM_UUID: urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79
   run: |
     vens generate \
@@ -182,6 +187,9 @@ A typical GitHub Actions step:
     name: vex
     path: vex.json
 ```
+
+!!! tip "Air-gapped CI"
+    Swap the `Install Vens` step for a prebuilt binary download (see [Installation](../getting-started/installation.md#option-3-prebuilt-binary)) and replace the OpenAI env vars with `OLLAMA_MODEL` + `OLLAMA_HOST` pointing at your internal Ollama server. Nothing else in the pipeline changes.
 
 This fails the build only when there is **real** risk, not when the scanner finds a CVSS 7 in a component you don't execute.
 

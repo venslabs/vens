@@ -68,9 +68,23 @@ Or force a provider explicitly: `--llm ollama`.
 
 The LLM returned text that is not valid JSON matching the expected schema. Most common causes:
 
-- **Small / local model with weak JSON compliance** (e.g. some Ollama models). Try a larger model, or lower `--llm-batch-size` to `3` so the LLM has less to produce per call.
+- **Small / local model with weak JSON compliance.** Vens asks for structured JSON with four component scores per CVE. Models under 7B parameters routinely fail this on batches of 10. Concrete recommendations for Ollama:
+    - `llama3.1:70b` / `llama3.3:70b` — robust on the default batch size of 10.
+    - `llama3.1:8b`, `mistral:7b` — work with `--llm-batch-size 3` to `5`.
+    - Anything smaller (`phi3:mini`, `gemma:2b`, …) — expect frequent failures; use only for smoke tests.
 - **Prompt truncation on small context windows.** Reduce `--llm-batch-size`.
-- **Provider-side safety filter** trimmed the response. Inspect `vens-debug/system.prompt` and re-run with the batch that failed.
+- **Provider-side safety filter** trimmed the response. Inspect `vens-debug/system.prompt` and `vens-debug/human.prompt` and re-run the batch that failed.
+
+---
+
+## My OWASP scores change between two runs with the same config
+
+This is expected within a small band. See the ["Reproducibility is best-effort"](reference/generate.md#--llm-seed-int) note in the `vens generate` reference: cloud LLM providers do not guarantee byte-deterministic decoding even at `temperature=0`. Vens mitigates drift by computing the final OWASP score in Go from the LLM's four 0-9 component scores — small component drift is averaged out — but you should expect **±1–3 points of variation on a minority of CVEs** between runs.
+
+What to do:
+
+- If you need strict reproducibility for audit evidence at a fixed point in time, pin a local Ollama model version (model tags are immutable) **and** archive `--debug-dir` output. Together they give you a byte-exact record of what was sent and returned.
+- If a specific CVE is jumping across severity buckets between runs, it usually means the LLM is genuinely uncertain about that CVE in your context — check the `--debug-dir` reasoning for that batch.
 
 ---
 
@@ -100,6 +114,22 @@ Note: `--input-format` examples in this page omit `--sbom-serial-number` for bre
 
 ---
 
+## What happens if the LLM fails on one batch?
+
+Vens processes CVEs in batches (default 10, tunable via `--llm-batch-size`). The failure behaviour is batch-level, not CVE-level:
+
+- **Rate limit on a batch** → Vens retries that batch up to 10 times with a 10 s backoff (`pkg/llm`). If all retries fail, the whole `vens generate` run exits with a non-zero status and the output VEX file is not written. This is intentional — a partial VEX would be misleading.
+- **LLM returns malformed JSON that cannot be parsed** → Vens exits with `unable to parse LLM output: ...`. The failing batch is included in the error message; use `--debug-dir` to capture the exact prompt so you can reproduce or downgrade the batch size.
+- **Network error / provider outage mid-batch** → same behaviour: exit non-zero, no partial VEX.
+- **A single CVE that the LLM cannot score** → the LLM still returns a JSON entry with some component scores; Vens clamps them to `[0, 9]` and proceeds. There is no "skipped" state in the output today. If you see a CVE with four identical component scores that match the default severity bucket of its CVSS, treat it as low-confidence and audit it via `--debug-dir`.
+
+For CI pipelines, this means you should either:
+
+- Let the step fail the build on any LLM error (cleanest), or
+- Wrap the `vens generate` step in `continue-on-error: true` and gate the downstream step on VEX file existence + non-empty.
+
+---
+
 ## "No vulnerabilities found in the report"
 
 Either the scanner returned nothing (great!), or the filter was too strict. Re-scan with a broader severity range:
@@ -110,13 +140,16 @@ trivy image IMAGE --format json --severity LOW,MEDIUM,HIGH,CRITICAL --output rep
 
 ---
 
-## OWASP score looks too generic
+## All my CVEs cluster in the same score range
 
-If every CVE lands in the same 30–40 range, the LLM didn't have enough context. Re-check:
+Vens **does** score every CVE — that part is not broken. But if virtually every CVE lands in the same narrow band (typically 30–40), it usually means the LLM had nothing specific to differentiate them with and regressed to a generic interpretation of the CVSS severity. A healthy Vens run on a production context produces a wide spread: some CVEs lose 20+ points because a control neutralizes them, others gain 20+ because they hit your data or compliance boundary directly.
+
+Re-check:
 
 1. Are the three required fields in `config.yaml` actually representative of the production deployment? (Don't leave `exposure: internal` when it's public-facing.)
 2. Did you enable the **real** controls in `context.controls`? Not wishful ones.
 3. Did you fill `context.notes` with 2–3 sentences of architecture? The LLM leans on it for tie-breaks.
+4. For local models: is your Ollama model large enough? (See [Ollama JSON compliance](#unable-to-parse-llm-output) above — small models sometimes produce flat, uniform scores even when they emit valid JSON.)
 
 See [Describe your system context](guides/configuration.md) for the checklist.
 

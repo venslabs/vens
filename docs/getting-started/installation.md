@@ -103,14 +103,37 @@ Download the latest release for your OS/architecture from the [releases page](ht
 
 ## Configure an LLM provider
 
-Vens calls an LLM to score each CVE. Before running it, export credentials for **one** provider:
+Vens calls an LLM to score each CVE. All four providers below are first-class — pick whichever matches your constraints. Export credentials for **one**:
 
-=== "OpenAI (recommended)"
+=== "Ollama (local, no cloud, zero cost)"
+
+    Run Ollama on the host where Vens runs (or another host on the same network), then pull a model:
+
+    ```bash
+    ollama pull llama3.1:70b    # recommended for OWASP scoring quality
+    # Lighter options if you are hardware-constrained:
+    # ollama pull llama3.1:8b
+    # ollama pull mistral:7b
+
+    export OLLAMA_MODEL="llama3.1:70b"
+    # Optional — only set if Ollama runs on a different host than Vens:
+    export OLLAMA_HOST="http://ollama.internal:11434"
+    ```
+
+    **Model size matters.** Vens asks the LLM to return structured JSON with four 0–9 component scores per CVE. Models under 7B parameters routinely emit malformed JSON on batches of 10 CVEs. If you see `unable to parse LLM output` errors in [troubleshooting](../troubleshooting.md), move up one model tier or lower `--llm-batch-size` to 3–5.
+
+    **Hardware rule of thumb:** `llama3.1:70b` needs a GPU with ≥48 GB VRAM (or an Apple Silicon box with ≥64 GB unified memory); `llama3.1:8b` runs on a modern laptop with ≥16 GB RAM.
+
+    Nothing leaves the machine(s) running Ollama and Vens — see [Privacy and data flow](../concepts/privacy-and-data-flow.md).
+
+=== "OpenAI"
 
     ```bash
     export OPENAI_API_KEY="sk-..."
     export OPENAI_MODEL="gpt-4o"
     ```
+
+    OpenAI currently honours the `seed` parameter Vens forwards, giving the lowest cross-run score drift among cloud providers.
 
 === "Anthropic"
 
@@ -126,17 +149,16 @@ Vens calls an LLM to score each CVE. Before running it, export credentials for *
     export GOOGLE_MODEL="gemini-2.0-flash"
     ```
 
-=== "Ollama (local, no API key)"
+Vens auto-detects which provider to use from whichever env var is set. You can force a provider explicitly with `--llm openai|anthropic|googleai|ollama`.
 
-    ```bash
-    # Run Ollama locally, then:
-    export OLLAMA_MODEL="llama3.1"
-    ```
+!!! warning "LLM cost"
+    Cloud LLM pricing changes frequently and depends on model tier, prompt size, and the number of CVEs in your report. Vens does **not** estimate cost for you. To get a real number for your own environment:
 
-Vens auto-detects which provider to use based on the environment variable that is set. You can override with `--llm openai|anthropic|googleai|ollama`.
+    - Run Vens once on a representative report with `--debug-dir ./debug`.
+    - Count the tokens in `debug/system.prompt` and `debug/human.prompt` (multiply by the batch count).
+    - Plug those numbers into your provider's pricing page.
 
-!!! warning "Token cost"
-    A scan of ~200 CVEs with `gpt-4o` typically costs in the order of a few cents to a dollar, depending on prompt size and the model you pick. Use Ollama for air-gapped or cost-sensitive environments, and always monitor your own provider billing for the authoritative number.
+    As a rough order of magnitude at the time of writing, a single-scan run of ~200 CVEs with `gpt-4o` falls in the "cents to low dollars" range. **Treat this as back-of-envelope only** and always validate against your actual provider invoice before scaling to production CI. For zero-cost or air-gapped deployments, use the Ollama tab above.
 
 ---
 

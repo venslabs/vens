@@ -71,6 +71,9 @@ nav:
   - Concepts:
       - What is a VEX file?: concepts/what-is-vex.md
       - CVSS vs OWASP contextual: concepts/cvss-vs-owasp.md
+      - Privacy and data flow: concepts/privacy-and-data-flow.md
+      - Vens vs alternatives: concepts/alternatives.md
+      - Limitations: concepts/limitations.md
   - Reference:
       - config.yaml schema: reference/config-schema.md
       - vens generate: reference/generate.md
