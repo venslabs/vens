@@ -176,26 +176,40 @@ func TestCycloneDxVexWriter_Close_VulnerabilitySource(t *testing.T) {
 		t.Fatalf("got %d vulnerabilities, want 2", len(vulns))
 	}
 
+	// Build lookup map (order is not guaranteed)
+	vulnByID := make(map[string]cyclonedx.Vulnerability)
+	for _, v := range vulns {
+		vulnByID[v.ID] = v
+	}
+
 	// Check CVE source
-	if vulns[0].Source == nil {
+	cve, ok := vulnByID["CVE-2024-1234"]
+	if !ok {
+		t.Fatal("CVE-2024-1234 not found")
+	}
+	if cve.Source == nil {
 		t.Fatal("CVE vulnerability source is nil")
 	}
-	if vulns[0].Source.Name != "NVD" {
-		t.Errorf("CVE source name = %q, want NVD", vulns[0].Source.Name)
+	if cve.Source.Name != "NVD" {
+		t.Errorf("CVE source name = %q, want NVD", cve.Source.Name)
 	}
-	if !strings.Contains(vulns[0].Source.URL, "nvd.nist.gov") {
-		t.Errorf("CVE source URL = %q, want URL containing nvd.nist.gov", vulns[0].Source.URL)
+	if !strings.Contains(cve.Source.URL, "nvd.nist.gov") {
+		t.Errorf("CVE source URL = %q, want URL containing nvd.nist.gov", cve.Source.URL)
 	}
 
 	// Check GHSA source
-	if vulns[1].Source == nil {
+	ghsa, ok := vulnByID["GHSA-abcd-efgh-ijkl"]
+	if !ok {
+		t.Fatal("GHSA-abcd-efgh-ijkl not found")
+	}
+	if ghsa.Source == nil {
 		t.Fatal("GHSA vulnerability source is nil")
 	}
-	if vulns[1].Source.Name != "GITHUB" {
-		t.Errorf("GHSA source name = %q, want GITHUB", vulns[1].Source.Name)
+	if ghsa.Source.Name != "GITHUB" {
+		t.Errorf("GHSA source name = %q, want GITHUB", ghsa.Source.Name)
 	}
-	if !strings.Contains(vulns[1].Source.URL, "github.com/advisories") {
-		t.Errorf("GHSA source URL = %q, want URL containing github.com/advisories", vulns[1].Source.URL)
+	if !strings.Contains(ghsa.Source.URL, "github.com/advisories") {
+		t.Errorf("GHSA source URL = %q, want URL containing github.com/advisories", ghsa.Source.URL)
 	}
 }
 
