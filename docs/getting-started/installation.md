@@ -149,7 +149,14 @@ Vens calls an LLM to score each CVE. All four providers below are first-class â€
     export GOOGLE_MODEL="gemini-2.0-flash"
     ```
 
-Vens auto-detects which provider to use from whichever env var is set. You can force a provider explicitly with `--llm openai|anthropic|googleai|ollama`.
+Auto-detection currently defaults to **OpenAI**. If you use a different provider, pass the `--llm` flag explicitly:
+
+```bash
+--llm openai      # default when auto
+--llm anthropic
+--llm googleai
+--llm ollama
+```
 
 !!! warning "LLM cost"
     Cloud LLM pricing changes frequently and depends on model tier, prompt size, and the number of CVEs in your report. Vens does **not** estimate cost for you. To get a real number for your own environment:

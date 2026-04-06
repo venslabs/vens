@@ -121,8 +121,8 @@ compliance_requirements:
   - "GDPR"
 ```
 
-!!! note
-    Unknown framework names are ignored. Use the exact identifiers listed above (case-sensitive for the canonical form, but Vens normalizes common variants).
+!!! warning
+    Unknown framework names cause a **validation error** — Vens will refuse to start. Use the exact identifiers listed above.
 
 ### `context.controls`
 

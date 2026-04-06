@@ -146,7 +146,10 @@ ls vens-debug/
     {...}
     ```
 
-- `human.prompt` — the JSON array of CVEs sent to the LLM in the last batch (vuln id, pkg, title, description, severity). One file per run; the last batch overwrites earlier ones, so capture these per-batch by running with `--llm-batch-size 1` if you need a full trace.
+- `human.prompt` — the JSON array of CVEs sent to the LLM in the last batch (vuln id, pkg, title, description, severity).
+
+!!! warning "Only the last batch is saved"
+    Each batch **overwrites** the previous `system.prompt` and `human.prompt` files. If your scan has 200 CVEs at batch size 10, you get 20 LLM calls but only the last batch's prompts on disk. To capture every batch, run with `--llm-batch-size` equal to the total CVE count (one big call), or use `--llm-batch-size 1` and copy the files between runs. This is a known limitation — per-batch file naming is planned for a future release.
 
 Per-CVE component scores and the LLM's reasoning are logged to stderr at `INFO`/`DEBUG` level (run with `DEBUG=1` to see them).
 

@@ -97,6 +97,12 @@ Vens is under active development and has not reached a 1.0 release yet. The CLI 
 
 ---
 
+## 11. Forked dependency: `langchaingo`
+
+Vens uses a [fork of `langchaingo`](https://github.com/AkihiroSuda/langchaingo) (originally by [AkihiroSuda/vexllm](https://github.com/AkihiroSuda/vexllm), the project that inspired Vens). The fork patches LLM provider handling for structured JSON output. This is declared in `go.mod` via a `replace` directive. The fork is pinned to a specific commit and is auditable, but it means Vens does not track upstream `langchaingo` releases directly. If this is a concern for your supply-chain policy, review the fork diff before adoption.
+
+---
+
 ## See also
 
 - **[Privacy and data flow](privacy-and-data-flow.md)**

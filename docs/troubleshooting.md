@@ -157,7 +157,7 @@ See [Describe your system context](guides/configuration.md) for the checklist.
 
 ## `sbom-serial-number must start with 'urn:uuid:'`
 
-You passed `--sbom-serial-number` but forgot the prefix. The value must look like `urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79`. Omit the flag entirely if you don't need a stable BOM-Link — Vens will generate a random UUID.
+You passed `--sbom-serial-number` but forgot the prefix. The value must look like `urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79`. This flag is **required** — see [`--sbom-serial-number`](reference/generate.md#--sbom-serial-number-urnuuid).
 
 ---
 
