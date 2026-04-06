@@ -71,7 +71,7 @@ Vens itself is an MIT-ish Apache 2.0 Go binary — it holds no data and signs no
 
 ## 7. Score quality drops on models below ~7B parameters
 
-Vens asks the LLM to return structured JSON with four component scores per CVE. Small local models (under 7B parameters) frequently emit malformed JSON or produce flat, uniform scores regardless of input. `llama3.1:70b` and larger cloud models (gpt-4o, claude-sonnet-4.5, gemini-2.0) are the sweet spot; lighter models are usable with `--llm-batch-size 3–5` but with lower quality.
+Vens asks the LLM to return structured JSON with four component scores per CVE. Small local models (under 7B parameters) frequently emit malformed JSON or produce flat, uniform scores regardless of input. `llama3.1:70b` and larger cloud models (gpt-4o, claude-sonnet-4-5, gemini-2.0-flash) are the sweet spot; lighter models are usable with `--llm-batch-size 3–5` but with lower quality.
 
 This is a fundamental constraint of today's open-weight model landscape — if you need air-gapped + high quality, plan for a beefy GPU box.
 
@@ -91,9 +91,9 @@ For true reachability signals, chain a dedicated tool (Semgrep Code, Snyk Reacha
 
 ---
 
-## 10. Single-maintainer project, pre-1.0
+## 10. Pre-1.0 — API surface may change
 
-At the time of writing, Vens is a small project under active development by a small team. API surface and `config.yaml` schema may evolve before `v1.0.0`. Pin versions in CI (`go install github.com/venslabs/vens/cmd/vens@vX.Y.Z`) and read release notes before upgrading.
+Vens is under active development and has not reached a 1.0 release yet. The CLI flags and `config.yaml` schema may evolve between minor versions. Pin a specific version in CI (`go install github.com/venslabs/vens/cmd/vens@vX.Y.Z`) and read the release notes before upgrading.
 
 ---
 

@@ -59,6 +59,9 @@ Vens reads your scanner report, combines it with _your_ system context (exposure
 - :material-cog: **[Describe your context](guides/configuration.md)**
   The step that makes scores accurate.
 
+- :material-arrow-collapse-right: **[Enrich your report](reference/enrich.md)**
+  Fold OWASP scores back into your Trivy report.
+
 </div>
 
 ---

@@ -12,7 +12,7 @@
 | CVE identifier (e.g. `CVE-2024-1234`) | ✅ Yes | ❌ No |
 | CVE description / title from your scanner report | ✅ Yes | ❌ No |
 | Package name, version, fixed version | ✅ Yes | ❌ No |
-| `config.yaml` fields (`exposure`, `data_sensitivity`, `business_criticality`, `compliance_requirements`, `controls`, `notes`) | ✅ Yes — **including the `notes` field verbatim** | ❌ No |
+| `config.yaml` fields (`exposure`, `data_sensitivity`, `business_criticality`, `availability_requirement`, `audit_requirement`, `compliance_requirements`, `controls`, `notes`) | ✅ Yes — **including the `notes` field verbatim** | ❌ No |
 | Your scanner report file as a whole | ❌ No — only the fields above are extracted | ❌ No |
 | SBOM contents beyond vulnerability metadata | ❌ No | ❌ No |
 | Source code, credentials, filesystem contents | ❌ Never | ❌ Never |
@@ -28,7 +28,7 @@ For each batch of CVEs (default: 10 per call, tunable via `--llm-batch-size`), V
 **System prompt** — contains:
 
 - A fixed instruction block describing the OWASP Risk Rating methodology.
-- Your `config.yaml` context, formatted as plain text. **The `notes` field is copied verbatim.**
+- Your `config.yaml` context, formatted as plain text: `exposure`, `data_sensitivity`, `business_criticality`, and — when set — `availability_requirement`, `audit_requirement`, `compliance_requirements`, `controls`, and the **`notes` field verbatim**.
 - The JSON schema the LLM must return.
 
 **Human prompt** — contains a JSON array with, for each CVE in the batch:
