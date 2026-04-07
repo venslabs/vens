@@ -5,9 +5,11 @@
 [![GitHub Downloads][github-downloads-img]][release]
 [![Documentation][docs-img]][docs]
 
-# vens - Context-Aware Vulnerability Risk Scoring
+# vens — Prioritize vulnerabilities by real risk, not just CVSS
 
-**Stop treating all vulnerabilities equally.** Vens transforms generic CVSS scores into **contextual OWASP risk scores** tailored to YOUR system using LLM intelligence, and outputs standards-compliant **[CycloneDX VEX](https://www.ntia.gov/files/ntia/publications/vex_one-page_summary.pdf)**.
+**Your scanner found 300 CVEs. Which ones actually matter?** Vens takes a Trivy or Grype report, combines it with a description of _your_ system (exposure, data sensitivity, compliance, security controls), and scores every CVE based on its real risk to you — not just its generic severity.
+
+The output is a [CycloneDX VEX](https://www.ntia.gov/files/ntia/publications/vex_one-page_summary.pdf) file with [OWASP Risk Rating](https://owasp.org/www-community/OWASP_Risk_Rating_Methodology) scores.
 
 > 📖 **[Read the full documentation →](https://venslabs.github.io/vens/)**
 >

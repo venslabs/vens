@@ -1,8 +1,10 @@
 # Vens
 
-**Stop treating all vulnerabilities equally.** Vens turns generic CVSS scores into **contextual OWASP risk scores** tailored to _your_ system, and outputs a standards-compliant **CycloneDX VEX** file.
+**Your scanner found 300 CVEs. Which ones actually matter?**
 
-Give Vens a Trivy or Grype report plus a short description of your system, and it tells you which CVEs actually matter.
+Give Vens a Trivy or Grype report plus a short description of your system — exposure, data sensitivity, compliance, security controls — and it scores every CVE based on its real risk to _you_, not just its generic CVSS severity.
+
+The output is a [CycloneDX VEX](https://cyclonedx.org/capabilities/vex/) file with [OWASP Risk Rating](https://owasp.org/www-community/OWASP_Risk_Rating_Methodology) scores.
 
 ---
 
