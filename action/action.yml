@@ -1,0 +1,234 @@
+# Copyright 2025 venslabs
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+
+name: 'vens — contextual CVE prioritization'
+description: >-
+  Turn a Trivy or Grype report into a CycloneDX VEX document with
+  per-CVE OWASP Risk Rating scores contextualized to your system,
+  using an LLM (OpenAI, Anthropic, Google AI, or local Ollama).
+author: 'venslabs'
+
+branding:
+  icon: 'shield'
+  color: 'blue'
+
+inputs:
+  version:
+    description: 'vens version to install, e.g. "v0.3.1". Use "latest" to resolve the most recent GitHub release.'
+    required: false
+    default: 'latest'
+
+  config-file:
+    description: 'Path to the vens config.yaml describing your system (exposure, data sensitivity, compliance, controls).'
+    required: true
+
+  scan-report:
+    description: 'Path to the Trivy or Grype JSON vulnerability report to prioritize.'
+    required: true
+
+  output:
+    description: 'Path where the CycloneDX VEX document will be written.'
+    required: false
+    default: 'vens.vex.json'
+
+  input-format:
+    description: 'Input scanner format: auto | trivy | grype.'
+    required: false
+    default: 'auto'
+
+  output-format:
+    description: 'Output format: auto | cyclonedxvex.'
+    required: false
+    default: 'auto'
+
+  llm-provider:
+    description: 'LLM backend: auto | openai | anthropic | googleai | ollama.'
+    required: false
+    default: 'auto'
+
+  llm-batch-size:
+    description: 'Number of CVEs per LLM request.'
+    required: false
+    default: '10'
+
+  llm-temperature:
+    description: 'LLM temperature (0.0 means no explicit temperature).'
+    required: false
+    default: '0.0'
+
+  llm-seed:
+    description: 'LLM seed (0 means no explicit seed).'
+    required: false
+    default: '0'
+
+  sbom-serial-number:
+    description: >-
+      Stable SBOM serial number (format: urn:uuid:...). STRONGLY RECOMMENDED
+      to pin a per-service UUID and reuse it across runs. If empty, a random
+      UUID is generated for this run only (a warning is logged).
+    required: false
+    default: ''
+
+  sbom-version:
+    description: 'SBOM version for BOM-Link.'
+    required: false
+    default: '1'
+
+  debug-dir:
+    description: 'Directory to save LLM debug files (prompts, responses). Leave empty to disable.'
+    required: false
+    default: ''
+
+  enrich:
+    description: 'Also run `vens enrich` to fold VEX ratings back into the Trivy report.'
+    required: false
+    default: 'false'
+
+  enrich-output:
+    description: 'Output path for the enriched Trivy report when enrich=true.'
+    required: false
+    default: 'trivy-enriched.json'
+
+  working-directory:
+    description: 'Working directory from which vens is invoked.'
+    required: false
+    default: '.'
+
+  install-dir:
+    description: 'Directory where the vens binary is installed and added to PATH.'
+    required: false
+    default: ''
+
+  github-token:
+    description: >-
+      GitHub token used to resolve `latest` release and avoid API rate-limits.
+      Defaults to the job token; override if your org proxies the API.
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  vex-file:
+    description: 'Absolute path to the generated CycloneDX VEX document.'
+    value: ${{ steps.generate.outputs.vex-file }}
+
+  enriched-report:
+    description: 'Absolute path to the enriched Trivy report (only set when enrich=true).'
+    value: ${{ steps.enrich.outputs.enriched-report }}
+
+  vens-version:
+    description: 'The vens version actually installed (resolved from `latest` if needed).'
+    value: ${{ steps.install.outputs.version }}
+
+  sbom-serial-number:
+    description: 'The SBOM serial number actually used (provided input or auto-generated UUID).'
+    value: ${{ steps.generate.outputs.sbom-serial-number }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install vens
+      id: install
+      shell: bash
+      env:
+        VENS_VERSION: ${{ inputs.version }}
+        VENS_INSTALL_DIR: ${{ inputs.install-dir }}
+        GH_TOKEN: ${{ inputs.github-token }}
+      run: |
+        set -euo pipefail
+        "${GITHUB_ACTION_PATH}/install.sh"
+
+    - name: Resolve SBOM serial number
+      id: sbom
+      shell: bash
+      env:
+        SBOM_SN: ${{ inputs.sbom-serial-number }}
+      run: |
+        set -euo pipefail
+        if [[ -z "${SBOM_SN}" ]]; then
+          if command -v uuidgen >/dev/null 2>&1; then
+            uuid=$(uuidgen | tr '[:upper:]' '[:lower:]')
+          else
+            # POSIX fallback using /proc/sys/kernel/random/uuid (Linux)
+            if [[ -r /proc/sys/kernel/random/uuid ]]; then
+              uuid=$(cat /proc/sys/kernel/random/uuid)
+            else
+              echo "::error::Neither uuidgen nor /proc/sys/kernel/random/uuid available; please provide sbom-serial-number explicitly." >&2
+              exit 1
+            fi
+          fi
+          resolved="urn:uuid:${uuid}"
+          echo "::warning::sbom-serial-number was not provided; generated a random UUID for this run only (${resolved}). Pin a stable per-service UUID in production to keep VEX documents linkable across runs."
+        else
+          resolved="${SBOM_SN}"
+        fi
+        echo "serial=${resolved}" >> "${GITHUB_OUTPUT}"
+
+    - name: Run vens generate
+      id: generate
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        VENS_CONFIG_FILE: ${{ inputs.config-file }}
+        VENS_SCAN_REPORT: ${{ inputs.scan-report }}
+        VENS_OUTPUT: ${{ inputs.output }}
+        VENS_INPUT_FORMAT: ${{ inputs.input-format }}
+        VENS_OUTPUT_FORMAT: ${{ inputs.output-format }}
+        VENS_LLM_PROVIDER: ${{ inputs.llm-provider }}
+        VENS_LLM_BATCH_SIZE: ${{ inputs.llm-batch-size }}
+        VENS_LLM_TEMPERATURE: ${{ inputs.llm-temperature }}
+        VENS_LLM_SEED: ${{ inputs.llm-seed }}
+        VENS_SBOM_SERIAL: ${{ steps.sbom.outputs.serial }}
+        VENS_SBOM_VERSION: ${{ inputs.sbom-version }}
+        VENS_DEBUG_DIR: ${{ inputs.debug-dir }}
+      run: |
+        set -euo pipefail
+
+        args=(
+          generate
+          --config-file "${VENS_CONFIG_FILE}"
+          --input-format "${VENS_INPUT_FORMAT}"
+          --output-format "${VENS_OUTPUT_FORMAT}"
+          --llm "${VENS_LLM_PROVIDER}"
+          --llm-batch-size "${VENS_LLM_BATCH_SIZE}"
+          --llm-temperature "${VENS_LLM_TEMPERATURE}"
+          --llm-seed "${VENS_LLM_SEED}"
+          --sbom-serial-number "${VENS_SBOM_SERIAL}"
+          --sbom-version "${VENS_SBOM_VERSION}"
+        )
+
+        if [[ -n "${VENS_DEBUG_DIR}" ]]; then
+          mkdir -p "${VENS_DEBUG_DIR}"
+          args+=(--debug-dir "${VENS_DEBUG_DIR}")
+        fi
+
+        args+=("${VENS_SCAN_REPORT}" "${VENS_OUTPUT}")
+
+        echo "::group::vens generate"
+        vens "${args[@]}"
+        echo "::endgroup::"
+
+        abs_output=$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "${VENS_OUTPUT}")
+        echo "vex-file=${abs_output}" >> "${GITHUB_OUTPUT}"
+        echo "sbom-serial-number=${VENS_SBOM_SERIAL}" >> "${GITHUB_OUTPUT}"
+
+    - name: Run vens enrich
+      id: enrich
+      if: ${{ inputs.enrich == 'true' }}
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        VENS_VEX: ${{ steps.generate.outputs.vex-file }}
+        VENS_SCAN_REPORT: ${{ inputs.scan-report }}
+        VENS_ENRICH_OUTPUT: ${{ inputs.enrich-output }}
+      run: |
+        set -euo pipefail
+        echo "::group::vens enrich"
+        vens enrich --vex "${VENS_VEX}" --output "${VENS_ENRICH_OUTPUT}" "${VENS_SCAN_REPORT}"
+        echo "::endgroup::"
+        abs_output=$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "${VENS_ENRICH_OUTPUT}")
+        echo "enriched-report=${abs_output}" >> "${GITHUB_OUTPUT}"

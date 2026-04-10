@@ -1,0 +1,148 @@
+name: action-test
+
+on:
+  push:
+    branches:
+      - main
+      - 'release/**'
+    paths:
+      - 'action/**'
+      - '.github/workflows/action-test.yml'
+      - 'examples/quickstart/**'
+  pull_request:
+    paths:
+      - 'action/**'
+      - '.github/workflows/action-test.yml'
+      - 'examples/quickstart/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke-test:
+    name: smoke-test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-14]
+    timeout-minutes: 10
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@fe104658747b27e96e4f7e80cd0a94068e53901d # v2.16.1
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        with:
+          go-version: 'stable'
+
+      # The action normally downloads a released vens binary, but the mock LLM
+      # backend (needed for running without real LLM credentials) is only
+      # present in unreleased code on main. We therefore build vens from the
+      # current source tree and drop it in an install-dir so the action picks
+      # it up via its cache-hit path.
+      - name: Build vens from current source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "${RUNNER_TEMP}/vens-prebuilt"
+          go build -o "${RUNNER_TEMP}/vens-prebuilt/vens" ./cmd/vens
+          "${RUNNER_TEMP}/vens-prebuilt/vens" --version
+
+      - name: Run vens action against the quickstart fixture
+        id: vens
+        uses: ./action
+        with:
+          config-file: examples/quickstart/config.yaml
+          scan-report: examples/quickstart/reports/python-slim.trivy.json
+          output: ${{ runner.temp }}/vens.vex.json
+          llm-provider: mock
+          sbom-serial-number: urn:uuid:00000000-0000-0000-0000-0000000cafe1
+          enrich: 'true'
+          enrich-output: ${{ runner.temp }}/trivy-enriched.json
+          install-dir: ${{ runner.temp }}/vens-prebuilt
+
+      - name: Validate VEX output is well-formed JSON
+        shell: bash
+        run: |
+          set -euo pipefail
+          vex="${{ steps.vens.outputs.vex-file }}"
+          test -s "${vex}" || { echo "::error::VEX output missing or empty: ${vex}"; exit 1; }
+
+          if command -v jq >/dev/null 2>&1; then
+            jq -e 'type == "object"' "${vex}" >/dev/null
+            jq -e '.bomFormat == "CycloneDX"' "${vex}" >/dev/null
+            vuln_count=$(jq '.vulnerabilities | length' "${vex}")
+            echo "VEX contains ${vuln_count} vulnerabilities"
+            owasp_count=$(jq '[.vulnerabilities[]?.ratings[]? | select(.method == "OWASP")] | length' "${vex}")
+            echo "OWASP ratings found: ${owasp_count}"
+            if [ "${owasp_count}" -eq 0 ]; then
+              echo "::error::Expected at least one OWASP rating in the VEX document"
+              exit 1
+            fi
+          else
+            python3 -c "
+          import json, sys
+          with open('${vex}') as f:
+              data = json.load(f)
+          assert data.get('bomFormat') == 'CycloneDX', 'bomFormat mismatch'
+          vulns = data.get('vulnerabilities', [])
+          print(f'VEX contains {len(vulns)} vulnerabilities')
+          owasp = [r for v in vulns for r in v.get('ratings', []) if r.get('method') == 'OWASP']
+          print(f'OWASP ratings found: {len(owasp)}')
+          assert len(owasp) > 0, 'No OWASP ratings found'
+          "
+          fi
+
+      - name: Validate enriched report is well-formed JSON
+        shell: bash
+        run: |
+          set -euo pipefail
+          enriched="${{ steps.vens.outputs.enriched-report }}"
+          test -s "${enriched}" || { echo "::error::enriched report missing or empty: ${enriched}"; exit 1; }
+          python3 -c "import json; json.load(open('${enriched}'))"
+
+      - name: Assert vens version output is populated
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${{ steps.vens.outputs.vens-version }}"
+          echo "installed vens version: ${version}"
+          test -n "${version}" || { echo "::error::vens-version output is empty"; exit 1; }
+
+  pinned-version-test:
+    name: pinned-version-test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@fe104658747b27e96e4f7e80cd0a94068e53901d # v2.16.1
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Run vens action pinned to v0.3.1
+        id: vens
+        uses: ./action
+        with:
+          version: v0.3.1
+          config-file: examples/quickstart/config.yaml
+          scan-report: examples/quickstart/reports/python-slim.trivy.json
+          output: ${{ runner.temp }}/vens.vex.json
+          llm-provider: mock
+          sbom-serial-number: urn:uuid:00000000-0000-0000-0000-0000000cafe2
+
+      - name: Assert requested version was installed
+        shell: bash
+        run: |
+          set -euo pipefail
+          got="${{ steps.vens.outputs.vens-version }}"
+          if [ "${got}" != "v0.3.1" ]; then
+            echo "::error::expected v0.3.1, got ${got}"
+            exit 1
+          fi
