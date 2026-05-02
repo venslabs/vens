@@ -4,7 +4,7 @@ go 1.25.8
 
 require (
 	github.com/CycloneDX/cyclonedx-go v0.10.0
-	github.com/anchore/grype v0.111.1
+	github.com/anchore/grype v0.112.0
 	github.com/aquasecurity/trivy v0.70.0
 	github.com/aquasecurity/trivy-db v0.0.0-20251222105351-a833f47f8f0d
 	github.com/google/uuid v1.6.0
@@ -61,7 +61,7 @@ require (
 	github.com/anchore/go-version v1.2.2-0.20210903204242-51efa5b487c4 // indirect
 	github.com/anchore/packageurl-go v0.2.0 // indirect
 	github.com/anchore/stereoscope v0.1.23 // indirect
-	github.com/anchore/syft v1.43.0 // indirect
+	github.com/anchore/syft v1.44.0 // indirect
 	github.com/andybalholm/brotli v1.2.0 // indirect
 	github.com/apparentlymart/go-textseg/v15 v15.0.0 // indirect
 	github.com/aquasecurity/go-pep440-version v0.0.1 // indirect
