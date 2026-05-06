@@ -64,7 +64,7 @@ This is the step that makes scores meaningful. A dev/test environment would use 
 
 ## Step 3 — Generate the VEX
 
-`vens generate` needs a `--sbom-serial-number` in `urn:uuid:<uuid>` form (it is used to build BOM-Link references in the VEX). Generate one once:
+`--sbom-serial-number` is the `serialNumber` of the CycloneDX SBOM paired with this scan — Vens uses it to build BOM-Link references back to that SBOM. Extract it from the SBOM (`jq -r .serialNumber sbom.cdx.json`), or for this quickstart generate an ad-hoc one:
 
 ```bash
 # Linux / macOS

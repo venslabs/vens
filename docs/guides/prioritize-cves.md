@@ -86,7 +86,7 @@ vens generate \
   output.vex.json
 ```
 
-`--sbom-serial-number` is required — it feeds the BOM-Link references in the VEX. Store the UUID alongside the service if you want stable BOM-Links across runs.
+`--sbom-serial-number` is required — pass the `serialNumber` of the CycloneDX SBOM paired with this scan so each `affects` in the VEX resolves back to that SBOM via BOM-Link.
 
 Runtime: ~1 minute for 300 CVEs with `gpt-4o`.
 
