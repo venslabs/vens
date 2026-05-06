@@ -213,7 +213,7 @@ Once you have more than one service scanned by Vens, copy-pasting the same `conf
 The pattern that works:
 
 - **One `config.yaml` per service, lives in the service's own repository**, typically under `.vens/config.yaml`. It ships and versions with the code it describes.
-- **One stable BOM-Link UUID per service**, stored as a repository/environment variable next to the config file. Reuse it forever on every CI run — see [`--sbom-serial-number`](../reference/generate.md#--sbom-serial-number-urnuuid).
+- **A canonical CycloneDX SBOM per service**: pass its `serialNumber` to [`--sbom-serial-number`](../reference/generate.md#--sbom-serial-number-urnuuid) so each `affects` entry in the VEX resolves back to that SBOM via BOM-Link. Reuse the same SBOM across rescans of the same artefact for stable references.
 - If you have genuinely shared defaults across many services (e.g. every fintech service under the same compliance perimeter), maintain a **template** in a central repo and have services vendor it with a short delta file on top. Avoid inheritance engines — YAML merging is a maintenance trap.
 - If you maintain an internal platform, publish a **tiered catalogue** (`dev-sandbox.yaml`, `internal-tool.yaml`, `customer-facing.yaml`, `pci-scope.yaml`) and let service owners pick the closest one as their starting point.
 
