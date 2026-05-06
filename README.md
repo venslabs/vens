@@ -11,6 +11,10 @@
 
 The output is a [CycloneDX VEX](https://www.ntia.gov/files/ntia/publications/vex_one-page_summary.pdf) file with [OWASP Risk Rating](https://owasp.org/www-community/OWASP_Risk_Rating_Methodology) scores.
 
+<p align="center">
+  <img src="docs/assets/vens-logic.png" alt="vens — scanner report + SBOM + system context, scored by an LLM into a CycloneDX VEX with OWASP ratings" width="720">
+</p>
+
 > 📖 **[Read the full documentation →](https://venslabs.github.io/vens/)**
 >
 > New to Vens? Start with the [5-minute quickstart](https://venslabs.github.io/vens/getting-started/quickstart/) or learn how to [prioritize a CVE backlog](https://venslabs.github.io/vens/guides/prioritize-cves/).
