@@ -1,13 +1,40 @@
 # Installation
 
 **Who this is for:** anyone getting started with Vens.
-**By the end of this page:** you have `vens` (or `trivy vens`) running on your machine, with an LLM provider configured and a scanner available.
-
-Vens ships as a single static binary. Pick the method that fits your workflow.
+**By the end of this page:** you have Vens running — either as a CI step or as a local CLI binary.
 
 ---
 
-## Prerequisites
+## GitHub Action
+
+If you scan with Trivy or Grype in GitHub Actions, drop [`venslabs/vens-action`](https://github.com/marketplace/actions/vens-action) into the workflow after the scan step:
+
+```yaml
+- name: Scan image with Trivy
+  run: trivy image python:3.11-slim --format json --output report.json
+
+- name: Prioritize with vens
+  uses: venslabs/vens-action@v0.1.0   # check the marketplace for the latest tag; pin by SHA in production
+  with:
+    version: v0.3.2                   # vens binary version
+    config-file: .vens/config.yaml    # see ../guides/configuration.md to author this file
+    input-report: report.json
+    sbom-serial-number: ${{ vars.SBOM_SERIAL }}
+    llm-provider: openai
+    llm-model: gpt-4o
+    llm-api-key: ${{ secrets.OPENAI_API_KEY }}
+    fail-on-severity: critical        # break the build on critical OWASP risk
+```
+
+The action installs the binary, runs `vens generate`, and exposes severity counts as workflow outputs you can fail the build on. Full input/output reference, air-gapped runners, and the mock provider: see the **[GitHub Actions integration guide](../guides/github-actions.md)**.
+
+---
+
+## Run Vens locally
+
+Vens ships as a single static binary. Pick the method that fits your workflow.
+
+### Prerequisites
 
 Vens is not a scanner — it consumes reports produced by one. Before you start, make sure you have **one** of the following installed:
 
@@ -18,7 +45,7 @@ You will also need credentials for an LLM provider (OpenAI, Anthropic, Google AI
 
 ---
 
-## Option 1 — Go install (recommended for developers)
+### Option 1 — Go install (recommended for developers)
 
 ```bash
 go install github.com/venslabs/vens/cmd/vens@latest
@@ -38,7 +65,7 @@ vens --version
 
 ---
 
-## Option 2 — Trivy plugin (recommended for Trivy users)
+### Option 2 — Trivy plugin (recommended for Trivy users)
 
 If you already use Trivy, install Vens as a native plugin — no separate binary to manage.
 
@@ -56,7 +83,7 @@ From now on, anywhere in this documentation where you see `vens <command>`, you 
 
 ---
 
-## Option 3 — Prebuilt binary
+### Option 3 — Prebuilt binary
 
 Download the latest release for your OS/architecture from the [releases page](https://github.com/venslabs/vens/releases), extract it, and put it in your `$PATH`.
 
@@ -101,17 +128,19 @@ Download the latest release for your OS/architecture from the [releases page](ht
 
 ---
 
-## Configure an LLM provider
+### Configure an LLM provider
 
 Vens calls an LLM to score each CVE. All four providers below are first-class — pick whichever matches your constraints. Export credentials for **one**:
+
+Vens asks the LLM to return structured JSON with four 0–9 component scores per CVE. If a model emits malformed JSON, you'll see `unable to parse LLM output` — see [troubleshooting](../troubleshooting.md).
 
 === "Ollama (local, no cloud, zero cost)"
 
     Run Ollama on the host where Vens runs (or another host on the same network), then pull a model:
 
     ```bash
-    ollama pull llama3.1:70b    # recommended for OWASP scoring quality
-    # Lighter options if you are hardware-constrained:
+    ollama pull llama3.1:70b
+    # Lighter alternatives:
     # ollama pull llama3.1:8b
     # ollama pull mistral:7b
 
@@ -120,11 +149,7 @@ Vens calls an LLM to score each CVE. All four providers below are first-class �
     export OLLAMA_HOST="http://ollama.internal:11434"
     ```
 
-    **Model size matters.** Vens asks the LLM to return structured JSON with four 0–9 component scores per CVE. Models under 7B parameters routinely emit malformed JSON on batches of 10 CVEs. If you see `unable to parse LLM output` errors in [troubleshooting](../troubleshooting.md), move up one model tier or lower `--llm-batch-size` to 3–5.
-
-    **Hardware rule of thumb:** `llama3.1:70b` needs a GPU with ≥48 GB VRAM (or an Apple Silicon box with ≥64 GB unified memory); `llama3.1:8b` runs on a modern laptop with ≥16 GB RAM.
-
-    Nothing leaves the machine(s) running Ollama and Vens — see [Privacy and data flow](../concepts/privacy-and-data-flow.md).
+    Nothing leaves the machine running Ollama — see [Privacy and data flow](../concepts/privacy-and-data-flow.md).
 
 === "OpenAI"
 
@@ -133,7 +158,7 @@ Vens calls an LLM to score each CVE. All four providers below are first-class �
     export OPENAI_MODEL="gpt-4o"
     ```
 
-    OpenAI currently honours the `seed` parameter Vens forwards, giving the lowest cross-run score drift among cloud providers.
+    Among the cloud providers, only OpenAI currently accepts the `seed` parameter Vens forwards (`--llm-seed`); Anthropic and Google AI silently ignore it. This does not guarantee byte-identical scores across runs — see [Reference: `--llm-seed`](../reference/generate.md#--llm-seed-int) and [Limitations](../concepts/limitations.md).
 
 === "Anthropic"
 
@@ -159,13 +184,11 @@ Auto-detection currently defaults to **OpenAI**. If you use a different provider
 ```
 
 !!! warning "LLM cost"
-    Cloud LLM pricing changes frequently and depends on model tier, prompt size, and the number of CVEs in your report. Vens does **not** estimate cost for you. To get a real number for your own environment:
+    Cloud LLM pricing depends on model, prompt size, and CVE count. Vens does not estimate cost.
 
-    - Run Vens once on a representative report with `--debug-dir ./debug`.
-    - Count the tokens in `debug/system.prompt` and `debug/human.prompt` (multiply by the batch count).
-    - Plug those numbers into your provider's pricing page.
+    For an exact number, run once against your provider and read the billing dashboard. For a pre-run estimate, run with `--debug-dir ./debug`, count the tokens in `debug/system.prompt`, and plug into your provider's pricing page (the `human.prompt` file is overwritten on every batch and output tokens are not captured, so this is approximate).
 
-    As a rough order of magnitude at the time of writing, a single-scan run of ~200 CVEs with `gpt-4o` falls in the "cents to low dollars" range. **Treat this as back-of-envelope only** and always validate against your actual provider invoice before scaling to production CI. For zero-cost or air-gapped deployments, use the Ollama tab above.
+    For zero-cost or air-gapped runs, use Ollama.
 
 ---
 

@@ -34,7 +34,7 @@ Path to your [`config.yaml`](config-schema.md) file.
 
 ### `--sbom-serial-number <urn:uuid:...>`
 
-UUID used to build the BOM-Link `urn:cdx:<uuid>/<version>#<bom-ref>` references in the generated VEX. **Must** be provided and **must** start with `urn:uuid:`. Reuse the same UUID across runs when you want stable BOM-Links (for example when linking the VEX back to a specific SBOM in CI).
+The `serialNumber` of the CycloneDX SBOM paired with this scan. Vens uses it to build the BOM-Link `urn:cdx:<uuid>/<version>#<bom-ref>` references in the generated VEX so each `affects` entry resolves back to that SBOM. **Required** and **must** start with `urn:uuid:`.
 
 ```bash
 vens generate \

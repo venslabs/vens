@@ -29,7 +29,7 @@ vens generate --config-file config.yaml --sbom-serial-number "$SBOM_UUID" report
 
 ## `sbom-serial-number is required`
 
-`vens generate` needs `--sbom-serial-number` in `urn:uuid:<uuid>` form — it feeds the BOM-Link references in the VEX. Generate one once:
+`vens generate` needs `--sbom-serial-number` — it must be the `serialNumber` of the CycloneDX SBOM paired with this scan, in `urn:uuid:<uuid>` form. Extract it from the SBOM (`jq -r .serialNumber sbom.cdx.json`), or for ad-hoc runs generate one:
 
 ```bash
 SBOM_UUID="urn:uuid:$(uuidgen | tr '[:upper:]' '[:lower:]')"

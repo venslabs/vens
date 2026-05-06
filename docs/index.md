@@ -49,8 +49,11 @@ Vens reads your scanner report, combines it with _your_ system context (exposure
 
 <div class="grid cards" markdown>
 
-- :material-download: **[Install Vens](getting-started/installation.md)**
-  Three commands, three options.
+- :material-github: **[GitHub Actions](guides/github-actions.md)**
+  Drop Vens into your Trivy/Grype pipeline.
+
+- :material-download: **[Install the CLI](getting-started/installation.md)**
+  Run Vens locally.
 
 - :material-rocket-launch: **[Quickstart (5 minutes)](getting-started/quickstart.md)**
   Your first VEX file from a real image.
@@ -63,9 +66,6 @@ Vens reads your scanner report, combines it with _your_ system context (exposure
 
 - :material-arrow-collapse-right: **[Enrich your report](reference/enrich.md)**
   Fold OWASP scores back into your Trivy report.
-
-- :material-github: **[GitHub Actions](guides/github-actions.md)**
-  Drop vens into your CI pipeline.
 
 </div>
 
