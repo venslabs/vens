@@ -15,19 +15,9 @@ The output is a [CycloneDX VEX](https://www.ntia.gov/files/ntia/publications/vex
   <img src="docs/assets/vens-logic.png" alt="vens — scanner report + SBOM + system context, scored by an LLM into a CycloneDX VEX with OWASP ratings" width="720">
 </p>
 
-> 📖 **[Read the full documentation →](https://venslabs.github.io/vens/)**
->
-> New to Vens? Start with the [5-minute quickstart](https://venslabs.github.io/vens/getting-started/quickstart/) or learn how to [prioritize a CVE backlog](https://venslabs.github.io/vens/guides/prioritize-cves/).
-
 ## Why vens?
 
-Traditional scanners treat all vulnerabilities the same. Vens analyzes each CVE in **your specific context** to calculate real risk:
-
-```
-Risk = Likelihood × Impact (0-81 scale)
-```
-
-**Illustrative example:**
+OWASP scoring (`Risk = Likelihood × Impact`, 0-81) reflects your system's exposure, data sensitivity, and controls — not just generic CVE severity:
 
 | Scenario | CVSS (Generic) | OWASP (Contextual) | Why? |
 |-----|----------------|-------------------|------|
@@ -35,8 +25,6 @@ Risk = Likelihood × Impact (0-81 scale)
 | Info leak in a PII handler running under GDPR | 5.3 MEDIUM | **52.0 HIGH** ⬆️ | PII leak + compliance impact |
 
 *Scores above are illustrative — actual scores depend on your `config.yaml` and the LLM model.*
-
-**Result**: Fix what actually matters in YOUR system.
 
 ## Installation
 
@@ -78,11 +66,11 @@ trivy image python:3.11-slim --format json --output report.json
 # or
 grype python:3.11-slim --output json --file report.json
 
-# 3. Pin a stable per-service UUID (reuse across runs, do not regenerate each time)
-SBOM_UUID="urn:uuid:$(uuidgen | tr '[:upper:]' '[:lower:]')"
+# 3. Use your CycloneDX SBOM's serialNumber (or generate an ad-hoc UUID for this quickstart)
+SBOM_SERIAL="urn:uuid:$(uuidgen | tr '[:upper:]' '[:lower:]')"
 
 # 4. Generate contextual risk scores
-vens generate --config-file config.yaml --sbom-serial-number "$SBOM_UUID" report.json output.vex.json
+vens generate --config-file config.yaml --sbom-serial-number "$SBOM_SERIAL" report.json output.vex.json
 
 # 5. Optionally fold the OWASP ratings back into the Trivy report
 vens enrich --vex output.vex.json report.json
