@@ -17,7 +17,7 @@ sudo mv vens /usr/local/bin/
 \`\`\`
 
 ### Verifying this release
-Release artifacts are signed with cosign keyless (Sigstore, GitHub Actions OIDC).
+Release artifacts are signed with cosign keyless — Sigstore cert bound to the GitHub Actions release workflow identity.
 \`\`\`bash
 # Verify the signature over the checksums file
 cosign verify-blob \\

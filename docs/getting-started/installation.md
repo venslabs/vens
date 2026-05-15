@@ -130,7 +130,7 @@ Download the latest release for your OS/architecture from the [releases page](ht
 
 ### Verify the download
 
-Release artifacts are signed with [cosign](https://github.com/sigstore/cosign) keyless signing (Sigstore, GitHub Actions OIDC — no long-lived keys). Each release publishes `SHA256SUMS`, its detached signature `SHA256SUMS.sig`, and the signing certificate `SHA256SUMS.pem`. Download all three alongside your archive from the [releases page](https://github.com/venslabs/vens/releases), then:
+Release artifacts are signed with [cosign](https://github.com/sigstore/cosign) in keyless mode: the signing identity is the GitHub Actions release workflow itself, certified by Sigstore — no long-lived key. Each release publishes `SHA256SUMS`, its detached signature `SHA256SUMS.sig`, and the signing certificate `SHA256SUMS.pem`. Download all three alongside your archive from the [releases page](https://github.com/venslabs/vens/releases), then:
 
 ```bash
 cosign verify-blob \
