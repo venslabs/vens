@@ -54,6 +54,29 @@ go install github.com/venslabs/vens/cmd/vens@latest
 trivy plugin install github.com/venslabs/vens
 ```
 
+## Verifying releases
+
+Release artifacts are signed with [cosign](https://github.com/sigstore/cosign)
+keyless signing (Sigstore, GitHub Actions OIDC — no long-lived keys). Each
+release ships `SHA256SUMS`, its detached signature `SHA256SUMS.sig`, and the
+signing certificate `SHA256SUMS.pem`.
+
+```bash
+# Verify the signature over SHA256SUMS
+cosign verify-blob \
+  --certificate SHA256SUMS.pem \
+  --signature SHA256SUMS.sig \
+  --certificate-identity-regexp '^https://github.com/venslabs/vens/\.github/workflows/release\.yml@refs/tags/v' \
+  --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+  SHA256SUMS
+
+# Then verify the downloaded artifacts against the trusted checksums
+sha256sum --check --ignore-missing SHA256SUMS
+```
+
+Releases also carry a GitHub build-provenance attestation, verifiable with
+`gh attestation verify <artifact> --repo venslabs/vens`.
+
 ## Quick Example
 
 ```bash
