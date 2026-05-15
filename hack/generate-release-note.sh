@@ -21,8 +21,7 @@ Release artifacts are signed with cosign keyless — Sigstore cert bound to the 
 \`\`\`bash
 # Verify the signature over the checksums file
 cosign verify-blob \\
-  --certificate SHA256SUMS.pem \\
-  --signature SHA256SUMS.sig \\
+  --bundle SHA256SUMS.sigstore.json \\
   --certificate-identity-regexp '^https://github.com/venslabs/vens/\.github/workflows/release\.yml@refs/tags/v' \\
   --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \\
   SHA256SUMS
