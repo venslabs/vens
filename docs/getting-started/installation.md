@@ -128,6 +128,25 @@ Download the latest release for your OS/architecture from the [releases page](ht
 
 ---
 
+### Verify the download
+
+Release artifacts are signed with [cosign](https://github.com/sigstore/cosign) in keyless mode: the signing identity is the GitHub Actions release workflow itself, certified by Sigstore — no long-lived key. Each release publishes `SHA256SUMS` and its Sigstore bundle `SHA256SUMS.sigstore.json` (signature, certificate, and transparency-log proof in one file). Download both alongside your archive from the [releases page](https://github.com/venslabs/vens/releases), then:
+
+```bash
+cosign verify-blob \
+  --bundle SHA256SUMS.sigstore.json \
+  --certificate-identity-regexp '^https://github.com/venslabs/vens/\.github/workflows/release\.yml@refs/tags/v' \
+  --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+  SHA256SUMS
+
+sha256sum --check --ignore-missing SHA256SUMS
+```
+
+!!! note
+    Releases also carry a GitHub build-provenance attestation. Verify it with `gh attestation verify <archive> --repo venslabs/vens`.
+
+---
+
 ### Configure an LLM provider
 
 Vens calls an LLM to score each CVE. All four providers below are first-class — pick whichever matches your constraints. Export credentials for **one**:
