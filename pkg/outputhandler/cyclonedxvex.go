@@ -109,7 +109,7 @@ func (c *cycloneDxVexWriter) Close() error {
 
 	enc := cyclonedx.NewBOMEncoder(c.w, cyclonedx.BOMFileFormatJSON)
 	enc.SetPretty(true)
-	if err := enc.Encode(bom); err != nil {
+	if err := enc.EncodeVersion(bom, cyclonedx.SpecVersion1_7); err != nil {
 		return err
 	}
 	c.closed = true

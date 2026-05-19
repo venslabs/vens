@@ -9,7 +9,7 @@ exists output.cdx.json
 
 # Verify output contains expected VEX structure
 json-contains output.cdx.json '"bomFormat": "CycloneDX"'
-json-contains output.cdx.json '"specVersion": "1.6"'
+json-contains output.cdx.json '"specVersion": "1.7"'
 json-contains output.cdx.json 'vulnerabilities'
 json-contains output.cdx.json 'CVE-2024-1234'
 

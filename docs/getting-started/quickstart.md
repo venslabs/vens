@@ -98,12 +98,12 @@ Typical runtime: **30 seconds to 2 minutes** depending on CVE count and LLM prov
 
 ## Step 4 — Read the result
 
-Open `output.vex.json`. It is a CycloneDX 1.6 BOM. Each vulnerability carries an OWASP rating:
+Open `output.vex.json`. It is a CycloneDX 1.7 BOM. Each vulnerability carries an OWASP rating:
 
 ```json
 {
   "bomFormat": "CycloneDX",
-  "specVersion": "1.6",
+  "specVersion": "1.7",
   "vulnerabilities": [
     {
       "id": "CVE-XXXX-YYYY",
