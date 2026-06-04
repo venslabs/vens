@@ -27,11 +27,13 @@ import (
 
 // NewCycloneDxVexOutputHandler returns an OutputHandler that accumulates
 // vulnerability ratings and emits a proper CycloneDX VEX BOM on Close.
-func NewCycloneDxVexOutputHandler(w io.Writer, sbomUUID string, sbomVersion int) OutputHandler {
+// vexUUID is the VEX document's serialNumber UUID; pass "" to generate one.
+func NewCycloneDxVexOutputHandler(w io.Writer, sbomUUID string, sbomVersion int, vexUUID string) OutputHandler {
 	return &cycloneDxVexWriter{
 		w:           w,
 		sbomUUID:    sbomUUID,
 		sbomVersion: sbomVersion,
+		vexUUID:     vexUUID,
 	}
 }
 
@@ -40,6 +42,7 @@ type cycloneDxVexWriter struct {
 	r           []VulnRating
 	sbomUUID    string
 	sbomVersion int
+	vexUUID     string
 	closed      bool
 }
 
@@ -56,7 +59,11 @@ func (c *cycloneDxVexWriter) Close() error {
 		return nil
 	}
 	bom := cyclonedx.NewBOM()
-	bom.SerialNumber = "urn:uuid:" + uuid.New().String()
+	serial := c.vexUUID
+	if serial == "" {
+		serial = uuid.New().String()
+	}
+	bom.SerialNumber = "urn:uuid:" + serial
 	bom.Version = c.sbomVersion
 	bom.Metadata = &cyclonedx.Metadata{
 		Timestamp: time.Now().UTC().Format(time.RFC3339),

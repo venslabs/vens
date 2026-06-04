@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
 	"strings"
 	"time"
 )
@@ -70,4 +71,39 @@ func isRateLimit(err error) bool {
 	}
 
 	return false
+}
+
+// defaultModels mirror each provider's own default, used when *_MODEL is unset.
+// vens sets the model explicitly so it can record and log which one ran.
+// Ollama has no default.
+var defaultModels = map[string]string{
+	OpenAI:    "gpt-3.5-turbo",
+	Anthropic: "claude-3-5-sonnet-20240620",
+	GoogleAI:  "gemini-pro",
+	Mock:      "mock",
+}
+
+// ResolveModel returns the provider and model for a backend name. Provider
+// defaults to openai; model comes from the provider's *_MODEL env var, falling
+// back to defaultModels. defaulted reports that fallback.
+func ResolveModel(name string) (provider, model string, defaulted bool) {
+	provider = name
+	if provider == "" || provider == Auto {
+		provider = OpenAI
+	}
+	switch provider {
+	case OpenAI:
+		model = os.Getenv("OPENAI_MODEL")
+	case Ollama:
+		model = os.Getenv("OLLAMA_MODEL")
+	case Anthropic:
+		model = os.Getenv("ANTHROPIC_MODEL")
+	case GoogleAI:
+		model = os.Getenv("GOOGLE_MODEL")
+	}
+	if model == "" {
+		model = defaultModels[provider]
+		defaulted = true
+	}
+	return
 }

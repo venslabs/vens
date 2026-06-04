@@ -1,0 +1,78 @@
+# --attest emits a CDXA sibling file with per-batch LLM evidence
+
+exec vens generate --llm=mock --attest --llm-seed=7 --config-file=config.yaml --sbom-serial-number=urn:uuid:11111111-2222-3333-4444-555555555555 report.json output.cdx.json
+stderr 'Processing vulnerabilities'
+stderr 'Attestation written'
+
+exists output.cdx.json
+exists output.attestation.cdx.json
+
+# CDX 1.7 BOM with declarations.evidence
+json-contains output.attestation.cdx.json '"bomFormat": "CycloneDX"'
+json-contains output.attestation.cdx.json '"specVersion": "1.7"'
+json-contains output.attestation.cdx.json '"declarations"'
+json-contains output.attestation.cdx.json '"evidence"'
+
+# Links back to the VEX via a BOM-Link external reference (not the SBOM serial)
+json-contains output.attestation.cdx.json '"bom-ref": "vens-vex"'
+json-contains output.attestation.cdx.json '"type": "bom"'
+
+# Producing tool version is recorded
+json-contains output.attestation.cdx.json '"name": "vens"'
+
+# Per-batch evidence carries the minimum reproducibility field set
+json-contains output.attestation.cdx.json '"bom-ref": "evidence-batch-1"'
+json-contains output.attestation.cdx.json '"name": "prompt_hash"'
+json-contains output.attestation.cdx.json '"name": "input_hash"'
+json-contains output.attestation.cdx.json '"name": "model"'
+json-contains output.attestation.cdx.json '"name": "seed"'
+json-contains output.attestation.cdx.json '"name": "raw_response"'
+json-contains output.attestation.cdx.json '"encoding": "base64"'
+
+# Evidence values, not just field names
+json-contains output.attestation.cdx.json '"content": "mock/mock"'
+json-contains output.attestation.cdx.json '"content": "7"'
+
+-- config.yaml --
+project:
+  name: "attest-test"
+  description: "Test project for attestation integration"
+context:
+  exposure: "internet"
+  data_sensitivity: "high"
+  business_criticality: "critical"
+-- report.json --
+{
+  "SchemaVersion": 2,
+  "CreatedAt": "2024-01-15T10:00:00Z",
+  "ArtifactName": "nginx:1.25",
+  "ArtifactType": "container_image",
+  "Results": [
+    {
+      "Target": "nginx:1.25 (debian 12.4)",
+      "Class": "os-pkgs",
+      "Type": "debian",
+      "Vulnerabilities": [
+        {
+          "VulnerabilityID": "CVE-2024-1234",
+          "PkgID": "openssl@3.0.11-1~deb12u2",
+          "PkgName": "openssl",
+          "PkgIdentifier": {
+            "PURL": "pkg:deb/debian/openssl@3.0.11-1~deb12u2?arch=amd64&distro=debian-12.4"
+          },
+          "InstalledVersion": "3.0.11-1~deb12u2",
+          "FixedVersion": "3.0.13-1~deb12u1",
+          "Status": "fixed",
+          "Title": "OpenSSL: Buffer overflow in SSL_select_next_proto",
+          "Description": "A buffer overflow vulnerability in OpenSSL.",
+          "Severity": "HIGH",
+          "DataSource": {
+            "ID": "debian",
+            "Name": "Debian Security Tracker",
+            "URL": "https://security-tracker.debian.org/tracker/CVE-2024-1234"
+          }
+        }
+      ]
+    }
+  ]
+}

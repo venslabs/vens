@@ -25,7 +25,7 @@ import (
 
 func TestCycloneDxVexWriter_Close_SerialNumber(t *testing.T) {
 	var buf bytes.Buffer
-	h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 1)
+	h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 1, "")
 
 	score := 42.0
 	err := h.HandleVulnRatings([]VulnRating{
@@ -69,7 +69,7 @@ func TestCycloneDxVexWriter_Close_SerialNumber(t *testing.T) {
 
 func TestCycloneDxVexWriter_Close_VersionFromSBOM(t *testing.T) {
 	var buf bytes.Buffer
-	h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 3)
+	h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 3, "")
 
 	if err := h.Close(); err != nil {
 		t.Fatalf("Close: %v", err)
@@ -87,7 +87,7 @@ func TestCycloneDxVexWriter_Close_VersionFromSBOM(t *testing.T) {
 
 func TestCycloneDxVexWriter_Close_Metadata(t *testing.T) {
 	var buf bytes.Buffer
-	h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 1)
+	h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 1, "")
 
 	if err := h.Close(); err != nil {
 		t.Fatalf("Close: %v", err)
@@ -129,7 +129,7 @@ func TestCycloneDxVexWriter_Close_Metadata(t *testing.T) {
 
 func TestCycloneDxVexWriter_Close_VulnerabilitySource(t *testing.T) {
 	var buf bytes.Buffer
-	h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 1)
+	h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 1, "")
 
 	score := 42.0
 	err := h.HandleVulnRatings([]VulnRating{
@@ -215,7 +215,7 @@ func TestCycloneDxVexWriter_Close_VulnerabilitySource(t *testing.T) {
 
 func TestCycloneDxVexWriter_Close_MergesDuplicateVulnIDs(t *testing.T) {
 	var buf bytes.Buffer
-	h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 1)
+	h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 1, "")
 
 	score := 42.0
 	err := h.HandleVulnRatings([]VulnRating{
@@ -291,7 +291,7 @@ func TestCycloneDxVexWriter_Close_MergesDuplicateVulnIDs(t *testing.T) {
 
 func TestCycloneDxVexWriter_Close_DeduplicatesAffectsRefs(t *testing.T) {
 	var buf bytes.Buffer
-	h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 1)
+	h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 1, "")
 
 	score := 42.0
 	err := h.HandleVulnRatings([]VulnRating{
@@ -341,7 +341,7 @@ func TestCycloneDxVexWriter_Close_DeduplicatesAffectsRefs(t *testing.T) {
 
 func TestCycloneDxVexWriter_Close_Idempotent(t *testing.T) {
 	var buf bytes.Buffer
-	h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 1)
+	h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 1, "")
 
 	if err := h.Close(); err != nil {
 		t.Fatalf("first Close: %v", err)

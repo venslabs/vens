@@ -25,6 +25,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"github.com/venslabs/vens/cmd/vens/version"
+	"github.com/venslabs/vens/pkg/attestation"
 	"github.com/venslabs/vens/pkg/generator"
 	"github.com/venslabs/vens/pkg/llm"
 	"github.com/venslabs/vens/pkg/llm/llmfactory"
@@ -66,6 +68,7 @@ The LLM calculates the OWASP risk score (0-81) for each vulnerability using:
 	flags.String("debug-dir", "", "Directory to save debug files (prompts, responses)")
 	flags.String("sbom-serial-number", "", "SBOM serial number for BOM-Link (format: urn:uuid:...)")
 	flags.Int("sbom-version", 1, "SBOM version for BOM-Link (default: 1)")
+	flags.Bool("attest", false, "Emit a CycloneDX Attestations (CDXA) sibling file with prompt hash, input hash, model, seed, raw LLM response")
 
 	return cmd
 }
@@ -129,7 +132,8 @@ func action(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	o.LLM, err = llmfactory.New(ctx, llmName)
+	var provider, model string
+	o.LLM, provider, model, err = llmfactory.New(ctx, llmName)
 	if err != nil {
 		return err
 	}
@@ -146,6 +150,11 @@ func action(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	o.DebugDir, err = flags.GetString("debug-dir")
+	if err != nil {
+		return err
+	}
+
+	attestEnabled, err := flags.GetBool("attest")
 	if err != nil {
 		return err
 	}
@@ -209,9 +218,12 @@ func action(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to extract SBOM metadata: %w", err)
 	}
 
+	// The VEX gets its own serialNumber; the attestation links back to it.
+	vexUUID := uuid.NewString()
+
 	switch outputFormat {
 	case "cyclonedxvex":
-		h = outputhandler.NewCycloneDxVexOutputHandler(outputW, sbomUUID, sbomVersion)
+		h = outputhandler.NewCycloneDxVexOutputHandler(outputW, sbomUUID, sbomVersion, vexUUID)
 	default:
 		return fmt.Errorf("unknown output format %q", outputFormat)
 	}
@@ -232,12 +244,46 @@ func action(cmd *cobra.Command, args []string) error {
 
 	slog.InfoContext(ctx, "Processing vulnerabilities", "count", len(vulns))
 
+	var attestor *attestation.Builder
+	if attestEnabled {
+		attestor = attestation.NewBuilder(attestation.Opts{
+			VensVersion: version.GetVersion(),
+			Provider:    provider,
+			Model:       model,
+			Seed:        o.Seed,
+			InputHash:   attestation.HashInput(inputB),
+			VEXUUID:     vexUUID,
+			VEXVersion:  sbomVersion,
+		})
+		g.SetAttestor(attestor)
+	}
+
 	// Generate risk scores using LLM
 	if err = g.GenerateRiskScore(ctx, vulns, h.HandleVulnRatings); err != nil {
 		return fmt.Errorf("failed to generate risk scores: %w", err)
 	}
 
-	return h.Close()
+	if err := h.Close(); err != nil {
+		return err
+	}
+
+	if attestor != nil && attestor.BatchCount() > 0 {
+		atPath := attestation.SiblingPath(outputPath)
+		atW, err := os.Create(atPath)
+		if err != nil {
+			return fmt.Errorf("failed to create attestation file %q: %w", atPath, err)
+		}
+		if err := attestor.Write(atW); err != nil {
+			atW.Close() //nolint:errcheck
+			return fmt.Errorf("failed to write attestation: %w", err)
+		}
+		if err := atW.Close(); err != nil {
+			return fmt.Errorf("failed to close attestation file %q: %w", atPath, err)
+		}
+		slog.InfoContext(ctx, "Attestation written", "path", atPath, "batches", attestor.BatchCount())
+	}
+
+	return nil
 }
 
 // extractSBOMMetadata extracts UUID and version from flags.
