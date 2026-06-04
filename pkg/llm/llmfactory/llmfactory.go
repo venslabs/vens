@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"os"
 
 	"github.com/tmc/langchaingo/llms"
 	"github.com/tmc/langchaingo/llms/anthropic"
@@ -31,36 +30,38 @@ import (
 	"github.com/venslabs/vens/pkg/llm"
 )
 
-// New instantiates an LLM.
-func New(ctx context.Context, name string) (llms.Model, error) {
-	switch name {
-	case "", llm.Auto:
+// New instantiates an LLM client and returns the resolved provider and model,
+// so callers can record what ran without resolving twice.
+func New(ctx context.Context, name string) (client llms.Model, provider, model string, err error) {
+	if name == "" || name == llm.Auto {
 		// TODO: add more sophisticated logic
 		slog.DebugContext(ctx, "Automatically choosing model", "name", llm.OpenAI)
-		name = llm.OpenAI
 	}
-	switch name {
-	case llm.OpenAI:
-		return openai.New()
-	case llm.Ollama:
-		var ollamaModel string
-		ollamaModel = os.Getenv("OLLAMA_MODEL")
-		return ollama.New(ollama.WithModel(ollamaModel))
-	case llm.Anthropic:
-		var anthropicModel string
-		anthropicModel = os.Getenv("ANTHROPIC_MODEL")
-		if anthropicModel != "" {
-			return anthropic.New(anthropic.WithModel(anthropicModel))
-		}
-		return anthropic.New()
-	case llm.GoogleAI:
-		var defaultModel string
-		defaultModel = os.Getenv("GOOGLE_MODEL")
-		return googleai.New(ctx, googleai.WithDefaultModel(defaultModel))
-	case llm.Mock:
+	var defaulted bool
+	provider, model, defaulted = llm.ResolveModel(name)
+	if provider == llm.Mock {
 		slog.DebugContext(ctx, "Using mock LLM for testing")
-		return testutil.NewMockLLM(), nil
-	default:
-		return nil, fmt.Errorf("unknown LLM %q, make sure to use one of %v", name, llm.Names)
+		client = testutil.NewMockLLM()
+		return
 	}
+	if defaulted && model != "" {
+		slog.WarnContext(ctx, "no model env var set; using the provider default", "provider", provider, "model", model)
+	}
+	switch provider {
+	case llm.OpenAI:
+		client, err = openai.New(openai.WithModel(model))
+	case llm.Ollama:
+		if model == "" {
+			err = fmt.Errorf("ollama: set the OLLAMA_MODEL environment variable")
+			return
+		}
+		client, err = ollama.New(ollama.WithModel(model))
+	case llm.Anthropic:
+		client, err = anthropic.New(anthropic.WithModel(model))
+	case llm.GoogleAI:
+		client, err = googleai.New(ctx, googleai.WithDefaultModel(model))
+	default:
+		err = fmt.Errorf("unknown LLM %q, make sure to use one of %v", name, llm.Names)
+	}
+	return
 }

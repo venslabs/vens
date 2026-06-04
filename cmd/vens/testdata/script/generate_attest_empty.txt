@@ -1,0 +1,31 @@
+# --attest with a vulnerability-free report writes the VEX but no attestation sibling
+
+exec vens generate --llm=mock --attest --config-file=config.yaml --sbom-serial-number=urn:uuid:88888888-8888-8888-8888-888888888888 report.json output.cdx.json
+stderr 'No vulnerabilities found'
+
+exists output.cdx.json
+! exists output.attestation.cdx.json
+
+-- config.yaml --
+project:
+  name: "attest-empty-test"
+  description: "Test project for attestation with no vulnerabilities"
+context:
+  exposure: "internet"
+  data_sensitivity: "high"
+  business_criticality: "critical"
+-- report.json --
+{
+  "SchemaVersion": 2,
+  "CreatedAt": "2024-01-15T10:00:00Z",
+  "ArtifactName": "nginx:1.25",
+  "ArtifactType": "container_image",
+  "Results": [
+    {
+      "Target": "nginx:1.25 (debian 12.4)",
+      "Class": "os-pkgs",
+      "Type": "debian",
+      "Vulnerabilities": []
+    }
+  ]
+}

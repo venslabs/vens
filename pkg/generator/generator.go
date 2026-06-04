@@ -30,6 +30,7 @@ import (
 	"github.com/CycloneDX/cyclonedx-go"
 	"github.com/tmc/langchaingo/jsonschema"
 	"github.com/tmc/langchaingo/llms"
+	"github.com/venslabs/vens/pkg/attestation"
 	"github.com/venslabs/vens/pkg/llm"
 	"github.com/venslabs/vens/pkg/outputhandler"
 	"github.com/venslabs/vens/pkg/owasp"
@@ -106,7 +107,8 @@ type Opts struct {
 
 // Generator produces OWASP risk scores using LLM analysis.
 type Generator struct {
-	o Opts
+	o        Opts
+	attestor *attestation.Builder
 }
 
 // New creates a new Generator with the given options.
@@ -135,6 +137,9 @@ func New(o Opts) (*Generator, error) {
 	}
 	return g, nil
 }
+
+// SetAttestor attaches an attestation Builder after construction. Pass nil to disable.
+func (g *Generator) SetAttestor(b *attestation.Builder) { g.attestor = b }
 
 // GenerateRiskScore generates contextual OWASP risk scores for the given vulnerabilities.
 // It uses the LLM to calculate the OWASP risk score for each vulnerability based on
@@ -320,6 +325,10 @@ func (g *Generator) evaluateOWASPScores(ctx context.Context, vulns []LLMVulnerab
 		return err
 	}); err != nil {
 		return nil, err
+	}
+
+	if g.attestor != nil {
+		g.attestor.AddBatch(systemPrompt, humanPrompt, buf.Bytes())
 	}
 
 	// Parse LLM response

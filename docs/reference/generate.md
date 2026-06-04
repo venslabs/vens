@@ -164,6 +164,34 @@ Per-CVE component scores and the LLM's reasoning are logged to stderr at `INFO`/
 !!! note "Retention for compliance workloads"
     If you need the debug output as audit evidence (HIPAA-style 6-year retention, SOC 2 change log, PCI-DSS risk decisions), store it in the same encrypted, access-controlled system you use for other security audit logs. Treat each `--debug-dir` directory as one entry in your vulnerability-triage evidence chain, indexed by scan date and by the Git SHA of the `config.yaml` that produced it. Reasoning can only be reconstructed later if **both** the `config.yaml` version and the debug files are preserved — a copy of the VEX alone is not enough.
 
+### `--attest`
+
+Opt-in. Emits a [CycloneDX Attestations (CDXA)](https://cyclonedx.org/specification/overview/) sibling file next to the VEX, capturing what the LLM saw and produced so the run can be audited and reproduced later. Off by default.
+
+```bash
+vens generate --attest \
+  --config-file c.yaml \
+  --sbom-serial-number "$SBOM_UUID" \
+  report.json out.cdx.json
+# writes out.cdx.json AND out.attestation.cdx.json
+```
+
+**Schema** (CDX 1.7 BOM, one `declarations.evidence[]` entry per LLM batch):
+
+- `prompt_hash` — SHA-256 of `system_prompt + "\n\n" + human_prompt`
+- `input_hash` — SHA-256 of the scanner input report bytes
+- `model` — the `<provider>/<model>` used for the run (e.g. `openai/gpt-4o`). When the provider's `*_MODEL` env var is unset, vens falls back to that provider's default model and logs it.
+- `seed` — the LLM seed (`0` if unset)
+- `raw_response` — base64-encoded raw LLM JSON response
+
+The producing `vens` version is recorded in `metadata.tools`. The attestation is a `file` component that links to the VEX it describes through a `bom` external reference (`urn:cdx:<vex-serial>/<version>`).
+
+!!! note "Reproducibility scope"
+    The attestation records the inputs and outputs of each LLM call. Recreating a score also requires the `config.yaml` used at the time — keep it under version control alongside the attestation.
+
+!!! warning "The attestation is sensitive — store it like audit evidence"
+    `raw_response` is **base64-encoded, not encrypted** — anyone with the file can decode it back to the model's reply: the CVE IDs you scored, their scores, and the free-text reasoning (which reflects your `config.yaml` context). The prompt and scanner report are stored only as SHA-256 hashes, so the raw vulnerability list and package versions are not embedded. In CI, write the attestation to the same access-controlled store as your other security evidence — not to a public build artifact.
+
 ### `--sbom-version <int>`
 
 BOM-Link `version` number used alongside `--sbom-serial-number`. Default: `1`.
