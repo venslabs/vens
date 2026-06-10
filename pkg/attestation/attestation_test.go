@@ -174,7 +174,9 @@ func TestBuilder_Write_StructureAndFields(t *testing.T) {
 	wantPrompt := sha256.Sum256([]byte("sys\n\nhum"))
 	assert.Equal(t, hex.EncodeToString(wantPrompt[:]), fields["prompt_hash"])
 	assert.Equal(t, HashInput([]byte(`{"hello":"world"}`)), fields["input_hash"])
-	assert.Equal(t, "openai/gpt-4o", fields["model"])
+	assert.Equal(t, "gpt-4o", fields["model"])
+	assert.Equal(t, "openai", fields["provider"])
+	assert.Equal(t, "llm", fields["generation_method"])
 	assert.Equal(t, "42", fields["seed"])
 
 	gotResp, err := base64.StdEncoding.DecodeString(fields["raw_response"])
@@ -197,21 +199,24 @@ func TestBuilder_Write_NoVEXUUID_NoComponent(t *testing.T) {
 	assert.Nil(t, got.Metadata.Component, "metadata.component should be omitted when VEXUUID empty")
 }
 
-func TestBuilder_Write_ProviderEmpty_ModelStandsAlone(t *testing.T) {
-	b := newTestBuilder(t, func(o *Opts) { o.Provider = "" })
+func TestBuilder_Write_ProviderAndModelSeparate(t *testing.T) {
+	b := newTestBuilder(t, nil)
 	b.AddBatch("s", "h", []byte("{}"))
 	var buf bytes.Buffer
 	require.NoError(t, b.Write(&buf))
-	assert.Equal(t, "gpt-4o", evidenceFields(t, buf.Bytes())["model"])
+	f := evidenceFields(t, buf.Bytes())
+	assert.Equal(t, "openai", f["provider"])
+	assert.Equal(t, "gpt-4o", f["model"])
 }
 
-func TestBuilder_Write_ModelEmpty_ProviderStandsAlone(t *testing.T) {
+func TestBuilder_Write_ModelEmpty_ProviderStillRecorded(t *testing.T) {
 	b := newTestBuilder(t, func(o *Opts) { o.Model = "" })
 	b.AddBatch("s", "h", []byte("{}"))
 	var buf bytes.Buffer
 	require.NoError(t, b.Write(&buf))
-	// An unset model must not produce a dangling "provider/".
-	assert.Equal(t, "openai", evidenceFields(t, buf.Bytes())["model"])
+	f := evidenceFields(t, buf.Bytes())
+	assert.Equal(t, "", f["model"])
+	assert.Equal(t, "openai", f["provider"])
 }
 
 func TestBuilder_Write_MultipleBatches(t *testing.T) {
@@ -225,6 +230,97 @@ func TestBuilder_Write_MultipleBatches(t *testing.T) {
 	for _, want := range []string{"evidence-batch-1", "evidence-batch-2", "evidence-batch-3"} {
 		assert.Contains(t, s, want)
 	}
+}
+
+func TestBuilder_Write_Claims(t *testing.T) {
+	b := newTestBuilder(t, nil)
+	ref := b.AddBatch("sys", "hum", []byte(`{"results":[]}`))
+	openssl := ClaimInput{
+		VulnID: "CVE-2024-1234", CompRef: "pkg:deb/debian/openssl@3.0.11",
+		CompName: "openssl", CompVersion: "3.0.11", PURL: "pkg:deb/debian/openssl@3.0.11",
+		Score: 56, Severity: "high", Reasoning: "RCE",
+	}
+	b.AddClaim(ref, openssl)
+	// Same component, second CVE: one more claim, but no duplicate target.
+	second := openssl
+	second.VulnID = "CVE-2024-5678"
+	second.Reasoning = "DoS"
+	b.AddClaim(ref, second)
+
+	var buf bytes.Buffer
+	require.NoError(t, b.Write(&buf))
+
+	var got struct {
+		Declarations struct {
+			Assessors []struct {
+				BomRef       string `json:"bom-ref"`
+				Organization struct {
+					Name string `json:"name"`
+				} `json:"organization"`
+			} `json:"assessors"`
+			Targets struct {
+				Components []struct {
+					BomRef string `json:"bom-ref"`
+					Name   string `json:"name"`
+					Purl   string `json:"purl"`
+				} `json:"components"`
+			} `json:"targets"`
+			Claims []struct {
+				BomRef    string   `json:"bom-ref"`
+				Target    string   `json:"target"`
+				Predicate string   `json:"predicate"`
+				Reasoning string   `json:"reasoning"`
+				Evidence  []string `json:"evidence"`
+			} `json:"claims"`
+			Attestations []struct {
+				Assessor string `json:"assessor"`
+				Map      []struct {
+					Claims []string `json:"claims"`
+				} `json:"map"`
+			} `json:"attestations"`
+		} `json:"declarations"`
+	}
+	require.NoError(t, json.Unmarshal(buf.Bytes(), &got), "output:\n%s", buf.String())
+	d := got.Declarations
+
+	require.Len(t, d.Claims, 2)
+	require.Len(t, d.Targets.Components, 1, "same component must be deduped")
+	require.Len(t, d.Assessors, 1)
+	require.Len(t, d.Attestations, 1)
+
+	assert.Equal(t, "pkg:deb/debian/openssl@3.0.11", d.Targets.Components[0].BomRef)
+	assert.Equal(t, "openssl", d.Targets.Components[0].Name)
+	assert.Equal(t, "pkg:deb/debian/openssl@3.0.11", d.Targets.Components[0].Purl)
+
+	c0 := d.Claims[0]
+	assert.Equal(t, "pkg:deb/debian/openssl@3.0.11", c0.Target)
+	assert.Contains(t, c0.Predicate, "CVE-2024-1234")
+	assert.Equal(t, "RCE", c0.Reasoning)
+	require.Len(t, c0.Evidence, 1)
+	assert.Equal(t, ref, c0.Evidence[0], "claim points at its batch evidence")
+
+	at := d.Attestations[0]
+	assert.Equal(t, d.Assessors[0].BomRef, at.Assessor)
+	require.Len(t, at.Map, 1)
+	assert.ElementsMatch(t, []string{d.Claims[0].BomRef, d.Claims[1].BomRef}, at.Map[0].Claims)
+}
+
+func TestBuilder_AddClaim_EmptyCompRefSkipped(t *testing.T) {
+	b := newTestBuilder(t, nil)
+	ref := b.AddBatch("s", "h", []byte("{}"))
+	b.AddClaim(ref, ClaimInput{VulnID: "CVE-X", Score: 1, Severity: "info"}) // no CompRef
+
+	var buf bytes.Buffer
+	require.NoError(t, b.Write(&buf))
+	var got struct {
+		Declarations struct {
+			Claims  *[]json.RawMessage `json:"claims"`
+			Targets *json.RawMessage   `json:"targets"`
+		} `json:"declarations"`
+	}
+	require.NoError(t, json.Unmarshal(buf.Bytes(), &got))
+	assert.Nil(t, got.Declarations.Claims, "a claim with no component ref must be skipped")
+	assert.Nil(t, got.Declarations.Targets)
 }
 
 func TestSiblingPath(t *testing.T) {

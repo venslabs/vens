@@ -20,18 +20,31 @@ json-contains output.attestation.cdx.json '"type": "bom"'
 # Producing tool version is recorded
 json-contains output.attestation.cdx.json '"name": "vens"'
 
-# Per-batch evidence carries the minimum reproducibility field set
+# Per-batch evidence carries the reproducibility field set
 json-contains output.attestation.cdx.json '"bom-ref": "evidence-batch-1"'
-json-contains output.attestation.cdx.json '"name": "prompt_hash"'
-json-contains output.attestation.cdx.json '"name": "input_hash"'
+json-contains output.attestation.cdx.json '"name": "generation_method"'
+json-contains output.attestation.cdx.json '"name": "provider"'
 json-contains output.attestation.cdx.json '"name": "model"'
 json-contains output.attestation.cdx.json '"name": "seed"'
+json-contains output.attestation.cdx.json '"name": "temperature"'
+json-contains output.attestation.cdx.json '"name": "prompt_hash"'
+json-contains output.attestation.cdx.json '"name": "input_hash"'
+json-contains output.attestation.cdx.json '"name": "config_hash"'
 json-contains output.attestation.cdx.json '"name": "raw_response"'
 json-contains output.attestation.cdx.json '"encoding": "base64"'
 
-# Evidence values, not just field names
-json-contains output.attestation.cdx.json '"content": "mock/mock"'
+# Evidence values: provider and model are separate fields, seed echoed
+json-contains output.attestation.cdx.json '"content": "mock"'
 json-contains output.attestation.cdx.json '"content": "7"'
+
+# One claim per CVE/component, with a deduped target, assessor and attestation
+json-contains output.attestation.cdx.json '"claims"'
+json-contains output.attestation.cdx.json '"bom-ref": "claim-1"'
+json-contains output.attestation.cdx.json '"predicate"'
+json-contains output.attestation.cdx.json '"name": "openssl"'
+json-contains output.attestation.cdx.json '"assessors"'
+json-contains output.attestation.cdx.json '"name": "vens automated assessment"'
+json-contains output.attestation.cdx.json '"attestations"'
 
 -- config.yaml --
 project:

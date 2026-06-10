@@ -176,13 +176,20 @@ vens generate --attest \
 # writes out.cdx.json AND out.attestation.cdx.json
 ```
 
-**Schema** (CDX 1.7 BOM, one `declarations.evidence[]` entry per LLM batch):
+**What it contains** (CDX 1.7 BOM, everything under `declarations`):
 
-- `prompt_hash` — SHA-256 of `system_prompt + "\n\n" + human_prompt`
-- `input_hash` — SHA-256 of the scanner input report bytes
-- `model` — the `<provider>/<model>` used for the run (e.g. `openai/gpt-4o`). When the provider's `*_MODEL` env var is unset, vens falls back to that provider's default model and logs it.
-- `seed` — the LLM seed (`0` if unset)
-- `raw_response` — base64-encoded raw LLM JSON response
+- `claims[]` — one per scored CVE/affected component: the assessment (`predicate` + `reasoning`), linked to its target component and to the evidence that backs it
+- `targets.components[]` — the affected components the claims point at
+- `evidence[]` — one per LLM batch, recording how the scoring was produced:
+    - `generation_method` — `llm`
+    - `provider` / `model` — backend and model used (e.g. `openai` / `gpt-4o`); when the provider's `*_MODEL` env var is unset, vens falls back to that provider's default and logs it
+    - `seed` — the LLM seed (`0` if unset)
+    - `temperature` — the sampling temperature
+    - `prompt_hash` — SHA-256 of `system_prompt + "\n\n" + human_prompt`
+    - `input_hash` — SHA-256 of the scanner report bytes
+    - `config_hash` — SHA-256 of the `config.yaml` used
+    - `raw_response` — base64-encoded raw LLM JSON reply (flagged `sensitiveData`)
+- `assessors[]` + `attestations[]` — tie the claims to vens as the producer; a human reviewer can later add their own assessor/attestation over the same claims without touching the LLM evidence
 
 The producing `vens` version is recorded in `metadata.tools`. The attestation is a `file` component that links to the VEX it describes through a `bom` external reference (`urn:cdx:<vex-serial>/<version>`).
 
@@ -190,7 +197,7 @@ The producing `vens` version is recorded in `metadata.tools`. The attestation is
     The attestation records the inputs and outputs of each LLM call. Recreating a score also requires the `config.yaml` used at the time — keep it under version control alongside the attestation.
 
 !!! warning "The attestation is sensitive — store it like audit evidence"
-    `raw_response` is **base64-encoded, not encrypted** — anyone with the file can decode it back to the model's reply: the CVE IDs you scored, their scores, and the free-text reasoning (which reflects your `config.yaml` context). The prompt and scanner report are stored only as SHA-256 hashes, so the raw vulnerability list and package versions are not embedded. In CI, write the attestation to the same access-controlled store as your other security evidence — not to a public build artifact.
+    The claims spell out, in clear text, which CVEs you scored, their scores and the model's reasoning, and `raw_response` holds the full model reply **base64-encoded, not encrypted** (anyone with the file can decode it). The prompt, scanner report and config are kept only as SHA-256 hashes, so the raw vulnerability list is not embedded, but the assessment itself is fully readable. In CI, write the attestation to the same access-controlled store as your other security evidence, not to a public build artifact.
 
 ### `--sbom-version <int>`
 
