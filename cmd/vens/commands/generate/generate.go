@@ -247,16 +247,15 @@ func action(cmd *cobra.Command, args []string) error {
 	var attestor *attestation.Builder
 	if attestEnabled {
 		attestor = attestation.NewBuilder(attestation.Opts{
-			VensVersion:         version.GetVersion(),
-			Provider:            provider,
-			Model:               model,
-			Seed:                o.Seed,
-			Temperature:         o.Temperature,
-			InputHash:           attestation.HashInput(inputB),
-			ConfigHash:          attestation.HashInput(cfgBytes),
-			PromptSchemaVersion: generator.PromptSchemaVersion,
-			VEXUUID:             vexUUID,
-			VEXVersion:          sbomVersion,
+			VensVersion: version.GetVersion(),
+			Provider:    provider,
+			Model:       model,
+			Seed:        o.Seed,
+			Temperature: o.Temperature,
+			InputHash:   attestation.HashInput(inputB),
+			ConfigHash:  attestation.HashInput(cfgBytes),
+			VEXUUID:     vexUUID,
+			VEXVersion:  sbomVersion,
 		})
 		g.SetAttestor(attestor)
 	}

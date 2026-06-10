@@ -90,10 +90,6 @@ type llmOutput struct {
 	Results []llmOutputEntry `json:"results"`
 }
 
-// PromptSchemaVersion identifies the LLM output schema. Bump it when the schema
-// or scoring prompt changes in a way that affects reproducibility.
-const PromptSchemaVersion = "1"
-
 // Opts configures the Generator.
 type Opts struct {
 	LLM         llms.Model

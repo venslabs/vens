@@ -188,7 +188,6 @@ vens generate --attest \
     - `prompt_hash` — SHA-256 of `system_prompt + "\n\n" + human_prompt`
     - `input_hash` — SHA-256 of the scanner report bytes
     - `config_hash` — SHA-256 of the `config.yaml` used
-    - `prompt_schema_version` — version of the LLM output schema
     - `raw_response` — base64-encoded raw LLM JSON reply (flagged `sensitiveData`)
 - `assessors[]` + `attestations[]` — tie the claims to vens as the producer; a human reviewer can later add their own assessor/attestation over the same claims without touching the LLM evidence
 

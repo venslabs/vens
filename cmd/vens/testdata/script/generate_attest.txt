@@ -30,7 +30,6 @@ json-contains output.attestation.cdx.json '"name": "temperature"'
 json-contains output.attestation.cdx.json '"name": "prompt_hash"'
 json-contains output.attestation.cdx.json '"name": "input_hash"'
 json-contains output.attestation.cdx.json '"name": "config_hash"'
-json-contains output.attestation.cdx.json '"name": "prompt_schema_version"'
 json-contains output.attestation.cdx.json '"name": "raw_response"'
 json-contains output.attestation.cdx.json '"encoding": "base64"'
 

@@ -31,17 +31,16 @@ import (
 
 // Opts configures a Builder. Set once per run.
 type Opts struct {
-	VensVersion         string
-	Provider            string
-	Model               string
-	Seed                int
-	Temperature         float64
-	InputHash           string
-	ConfigHash          string
-	PromptSchemaVersion string
-	VEXUUID             string
-	VEXVersion          int
-	Now                 func() time.Time
+	VensVersion string
+	Provider    string
+	Model       string
+	Seed        int
+	Temperature float64
+	InputHash   string
+	ConfigHash  string
+	VEXUUID     string
+	VEXVersion  int
+	Now         func() time.Time
 }
 
 // ClaimInput is one scored CVE/component assessment to attest.
@@ -212,9 +211,6 @@ func (b *Builder) evidence() *[]cyclonedx.DeclarationEvidence {
 		}
 		if b.opts.ConfigHash != "" {
 			data = append(data, textData("config_hash", b.opts.ConfigHash))
-		}
-		if b.opts.PromptSchemaVersion != "" {
-			data = append(data, textData("prompt_schema_version", b.opts.PromptSchemaVersion))
 		}
 		raw := base64Data("raw_response", e.rawResponse, "application/json")
 		raw.SensitiveData = &[]string{"raw LLM output, may echo SBOM-derived context"}
