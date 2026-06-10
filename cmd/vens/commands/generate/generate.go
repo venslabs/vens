@@ -109,8 +109,12 @@ func action(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("--config-file is required")
 	}
 
-	// Load config.yaml with context hints
-	cfg, cfgBytes, err := riskconfig.Load(configPath)
+	// Load config.yaml with context hints (read once so --attest can hash these bytes)
+	cfgBytes, err := os.ReadFile(configPath)
+	if err != nil {
+		return fmt.Errorf("failed to read config file %q: %w", configPath, err)
+	}
+	cfg, err := riskconfig.Parse(cfgBytes)
 	if err != nil {
 		return fmt.Errorf("failed to load config file %q: %w", configPath, err)
 	}

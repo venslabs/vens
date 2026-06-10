@@ -16,7 +16,6 @@ package riskconfig
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"go.yaml.in/yaml/v3"
@@ -140,24 +139,19 @@ var (
 	}
 )
 
-// Load parses a config.yaml file from the given path, validates entries, and
-// returns the raw file bytes so callers can hash exactly what was read.
-func Load(path string) (*Config, []byte, error) {
-	b, err := os.ReadFile(path)
-	if err != nil {
-		return nil, nil, err
-	}
+// Parse unmarshals raw YAML bytes into a Config, then validates it.
+func Parse(b []byte) (*Config, error) {
 	var cfg Config
 	if err := yaml.Unmarshal(b, &cfg); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	// Validate context hints
 	if err := cfg.validate(); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	return &cfg, b, nil
+	return &cfg, nil
 }
 
 // validate checks that all context hints have valid values and applies defaults.
