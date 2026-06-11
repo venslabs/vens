@@ -160,10 +160,12 @@ func (g *Generator) generateRiskScore(ctx context.Context, vulnBatch []Vulnerabi
 		return errors.New("config not initialized; load config.yaml first")
 	}
 
-	vulnMap := make(map[string]Vulnerability, len(vulnBatch))
+	// A CVE can affect several components in one batch, so group every component
+	// under its VulnID. Keying by VulnID alone would keep only the last one.
+	vulnsByID := make(map[string][]Vulnerability, len(vulnBatch))
 	llmBatch := make([]LLMVulnerability, len(vulnBatch))
 	for i, v := range vulnBatch {
-		vulnMap[v.VulnID] = v
+		vulnsByID[v.VulnID] = append(vulnsByID[v.VulnID], v)
 		llmBatch[i] = LLMVulnerability{
 			VulnID:           v.VulnID,
 			PkgID:            v.PkgID,
@@ -182,12 +184,16 @@ func (g *Generator) generateRiskScore(ctx context.Context, vulnBatch []Vulnerabi
 		return fmt.Errorf("LLM evaluation failed: %w", err)
 	}
 
-	// Build VulnRating group using Go-calculated scores
+	// Build VulnRating group using Go-calculated scores. The LLM scores each CVE
+	// once; apply that score to every component the CVE affects, emitting one
+	// rating and one claim per (CVE, component).
 	group := make([]outputhandler.VulnRating, 0, len(vulnBatch))
+	scored := make(map[string]bool)
 	for _, entry := range scores {
-		if entry.VulnID == "" {
+		if entry.VulnID == "" || scored[entry.VulnID] {
 			continue
 		}
+		scored[entry.VulnID] = true
 
 		// Calculate final OWASP score using the formula:
 		// Risk = Likelihood × Impact = ((ThreatAgent + Vulnerability)/2) × ((TechImpact + BusinessImpact)/2)
@@ -207,53 +213,56 @@ func (g *Generator) generateRiskScore(ctx context.Context, vulnBatch []Vulnerabi
 		)
 		vectorString := vector.String()
 
-		bomRef := ""
-		if v, ok := vulnMap[entry.VulnID]; ok {
-			bomRef = v.BOMRef
+		// Fan out to every component the CVE affects. Keep a single rating with
+		// an empty bom-ref when the CVE isn't in the batch map (unchanged).
+		comps := vulnsByID[entry.VulnID]
+		if len(comps) == 0 {
+			comps = []Vulnerability{{VulnID: entry.VulnID}}
 		}
+		for _, v := range comps {
+			slog.InfoContext(ctx, "Scored vulnerability",
+				"vuln", entry.VulnID,
+				"pkg", v.BOMRef,
+				"score", fmt.Sprintf("%.1f", score),
+				"severity", severity,
+				"vector", vectorString,
+			)
 
-		slog.InfoContext(ctx, "Scored vulnerability",
-			"vuln", entry.VulnID,
-			"pkg", bomRef,
-			"score", fmt.Sprintf("%.1f", score),
-			"severity", severity,
-			"vector", vectorString,
-		)
-
-		var source *cyclonedx.Source
-		if v, ok := vulnMap[entry.VulnID]; ok && v.SourceName != "" {
-			source = &cyclonedx.Source{
-				Name: v.SourceName,
-				URL:  v.SourceURL,
+			var source *cyclonedx.Source
+			if v.SourceName != "" {
+				source = &cyclonedx.Source{
+					Name: v.SourceName,
+					URL:  v.SourceURL,
+				}
+			} else {
+				source = vuln.Source(entry.VulnID)
 			}
-		} else {
-			source = vuln.Source(entry.VulnID)
-		}
 
-		group = append(group, outputhandler.VulnRating{
-			VulnID: entry.VulnID,
-			BOMRef: bomRef,
-			Rating: cyclonedx.VulnerabilityRating{
-				Method:   cyclonedx.ScoringMethodOWASP,
-				Score:    &score,
-				Severity: cyclonedx.Severity(severity),
-				Vector:   vectorString,
-			},
-			Source: source,
-		})
-
-		if g.attestor != nil {
-			v := vulnMap[entry.VulnID]
-			g.attestor.AddClaim(evidenceRef, attestation.ClaimInput{
-				VulnID:      entry.VulnID,
-				CompRef:     v.BOMRef,
-				CompName:    v.PkgName,
-				CompVersion: v.InstalledVersion,
-				PURL:        v.BOMRef,
-				Score:       score,
-				Severity:    severity,
-				Reasoning:   entry.Reasoning,
+			s := score
+			group = append(group, outputhandler.VulnRating{
+				VulnID: entry.VulnID,
+				BOMRef: v.BOMRef,
+				Rating: cyclonedx.VulnerabilityRating{
+					Method:   cyclonedx.ScoringMethodOWASP,
+					Score:    &s,
+					Severity: cyclonedx.Severity(severity),
+					Vector:   vectorString,
+				},
+				Source: source,
 			})
+
+			if g.attestor != nil {
+				g.attestor.AddClaim(evidenceRef, attestation.ClaimInput{
+					VulnID:      entry.VulnID,
+					CompRef:     v.BOMRef,
+					CompName:    v.PkgName,
+					CompVersion: v.InstalledVersion,
+					PURL:        v.BOMRef,
+					Score:       score,
+					Severity:    severity,
+					Reasoning:   entry.Reasoning,
+				})
+			}
 		}
 	}
 
