@@ -1,0 +1,57 @@
+# Regression: the same CVE on two components must not collapse onto one.
+# The VEX must reference both affected components, and the attestation must
+# carry one claim per component with two distinct targets.
+
+exec vens generate --llm=mock --attest --config-file=config.yaml --sbom-serial-number=urn:uuid:11111111-1111-1111-1111-111111111111 report.json output.cdx.json
+stderr 'Processing vulnerabilities'
+
+# VEX references both affected components
+json-contains output.cdx.json 'pkg:deb/debian/openssl@3.0.11'
+json-contains output.cdx.json 'pkg:deb/debian/libssl3@3.0.11'
+
+# Attestation: one claim per component, two distinct targets
+json-contains output.attestation.cdx.json '"bom-ref": "claim-1"'
+json-contains output.attestation.cdx.json '"bom-ref": "claim-2"'
+json-contains output.attestation.cdx.json '"target": "pkg:deb/debian/openssl@3.0.11"'
+json-contains output.attestation.cdx.json '"target": "pkg:deb/debian/libssl3@3.0.11"'
+
+-- config.yaml --
+project:
+  name: "dup-cve-test"
+  description: "Same CVE across two components"
+context:
+  exposure: "internet"
+  data_sensitivity: "high"
+  business_criticality: "critical"
+-- report.json --
+{
+  "SchemaVersion": 2,
+  "CreatedAt": "2026-06-11T10:00:00Z",
+  "ArtifactName": "demo",
+  "ArtifactType": "container_image",
+  "Results": [
+    {
+      "Target": "demo (debian 12)",
+      "Class": "os-pkgs",
+      "Type": "debian",
+      "Vulnerabilities": [
+        {
+          "VulnerabilityID": "CVE-2024-1234",
+          "PkgName": "openssl",
+          "InstalledVersion": "3.0.11",
+          "Severity": "HIGH",
+          "Title": "Same CVE, first component",
+          "PkgIdentifier": { "PURL": "pkg:deb/debian/openssl@3.0.11" }
+        },
+        {
+          "VulnerabilityID": "CVE-2024-1234",
+          "PkgName": "libssl3",
+          "InstalledVersion": "3.0.11",
+          "Severity": "HIGH",
+          "Title": "Same CVE, second component",
+          "PkgIdentifier": { "PURL": "pkg:deb/debian/libssl3@3.0.11" }
+        }
+      ]
+    }
+  ]
+}
