@@ -177,7 +177,7 @@ func (g *Generator) generateRiskScore(ctx context.Context, vulnBatch []Vulnerabi
 	}
 
 	// Call LLM to calculate OWASP scores for each vulnerability
-	scores, err := g.evaluateOWASPScores(ctx, llmBatch)
+	scores, evidenceRef, err := g.evaluateOWASPScores(ctx, llmBatch)
 	if err != nil {
 		return fmt.Errorf("LLM evaluation failed: %w", err)
 	}
@@ -241,6 +241,20 @@ func (g *Generator) generateRiskScore(ctx context.Context, vulnBatch []Vulnerabi
 			},
 			Source: source,
 		})
+
+		if g.attestor != nil {
+			v := vulnMap[entry.VulnID]
+			g.attestor.AddClaim(evidenceRef, attestation.ClaimInput{
+				VulnID:      entry.VulnID,
+				CompRef:     v.BOMRef,
+				CompName:    v.PkgName,
+				CompVersion: v.InstalledVersion,
+				PURL:        v.BOMRef,
+				Score:       score,
+				Severity:    severity,
+				Reasoning:   entry.Reasoning,
+			})
+		}
 	}
 
 	if len(group) == 0 {
@@ -254,9 +268,9 @@ func (g *Generator) generateRiskScore(ctx context.Context, vulnBatch []Vulnerabi
 
 // evaluateOWASPScores calls the LLM to calculate the OWASP risk score for each vulnerability.
 // The LLM uses the project context hints to determine the appropriate score.
-func (g *Generator) evaluateOWASPScores(ctx context.Context, vulns []LLMVulnerability) ([]llmOutputEntry, error) {
+func (g *Generator) evaluateOWASPScores(ctx context.Context, vulns []LLMVulnerability) ([]llmOutputEntry, string, error) {
 	if g.o.LLM == nil {
-		return nil, errors.New("no LLM configured")
+		return nil, "", errors.New("no LLM configured")
 	}
 
 	var buf bytes.Buffer
@@ -284,7 +298,7 @@ func (g *Generator) evaluateOWASPScores(ctx context.Context, vulns []LLMVulnerab
 	schema := g.buildOutputSchema()
 	schemaJ, err := schema.MarshalJSON()
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	systemPrompt += "#### Output format: JSON Schema\n"
@@ -299,7 +313,7 @@ func (g *Generator) evaluateOWASPScores(ctx context.Context, vulns []LLMVulnerab
 	// Build human prompt with vulnerabilities
 	vulnsJSON, err := json.Marshal(vulns)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal vulnerabilities: %w", err)
+		return nil, "", fmt.Errorf("failed to marshal vulnerabilities: %w", err)
 	}
 	humanPrompt := string(vulnsJSON)
 
@@ -324,17 +338,18 @@ func (g *Generator) evaluateOWASPScores(ctx context.Context, vulns []LLMVulnerab
 		_, err := g.o.LLM.GenerateContent(c, msgs, callOpts...)
 		return err
 	}); err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
+	var evidenceRef string
 	if g.attestor != nil {
-		g.attestor.AddBatch(systemPrompt, humanPrompt, buf.Bytes())
+		evidenceRef = g.attestor.AddBatch(systemPrompt, humanPrompt, buf.Bytes())
 	}
 
 	// Parse LLM response
 	var resp llmOutput
 	if err := json.Unmarshal(buf.Bytes(), &resp); err != nil {
-		return nil, fmt.Errorf("unable to parse LLM output: %w: %q", err, buf.String())
+		return nil, "", fmt.Errorf("unable to parse LLM output: %w: %q", err, buf.String())
 	}
 
 	// Calculate final OWASP scores in Go for mathematical accuracy
@@ -358,7 +373,7 @@ func (g *Generator) evaluateOWASPScores(ctx context.Context, vulns []LLMVulnerab
 		)
 	}
 
-	return resp.Results, nil
+	return resp.Results, evidenceRef, nil
 }
 
 // buildSystemPrompt creates the system prompt for OWASP score calculation.
