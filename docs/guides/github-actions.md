@@ -44,25 +44,7 @@ The `llm-api-key` is passed as an environment variable (never a CLI argument) an
 
 ## Attestation
 
-Set `attest: "true"` to also emit a [CycloneDX Attestations (CDXA)](https://cyclonedx.org/capabilities/attestations/) file next to the VEX, recording how each CVE was scored (model, seed, prompt/input/config hashes, raw LLM response) for audit and reproduction. Its path is exposed as the `attestation-file` output:
-
-```yaml
-- name: Prioritize with vens
-  id: vens
-  uses: venslabs/vens-action@v0.2.0
-  with:
-    # ...usual inputs...
-    attest: "true"
-
-- uses: actions/upload-artifact@v4
-  with:
-    name: vens-output
-    path: |
-      ${{ steps.vens.outputs.vex-file }}
-      ${{ steps.vens.outputs.attestation-file }}
-```
-
-The attestation is evidence (hashes plus the raw response), not a cryptographic signature, and it spells out the model's reasoning in clear text, so keep it access-controlled rather than in a public artifact. Requires vens-action v0.2.0 or later.
+Set `attest: "true"` to also emit a [CycloneDX attestation](https://cyclonedx.org/capabilities/attestations/) next to the VEX, recording how each CVE was scored (model, seed, prompt/input/config hashes, raw response) for audit and reproduction. Add the `attestation-file` output to your `upload-artifact` paths to keep it. It is evidence, not a cryptographic signature, and includes the model's reasoning in clear text, so keep it access-controlled. Requires vens-action v0.2.0.
 
 ## Using the mock provider in CI
 
