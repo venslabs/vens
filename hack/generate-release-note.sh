@@ -36,8 +36,8 @@ A GitHub build-provenance attestation is also published; see the docs for verifi
 export OPENAI_API_KEY="your-key"
 vens generate \\
   --config-file config.yaml \\
-  --sboms sbom.cdx.json \\
-  trivy.json \\
-  output_vex.json
+  --sbom-serial-number "urn:uuid:..." \\
+  report.json \\
+  output.vex.json
 \`\`\`
 EOX
