@@ -28,11 +28,13 @@ import (
 )
 
 // truncatingLLM returns llm.ErrTruncated whenever a batch carries more than
-// maxPerCall vulnerabilities; smaller batches score normally. maxOK records the
-// largest batch that was actually scored, so a test can assert the batch shrank.
+// maxPerCall vulnerabilities; smaller batches score normally. It records how it
+// was called so a test can assert the batch was actually split.
 type truncatingLLM struct {
-	maxPerCall int
-	maxOK      int
+	maxPerCall  int
+	calls       int // successful (non-truncated) scoring calls
+	truncations int
+	maxSeen     int // largest batch it was asked to score, truncated or not
 }
 
 func (m *truncatingLLM) Generate(_ context.Context, req llm.Request) (string, error) {
@@ -42,12 +44,14 @@ func (m *truncatingLLM) Generate(_ context.Context, req llm.Request) (string, er
 	if err := json.Unmarshal([]byte(req.Human), &in); err != nil {
 		return "", err
 	}
+	if len(in) > m.maxSeen {
+		m.maxSeen = len(in)
+	}
 	if len(in) > m.maxPerCall {
+		m.truncations++
 		return "", fmt.Errorf("mock truncated: %w", llm.ErrTruncated)
 	}
-	if len(in) > m.maxOK {
-		m.maxOK = len(in)
-	}
+	m.calls++
 
 	out := llmOutput{Results: make([]llmOutputEntry, 0, len(in))}
 	for _, v := range in {
@@ -64,26 +68,36 @@ func (m *truncatingLLM) Generate(_ context.Context, req llm.Request) (string, er
 	return string(b), err
 }
 
-// An oversized batch that the provider truncates is halved and retried until it
-// fits, and every CVE still gets scored.
+// An oversized batch that the provider truncates is split and retried until it
+// fits; every CVE is scored exactly once (no gaps, no duplicate emission).
 func TestGenerator_AutoSplitsOnTruncation(t *testing.T) {
 	m := &truncatingLLM{maxPerCall: 3}
 	g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 10})
 	require.NoError(t, err)
 
-	scored := map[string]bool{}
+	// Collect into a slice (not a set) so a duplicate emission is visible.
+	var emitted []outputhandler.VulnRating
 	h := func(group []outputhandler.VulnRating) error {
-		for _, r := range group {
-			scored[r.VulnID] = true
-		}
+		emitted = append(emitted, group...)
 		return nil
 	}
 
 	require.NoError(t, g.GenerateRiskScore(context.Background(), testVulns(10), h))
 
-	require.Len(t, scored, 10, "every CVE must be scored after splitting")
-	require.LessOrEqual(t, m.maxOK, m.maxPerCall, "successful batches must fit the provider limit")
-	require.Greater(t, m.maxOK, 0)
+	counts := map[string]int{}
+	for _, r := range emitted {
+		counts[r.VulnID]++
+	}
+	require.Len(t, emitted, 10, "expected exactly 10 ratings")
+	require.Len(t, counts, 10, "every CVE must be scored")
+	for id, n := range counts {
+		require.Equalf(t, 1, n, "CVE %s emitted %d times", id, n)
+	}
+
+	// The split path was actually exercised, not a lucky single call.
+	require.Equal(t, 10, m.maxSeen, "the full 10-CVE batch must be attempted first")
+	require.Greater(t, m.truncations, 0, "a truncation must trigger the split")
+	require.Greater(t, m.calls, 1, "the batch must be scored across several sub-batches")
 }
 
 // When even a single CVE truncates, the run surfaces the error instead of
