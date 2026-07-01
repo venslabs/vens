@@ -18,10 +18,11 @@ package testutil
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"regexp"
 	"strconv"
 
-	"github.com/tmc/langchaingo/llms"
+	"github.com/venslabs/vens/pkg/llm"
 )
 
 type MockLLM struct{}
@@ -43,16 +44,12 @@ type llmOutput struct {
 	Results []llmOutputEntry `json:"results"`
 }
 
-func (m *MockLLM) GenerateContent(ctx context.Context, messages []llms.MessageContent, options ...llms.CallOption) (*llms.ContentResponse, error) {
-	var vulnIDs []string
-	for _, msg := range messages {
-		if msg.Role == llms.ChatMessageTypeHuman {
-			for _, part := range msg.Parts {
-				if textPart, ok := part.(llms.TextContent); ok {
-					vulnIDs = extractVulnIDs(textPart.Text)
-				}
-			}
-		}
+// Generate returns deterministic scores for every vulnId found in the human
+// prompt, so integration tests stay reproducible without a real provider.
+func (m *MockLLM) Generate(ctx context.Context, req llm.Request) (string, error) {
+	vulnIDs, err := extractVulnIDs(req.Human)
+	if err != nil {
+		return "", err
 	}
 
 	results := make([]llmOutputEntry, 0, len(vulnIDs))
@@ -68,55 +65,31 @@ func (m *MockLLM) GenerateContent(ctx context.Context, messages []llms.MessageCo
 		})
 	}
 
-	output := llmOutput{Results: results}
-	jsonBytes, err := json.Marshal(output)
-	if err != nil {
-		return nil, err
-	}
-
-	opts := llms.CallOptions{}
-	for _, opt := range options {
-		opt(&opts)
-	}
-	if opts.StreamingFunc != nil {
-		if err := opts.StreamingFunc(ctx, jsonBytes); err != nil {
-			return nil, err
-		}
-	}
-
-	return &llms.ContentResponse{
-		Choices: []*llms.ContentChoice{
-			{
-				Content: string(jsonBytes),
-			},
-		},
-	}, nil
-}
-
-func (m *MockLLM) Call(ctx context.Context, prompt string, options ...llms.CallOption) (string, error) {
-	resp, err := m.GenerateContent(ctx, []llms.MessageContent{
-		llms.TextParts(llms.ChatMessageTypeHuman, prompt),
-	}, options...)
+	jsonBytes, err := json.Marshal(llmOutput{Results: results})
 	if err != nil {
 		return "", err
 	}
-	if len(resp.Choices) == 0 {
-		return "", nil
-	}
-	return resp.Choices[0].Content, nil
+	return string(jsonBytes), nil
 }
 
-var vulnIDRegex = regexp.MustCompile(`"vulnId"\s*:\s*"([^"]+)"`)
+var numRegex = regexp.MustCompile(`\d+`)
 
-func extractVulnIDs(text string) []string {
-	matches := vulnIDRegex.FindAllStringSubmatch(text, -1)
-	ids := make([]string, 0, len(matches))
-	for _, match := range matches {
-		if len(match) > 1 {
-			ids = append(ids, match[1])
+// extractVulnIDs reads each vulnId from the human prompt. Decoding the JSON
+// keeps the mock independent of the prompt's exact text layout.
+func extractVulnIDs(human string) ([]string, error) {
+	var vulns []struct {
+		VulnID string `json:"vulnId"`
+	}
+	if err := json.Unmarshal([]byte(human), &vulns); err != nil {
+		return nil, fmt.Errorf("mockllm: decode human prompt: %w", err)
+	}
+	ids := make([]string, 0, len(vulns))
+	for _, v := range vulns {
+		if v.VulnID != "" {
+			ids = append(ids, v.VulnID)
 		}
 	}
-	return ids
+	return ids, nil
 }
 
 func deterministicScores(vulnID string) [4]float64 {
@@ -125,7 +98,6 @@ func deterministicScores(vulnID string) [4]float64 {
 		hash = hash*31 + int(c)
 	}
 
-	numRegex := regexp.MustCompile(`\d+`)
 	nums := numRegex.FindAllString(vulnID, -1)
 	if len(nums) > 0 {
 		if n, err := strconv.Atoi(nums[len(nums)-1]); err == nil {

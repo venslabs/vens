@@ -21,9 +21,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/tmc/langchaingo/llms"
 	"github.com/venslabs/vens/internal/testutil"
 	"github.com/venslabs/vens/pkg/attestation"
+	"github.com/venslabs/vens/pkg/llm"
 	"github.com/venslabs/vens/pkg/riskconfig"
 )
 
@@ -48,11 +48,7 @@ func TestGenerator_Attestor_OneBatchPerLLMCall(t *testing.T) {
 
 type failingLLM struct{}
 
-func (failingLLM) GenerateContent(context.Context, []llms.MessageContent, ...llms.CallOption) (*llms.ContentResponse, error) {
-	return nil, errors.New("llm down")
-}
-
-func (failingLLM) Call(context.Context, string, ...llms.CallOption) (string, error) {
+func (failingLLM) Generate(context.Context, llm.Request) (string, error) {
 	return "", errors.New("llm down")
 }
 

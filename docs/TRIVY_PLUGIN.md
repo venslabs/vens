@@ -76,9 +76,9 @@ context:
 | Provider | Environment Variable | Example |
 |----------|---------------------|---------|
 | OpenAI (recommended) | `OPENAI_API_KEY` | `export OPENAI_MODEL="gpt-4o"` |
-| Anthropic | `ANTHROPIC_API_KEY` | `export ANTHROPIC_MODEL="claude-3-5-sonnet-20241022"` |
+| Anthropic | `ANTHROPIC_API_KEY` | `export ANTHROPIC_MODEL="claude-sonnet-4-5"` |
 | Ollama (local) | `OLLAMA_MODEL` | `export OLLAMA_MODEL="llama3"` |
-| Google AI | `GOOGLE_API_KEY` | `export GOOGLE_MODEL="gemini-pro"` |
+| Google AI | `GOOGLE_API_KEY` | `export GOOGLE_MODEL="gemini-2.5-flash"` |
 
 **Using Ollama:**
 

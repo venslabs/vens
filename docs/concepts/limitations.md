@@ -73,7 +73,7 @@ Vens itself is an MIT-ish Apache 2.0 Go binary — it holds no data and signs no
 
 ## 7. Score quality drops on models below ~7B parameters
 
-Vens asks the LLM to return structured JSON with four component scores per CVE. Small local models (under 7B parameters) frequently emit malformed JSON or produce flat, uniform scores regardless of input. `llama3.1:70b` and larger cloud models (gpt-4o, claude-sonnet-4-5, gemini-2.0-flash) are the sweet spot; lighter models are usable with `--llm-batch-size 3–5` but with lower quality.
+Vens asks the LLM to return structured JSON with four component scores per CVE. Small local models (under 7B parameters) frequently emit malformed JSON or produce flat, uniform scores regardless of input. `llama3.1:70b` and larger cloud models (gpt-4o, claude-sonnet-4-5, gemini-2.5-flash) are the sweet spot; lighter models are usable with `--llm-batch-size 3–5` but with lower quality.
 
 This is a fundamental constraint of today's open-weight model landscape — if you need air-gapped + high quality, plan for a beefy GPU box.
 
@@ -96,12 +96,6 @@ For true reachability signals, chain a dedicated tool (Semgrep Code, Snyk Reacha
 ## 10. Pre-1.0 — API surface may change
 
 Vens is under active development and has not reached a 1.0 release yet. The CLI flags and `config.yaml` schema may evolve between minor versions. Pin a specific version in CI (`go install github.com/venslabs/vens/cmd/vens@vX.Y.Z`) and read the release notes before upgrading.
-
----
-
-## 11. Forked dependency: `langchaingo`
-
-Vens uses a [fork of `langchaingo`](https://github.com/AkihiroSuda/langchaingo) (originally by [AkihiroSuda/vexllm](https://github.com/AkihiroSuda/vexllm), the project that inspired Vens). The fork patches LLM provider handling for structured JSON output. This is declared in `go.mod` via a `replace` directive. The fork is pinned to a specific commit and is auditable, but it means Vens does not track upstream `langchaingo` releases directly. If this is a concern for your supply-chain policy, review the fork diff before adoption.
 
 ---
 

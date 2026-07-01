@@ -361,25 +361,45 @@ func TestPromptAuditRequirementConditional(t *testing.T) {
 	})
 }
 
+// schemaDoc mirrors the JSON Schema produced by buildOutputSchema, enough to
+// assert on its shape in tests.
+type schemaDoc struct {
+	Type       string `json:"type"`
+	Properties struct {
+		Results struct {
+			Type  string `json:"type"`
+			Items struct {
+				Properties map[string]struct {
+					Type        string `json:"type"`
+					Description string `json:"description"`
+				} `json:"properties"`
+				Required []string `json:"required"`
+			} `json:"items"`
+		} `json:"results"`
+	} `json:"properties"`
+	Required []string `json:"required"`
+}
+
+func parseOutputSchema(t *testing.T, raw json.RawMessage) schemaDoc {
+	t.Helper()
+	var doc schemaDoc
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		t.Fatalf("buildOutputSchema returned invalid JSON: %v", err)
+	}
+	return doc
+}
+
 func TestOutputSchemaRequired(t *testing.T) {
 	g := newTestGenerator(t, minimalConfig())
-	schema := g.buildOutputSchema()
+	doc := parseOutputSchema(t, g.buildOutputSchema())
 
-	if schema.Type != "object" {
-		t.Errorf("Schema type should be 'object', got %q", schema.Type)
+	if doc.Type != "object" {
+		t.Errorf("Schema type should be 'object', got %q", doc.Type)
 	}
 
-	results, ok := schema.Properties["results"]
-	if !ok {
-		t.Fatal("Schema missing 'results' property")
-	}
-
+	results := doc.Properties.Results
 	if results.Type != "array" {
 		t.Errorf("Results type should be 'array', got %q", results.Type)
-	}
-
-	if results.Items == nil {
-		t.Fatal("Results.Items should not be nil")
 	}
 
 	requiredFields := []string{
@@ -413,10 +433,9 @@ func TestOutputSchemaRequired(t *testing.T) {
 
 func TestOutputSchemaScoreDescriptions(t *testing.T) {
 	g := newTestGenerator(t, minimalConfig())
-	schema := g.buildOutputSchema()
+	doc := parseOutputSchema(t, g.buildOutputSchema())
 
-	results := schema.Properties["results"]
-	props := results.Items.Properties
+	props := doc.Properties.Results.Items.Properties
 
 	scoreFields := map[string]string{
 		"threat_agent_score":  "0-9",
@@ -478,12 +497,11 @@ func TestOutputExample(t *testing.T) {
 
 func TestExampleSchemaConsistency(t *testing.T) {
 	g := newTestGenerator(t, minimalConfig())
-	schema := g.buildOutputSchema()
+	doc := parseOutputSchema(t, g.buildOutputSchema())
 	example := g.buildOutputExample()
 
-	results := schema.Properties["results"]
 	schemaFields := make([]string, 0)
-	for field := range results.Items.Properties {
+	for field := range doc.Properties.Results.Items.Properties {
 		schemaFields = append(schemaFields, field)
 	}
 

@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// This implementation is adapted from github.com/AkihiroSuda/vexllm/pkg/llm/llmfactory
-
 package llmfactory
 
 import (
@@ -21,45 +19,39 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/tmc/langchaingo/llms"
-	"github.com/tmc/langchaingo/llms/anthropic"
-	"github.com/tmc/langchaingo/llms/googleai"
-	"github.com/tmc/langchaingo/llms/ollama"
-	"github.com/tmc/langchaingo/llms/openai"
 	"github.com/venslabs/vens/internal/testutil"
 	"github.com/venslabs/vens/pkg/llm"
+	anthropicprov "github.com/venslabs/vens/pkg/llm/providers/anthropic"
+	googleprov "github.com/venslabs/vens/pkg/llm/providers/google"
+	ollamaprov "github.com/venslabs/vens/pkg/llm/providers/ollama"
+	openaiprov "github.com/venslabs/vens/pkg/llm/providers/openai"
 )
 
 // New instantiates an LLM client and returns the resolved provider and model,
 // so callers can record what ran without resolving twice.
-func New(ctx context.Context, name string) (client llms.Model, provider, model string, err error) {
-	if name == "" || name == llm.Auto {
-		// TODO: add more sophisticated logic
-		slog.DebugContext(ctx, "Automatically choosing model", "name", llm.OpenAI)
-	}
+func New(ctx context.Context, name string) (client llm.Client, provider, model string, err error) {
 	var defaulted bool
 	provider, model, defaulted = llm.ResolveModel(name)
 	if provider == llm.Mock {
 		slog.DebugContext(ctx, "Using mock LLM for testing")
-		client = testutil.NewMockLLM()
-		return
+		return testutil.NewMockLLM(), provider, model, nil
 	}
 	if defaulted && model != "" {
 		slog.WarnContext(ctx, "no model env var set; using the provider default", "provider", provider, "model", model)
 	}
 	switch provider {
 	case llm.OpenAI:
-		client, err = openai.New(openai.WithModel(model))
+		client, err = openaiprov.New(model)
 	case llm.Ollama:
 		if model == "" {
 			err = fmt.Errorf("ollama: set the OLLAMA_MODEL environment variable")
 			return
 		}
-		client, err = ollama.New(ollama.WithModel(model))
+		client, err = ollamaprov.New(model)
 	case llm.Anthropic:
-		client, err = anthropic.New(anthropic.WithModel(model))
+		client, err = anthropicprov.New(model)
 	case llm.GoogleAI:
-		client, err = googleai.New(ctx, googleai.WithDefaultModel(model))
+		client, err = googleprov.New(ctx, model)
 	default:
 		err = fmt.Errorf("unknown LLM %q, make sure to use one of %v", name, llm.Names)
 	}
