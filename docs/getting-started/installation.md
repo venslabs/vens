@@ -177,7 +177,7 @@ Vens asks the LLM to return structured JSON with four 0–9 component scores per
     export OPENAI_MODEL="gpt-4o"
     ```
 
-    Among the cloud providers, only OpenAI currently accepts the `seed` parameter Vens forwards (`--llm-seed`); Anthropic and Google AI silently ignore it. This does not guarantee byte-identical scores across runs — see [Reference: `--llm-seed`](../reference/generate.md#--llm-seed-int) and [Limitations](../concepts/limitations.md).
+    Among the cloud providers, OpenAI and Google AI accept the `seed` parameter Vens forwards (`--llm-seed`); Anthropic has no seed parameter and silently ignores it. This does not guarantee byte-identical scores across runs — see [Reference: `--llm-seed`](../reference/generate.md#--llm-seed-int) and [Limitations](../concepts/limitations.md).
 
 === "Anthropic"
 
@@ -190,7 +190,7 @@ Vens asks the LLM to return structured JSON with four 0–9 component scores per
 
     ```bash
     export GOOGLE_API_KEY="..."
-    export GOOGLE_MODEL="gemini-2.0-flash"
+    export GOOGLE_MODEL="gemini-2.5-flash"
     ```
 
 Auto-detection currently defaults to **OpenAI**. If you use a different provider, pass the `--llm` flag explicitly:

@@ -16,12 +16,18 @@ package llm
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
 	"strings"
 	"time"
 )
+
+// ErrTruncated reports that the model stopped at its output-token limit, leaving
+// the structured JSON incomplete. Providers wrap it so the generator can halve
+// the batch and retry instead of failing the whole run.
+var ErrTruncated = errors.New("llm: response truncated at max output tokens")
 
 // Supported LLM backends and selection helpers
 const (
@@ -51,35 +57,34 @@ func RetryOnRateLimit(ctx context.Context, interval time.Duration, maxRetry int,
 	return fmt.Errorf("still hitting rate limit, after retrying %d times in %v: %w", maxRetry, elapsed, err)
 }
 
-// IsRateLimit returns true if the error looks like a provider or HTTP rate limit.
-// TODO: Maybe add a check to langchaingo upstream so everyone can benefit from this mechanism.
+// isRateLimit reports whether err looks like a provider or HTTP rate limit.
 func isRateLimit(err error) bool {
 	if err == nil {
 		return false
 	}
 
 	msg := strings.ToLower(err.Error())
-
-	if strings.Contains(msg, "status code: 429") || strings.Contains(msg, "Error 429:") {
-		return true
+	if !strings.Contains(msg, "429") {
+		return false
 	}
 
-	// Heuristic: if it mentions 429 anywhere together with "rate",
-	// consider it a rate limit.
-	if strings.Contains(msg, "429") && (strings.Contains(msg, "rate")) {
-		return true
-	}
-
-	return false
+	// A 429 from any provider is a rate/quota limit, but the wording differs:
+	// OpenAI/Anthropic say "rate limit"/"too many requests", Gemini reports
+	// "resource_exhausted"/quota.
+	return strings.Contains(msg, "rate") ||
+		strings.Contains(msg, "quota") ||
+		strings.Contains(msg, "exhausted") ||
+		strings.Contains(msg, "too many")
 }
 
-// defaultModels mirror each provider's own default, used when *_MODEL is unset.
+// defaultModels are used when *_MODEL is unset. They must support native
+// structured output (json_schema), since vens enforces a schema on every call.
 // vens sets the model explicitly so it can record and log which one ran.
 // Ollama has no default.
 var defaultModels = map[string]string{
-	OpenAI:    "gpt-3.5-turbo",
-	Anthropic: "claude-3-5-sonnet-20240620",
-	GoogleAI:  "gemini-pro",
+	OpenAI:    "gpt-4o",
+	Anthropic: "claude-sonnet-4-5",
+	GoogleAI:  "gemini-2.5-flash",
 	Mock:      "mock",
 }
 

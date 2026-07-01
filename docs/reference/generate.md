@@ -62,7 +62,7 @@ Force a specific LLM provider. Default: `auto` (detected from exported environme
 | `auto` | First detected | — |
 | `openai` | OpenAI | `OPENAI_API_KEY`, `OPENAI_MODEL` |
 | `anthropic` | Anthropic Claude | `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` |
-| `googleai` | Google AI (Gemini) | `GOOGLE_API_KEY`, `GOOGLE_MODEL` |
+| `googleai` | Google AI (Gemini) | `GOOGLE_API_KEY` (or `GEMINI_API_KEY`), `GOOGLE_MODEL` |
 | `ollama` | Ollama (local) | `OLLAMA_MODEL` |
 
 ```bash
@@ -86,7 +86,7 @@ LLM sampling temperature. Default: `0.0` — keeps sampling as close to greedy a
 
 ### `--llm-seed <int>`
 
-Seed forwarded to the LLM when the provider supports it. Default: `0` (no explicit seed sent). Today, OpenAI exposes a `seed` parameter; Anthropic and Google AI do not. On providers without seed support, this flag is silently ignored.
+Seed forwarded to the LLM when the provider supports it. Default: `0` (no explicit seed sent). OpenAI, Google AI and Ollama accept a `seed` parameter; Anthropic has none, so on Anthropic this flag is silently ignored.
 
 !!! warning "Reproducibility is best-effort, not a guarantee"
     Even at `--llm-temperature 0.0` with a fixed `--llm-seed`, **byte-identical scores across runs are not guaranteed**. Cloud LLM providers periodically update server-side models without changing the API model name, and most of them do not expose true deterministic decoding. What Vens does do is:
@@ -214,7 +214,8 @@ BOM-Link `version` number used alongside `--sbom-serial-number`. Default: `1`.
 | `ANTHROPIC_API_KEY` | Anthropic credentials |
 | `ANTHROPIC_MODEL` | Anthropic model name (e.g. `claude-sonnet-4-5`) |
 | `GOOGLE_API_KEY` | Google AI credentials |
-| `GOOGLE_MODEL` | Google AI model name (e.g. `gemini-2.0-flash`) |
+| `GEMINI_API_KEY` | Google AI credentials (fallback used when `GOOGLE_API_KEY` is unset) |
+| `GOOGLE_MODEL` | Google AI model name (e.g. `gemini-2.5-flash`) |
 | `OLLAMA_MODEL` | Ollama model name (e.g. `llama3.1`) |
 
 ---

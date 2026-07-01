@@ -59,7 +59,7 @@ The LLM calculates the OWASP risk score (0-81) for each vulnerability using:
 
 	flags := cmd.Flags()
 	flags.String("llm", llm.Auto, fmt.Sprintf("LLM backend (%v)", llm.Names))
-	flags.Float64("llm-temperature", 0.0, "Temperature (0.0 means no explicit temperature)")
+	flags.Float64("llm-temperature", 0.0, "Temperature, forwarded to every provider (0.0 = deterministic)")
 	flags.Int("llm-batch-size", generator.DefaultBatchSize, "LLM batch size")
 	flags.Int("llm-seed", 0, "Seed (0 means no explicit seed)")
 	flags.String("config-file", "", "Path to config.yaml file with OWASP factors")

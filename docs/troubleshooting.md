@@ -56,7 +56,7 @@ No LLM provider environment variable is set. Export one of:
 ```bash
 export OPENAI_API_KEY=sk-...    OPENAI_MODEL=gpt-4o
 export ANTHROPIC_API_KEY=...    ANTHROPIC_MODEL=claude-sonnet-4-5
-export GOOGLE_API_KEY=...       GOOGLE_MODEL=gemini-2.0-flash
+export GOOGLE_API_KEY=...       GOOGLE_MODEL=gemini-2.5-flash
 export OLLAMA_MODEL=llama3.1    # with a local Ollama running
 ```
 

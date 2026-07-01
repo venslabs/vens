@@ -17,7 +17,6 @@
 package generator
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -28,8 +27,6 @@ import (
 	"time"
 
 	"github.com/CycloneDX/cyclonedx-go"
-	"github.com/tmc/langchaingo/jsonschema"
-	"github.com/tmc/langchaingo/llms"
 	"github.com/venslabs/vens/pkg/attestation"
 	"github.com/venslabs/vens/pkg/llm"
 	"github.com/venslabs/vens/pkg/outputhandler"
@@ -92,7 +89,7 @@ type llmOutput struct {
 
 // Opts configures the Generator.
 type Opts struct {
-	LLM         llms.Model
+	LLM         llm.Client
 	Temperature float64
 	BatchSize   int // Avoid high values to avoid rate limit
 	Seed        int
@@ -145,12 +142,33 @@ func (g *Generator) SetAttestor(b *attestation.Builder) { g.attestor = b }
 // It uses the LLM to calculate the OWASP risk score for each vulnerability based on
 // the project context hints provided in config.yaml.
 func (g *Generator) GenerateRiskScore(ctx context.Context, vulns []Vulnerability, h func([]outputhandler.VulnRating) error) error {
-	batchSize := g.o.BatchSize
+	return g.scoreInBatches(ctx, vulns, g.o.BatchSize, h)
+}
+
+// scoreInBatches scores vulns batchSize at a time. If a provider truncates a
+// batch at its output-token limit (llm.ErrTruncated), that batch is split in
+// half and retried; the split repeats on each further truncation, down to a
+// single CVE. Only a lone CVE that still truncates fails the run.
+func (g *Generator) scoreInBatches(ctx context.Context, vulns []Vulnerability, batchSize int, h func([]outputhandler.VulnRating) error) error {
+	if batchSize < 1 {
+		batchSize = 1
+	}
 	for i := 0; i < len(vulns); i += batchSize {
 		batch := vulns[i:min(i+batchSize, len(vulns))]
-		if err := g.generateRiskScore(ctx, batch, h); err != nil {
-			return err
+		err := g.generateRiskScore(ctx, batch, h)
+		if err == nil {
+			continue
 		}
+		if errors.Is(err, llm.ErrTruncated) && len(batch) > 1 {
+			half := (len(batch) + 1) / 2
+			slog.WarnContext(ctx, "LLM truncated the batch; retrying with smaller batches",
+				"from", len(batch), "to", half)
+			if err := g.scoreInBatches(ctx, batch, half, h); err != nil {
+				return err
+			}
+			continue
+		}
+		return err
 	}
 	return nil
 }
@@ -178,13 +196,11 @@ func (g *Generator) generateRiskScore(ctx context.Context, vulnBatch []Vulnerabi
 		}
 	}
 
-	// Call LLM to calculate OWASP scores for each vulnerability
 	scores, evidenceRef, err := g.evaluateOWASPScores(ctx, llmBatch)
 	if err != nil {
 		return fmt.Errorf("LLM evaluation failed: %w", err)
 	}
 
-	// Build VulnRating group using Go-calculated scores.
 	group := make([]outputhandler.VulnRating, 0, len(vulnBatch))
 	scored := make(map[string]bool)
 	for _, entry := range scores {
@@ -279,56 +295,22 @@ func (g *Generator) evaluateOWASPScores(ctx context.Context, vulns []LLMVulnerab
 		return nil, "", errors.New("no LLM configured")
 	}
 
-	var buf bytes.Buffer
-	callOpts := []llms.CallOption{
-		llms.WithJSONMode(),
-		llms.WithStreamingFunc(func(ctx context.Context, chunk []byte) error {
-			buf.Write(chunk)
-			return nil
-		}),
-	}
-
-	if g.o.Temperature > 0.0 {
-		slog.Debug("Using temperature", "temperature", g.o.Temperature)
-		callOpts = append(callOpts, llms.WithTemperature(g.o.Temperature))
-	}
-	if g.o.Seed != 0 {
-		slog.Debug("Using seed", "seed", g.o.Seed)
-		callOpts = append(callOpts, llms.WithSeed(g.o.Seed))
-	}
-
-	// Build system prompt with context hints
 	systemPrompt := g.buildSystemPrompt()
 
-	// Build JSON schema for structured output
+	// Build the JSON schema for structured output and embed it in the prompt so
+	// the contract is self-documented even for weaker models.
 	schema := g.buildOutputSchema()
-	schemaJ, err := schema.MarshalJSON()
-	if err != nil {
-		return nil, "", err
-	}
-
 	systemPrompt += "#### Output format: JSON Schema\n"
-	systemPrompt += string(schemaJ) + "\n"
+	systemPrompt += string(schema) + "\n"
 	systemPrompt += "#### Output Example\n"
 	systemPrompt += "```json\n" + g.buildOutputExample() + "\n```\n"
 
-	// Only ollama and openai supports WithJSONSchema
-	// Reference: https://github.com/tmc/langchaingo/pull/1302
-	callOpts = append(callOpts, llms.WithJSONSchema(schema))
-
-	// Build human prompt with vulnerabilities
 	vulnsJSON, err := json.Marshal(vulns)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to marshal vulnerabilities: %w", err)
 	}
 	humanPrompt := string(vulnsJSON)
 
-	msgs := []llms.MessageContent{
-		llms.TextParts(llms.ChatMessageTypeSystem, systemPrompt),
-		llms.TextParts(llms.ChatMessageTypeHuman, humanPrompt),
-	}
-
-	// Debug: save prompts if debug directory is configured
 	if g.o.DebugDir != "" {
 		if err := os.WriteFile(filepath.Join(g.o.DebugDir, "system.prompt"), []byte(systemPrompt), 0644); err != nil {
 			slog.ErrorContext(ctx, "failed to write system.prompt", "error", err)
@@ -338,37 +320,41 @@ func (g *Generator) evaluateOWASPScores(ctx context.Context, vulns []LLMVulnerab
 		}
 	}
 
-	// Call LLM with retry on rate limit
+	req := llm.Request{
+		System:      systemPrompt,
+		Human:       humanPrompt,
+		Schema:      schema,
+		Temperature: g.o.Temperature,
+		Seed:        g.o.Seed,
+	}
+
+	var raw string
 	if err := llm.RetryOnRateLimit(ctx, g.o.SleepOnRateLimit, g.o.RetryOnRateLimit, func(c context.Context) error {
-		buf.Reset()
-		_, err := g.o.LLM.GenerateContent(c, msgs, callOpts...)
-		return err
+		var e error
+		raw, e = g.o.LLM.Generate(c, req)
+		return e
 	}); err != nil {
 		return nil, "", err
 	}
 
 	var evidenceRef string
 	if g.attestor != nil {
-		evidenceRef = g.attestor.AddBatch(systemPrompt, humanPrompt, buf.Bytes())
+		evidenceRef = g.attestor.AddBatch(systemPrompt, humanPrompt, []byte(raw))
 	}
 
-	// Parse LLM response
 	var resp llmOutput
-	if err := json.Unmarshal(buf.Bytes(), &resp); err != nil {
-		return nil, "", fmt.Errorf("unable to parse LLM output: %w: %q", err, buf.String())
+	if err := json.Unmarshal([]byte(raw), &resp); err != nil {
+		return nil, "", fmt.Errorf("unable to parse LLM output: %w: %q", err, raw)
 	}
 
-	// Calculate final OWASP scores in Go for mathematical accuracy
 	for i := range resp.Results {
 		entry := &resp.Results[i]
 
-		// Validate and clamp component scores to 0-9 range
 		entry.ThreatAgentScore = clampScore09(entry.ThreatAgentScore)
 		entry.VulnerabilityScore = clampScore09(entry.VulnerabilityScore)
 		entry.TechnicalImpact = clampScore09(entry.TechnicalImpact)
 		entry.BusinessImpact = clampScore09(entry.BusinessImpact)
 
-		// Log component scores for debugging
 		slog.DebugContext(ctx, "owasp_components",
 			"vuln", entry.VulnID,
 			"threat_agent", entry.ThreatAgentScore,
@@ -454,57 +440,37 @@ OUTPUT: 4 scores (0-9) + brief reasoning for THIS specific vulnerability in THIS
 	return prompt
 }
 
-// buildOutputSchema creates the JSON schema for the LLM output.
-// The LLM must rate each of the 4 OWASP factors separately (0-9 scale).
-// The final score calculation is done in Go code for accuracy.
-func (g *Generator) buildOutputSchema() *jsonschema.Definition {
-	return &jsonschema.Definition{
-		Type: jsonschema.Object,
-		Properties: map[string]jsonschema.Definition{
-			"results": {
-				Type: jsonschema.Array,
-				Items: &jsonschema.Definition{
-					Type: jsonschema.Object,
-					Properties: map[string]jsonschema.Definition{
-						"vulnId": {
-							Type:        jsonschema.String,
-							Description: "The vulnerability ID from the input (e.g., CVE-2024-1234)",
-						},
-						"threat_agent_score": {
-							Type:        jsonschema.Number,
-							Description: "Threat Agent score (0-9): skill level, motive, opportunity, size",
-						},
-						"vulnerability_score": {
-							Type:        jsonschema.Number,
-							Description: "Vulnerability score (0-9): ease of discovery, ease of exploit",
-						},
-						"technical_impact": {
-							Type:        jsonschema.Number,
-							Description: "Technical Impact score (0-9): loss of confidentiality, integrity, availability, accountability",
-						},
-						"business_impact": {
-							Type:        jsonschema.Number,
-							Description: "Business Impact score (0-9): financial damage, reputation damage, non-compliance, privacy violation",
-						},
-						"reasoning": {
-							Type:        jsonschema.String,
-							Description: "Brief explanation of each score (2-3 sentences)",
-						},
-					},
-					Required: []string{
-						"vulnId",
-						"threat_agent_score",
-						"vulnerability_score",
-						"technical_impact",
-						"business_impact",
-						"reasoning",
-					},
-				},
-			},
-		},
-		Required: []string{"results"},
-	}
+// buildOutputSchema returns the JSON Schema the LLM output must satisfy.
+// Every property is required and additionalProperties is false so the schema is
+// valid for OpenAI strict mode; the same document is then enforced natively by
+// each provider.
+func (g *Generator) buildOutputSchema() json.RawMessage {
+	return json.RawMessage(outputSchema)
 }
+
+const outputSchema = `{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "vulnId": {"type": "string", "description": "The vulnerability ID from the input (e.g., CVE-2024-1234)"},
+          "threat_agent_score": {"type": "number", "description": "Threat Agent score (0-9): skill level, motive, opportunity, size"},
+          "vulnerability_score": {"type": "number", "description": "Vulnerability score (0-9): ease of discovery, ease of exploit"},
+          "technical_impact": {"type": "number", "description": "Technical Impact score (0-9): loss of confidentiality, integrity, availability, accountability"},
+          "business_impact": {"type": "number", "description": "Business Impact score (0-9): financial damage, reputation damage, non-compliance, privacy violation"},
+          "reasoning": {"type": "string", "description": "Brief explanation of each score (2-3 sentences)"}
+        },
+        "required": ["vulnId", "threat_agent_score", "vulnerability_score", "technical_impact", "business_impact", "reasoning"]
+      }
+    }
+  },
+  "required": ["results"]
+}`
 
 // buildOutputExample returns an example output for the LLM.
 func (g *Generator) buildOutputExample() string {
