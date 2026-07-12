@@ -74,6 +74,7 @@ nav:
       - CVSS vs OWASP contextual: concepts/cvss-vs-owasp.md
       - Privacy and data flow: concepts/privacy-and-data-flow.md
       - Vens vs alternatives: concepts/alternatives.md
+      - Choosing an LLM: concepts/choosing-a-model.md
       - Limitations: concepts/limitations.md
   - Reference:
       - config.yaml schema: reference/config-schema.md
