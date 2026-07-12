@@ -80,10 +80,10 @@ func isRateLimit(err error) bool {
 // defaultModels are used when *_MODEL is unset. They must support native
 // structured output (json_schema), since vens enforces a schema on every call.
 // vens sets the model explicitly so it can record and log which one ran.
-// Ollama has no default.
+// Ollama has no default. Cloud picks track the vens-benchmark recommendation.
 var defaultModels = map[string]string{
-	OpenAI:    "gpt-4o",
-	Anthropic: "claude-sonnet-4-5",
+	OpenAI:    "gpt-5.4-mini",
+	Anthropic: "claude-sonnet-4-6",
 	GoogleAI:  "gemini-2.5-flash",
 	Mock:      "mock",
 }
