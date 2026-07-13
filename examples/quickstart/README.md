@@ -11,7 +11,7 @@ This example demonstrates how **vens** transforms generic CVSS scores into conte
 
 ```bash
 export OPENAI_API_KEY="sk-..."
-export OPENAI_MODEL="gpt-4o"
+export OPENAI_MODEL="gpt-5.4-mini"
 
 # Using Trivy report (auto-detected)
 vens generate \

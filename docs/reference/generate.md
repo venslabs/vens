@@ -182,7 +182,7 @@ vens generate --attest \
 - `targets.components[]` — the affected components the claims point at
 - `evidence[]` — one per LLM batch, recording how the scoring was produced:
     - `generation_method` — `llm`
-    - `provider` / `model` — backend and model used (e.g. `openai` / `gpt-4o`); when the provider's `*_MODEL` env var is unset, vens falls back to that provider's default and logs it
+    - `provider` / `model` — backend and model used (e.g. `openai` / `gpt-5.4-mini`); when the provider's `*_MODEL` env var is unset, vens falls back to that provider's default and logs it
     - `seed` — the LLM seed (`0` if unset)
     - `temperature` — the sampling temperature
     - `prompt_hash` — SHA-256 of `system_prompt + "\n\n" + human_prompt`
@@ -210,9 +210,9 @@ BOM-Link `version` number used alongside `--sbom-serial-number`. Default: `1`.
 | Variable | Purpose |
 |---|---|
 | `OPENAI_API_KEY` | OpenAI credentials |
-| `OPENAI_MODEL` | OpenAI model name (e.g. `gpt-4o`) |
+| `OPENAI_MODEL` | OpenAI model name (e.g. `gpt-5.4-mini`) |
 | `ANTHROPIC_API_KEY` | Anthropic credentials |
-| `ANTHROPIC_MODEL` | Anthropic model name (e.g. `claude-sonnet-4-5`) |
+| `ANTHROPIC_MODEL` | Anthropic model name (e.g. `claude-sonnet-4-6`) |
 | `GOOGLE_API_KEY` | Google AI credentials |
 | `GEMINI_API_KEY` | Google AI credentials (fallback used when `GOOGLE_API_KEY` is unset) |
 | `GOOGLE_MODEL` | Google AI model name (e.g. `gemini-2.5-flash`) |
@@ -245,7 +245,7 @@ SBOM_UUID="urn:uuid:$(uuidgen | tr '[:upper:]' '[:lower:]')"
 
 ```bash
 export OPENAI_API_KEY=sk-...
-export OPENAI_MODEL=gpt-4o
+export OPENAI_MODEL=gpt-5.4-mini
 
 trivy image python:3.11-slim --format json --output report.json
 vens generate --config-file vens.yaml --sbom-serial-number "$SBOM_UUID" report.json vex.json
@@ -273,7 +273,7 @@ vens generate \
 
 ```bash
 export ANTHROPIC_API_KEY=sk-ant-...
-export ANTHROPIC_MODEL=claude-sonnet-4-5
+export ANTHROPIC_MODEL=claude-sonnet-4-6
 vens generate --llm anthropic --config-file vens.yaml --sbom-serial-number "$SBOM_UUID" report.json vex.json
 ```
 

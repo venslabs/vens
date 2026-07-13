@@ -88,7 +88,7 @@ vens generate \
 
 `--sbom-serial-number` is required — pass the `serialNumber` of the CycloneDX SBOM paired with this scan so each `affects` in the VEX resolves back to that SBOM via BOM-Link.
 
-Runtime: ~1 minute for 300 CVEs with `gpt-4o`.
+Runtime: ~1 minute for 300 CVEs with `gpt-5.4-mini`.
 
 ---
 
@@ -162,7 +162,7 @@ For a turnkey Action, see [GitHub Actions integration](github-actions.md). The m
 - name: Generate contextual VEX
   env:
     OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-    OPENAI_MODEL: gpt-4o               # required alongside OPENAI_API_KEY
+    OPENAI_MODEL: gpt-5.4-mini               # required alongside OPENAI_API_KEY
     # Stable per-service UUID so BOM-Links don't churn between builds.
     # Store it as a repo variable instead of hardcoding once you have more than one service.
     SBOM_UUID: urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79

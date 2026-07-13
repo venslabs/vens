@@ -37,7 +37,7 @@ OWASP scoring (`Risk = Likelihood × Impact`, 0-81) reflects your system's expos
     input-report: report.json
     sbom-serial-number: ${{ vars.SBOM_SERIAL }}
     llm-provider: openai
-    llm-model: gpt-4o
+    llm-model: gpt-5.4-mini
     llm-api-key: ${{ secrets.OPENAI_API_KEY }}
     fail-on-severity: critical        # break the build on critical OWASP risk
 ```
@@ -59,7 +59,7 @@ trivy plugin install github.com/venslabs/vens
 ```bash
 # 1. Set up LLM (OpenAI shown — Anthropic, Google AI, or local Ollama also supported)
 export OPENAI_API_KEY="sk-..."
-export OPENAI_MODEL="gpt-4o"
+export OPENAI_MODEL="gpt-5.4-mini"
 
 # 2. Scan with Trivy or Grype
 trivy image python:3.11-slim --format json --output report.json
