@@ -19,7 +19,7 @@ Add this to your workflow after a container or dependency scan:
     input-report: report.json
     sbom-serial-number: ${{ vars.SBOM_SERIAL }}
     llm-provider: openai
-    llm-model: gpt-4o
+    llm-model: gpt-5.4-mini
     llm-api-key: ${{ secrets.OPENAI_API_KEY }}
     fail-on-severity: critical
     enrich: "true"

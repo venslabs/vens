@@ -21,7 +21,7 @@ If you scan with Trivy or Grype in GitHub Actions, drop [`venslabs/vens-action`]
     input-report: report.json
     sbom-serial-number: ${{ vars.SBOM_SERIAL }}
     llm-provider: openai
-    llm-model: gpt-4o
+    llm-model: gpt-5.4-mini
     llm-api-key: ${{ secrets.OPENAI_API_KEY }}
     fail-on-severity: critical        # break the build on critical OWASP risk
 ```
@@ -174,7 +174,7 @@ Vens asks the LLM to return structured JSON with four 0–9 component scores per
 
     ```bash
     export OPENAI_API_KEY="sk-..."
-    export OPENAI_MODEL="gpt-4o"
+    export OPENAI_MODEL="gpt-5.4-mini"
     ```
 
     Among the cloud providers, OpenAI and Google AI accept the `seed` parameter Vens forwards (`--llm-seed`); Anthropic has no seed parameter and silently ignores it. This does not guarantee byte-identical scores across runs — see [Reference: `--llm-seed`](../reference/generate.md#--llm-seed-int) and [Limitations](../concepts/limitations.md).
@@ -183,7 +183,7 @@ Vens asks the LLM to return structured JSON with four 0–9 component scores per
 
     ```bash
     export ANTHROPIC_API_KEY="sk-ant-..."
-    export ANTHROPIC_MODEL="claude-sonnet-4-5"
+    export ANTHROPIC_MODEL="claude-sonnet-4-6"
     ```
 
 === "Google AI"

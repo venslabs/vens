@@ -80,7 +80,7 @@ func Example() string {
 	}
 	return fmt.Sprintf(`  # Basic usage
   export OPENAI_API_KEY=...
-  export OPENAI_MODEL=gpt-4o
+  export OPENAI_MODEL=gpt-5.4-mini
 
   # Scan an image and generate a vulnerability report
   trivy image nginx:1.25 --format=json --severity HIGH,CRITICAL > report.json
