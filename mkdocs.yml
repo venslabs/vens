@@ -50,6 +50,8 @@ markdown_extensions:
 
 plugins:
   - search
+  - blog:
+      post_url_format: "{slug}"
   - git-revision-date-localized:
       enable_creation_date: true
       fallback_to_build_date: true
@@ -76,6 +78,7 @@ nav:
       - Vens vs alternatives: concepts/alternatives.md
       - Choosing an LLM: concepts/choosing-a-model.md
       - Limitations: concepts/limitations.md
+  - Blog: blog/index.md
   - Reference:
       - config.yaml schema: reference/config-schema.md
       - vens generate: reference/generate.md
