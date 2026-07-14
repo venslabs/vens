@@ -34,7 +34,7 @@ Set the model with the provider's `*_MODEL` env var (`OPENAI_MODEL`, `ANTHROPIC_
 
 Not there yet. Every local model tested (via Ollama: `llama3.2`, `qwen2.5:7b`, `gemma2:9b`, `deepseek-r1:8b`) came out statistically indistinguishable from a constant-guess baseline — their confidence intervals overlap the 1.57 floor — and only the reasoning model engaged the context at all. For context-conditioned scoring today, a small local model is close to not using an LLM.
 
-See the [paper](../assets/vens-benchmark.pdf) for the method, the two showcases (a 10.0 that ends LOW, a 5.3 that ends HIGH), and where the models — and the test itself — break.
+See the [paper](../assets/vens-benchmark.pdf) for the method, the two showcases (a 10.0 that ends LOW, a 6.5 that ends HIGH), and where the models (and the test itself) break.
 
 ---
 
