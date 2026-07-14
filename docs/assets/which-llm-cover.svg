@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-label="Which LLM should score your CVEs? A benchmark of 12 models." font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b2a33"/>
+      <stop offset="1" stop-color="#0f3b49"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+
+  <g fill="#3f8ba3" opacity="0.13">
+    <rect x="815" y="150" width="305" height="24" rx="4"/>
+    <rect x="815" y="196" width="255" height="24" rx="4"/>
+    <rect x="815" y="242" width="205" height="24" rx="4"/>
+    <rect x="815" y="288" width="130" height="24" rx="4"/>
+    <rect x="815" y="334" width="78"  height="24" rx="4"/>
+  </g>
+
+  <text x="90" y="146" fill="#7fc4d6" font-size="25" font-weight="600" letter-spacing="4">VENS · BENCHMARK</text>
+  <rect x="90" y="164" width="62" height="4" fill="#7fc4d6"/>
+
+  <text x="86" y="296" fill="#ffffff" font-size="74" font-weight="800" letter-spacing="-1">Which LLM should</text>
+  <text x="86" y="380" fill="#ffffff" font-size="74" font-weight="800" letter-spacing="-1">score your CVEs?</text>
+
+  <text x="90" y="462" fill="#cfe1e7" font-size="32">12 models, measured. Which to run,</text>
+  <text x="90" y="504" fill="#cfe1e7" font-size="32">and where they quietly fail.</text>
+</svg>
