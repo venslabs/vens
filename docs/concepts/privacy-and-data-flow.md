@@ -49,13 +49,11 @@ That is the complete list. Nothing else from the scanner report is forwarded.
 The `notes` field in `config.yaml` is free-form text that you author. It is designed to let you describe architecture and deployment context in plain English so the LLM can make better scoring decisions. **It is sent verbatim** to the configured LLM provider.
 
 **Do:**
-
 - Describe architecture at a level you would share with a security vendor.
 - Mention technologies, frameworks, deployment patterns.
 - Note compensating controls and the services the system talks to.
 
 **Do not:**
-
 - Paste secrets, API keys, tokens, passwords, or any credential material.
 - Name internal systems by sensitive codename if that would violate an NDA or classification policy.
 - Include customer data, PHI, PII, or personal identifiers.

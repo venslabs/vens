@@ -22,11 +22,9 @@ You can also pass [`--attest`](../reference/generate.md#--attest) to write a CDX
 
 ---
 
-## 2. Benchmarked for model choice, not calibrated to your outcomes
+## 2. No published benchmark or calibration study
 
-There is now a public benchmark, [vens-benchmark](https://github.com/venslabs/vens-benchmark), measuring how 12 LLMs do the vens scoring task: predicting a CVE's severity and reacting when the context changes. It is what backs the model advice in [Choosing a model](choosing-a-model.md) and the [writeup](../blog/posts/which-llm-should-score-your-cves.md).
-
-What it does **not** give you is a calibration study proving Vens' priorities match expert human judgment on your systems. It tells you which model to run, not "Vens agreed with a human N% of the time" on your backlog. Treat Vens scores as a **ranking aid over CVSS alone**, not a certified risk assessment.
+We do not claim a measured accuracy number against a ground-truth dataset. There is no "Vens scores agreed with human experts N% of the time" study. Treat Vens scores as a **ranking aid over CVSS alone**, not as a certified risk assessment.
 
 How to use it responsibly:
 
@@ -36,7 +34,7 @@ How to use it responsibly:
 
 ---
 
-## 3. Score quality depends on your context and your model
+## 3. Score quality depends entirely on user-provided context
 
 `config.yaml` is a trust input. If you:
 
@@ -44,9 +42,7 @@ How to use it responsibly:
 - mark `waf: true` when you have no WAF,
 - leave `notes` empty on a complex deployment,
 
-then the LLM has no way of knowing, and the scores will silently reflect your bad data. There is no automated validation of your claims. This is by design (Vens cannot inspect your production), but it is a limitation you should mitigate with [governance](../guides/configuration.md#governing-your-context-file).
-
-Quality also depends on the model you run. A weak model produces weak scores even with perfect context, and the [benchmark](https://github.com/venslabs/vens-benchmark) shows the spread between models is large. See [Choosing a model](choosing-a-model.md) for the ones that hold up.
+— the LLM has no way of knowing, and the scores will silently reflect your bad data. There is no automated validation of your claims. This is by design (Vens cannot inspect your production), but it is a limitation you should mitigate with [governance](../guides/configuration.md#governing-your-context-file).
 
 ---
 
@@ -71,17 +67,15 @@ See [Privacy and data flow](privacy-and-data-flow.md) for the full list of what 
 
 ## 6. No HIPAA BAA or similar legal agreements
 
-Vens itself is an MIT-ish Apache 2.0 Go binary — it holds no data and signs no agreements. If you need a BAA, DPA, or equivalent for a cloud LLM provider, negotiate it directly with the provider on your provider account. For regulated workloads, the safest path is to deploy with Ollama on infrastructure you already have compliance coverage for, accepting the local-model quality tradeoff in limitation 7.
+Vens itself is an MIT-ish Apache 2.0 Go binary — it holds no data and signs no agreements. If you need a BAA, DPA, or equivalent for a cloud LLM provider, negotiate it directly with the provider on your provider account. For regulated workloads, the safest path is to deploy with Ollama on infrastructure you already have compliance coverage for.
 
 ---
 
-## 7. Local models underperform on this task today
+## 7. Score quality drops on models below ~7B parameters
 
-Vens asks the LLM to return structured JSON with four component scores per CVE. Small local models (under ~7B parameters) frequently emit malformed JSON or produce flat, uniform scores regardless of input. Smaller batches (`--llm-batch-size 3–5`) cut down the malformed JSON, but they do not fix the quality gap.
+Vens asks the LLM to return structured JSON with four component scores per CVE. Small local models (under 7B parameters) frequently emit malformed JSON or produce flat, uniform scores regardless of input. `llama3.1:70b` and larger cloud models (gpt-5.4-mini, claude-sonnet-4-6, gemini-2.5-flash-lite) are the sweet spot; lighter models are usable with `--llm-batch-size 3–5` but with lower quality.
 
-Larger local models are not a safe fix either: in the [benchmark](https://github.com/venslabs/vens-benchmark), the local models tried through Ollama all scored at or below a constant-guess baseline on the context task. If you need air-gapped **and** high quality, that is a real gap right now.
-
-On cloud, the benchmark-backed picks are `claude-sonnet-4-6` (most accurate and stable) and `gpt-5.4-mini` (best value, run it a few times); `gemini-2.5-flash-lite` is fine only for rough triage. See [Choosing a model](choosing-a-model.md).
+This is a fundamental constraint of today's open-weight model landscape — if you need air-gapped + high quality, plan for a beefy GPU box.
 
 ---
 

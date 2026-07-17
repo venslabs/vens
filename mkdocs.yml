@@ -7,18 +7,21 @@ edit_uri: edit/main/docs/
 
 theme:
   name: material
+  custom_dir: overrides
+  logo: assets/vens-logo.svg
+  favicon: assets/vens-favicon.png
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
-      primary: indigo
-      accent: indigo
+      primary: custom
+      accent: custom
       toggle:
         icon: material/weather-night
         name: Switch to dark mode
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
-      primary: indigo
-      accent: indigo
+      primary: custom
+      accent: custom
       toggle:
         icon: material/weather-sunny
         name: Switch to light mode
@@ -32,6 +35,12 @@ theme:
     - content.code.annotate
     - search.suggest
     - search.highlight
+
+extra_css:
+  - stylesheets/landing.css
+
+extra_javascript:
+  - javascripts/landing.js
 
 markdown_extensions:
   - admonition

@@ -1,0 +1,445 @@
+/* ============================================================
+   vens landing page styles (docs/index.md via overrides/home.html)
+   Brand teal, works in both Material light (default) and dark (slate).
+   ============================================================ */
+
+/* Site-wide brand palette: teal header + links, to match the landing hero. */
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color: #0e4f5f;
+  --md-primary-fg-color--light: #14657a;
+  --md-primary-fg-color--dark: #0a3a47;
+  --md-primary-bg-color: #ffffff;
+  --md-primary-bg-color--light: rgba(255, 255, 255, 0.7);
+  --md-accent-fg-color: #0f7d95;
+}
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #0c3a47;
+  --md-primary-fg-color--light: #14657a;
+  --md-primary-fg-color--dark: #082c36;
+  --md-primary-bg-color: #ffffff;
+  --md-primary-bg-color--light: rgba(255, 255, 255, 0.7);
+  --md-accent-fg-color: #7fc4d6;
+  /* Material derives body links from --md-primary-fg-color, which here is the
+     dark header teal: unreadable on slate. Pin links to the light accent. */
+  --md-typeset-a-color: #7fc4d6;
+}
+
+:root,
+[data-md-color-scheme="default"] {
+  --vens-ink: #12272e;
+  --vens-muted: #4b5c62;
+  --vens-band: #f1f6f7;
+  --vens-card: #ffffff;
+  --vens-border: #e2eaec;
+  --vens-accent: #0f7d95;
+  --vens-accent-ink: #0c6a7f;
+  --vens-accent-soft: #e2f1f5;
+}
+
+[data-md-color-scheme="slate"] {
+  --vens-ink: #e8f1f3;
+  --vens-muted: #a6bfc6;
+  --vens-band: #122228;
+  --vens-card: #16282f;
+  --vens-border: #26424b;
+  --vens-accent: #7fc4d6;
+  --vens-accent-ink: #8fd0e0;
+  --vens-accent-soft: #173038;
+}
+
+/* The landing renders full-bleed sections in the tabs block; the page's own
+   (empty) content area is dropped so there is no gap before the footer. */
+.vens-hero ~ .md-main { display: none; }
+
+/* the header logo is the vens wordmark, so hide the redundant site-name text
+   (the per-page title in the second topic still shows on scroll) */
+.md-header__title .md-header__topic:first-child { display: none; }
+
+/* ---------- shared ---------- */
+.vens-wrap { max-width: 72rem; margin: 0 auto; padding: 0 1.5rem; }
+.vens-wrap--narrow { max-width: 46rem; }
+
+.vens-eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #7fc4d6;
+  margin: 0 0 1rem;
+}
+.vens-eyebrow--dark { color: var(--vens-accent-ink); }
+
+.vens-h2 {
+  font-size: clamp(1.5rem, 3vw, 2.1rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  margin: 0.2rem 0 2rem;
+  color: var(--vens-ink);
+  text-wrap: balance;
+  max-width: 24ch;
+}
+
+.vens-section { padding: 4rem 0; }
+.vens-section--band { background: var(--vens-band); }
+
+/* ---------- buttons ---------- */
+.md-button.vens-btn {
+  border: 0;
+  border-radius: 0.5rem;
+  font-weight: 700;
+  padding: 0.62em 1.3em;
+  transition: background-color 0.15s, color 0.15s, transform 0.05s;
+}
+.md-button.vens-btn:active { transform: translateY(1px); }
+.md-button.vens-btn--primary { background: var(--vens-accent); color: #fff; }
+.md-button.vens-btn--primary:hover { background: var(--vens-accent-ink); color: #fff; }
+.md-button.vens-btn--ghost {
+  background: transparent;
+  color: #eaf2f4;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+}
+.md-button.vens-btn--ghost:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.6);
+}
+/* on the dark grounds (hero + final CTA) the primary pops brighter */
+.vens-hero .md-button.vens-btn--primary,
+.vens-cta .md-button.vens-btn--primary { background: #7fc4d6; color: #0b2a33; }
+.vens-hero .md-button.vens-btn--primary:hover,
+.vens-cta .md-button.vens-btn--primary:hover { background: #9ad4e2; color: #0b2a33; }
+/* off the dark grounds, slate paints the button with the light accent, so the
+   white label would drop to 1.95:1 */
+[data-md-color-scheme="slate"] .md-button.vens-btn--primary,
+[data-md-color-scheme="slate"] .md-button.vens-btn--primary:hover { color: #0b2a33; }
+.md-button.vens-btn:focus-visible { outline: 2px solid #7fc4d6; outline-offset: 2px; }
+
+/* ---------- hero ---------- */
+.vens-hero {
+  background: linear-gradient(135deg, #0b2a33, #0f3b49);
+  color: #eaf2f4;
+  position: relative;
+  overflow: hidden;
+}
+.vens-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(60% 80% at 82% 12%, rgba(63, 139, 163, 0.35), transparent 70%);
+  pointer-events: none;
+}
+.vens-hero__inner {
+  position: relative;
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 4.5rem 1.5rem 4rem;
+  display: grid;
+  grid-template-columns: 1.05fr 0.95fr;
+  gap: 3rem;
+  align-items: center;
+}
+.vens-hero__title {
+  font-size: clamp(2rem, 4.4vw, 3.1rem);
+  line-height: 1.08;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin: 0 0 1.1rem;
+  color: #fff;
+  text-wrap: balance;
+}
+.vens-hero__lead {
+  font-size: 1.07rem;
+  line-height: 1.6;
+  color: #cfe1e7;
+  margin: 0 0 1.75rem;
+  max-width: 44ch;
+}
+.vens-hero__actions { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1.6rem; }
+.vens-hero__install { display: flex; align-items: center; gap: 0.6rem; font-size: 0.82rem; flex-wrap: wrap; }
+.vens-hero__install-label {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.66rem;
+  color: #8fb4bf;
+  font-weight: 700;
+}
+.vens-hero__install code {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 0.4rem;
+  padding: 0.4em 0.7em;
+  color: #eaf2f4;
+  font-size: 0.86em;
+  /* the install path is one unbreakable token; without this it pins the hero
+     grid track to ~360px and .vens-hero{overflow:hidden} clips it below ~385px */
+  overflow-wrap: anywhere;
+}
+
+/* ---------- hero visual (re-score card) ---------- */
+.vens-rescore {
+  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0.9rem;
+  padding: 1.4rem 1.5rem;
+  box-shadow: 0 24px 60px -30px rgba(0, 0, 0, 0.6);
+}
+.vens-viz { display: flex; flex-direction: column; gap: 0.85rem; margin: 0.4rem 0 1rem; }
+.vens-viz__row { display: flex; align-items: center; gap: 0.7rem; }
+.vens-viz__label {
+  flex: 0 0 3.1rem;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #9fc0ca;
+  font-weight: 700;
+}
+.vens-viz__bar {
+  flex: 1;
+  display: flex;
+  height: 30px;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+.vens-seg { display: block; }
+.vens-seg--crit { background: #ef5350; }
+.vens-seg--high { background: #f5a623; }
+.vens-seg--med { background: #f7d154; }
+.vens-seg--low { background: #35c988; }
+.vens-viz__n {
+  flex: 0 0 auto;
+  min-width: 2.7rem;
+  text-align: right;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #9fc0ca;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+.vens-viz__n--good { color: #4fd69c; }
+.vens-legend { display: flex; flex-wrap: wrap; gap: 0.3rem 1.1rem; font-size: 0.72rem; color: #9fc0ca; }
+.vens-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 0.35rem; vertical-align: middle; }
+.vens-legend .crit { background: #ef5350; }
+.vens-legend .low { background: #35c988; }
+/* ---------- badges ---------- */
+.vens-badge {
+  display: inline-block;
+  padding: 0.2em 0.55em;
+  border-radius: 0.35rem;
+  font-size: 0.76em;
+  font-weight: 700;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+/* ---------- how it works ---------- */
+.vens-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.5rem;
+}
+.vens-step__n {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background: var(--vens-accent-soft);
+  color: var(--vens-accent-ink);
+  font-weight: 800;
+  font-size: 0.9rem;
+  margin-bottom: 0.85rem;
+}
+.vens-step__t { font-size: 1.02rem; font-weight: 700; margin: 0 0 0.35rem; color: var(--vens-ink); }
+.vens-step__d { font-size: 0.9rem; line-height: 1.55; color: var(--vens-muted); margin: 0; }
+
+/* ---------- before / after ---------- */
+.vens-ba { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.25rem; }
+.vens-ba__card {
+  background: var(--vens-card);
+  border: 1px solid var(--vens-border);
+  border-radius: 0.75rem;
+  padding: 1.4rem;
+}
+.vens-ba__flip { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 0.85rem; }
+.vens-ba__arrow { color: var(--vens-accent); font-weight: 700; font-size: 1.25rem; }
+.vens-ba__d { font-size: 0.9rem; line-height: 1.55; color: var(--vens-muted); margin: 0; }
+.vens-ba .vens-badge { font-size: 0.92rem; padding: 0.28em 0.6em; }
+.vens-ba .vens-badge--from { background: rgba(127, 140, 148, 0.15); color: var(--vens-muted); }
+.vens-ba .vens-badge--low { background: rgba(46, 157, 92, 0.14); color: #1e6b3e; }
+.vens-ba .vens-badge--high { background: rgba(192, 125, 31, 0.14); color: #8a5a14; }
+[data-md-color-scheme="slate"] .vens-ba .vens-badge--low { color: #8fd3a6; }
+[data-md-color-scheme="slate"] .vens-ba .vens-badge--high { color: #f0b072; }
+.vens-note { font-size: 0.82rem; color: var(--vens-muted); margin-top: 1.75rem; }
+.vens-note a, .vens-card__d a, .vens-who__links a { color: var(--vens-accent-ink); font-weight: 600; }
+
+/* ---------- feature cards ---------- */
+.vens-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(15rem, 100%), 1fr)); gap: 1.25rem; }
+.vens-card {
+  background: var(--vens-card);
+  border: 1px solid var(--vens-border);
+  border-top: 3px solid var(--vens-accent);
+  border-radius: 0.75rem;
+  padding: 1.4rem;
+}
+.vens-card__t { font-size: 1rem; font-weight: 700; margin: 0 0 0.5rem; color: var(--vens-ink); }
+.vens-card__d { font-size: 0.9rem; line-height: 1.55; color: var(--vens-muted); margin: 0; }
+
+/* ---------- quickstart code ---------- */
+.vens-wrap--narrow .vens-eyebrow--dark,
+.vens-wrap--narrow .vens-h2 { text-align: center; }
+.vens-wrap--narrow .vens-h2 { max-width: none; }
+.vens-code {
+  background: #0d2830;
+  color: #d7e5e9;
+  border: 1px solid #204049;
+  border-radius: 0.7rem;
+  padding: 1.25rem 1.4rem;
+  overflow-x: auto;
+  font-size: 0.82rem;
+  line-height: 1.7;
+  margin: 0 0 1.5rem;
+}
+.vens-code code { font-family: var(--md-code-font-family, monospace); background: none; color: inherit; padding: 0; }
+.vens-code .c { color: #6f95a0; }
+.vens-code .k { color: #7fc4d6; }
+.vens-cta-inline { text-align: center; margin: 0; }
+
+/* ---------- who / honest ---------- */
+.vens-who { display: grid; grid-template-columns: 1.3fr 1fr; gap: 2.5rem; align-items: start; }
+.vens-who__list { margin: 0; padding-left: 1.1rem; }
+.vens-who__list li { font-size: 1.05rem; margin-bottom: 0.85rem; color: var(--vens-muted); line-height: 1.6; }
+.vens-who__list strong { color: var(--vens-ink); }
+.vens-who__aside {
+  background: var(--vens-band);
+  border: 1px solid var(--vens-border);
+  border-radius: 0.75rem;
+  padding: 1.3rem;
+}
+.vens-who__aside p { margin: 0 0 0.8rem; font-size: 0.95rem; line-height: 1.55; color: var(--vens-muted); }
+.vens-who__aside p:last-child { margin-bottom: 0; }
+.vens-who__aside strong { color: var(--vens-ink); }
+.vens-who__links { font-size: 0.85rem; }
+
+/* ---------- documentation hub ---------- */
+.vens-docs { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(15rem, 100%), 1fr)); gap: 0.9rem; }
+.vens-doc {
+  display: block;
+  background: var(--vens-card);
+  border: 1px solid var(--vens-border);
+  border-radius: 0.6rem;
+  padding: 1rem 1.15rem;
+  text-decoration: none;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+.vens-doc:hover { border-color: var(--vens-accent); transform: translateY(-2px); }
+.vens-doc__t { display: block; font-weight: 700; color: var(--vens-ink); font-size: 0.95rem; margin-bottom: 0.2rem; }
+.vens-doc__t::after { content: " \2192"; color: var(--vens-accent); }
+.vens-doc__d { display: block; font-size: 0.82rem; color: var(--vens-muted); line-height: 1.45; }
+
+/* ---------- final CTA ---------- */
+.vens-cta {
+  background: linear-gradient(135deg, #0b2a33, #0f3b49);
+  color: #eaf2f4;
+  text-align: center;
+  padding: 4.5rem 0;
+  position: relative;
+  overflow: hidden;
+}
+.vens-cta::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(50% 120% at 50% 0%, rgba(63, 139, 163, 0.3), transparent 70%);
+  pointer-events: none;
+}
+.vens-cta .vens-wrap { position: relative; }
+.vens-cta__t { font-size: clamp(1.6rem, 3.4vw, 2.4rem); font-weight: 800; letter-spacing: -0.02em; margin: 0 0 0.6rem; color: #fff; }
+.vens-cta__d { font-size: 1.05rem; color: #cfe1e7; margin: 0 0 1.75rem; }
+.vens-cta .vens-hero__actions { justify-content: center; margin-bottom: 1.25rem; }
+.vens-cta__meta { font-size: 0.8rem; color: #88aab3; margin: 0; }
+
+/* ---------- responsive ---------- */
+@media (max-width: 60em) {
+  .vens-hero__inner { grid-template-columns: 1fr; gap: 2.25rem; padding: 3rem 1.25rem; }
+  .vens-steps { grid-template-columns: repeat(2, 1fr); }
+  .vens-ba { grid-template-columns: 1fr; }
+  .vens-who { grid-template-columns: 1fr; gap: 1.5rem; }
+}
+@media (max-width: 36em) {
+  .vens-steps { grid-template-columns: 1fr; }
+  .vens-section { padding: 3rem 0; }
+}
+
+/* ============================================================
+   Enhancements: clearer commands, motion, hover
+   ============================================================ */
+
+/* inline commands read as commands, not prose */
+.vens-step__d code,
+.vens-card__d code,
+.vens-note code {
+  font-family: var(--md-code-font-family, monospace);
+  font-size: 0.86em;
+  background: var(--vens-accent-soft);
+  color: var(--vens-accent-ink);
+  padding: 0.12em 0.42em;
+  border-radius: 0.3rem;
+  white-space: nowrap;
+}
+
+/* hero re-score card: caption + bigger, cleaner rows */
+.vens-rescore__cap {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #7fc4d6;
+  margin: 0 0 1rem;
+}
+/* hover life on cards */
+.vens-card,
+.vens-ba__card,
+.vens-rescore { transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease; }
+.vens-card:hover,
+.vens-ba__card:hover {
+  transform: translateY(-3px);
+  border-color: var(--vens-accent);
+  box-shadow: 0 14px 32px -20px rgba(0, 0, 0, 0.4);
+}
+
+/* step pipeline: a big chevron arrowhead centered between steps on desktop */
+@media (min-width: 60.0625em) {
+  .vens-step { position: relative; }
+  .vens-step:not(:last-child)::after {
+    content: "";
+    position: absolute;
+    top: 1rem;
+    left: calc(50% + 20px);
+    width: 15px;
+    height: 15px;
+    margin-top: -8px;
+    border-top: 3px solid var(--vens-accent);
+    border-right: 3px solid var(--vens-accent);
+    transform: rotate(45deg);
+  }
+}
+
+/* motion: hero glow drift + scroll reveal (opt-in, JS-guarded) */
+@media (prefers-reduced-motion: no-preference) {
+  .vens-hero::before { animation: vens-drift 16s ease-in-out infinite alternate; }
+  @keyframes vens-drift {
+    from { transform: translate(0, 0); }
+    to { transform: translate(-4%, 3%); }
+  }
+  .js-reveal [data-reveal] {
+    opacity: 0;
+    transform: translateY(18px);
+    transition: opacity 0.55s ease, transform 0.55s ease;
+  }
+  .js-reveal [data-reveal].is-visible { opacity: 1; transform: none; }
+}
