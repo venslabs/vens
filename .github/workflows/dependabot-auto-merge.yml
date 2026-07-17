@@ -22,7 +22,14 @@ jobs:
         id: meta
         uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
 
-      # Auto-merge patch and minor bumps once CI is green; leave majors for a human.
+      # Patch/minor only, majors stay manual. Approve because main requires a review.
+      - name: Approve
+        if: steps.meta.outputs.update-type == 'version-update:semver-patch' || steps.meta.outputs.update-type == 'version-update:semver-minor'
+        run: gh pr review --approve "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Enable auto-merge
         if: steps.meta.outputs.update-type == 'version-update:semver-patch' || steps.meta.outputs.update-type == 'version-update:semver-minor'
         run: gh pr merge --auto --squash "$PR_URL"
