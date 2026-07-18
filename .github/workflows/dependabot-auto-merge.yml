@@ -1,13 +1,17 @@
 name: Dependabot auto-merge
 
-on: pull_request
+on:
+  pull_request:
+    # milestoned so assigning the milestone re-triggers and unblocks the merge
+    types: [opened, synchronize, reopened, milestoned]
 
 permissions:
   contents: read
 
 jobs:
   auto-merge:
-    if: github.actor == 'dependabot[bot]'
+    # gate on the PR author, not the actor, so a human adding the milestone still runs it
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -22,16 +26,17 @@ jobs:
         id: meta
         uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
 
-      # Patch/minor only, majors stay manual. Approve because main requires a review.
+      # Auto-merge patch/minor, and only once the PR has a milestone. Majors and
+      # unmilestoned PRs stay manual. Approve because main requires a review.
       - name: Approve
-        if: steps.meta.outputs.update-type == 'version-update:semver-patch' || steps.meta.outputs.update-type == 'version-update:semver-minor'
+        if: (steps.meta.outputs.update-type == 'version-update:semver-patch' || steps.meta.outputs.update-type == 'version-update:semver-minor') && github.event.pull_request.milestone != null
         run: gh pr review --approve "$PR_URL"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Enable auto-merge
-        if: steps.meta.outputs.update-type == 'version-update:semver-patch' || steps.meta.outputs.update-type == 'version-update:semver-minor'
+        if: (steps.meta.outputs.update-type == 'version-update:semver-patch' || steps.meta.outputs.update-type == 'version-update:semver-minor') && github.event.pull_request.milestone != null
         run: gh pr merge --auto --squash "$PR_URL"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
