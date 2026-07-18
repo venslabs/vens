@@ -34,14 +34,12 @@ The two are not mutually exclusive: you can use Vens to rank, triage the top N, 
 
 ## LLM-based triage tooling
 
-**[vexllm](https://github.com/AkihiroSuda/vexllm)** (now archived) — the predecessor and direct inspiration for Vens. vexllm used an LLM to mark CVEs as `not_affected` in OpenVEX format.
+**[vexllm](https://github.com/AkihiroSuda/vexllm)** (now archived) — an LLM-based tool that marked CVEs as `not_affected` in OpenVEX format.
 
 - vexllm outputs a binary **affected / not_affected** per CVE — yes/no suppression.
 - Vens outputs a **continuous OWASP Risk Rating score (0–81)** per CVE, with the four OWASP factors, and maps it to the CycloneDX VEX severity bucket.
 
-They answer different questions. vexllm answers "should I hide this CVE?"; Vens answers "how urgent is it compared to the others?". vexllm is now archived and unmaintained: it proved the LLM-triage idea, but for anything you set up today Vens is the maintained path, and if you need a prioritized patch queue and CI gating by contextual risk it is also the closer fit.
-
-Vens' prompt structure and output-handler pattern are adapted from vexllm — credit is in the code comments.
+They answer different questions. vexllm answers "should I hide this CVE?"; Vens answers "how urgent is it compared to the others?". vexllm is now archived and unmaintained: for anything you set up today Vens is the maintained path, and if you need a prioritized patch queue and CI gating by contextual risk it is also the closer fit.
 
 ---
 
