@@ -229,7 +229,7 @@ require (
 	github.com/olekukonko/ll v0.1.6 // indirect
 	github.com/olekukonko/tablewriter v1.1.4 // indirect
 	github.com/ollama/ollama v0.32.1
-	github.com/openai/openai-go/v3 v3.41.0
+	github.com/openai/openai-go/v3 v3.44.0
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.1 // indirect
 	github.com/opencontainers/runtime-spec v1.3.0 // indirect
