@@ -4,7 +4,7 @@ go 1.26.3
 
 require (
 	github.com/CycloneDX/cyclonedx-go v0.11.0
-	github.com/anchore/grype v0.115.0
+	github.com/anchore/grype v0.116.0
 	github.com/aquasecurity/trivy v0.71.2
 	github.com/aquasecurity/trivy-db v0.0.0-20251222105351-a833f47f8f0d
 	github.com/google/uuid v1.6.0
@@ -33,6 +33,7 @@ require (
 	github.com/tidwall/sjson v1.2.5 // indirect
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
 	go.yaml.in/yaml/v4 v4.0.0-rc.3 // indirect
+	howett.net/plist v1.0.1 // indirect
 )
 
 require (
@@ -68,13 +69,13 @@ require (
 	github.com/anchore/go-logger v0.1.1 // indirect
 	github.com/anchore/go-lzo v0.1.1 // indirect
 	github.com/anchore/go-macholibre v0.1.1 // indirect
-	github.com/anchore/go-rpmdb v0.1.0 // indirect
+	github.com/anchore/go-rpmdb v0.2.0 // indirect
 	github.com/anchore/go-struct-converter v0.2.0-rc2 // indirect
 	github.com/anchore/go-sync v0.1.1 // indirect
 	github.com/anchore/go-version v1.2.2-0.20210903204242-51efa5b487c4 // indirect
 	github.com/anchore/packageurl-go v0.2.0 // indirect
 	github.com/anchore/stereoscope v0.2.2 // indirect
-	github.com/anchore/syft v1.46.0 // indirect
+	github.com/anchore/syft v1.48.0 // indirect
 	github.com/andybalholm/brotli v1.2.0 // indirect
 	github.com/anthropics/anthropic-sdk-go v1.51.1
 	github.com/apparentlymart/go-textseg/v15 v15.0.0 // indirect
@@ -190,7 +191,7 @@ require (
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/kastenhq/goversion v0.0.0-20230811215019-93b2f8823953 // indirect
 	github.com/kevinburke/ssh_config v1.2.0 // indirect
-	github.com/klauspost/compress v1.18.6 // indirect
+	github.com/klauspost/compress v1.19.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/klauspost/pgzip v1.2.6 // indirect
 	github.com/knqyf263/go-apk-version v0.0.0-20200609155635-041fdbb8563f // indirect
@@ -295,9 +296,9 @@ require (
 	golang.org/x/sync v0.21.0 // indirect
 	golang.org/x/sys v0.46.0 // indirect
 	golang.org/x/term v0.44.0 // indirect
-	golang.org/x/text v0.38.0 // indirect
+	golang.org/x/text v0.39.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
-	golang.org/x/tools v0.46.0 // indirect
+	golang.org/x/tools v0.47.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
 	gonum.org/v1/gonum v0.17.0 // indirect
 	google.golang.org/api v0.274.0 // indirect
