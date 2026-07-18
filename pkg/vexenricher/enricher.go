@@ -28,6 +28,8 @@ import (
 type VEXEnricher struct {
 	// Map of VulnerabilityID to OWASP Score
 	OWASPScorePerVulnID map[string]float64
+	// Map of VulnerabilityID to OWASP Risk Rating vector string
+	OWASPVectorPerVulnID map[string]string
 }
 
 // New creates a new VEXEnricher from VEX data
@@ -38,7 +40,8 @@ func New(vexData []byte) (*VEXEnricher, error) {
 	}
 
 	enricher := &VEXEnricher{
-		OWASPScorePerVulnID: make(map[string]float64),
+		OWASPScorePerVulnID:  make(map[string]float64),
+		OWASPVectorPerVulnID: make(map[string]string),
 	}
 
 	// Parse VEX vulnerabilities - extract OWASP ratings by Vulnerability ID
@@ -54,10 +57,11 @@ func New(vexData []byte) (*VEXEnricher, error) {
 					continue
 				}
 
-				// Map the score to the vulnerability ID.
+				// Map the score and vector to the vulnerability ID.
 				// Note: if multiple entries exist for the same CVE in VEX,
 				// we take the last one found.
 				enricher.OWASPScorePerVulnID[vuln.ID] = *rating.Score
+				enricher.OWASPVectorPerVulnID[vuln.ID] = rating.Vector
 			}
 		}
 	}
@@ -82,7 +86,8 @@ func (e *VEXEnricher) EnrichReport(ctx context.Context, reportData []byte) (*tri
 			vuln := &result.Vulnerabilities[j]
 
 			if score, ok := e.OWASPScorePerVulnID[vuln.VulnerabilityID]; ok {
-				if e.applyRating(vuln, score) {
+				vector := e.OWASPVectorPerVulnID[vuln.VulnerabilityID]
+				if e.applyRating(vuln, score, vector) {
 					enrichedCount++
 				}
 			}
@@ -96,8 +101,9 @@ func (e *VEXEnricher) EnrichReport(ctx context.Context, reportData []byte) (*tri
 	return &report, nil
 }
 
-// applyRating sets the OWASP score in the vulnerability's Custom field
-func (e *VEXEnricher) applyRating(vuln *trivytypes.DetectedVulnerability, score float64) bool {
+// applyRating sets the OWASP score (and, if present, the OWASP Risk Rating
+// vector) in the vulnerability's Custom field
+func (e *VEXEnricher) applyRating(vuln *trivytypes.DetectedVulnerability, score float64, vector string) bool {
 	if vuln.Custom == nil {
 		vuln.Custom = make(map[string]interface{})
 	}
@@ -110,7 +116,12 @@ func (e *VEXEnricher) applyRating(vuln *trivytypes.DetectedVulnerability, score 
 		return false
 	}
 
-	// Temporary field until Trivy adds an official one
+	// Temporary fields until Trivy adds official ones
 	customMap["owasp_score"] = score
+	if vector != "" {
+		customMap["owasp_vector"] = vector
+	} else {
+		delete(customMap, "owasp_vector")
+	}
 	return true
 }
