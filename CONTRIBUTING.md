@@ -30,7 +30,7 @@ cd vens
 # Download deps
 go mod download
 
-# Build the binary (outputs to ./bin/)
+# Build the binary (outputs to _output/bin/)
 make binaries
 
 # Run the full test suite
@@ -44,8 +44,8 @@ make lint
 
 ## Code style
 
-- **Go formatting** — everything must pass `gofmt -s` and `goimports`. The Makefile target `make fmt` does both. CI will fail if the working tree is not formatted.
-- **Linting** — `make lint` runs `golangci-lint` with the project configuration in `.golangci.yml`. Fix or justify every finding before asking for review.
+- **Go formatting** — everything must pass `gofmt -s` and `goimports`. The Makefile target `make fmt` does both; run it before submitting a change.
+- **Linting** — `make lint` runs `golangci-lint run --timeout=10m --verbose`. Fix or justify every finding before asking for review.
 - **Package layout** — follow the structure already in `pkg/` and `cmd/vens/commands/`. New LLM providers live under `pkg/llm/`, new scanners under `pkg/scanner/`, new output formats under `pkg/outputhandler/`.
 - **Error wrapping** — wrap with `fmt.Errorf("context: %w", err)` so error chains stay inspectable. Do not discard errors silently.
 - **Logging** — use `log/slog` with the keyed form (`slog.InfoContext(ctx, "message", "key", value)`), never `log.Printf`.

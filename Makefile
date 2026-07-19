@@ -6,6 +6,10 @@ export CGO_ENABLED ?= 0
 GO ?= go
 GO_LDFLAGS ?= -s -w -X $(VERSION_SYMBOL)=$(VERSION)
 GO_BUILD ?= $(GO) build -trimpath -ldflags="$(GO_LDFLAGS)"
+GOPATH_BIN := $(shell $(GO) env GOBIN)
+ifeq ($(GOPATH_BIN),)
+GOPATH_BIN := $(shell $(GO) env GOPATH)/bin
+endif
 
 .PHONY: all
 all: binaries
@@ -20,6 +24,17 @@ test:
 .PHONY: test-integration
 test-integration:
 	$(GO) test -v ./cmd/vens/... -run TestScript
+
+.PHONY: fmt
+fmt:
+	@PATH="$(GOPATH_BIN):$$PATH" command -v goimports >/dev/null 2>&1 || $(GO) install golang.org/x/tools/cmd/goimports@latest
+	gofmt -s -w .
+	PATH="$(GOPATH_BIN):$$PATH" goimports -w .
+
+.PHONY: lint
+lint:
+	@PATH="$(GOPATH_BIN):$$PATH" command -v golangci-lint >/dev/null 2>&1 || $(GO) install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
+	PATH="$(GOPATH_BIN):$$PATH" golangci-lint run --timeout=10m --verbose
 
 .PHONY: _output/bin/vens
 _output/bin/vens:
