@@ -6,6 +6,7 @@ export CGO_ENABLED ?= 0
 GO ?= go
 GO_LDFLAGS ?= -s -w -X $(VERSION_SYMBOL)=$(VERSION)
 GO_BUILD ?= $(GO) build -trimpath -ldflags="$(GO_LDFLAGS)"
+GOLANGCI_VERSION ?= v2.12.2
 GOPATH_BIN := $(shell $(GO) env GOBIN)
 ifeq ($(GOPATH_BIN),)
 GOPATH_BIN := $(shell $(GO) env GOPATH)/bin
@@ -33,8 +34,12 @@ fmt:
 
 .PHONY: lint
 lint:
-	@PATH="$(GOPATH_BIN):$$PATH" command -v golangci-lint >/dev/null 2>&1 || $(GO) install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
+	@PATH="$(GOPATH_BIN):$$PATH" command -v golangci-lint >/dev/null 2>&1 || $(GO) install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_VERSION)
 	PATH="$(GOPATH_BIN):$$PATH" golangci-lint run --timeout=10m --verbose
+
+.PHONY: print-golangci-version
+print-golangci-version:
+	@echo $(GOLANGCI_VERSION)
 
 .PHONY: _output/bin/vens
 _output/bin/vens:

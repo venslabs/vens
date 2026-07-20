@@ -45,7 +45,7 @@ make lint
 ## Code style
 
 - **Go formatting** — everything must pass `gofmt -s` and `goimports`. The Makefile target `make fmt` does both; run it before submitting a change.
-- **Linting** — `make lint` runs `golangci-lint run --timeout=10m --verbose`. Fix or justify every finding before asking for review.
+- **Linting** — `make lint` runs golangci-lint, pinned via `GOLANGCI_VERSION` in the Makefile (the single source of truth for the linter version). Fix or justify every finding before asking for review.
 - **Package layout** — follow the structure already in `pkg/` and `cmd/vens/commands/`. New LLM providers live under `pkg/llm/`, new scanners under `pkg/scanner/`, new output formats under `pkg/outputhandler/`.
 - **Error wrapping** — wrap with `fmt.Errorf("context: %w", err)` so error chains stay inspectable. Do not discard errors silently.
 - **Logging** — use `log/slog` with the keyed form (`slog.InfoContext(ctx, "message", "key", value)`), never `log.Printf`.
