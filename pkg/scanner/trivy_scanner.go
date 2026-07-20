@@ -56,7 +56,12 @@ func (s *TrivyScanner) Parse(data []byte) ([]generator.Vulnerability, error) {
 				BOMRef:           bomRef,
 				Title:            v.Title,
 				Description:      v.Description,
-				Severity:         v.Severity,
+				// Trivy 0.72 deprecates Severity for VendorSeverity, but the two are not
+				// interchangeable when reading a report: SeveritySource is empty on about
+				// half the entries, and the resolved severity is frequently absent from
+				// VendorSeverity because Trivy falls back to CVSS. Its resolution logic is
+				// unexported, so keep the resolved value until Trivy DB v3 drops it.
+				Severity: v.Severity, //nolint:staticcheck // SA1019, see above
 			}
 			if v.DataSource != nil {
 				vuln.SourceName = trivyDataSourceToSourceName(string(v.DataSource.ID), v.VulnerabilityID)
