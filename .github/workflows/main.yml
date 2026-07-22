@@ -33,9 +33,14 @@ jobs:
       - name: Integration tests
         run: go test -v ./cmd/vens/... -run TestScript
 
+      - name: Resolve golangci-lint version
+        id: golangci
+        run: echo "version=$(make print-golangci-version)" >> "$GITHUB_OUTPUT"
+
       - name: golangci-lint
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
+          version: ${{ steps.golangci.outputs.version }}
           args: --timeout=10m --verbose
 
       - run: go install ./cmd/vens
