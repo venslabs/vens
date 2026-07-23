@@ -25,7 +25,7 @@ import (
 
 func TestCycloneDxVexWriter_Close_SerialNumber(t *testing.T) {
 	var buf bytes.Buffer
-	h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 1, "")
+	h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 1, "", cyclonedx.SpecVersion1_7)
 
 	score := 42.0
 	err := h.HandleVulnRatings([]VulnRating{
@@ -69,7 +69,7 @@ func TestCycloneDxVexWriter_Close_SerialNumber(t *testing.T) {
 
 func TestCycloneDxVexWriter_Close_VersionFromSBOM(t *testing.T) {
 	var buf bytes.Buffer
-	h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 3, "")
+	h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 3, "", cyclonedx.SpecVersion1_7)
 
 	if err := h.Close(); err != nil {
 		t.Fatalf("Close: %v", err)
@@ -87,7 +87,7 @@ func TestCycloneDxVexWriter_Close_VersionFromSBOM(t *testing.T) {
 
 func TestCycloneDxVexWriter_Close_Metadata(t *testing.T) {
 	var buf bytes.Buffer
-	h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 1, "")
+	h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 1, "", cyclonedx.SpecVersion1_7)
 
 	if err := h.Close(); err != nil {
 		t.Fatalf("Close: %v", err)
@@ -129,7 +129,7 @@ func TestCycloneDxVexWriter_Close_Metadata(t *testing.T) {
 
 func TestCycloneDxVexWriter_Close_VulnerabilitySource(t *testing.T) {
 	var buf bytes.Buffer
-	h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 1, "")
+	h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 1, "", cyclonedx.SpecVersion1_7)
 
 	score := 42.0
 	err := h.HandleVulnRatings([]VulnRating{
@@ -215,7 +215,7 @@ func TestCycloneDxVexWriter_Close_VulnerabilitySource(t *testing.T) {
 
 func TestCycloneDxVexWriter_Close_MergesDuplicateVulnIDs(t *testing.T) {
 	var buf bytes.Buffer
-	h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 1, "")
+	h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 1, "", cyclonedx.SpecVersion1_7)
 
 	score := 42.0
 	err := h.HandleVulnRatings([]VulnRating{
@@ -291,7 +291,7 @@ func TestCycloneDxVexWriter_Close_MergesDuplicateVulnIDs(t *testing.T) {
 
 func TestCycloneDxVexWriter_Close_DeduplicatesAffectsRefs(t *testing.T) {
 	var buf bytes.Buffer
-	h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 1, "")
+	h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 1, "", cyclonedx.SpecVersion1_7)
 
 	score := 42.0
 	err := h.HandleVulnRatings([]VulnRating{
@@ -341,7 +341,7 @@ func TestCycloneDxVexWriter_Close_DeduplicatesAffectsRefs(t *testing.T) {
 
 func TestCycloneDxVexWriter_Close_Idempotent(t *testing.T) {
 	var buf bytes.Buffer
-	h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 1, "")
+	h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 1, "", cyclonedx.SpecVersion1_7)
 
 	if err := h.Close(); err != nil {
 		t.Fatalf("first Close: %v", err)
@@ -356,5 +356,84 @@ func TestCycloneDxVexWriter_Close_Idempotent(t *testing.T) {
 
 	if buf.String() != firstOutput {
 		t.Error("second Close wrote additional output")
+	}
+}
+
+func TestParseSpecVersion(t *testing.T) {
+	tests := []struct {
+		in      string
+		want    cyclonedx.SpecVersion
+		wantErr bool
+	}{
+		{in: "1.6", want: cyclonedx.SpecVersion1_6},
+		{in: "1.7", want: cyclonedx.SpecVersion1_7},
+		{in: "1.5", wantErr: true},
+		{in: "1.8", wantErr: true},
+		{in: "", wantErr: true},
+		{in: "v1.7", wantErr: true},
+	}
+	for _, tt := range tests {
+		got, err := ParseSpecVersion(tt.in)
+		if tt.wantErr {
+			if err == nil {
+				t.Errorf("ParseSpecVersion(%q) = %v, want error", tt.in, got)
+			}
+			continue
+		}
+		if err != nil {
+			t.Errorf("ParseSpecVersion(%q): unexpected error: %v", tt.in, err)
+			continue
+		}
+		if got != tt.want {
+			t.Errorf("ParseSpecVersion(%q) = %v, want %v", tt.in, got, tt.want)
+		}
+	}
+}
+
+func TestCycloneDxVexWriter_Close_SpecVersion(t *testing.T) {
+	cases := []struct {
+		name        string
+		specVersion cyclonedx.SpecVersion
+		want        string
+	}{
+		{name: "1.6", specVersion: cyclonedx.SpecVersion1_6, want: "1.6"},
+		{name: "1.7", specVersion: cyclonedx.SpecVersion1_7, want: "1.7"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 1, "", tc.specVersion)
+
+			score := 42.0
+			if err := h.HandleVulnRatings([]VulnRating{
+				{
+					VulnID: "CVE-2024-1234",
+					BOMRef: "pkg:npm/foo@1.0.0",
+					Rating: cyclonedx.VulnerabilityRating{
+						Method:   cyclonedx.ScoringMethodOWASP,
+						Score:    &score,
+						Severity: cyclonedx.SeverityHigh,
+					},
+					Source: &cyclonedx.Source{Name: "NVD"},
+				},
+			}); err != nil {
+				t.Fatalf("HandleVulnRatings: %v", err)
+			}
+
+			if err := h.Close(); err != nil {
+				t.Fatalf("Close: %v", err)
+			}
+
+			// specVersion is a top-level field of the encoded BOM.
+			var doc struct {
+				SpecVersion string `json:"specVersion"`
+			}
+			if err := json.Unmarshal(buf.Bytes(), &doc); err != nil {
+				t.Fatalf("unmarshal BOM: %v", err)
+			}
+			if doc.SpecVersion != tc.want {
+				t.Errorf("specVersion = %q, want %q", doc.SpecVersion, tc.want)
+			}
+		})
 	}
 }

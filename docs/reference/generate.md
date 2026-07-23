@@ -108,6 +108,19 @@ vens generate --input-format grype --config-file c.yaml --sbom-serial-number "$S
 
 Output format. Default: `auto`. Currently only `cyclonedxvex` is supported.
 
+### `--cyclonedx-spec-version <1.6|1.7>`
+
+CycloneDX spec version for the VEX output. Default: `1.7`.
+
+Pin the output to `1.6` for consumers that don't understand 1.7 yet — mainly older Dependency-Track and strict validators. Any value other than `1.6` or `1.7` is rejected with an error.
+
+```bash
+vens generate --cyclonedx-spec-version 1.6 \
+  --config-file c.yaml \
+  --sbom-serial-number "$SBOM_UUID" \
+  report.json out.json
+```
+
 ### `--debug-dir <path>`
 
 Directory where Vens writes the prompts it sends to the LLM. Useful for auditing scores, debugging unexpected results, and producing evidence for compliance reviews.
