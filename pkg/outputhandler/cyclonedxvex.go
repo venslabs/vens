@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/CycloneDX/cyclonedx-go"
@@ -25,15 +26,40 @@ import (
 	"github.com/venslabs/vens/cmd/vens/version"
 )
 
+// DefaultSpecVersion is the CycloneDX spec version emitted when the caller does
+// not request a specific one.
+const DefaultSpecVersion = "1.7"
+
+// SupportedSpecVersions lists the CycloneDX spec versions vens can emit, in
+// ascending order. Used for validation and help/error text.
+var SupportedSpecVersions = []string{"1.6", "1.7"}
+
+var specVersionsByString = map[string]cyclonedx.SpecVersion{
+	"1.6": cyclonedx.SpecVersion1_6,
+	"1.7": cyclonedx.SpecVersion1_7,
+}
+
+// ParseSpecVersion maps a CycloneDX spec version string (e.g. "1.6", "1.7") to
+// its cyclonedx.SpecVersion. It returns an error for any value outside
+// SupportedSpecVersions.
+func ParseSpecVersion(s string) (cyclonedx.SpecVersion, error) {
+	if v, ok := specVersionsByString[s]; ok {
+		return v, nil
+	}
+	return 0, fmt.Errorf("unsupported CycloneDX spec version %q (supported: %s)", s, strings.Join(SupportedSpecVersions, ", "))
+}
+
 // NewCycloneDxVexOutputHandler returns an OutputHandler that accumulates
 // vulnerability ratings and emits a proper CycloneDX VEX BOM on Close.
 // vexUUID is the VEX document's serialNumber UUID; pass "" to generate one.
-func NewCycloneDxVexOutputHandler(w io.Writer, sbomUUID string, sbomVersion int, vexUUID string) OutputHandler {
+// specVersion selects the CycloneDX spec version the BOM is encoded to.
+func NewCycloneDxVexOutputHandler(w io.Writer, sbomUUID string, sbomVersion int, vexUUID string, specVersion cyclonedx.SpecVersion) OutputHandler {
 	return &cycloneDxVexWriter{
 		w:           w,
 		sbomUUID:    sbomUUID,
 		sbomVersion: sbomVersion,
 		vexUUID:     vexUUID,
+		specVersion: specVersion,
 	}
 }
 
@@ -43,6 +69,7 @@ type cycloneDxVexWriter struct {
 	sbomUUID    string
 	sbomVersion int
 	vexUUID     string
+	specVersion cyclonedx.SpecVersion
 	closed      bool
 }
 
@@ -116,7 +143,7 @@ func (c *cycloneDxVexWriter) Close() error {
 
 	enc := cyclonedx.NewBOMEncoder(c.w, cyclonedx.BOMFileFormatJSON)
 	enc.SetPretty(true)
-	if err := enc.EncodeVersion(bom, cyclonedx.SpecVersion1_7); err != nil {
+	if err := enc.EncodeVersion(bom, c.specVersion); err != nil {
 		return err
 	}
 	c.closed = true

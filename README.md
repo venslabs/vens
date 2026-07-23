@@ -142,6 +142,7 @@ vens generate --config-file config.yaml INPUT OUTPUT
 - `--llm` - LLM provider: `openai` | `anthropic` | `ollama` | `googleai` (default: `auto`)
 - `--llm-batch-size` - CVEs per request (default: `10`)
 - `--debug-dir` - Save prompts/responses for debugging
+- `--cyclonedx-spec-version` - CycloneDX spec version for the VEX output: `1.6` | `1.7` (default: `1.7`; pin to `1.6` for older Dependency-Track and strict validators)
 - `--attest` - Emit a CycloneDX attestation sidecar recording how each CVE was scored (model, seed, prompt/input/config hashes, reasoning, raw response) for audit and reproduction
 
 ### `vens enrich`
