@@ -65,6 +65,7 @@ The LLM calculates the OWASP risk score (0-81) for each vulnerability using:
 	flags.String("config-file", "", "Path to config.yaml file with OWASP factors")
 	flags.String("input-format", "auto", "Input format ([auto trivy grype])")
 	flags.String("output-format", "auto", "Output format ([auto cyclonedxvex])")
+	flags.String("cyclonedx-spec-version", outputhandler.DefaultSpecVersion, fmt.Sprintf("CycloneDX spec version for VEX output (%s)", strings.Join(outputhandler.SupportedSpecVersions, " ")))
 	flags.String("debug-dir", "", "Directory to save debug files (prompts, responses)")
 	flags.String("sbom-serial-number", "", "SBOM serial number for BOM-Link (format: urn:uuid:...)")
 	flags.Int("sbom-version", 1, "SBOM version for BOM-Link (default: 1)")
@@ -222,12 +223,21 @@ func action(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to extract SBOM metadata: %w", err)
 	}
 
+	specVersionStr, err := flags.GetString("cyclonedx-spec-version")
+	if err != nil {
+		return err
+	}
+	specVersion, err := outputhandler.ParseSpecVersion(specVersionStr)
+	if err != nil {
+		return err
+	}
+
 	// The VEX gets its own serialNumber; the attestation links back to it.
 	vexUUID := uuid.NewString()
 
 	switch outputFormat {
 	case "cyclonedxvex":
-		h = outputhandler.NewCycloneDxVexOutputHandler(outputW, sbomUUID, sbomVersion, vexUUID)
+		h = outputhandler.NewCycloneDxVexOutputHandler(outputW, sbomUUID, sbomVersion, vexUUID, specVersion)
 	default:
 		return fmt.Errorf("unknown output format %q", outputFormat)
 	}
