@@ -1,0 +1,73 @@
+# A failure DURING generation (e.g. an LLM error mid-run) must not truncate
+# an existing output file: vens writes to a temp file in the destination
+# directory and only renames it into place on success.
+
+# Produce a valid output file first
+exec vens generate --llm=mock --config-file=config.yaml --sbom-serial-number=urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79 report.json out.cdx.json
+cp out.cdx.json golden.cdx.json
+
+# Force the mock LLM to fail mid-generation. The pre-existing output file
+# must survive byte-identical.
+env VENS_MOCK_LLM_FAIL=1
+! exec vens generate --llm=mock --config-file=config.yaml --sbom-serial-number=urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79 report.json out.cdx.json
+stderr 'failed to generate risk scores'
+cmp golden.cdx.json out.cdx.json
+
+# A failed run must not create a previously missing output file either,
+# and no temp file may be left behind.
+! exec vens generate --llm=mock --config-file=config.yaml --sbom-serial-number=urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79 report.json missing.cdx.json
+stderr 'failed to generate risk scores'
+! exists missing.cdx.json
+! exec sh -c 'ls .vens-*.tmp'
+
+# With the failure injection unset, generation succeeds again and overwrites
+# the output normally (serialNumber and timestamp differ per run, so check
+# content rather than bytes).
+env VENS_MOCK_LLM_FAIL=
+exec vens generate --llm=mock --config-file=config.yaml --sbom-serial-number=urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79 report.json out.cdx.json
+json-contains out.cdx.json '"specVersion": "1.6"'
+json-contains out.cdx.json '"CVE-2024-1234"'
+
+-- config.yaml --
+project:
+  name: "test-project"
+  description: "Test project for integration tests"
+context:
+  exposure: "internet"
+  data_sensitivity: "high"
+  business_criticality: "critical"
+-- report.json --
+{
+  "SchemaVersion": 2,
+  "CreatedAt": "2024-01-15T10:00:00Z",
+  "ArtifactName": "nginx:1.25",
+  "ArtifactType": "container_image",
+  "Results": [
+    {
+      "Target": "nginx:1.25 (debian 12.4)",
+      "Class": "os-pkgs",
+      "Type": "debian",
+      "Vulnerabilities": [
+        {
+          "VulnerabilityID": "CVE-2024-1234",
+          "PkgID": "openssl@3.0.11-1~deb12u2",
+          "PkgName": "openssl",
+          "PkgIdentifier": {
+            "PURL": "pkg:deb/debian/openssl@3.0.11-1~deb12u2?arch=amd64&distro=debian-12.4"
+          },
+          "InstalledVersion": "3.0.11-1~deb12u2",
+          "FixedVersion": "3.0.13-1~deb12u1",
+          "Status": "fixed",
+          "Title": "OpenSSL: Buffer overflow in SSL_select_next_proto",
+          "Description": "A buffer overflow vulnerability in OpenSSL.",
+          "Severity": "HIGH",
+          "DataSource": {
+            "ID": "debian",
+            "Name": "Debian Security Tracker",
+            "URL": "https://security-tracker.debian.org/tracker/CVE-2024-1234"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -21,7 +21,9 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"strings"
+	"syscall"
 
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
@@ -248,21 +250,43 @@ func action(cmd *cobra.Command, args []string) error {
 	}
 
 	// Flags are validated and the report has parsed; only now is it safe to
-	// create (and truncate) the output file.
-	outputW, err := os.Create(outputPath)
+	// prepare the output. Write to a temp file in the destination directory
+	// and rename it into place only on success, so a failure during
+	// generation never truncates an existing output file.
+	outputW, err := tempOutputFile(outputPath)
 	if err != nil {
 		return fmt.Errorf("failed to create output file: %w", err)
 	}
-	defer outputW.Close() //nolint:errcheck
+	tmpPath := outputW.Name()
+	committed := false
+	defer func() {
+		outputW.Close() //nolint:errcheck
+		if !committed {
+			os.Remove(tmpPath) //nolint:errcheck
+		}
+	}()
 
 	h := newHandler(outputW)
 
-	if len(vulns) == 0 {
-		slog.WarnContext(ctx, "No vulnerabilities found in the report")
+	// commit flushes the handler, then atomically moves the temp file into
+	// place. From here on the deferred cleanup must not remove it.
+	commit := func() error {
 		if err := h.Close(); err != nil {
 			return fmt.Errorf("failed to close output: %w", err)
 		}
+		if err := outputW.Close(); err != nil {
+			return fmt.Errorf("failed to close output file: %w", err)
+		}
+		if err := os.Rename(tmpPath, outputPath); err != nil {
+			return fmt.Errorf("failed to move output file into place: %w", err)
+		}
+		committed = true
 		return nil
+	}
+
+	if len(vulns) == 0 {
+		slog.WarnContext(ctx, "No vulnerabilities found in the report")
+		return commit()
 	}
 
 	slog.InfoContext(ctx, "Processing vulnerabilities", "count", len(vulns))
@@ -289,27 +313,66 @@ func action(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to generate risk scores: %w", err)
 	}
 
-	if err := h.Close(); err != nil {
+	if err := commit(); err != nil {
 		return err
 	}
 
 	if attestor != nil && attestor.BatchCount() > 0 {
 		atPath := attestation.SiblingPath(outputPath)
-		atW, err := os.Create(atPath)
+		atW, err := tempOutputFile(atPath)
 		if err != nil {
 			return fmt.Errorf("failed to create attestation file %q: %w", atPath, err)
 		}
+		atTmpPath := atW.Name()
+		atCommitted := false
+		defer func() {
+			if !atCommitted {
+				atW.Close()          //nolint:errcheck
+				os.Remove(atTmpPath) //nolint:errcheck
+			}
+		}()
 		if err := attestor.Write(atW); err != nil {
-			atW.Close() //nolint:errcheck
 			return fmt.Errorf("failed to write attestation: %w", err)
 		}
 		if err := atW.Close(); err != nil {
 			return fmt.Errorf("failed to close attestation file %q: %w", atPath, err)
 		}
+		if err := os.Rename(atTmpPath, atPath); err != nil {
+			return fmt.Errorf("failed to move attestation file into place: %w", err)
+		}
+		atCommitted = true
 		slog.InfoContext(ctx, "Attestation written", "path", atPath, "batches", attestor.BatchCount())
 	}
 
 	return nil
+}
+
+// tempOutputFile creates a temp file next to outputPath (same directory, so
+// the later os.Rename stays on one filesystem and is atomic). The caller is
+// responsible for closing, renaming, or removing it.
+func tempOutputFile(outputPath string) (*os.File, error) {
+	tmp, err := os.CreateTemp(filepath.Dir(outputPath), ".vens-*.tmp")
+	if err != nil {
+		return nil, err
+	}
+	if err := tmp.Chmod(outputFileMode(outputPath)); err != nil {
+		tmp.Close()           //nolint:errcheck
+		os.Remove(tmp.Name()) //nolint:errcheck
+		return nil, err
+	}
+	return tmp, nil
+}
+
+// outputFileMode reports the permissions the output file should have: the
+// destination's existing mode when it already exists, otherwise the
+// 0666-before-umask mode os.Create would have produced.
+func outputFileMode(outputPath string) os.FileMode {
+	if fi, err := os.Stat(outputPath); err == nil {
+		return fi.Mode().Perm()
+	}
+	umask := syscall.Umask(0)
+	syscall.Umask(umask)
+	return 0o666 &^ os.FileMode(umask)
 }
 
 // extractSBOMMetadata extracts UUID and version from flags.

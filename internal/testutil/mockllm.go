@@ -18,12 +18,18 @@ package testutil
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"os"
 	"regexp"
 	"strconv"
 
 	"github.com/venslabs/vens/pkg/llm"
 )
+
+// FailEnv, when set to a non-empty value, makes Generate fail. Integration
+// tests use it to exercise error paths that only surface during generation.
+const FailEnv = "VENS_MOCK_LLM_FAIL"
 
 type MockLLM struct{}
 
@@ -47,6 +53,10 @@ type llmOutput struct {
 // Generate returns deterministic scores for every vulnId found in the human
 // prompt, so integration tests stay reproducible without a real provider.
 func (m *MockLLM) Generate(ctx context.Context, req llm.Request) (string, error) {
+	if os.Getenv(FailEnv) != "" {
+		return "", errors.New("mockllm: forced failure (" + FailEnv + " is set)")
+	}
+
 	vulnIDs, err := extractVulnIDs(req.Human)
 	if err != nil {
 		return "", err
