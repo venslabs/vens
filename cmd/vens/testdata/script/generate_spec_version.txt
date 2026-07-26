@@ -25,6 +25,14 @@ stderr 'unsupported CycloneDX spec version'
 ! exec vens generate --llm=mock --cyclonedx-spec-version=1.5 --config-file=config.yaml --sbom-serial-number=urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79 report.json existing.cdx.json
 cmp v16.cdx.json existing.cdx.json
 
+# A malformed report that still detects as Trivy (it has a "Results" key) fails
+# the typed unmarshal. It must not truncate an existing output file either: the
+# report is parsed before the output file is created.
+cp v16.cdx.json existing2.cdx.json
+! exec vens generate --llm=mock --config-file=config.yaml --sbom-serial-number=urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79 malformed.json existing2.cdx.json
+stderr 'failed to parse vulnerabilities'
+cmp v16.cdx.json existing2.cdx.json
+
 -- config.yaml --
 project:
   name: "test-project"
@@ -68,3 +76,6 @@ context:
     }
   ]
 }
+
+-- malformed.json --
+{"Results": "not-an-array"}

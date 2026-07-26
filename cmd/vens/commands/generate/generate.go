@@ -241,8 +241,14 @@ func action(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("unknown output format %q", outputFormat)
 	}
 
-	// All validation is done; only now is it safe to create (and truncate)
-	// the output file.
+	// Parse vulnerabilities
+	vulns, err := reportScanner.Parse(inputB)
+	if err != nil {
+		return fmt.Errorf("failed to parse vulnerabilities: %w", err)
+	}
+
+	// Flags are validated and the report has parsed; only now is it safe to
+	// create (and truncate) the output file.
 	outputW, err := os.Create(outputPath)
 	if err != nil {
 		return fmt.Errorf("failed to create output file: %w", err)
@@ -250,12 +256,6 @@ func action(cmd *cobra.Command, args []string) error {
 	defer outputW.Close() //nolint:errcheck
 
 	h := newHandler(outputW)
-
-	// Parse vulnerabilities
-	vulns, err := reportScanner.Parse(inputB)
-	if err != nil {
-		return fmt.Errorf("failed to parse vulnerabilities: %w", err)
-	}
 
 	if len(vulns) == 0 {
 		slog.WarnContext(ctx, "No vulnerabilities found in the report")
