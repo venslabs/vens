@@ -28,7 +28,7 @@ Without VEX, every consumer of the scanner output has to re-do this analysis fro
 
 ## What does Vens put in a VEX?
 
-Vens emits a **CycloneDX 1.7 VEX BOM**. For each CVE, it writes:
+Vens emits a **CycloneDX 1.6 VEX BOM** (1.6 is the default so Dependency-Track can ingest it; `--cyclonedx-spec-version 1.7` opts up). For each CVE, it writes:
 
 - `id` — the CVE identifier
 - `source` — where the CVE comes from (NVD, GHSA, vendor tracker, …)

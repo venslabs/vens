@@ -110,12 +110,12 @@ Output format. Default: `auto`. Currently only `cyclonedxvex` is supported.
 
 ### `--cyclonedx-spec-version <1.6|1.7>`
 
-CycloneDX spec version for the VEX output. Default: `1.7`.
+CycloneDX spec version for the VEX output. Default: `1.6`.
 
-Pin the output to `1.6` for consumers that don't understand 1.7 yet — mainly older Dependency-Track and strict validators. Any value other than `1.6` or `1.7` is rejected with an error.
+The default is `1.6` because no released Dependency-Track version can ingest a 1.7 BOM yet (it is rejected as an unrecognized specVersion) — 1.6 lands out of the box. Opt up to `1.7` if your consumer understands it. The `--attest` sidecar is emitted at the same spec version as the VEX. Any value other than `1.6` or `1.7` is rejected with an error.
 
 ```bash
-vens generate --cyclonedx-spec-version 1.6 \
+vens generate --cyclonedx-spec-version 1.7 \
   --config-file c.yaml \
   --sbom-serial-number "$SBOM_UUID" \
   report.json out.json
@@ -189,7 +189,7 @@ vens generate --attest \
 # writes out.cdx.json AND out.attestation.cdx.json
 ```
 
-**What it contains** (CDX 1.7 BOM, everything under `declarations`):
+**What it contains** (CDX BOM at the same spec version as the VEX — `1.6` by default, or whatever `--cyclonedx-spec-version` selects — everything under `declarations`):
 
 - `claims[]` — one per scored CVE/affected component: the assessment (`predicate` + `reasoning`), linked to its target component and to the evidence that backs it
 - `targets.components[]` — the affected components the claims point at
