@@ -40,6 +40,10 @@ type Opts struct {
 	ConfigHash  string
 	VEXUUID     string
 	VEXVersion  int
+	// SpecVersion is the CycloneDX spec version the attestation is encoded
+	// to. It should match the VEX it describes; zero selects the default
+	// (SpecVersion1_6).
+	SpecVersion cyclonedx.SpecVersion
 	Now         func() time.Time
 }
 
@@ -55,8 +59,9 @@ type ClaimInput struct {
 	Reasoning   string
 }
 
-// Builder collects per-batch evidence and per-CVE claims, then emits a CDX 1.7
-// BOM with declarations (targets, claims, evidence, assessor, attestation).
+// Builder collects per-batch evidence and per-CVE claims, then emits a
+// CycloneDX BOM with declarations (targets, claims, evidence, assessor,
+// attestation) at Opts.SpecVersion.
 type Builder struct {
 	opts       Opts
 	batches    []batchEvidence
@@ -94,6 +99,9 @@ func SiblingPath(vexPath string) string {
 func NewBuilder(opts Opts) *Builder {
 	if opts.Now == nil {
 		opts.Now = time.Now
+	}
+	if opts.SpecVersion == 0 {
+		opts.SpecVersion = cyclonedx.SpecVersion1_6
 	}
 	return &Builder{opts: opts, seenTarget: map[string]bool{}}
 }
@@ -138,8 +146,8 @@ func (b *Builder) AddClaim(evidenceRef string, c ClaimInput) {
 // BatchCount returns the number of batches recorded.
 func (b *Builder) BatchCount() int { return len(b.batches) }
 
-// Write serializes the attestation as a CycloneDX 1.7 JSON BOM.
-// Returns an error if no batches were recorded.
+// Write serializes the attestation as a CycloneDX JSON BOM at
+// Opts.SpecVersion. Returns an error if no batches were recorded.
 func (b *Builder) Write(w io.Writer) error {
 	if len(b.batches) == 0 {
 		return fmt.Errorf("attestation: no batches recorded")
@@ -190,7 +198,7 @@ func (b *Builder) Write(w io.Writer) error {
 
 	enc := cyclonedx.NewBOMEncoder(w, cyclonedx.BOMFileFormatJSON)
 	enc.SetPretty(true)
-	if err := enc.EncodeVersion(bom, cyclonedx.SpecVersion1_7); err != nil {
+	if err := enc.EncodeVersion(bom, b.opts.SpecVersion); err != nil {
 		return fmt.Errorf("attestation: encode: %w", err)
 	}
 	return nil

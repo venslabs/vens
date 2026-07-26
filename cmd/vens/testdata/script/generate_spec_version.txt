@@ -1,20 +1,29 @@
 # Test the --cyclonedx-spec-version flag
 
-# Default (no flag) emits CycloneDX 1.7
+# Default (no flag) emits CycloneDX 1.6
 exec vens generate --llm=mock --config-file=config.yaml --sbom-serial-number=urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79 report.json default.cdx.json
-json-contains default.cdx.json '"specVersion": "1.7"'
+json-contains default.cdx.json '"specVersion": "1.6"'
 
 # Explicit 1.7
 exec vens generate --llm=mock --cyclonedx-spec-version=1.7 --config-file=config.yaml --sbom-serial-number=urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79 report.json v17.cdx.json
 json-contains v17.cdx.json '"specVersion": "1.7"'
 
+# The attestation sidecar matches the requested spec version
+exec vens generate --llm=mock --attest --cyclonedx-spec-version=1.7 --config-file=config.yaml --sbom-serial-number=urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79 report.json v17att.cdx.json
+json-contains v17att.cdx.json '"specVersion": "1.7"'
+json-contains v17att.attestation.cdx.json '"specVersion": "1.7"'
+
 # Opt out to 1.6
 exec vens generate --llm=mock --cyclonedx-spec-version=1.6 --config-file=config.yaml --sbom-serial-number=urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79 report.json v16.cdx.json
 json-contains v16.cdx.json '"specVersion": "1.6"'
 
-# Unsupported version is rejected with a clear error
+# Unsupported version is rejected with a clear error, and an existing output
+# file is NOT truncated by the failed run
+cp v16.cdx.json existing.cdx.json
 ! exec vens generate --llm=mock --cyclonedx-spec-version=1.5 --config-file=config.yaml --sbom-serial-number=urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79 report.json bad.cdx.json
 stderr 'unsupported CycloneDX spec version'
+! exec vens generate --llm=mock --cyclonedx-spec-version=1.5 --config-file=config.yaml --sbom-serial-number=urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79 report.json existing.cdx.json
+cmp v16.cdx.json existing.cdx.json
 
 -- config.yaml --
 project:

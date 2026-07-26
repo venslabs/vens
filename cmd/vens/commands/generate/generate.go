@@ -18,6 +18,7 @@ package generate
 
 import (
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"strings"
@@ -200,14 +201,9 @@ func action(cmd *cobra.Command, args []string) error {
 		slog.DebugContext(ctx, "Using explicit input format", "format", inputFormat)
 	}
 
-	// Setup output handler
-	var h outputhandler.OutputHandler
-	outputW, err := os.Create(outputPath)
-	if err != nil {
-		return fmt.Errorf("failed to create output file: %w", err)
-	}
-	defer outputW.Close() //nolint:errcheck
-
+	// Resolve and validate every output-related flag BEFORE creating the
+	// output file: os.Create truncates an existing file, so it must run only
+	// once every value that can fail validation has been checked.
 	outputFormat, err := flags.GetString("output-format")
 	if err != nil {
 		return err
@@ -235,12 +231,25 @@ func action(cmd *cobra.Command, args []string) error {
 	// The VEX gets its own serialNumber; the attestation links back to it.
 	vexUUID := uuid.NewString()
 
+	var newHandler func(w io.Writer) outputhandler.OutputHandler
 	switch outputFormat {
 	case "cyclonedxvex":
-		h = outputhandler.NewCycloneDxVexOutputHandler(outputW, sbomUUID, sbomVersion, vexUUID, specVersion)
+		newHandler = func(w io.Writer) outputhandler.OutputHandler {
+			return outputhandler.NewCycloneDxVexOutputHandler(w, sbomUUID, sbomVersion, vexUUID, specVersion)
+		}
 	default:
 		return fmt.Errorf("unknown output format %q", outputFormat)
 	}
+
+	// All validation is done; only now is it safe to create (and truncate)
+	// the output file.
+	outputW, err := os.Create(outputPath)
+	if err != nil {
+		return fmt.Errorf("failed to create output file: %w", err)
+	}
+	defer outputW.Close() //nolint:errcheck
+
+	h := newHandler(outputW)
 
 	// Parse vulnerabilities
 	vulns, err := reportScanner.Parse(inputB)
@@ -270,6 +279,7 @@ func action(cmd *cobra.Command, args []string) error {
 			ConfigHash:  attestation.HashInput(cfgBytes),
 			VEXUUID:     vexUUID,
 			VEXVersion:  sbomVersion,
+			SpecVersion: specVersion,
 		})
 		g.SetAttestor(attestor)
 	}

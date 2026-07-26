@@ -7,9 +7,9 @@ stderr 'Attestation written'
 exists output.cdx.json
 exists output.attestation.cdx.json
 
-# CDX 1.7 BOM with declarations.evidence
+# CDX 1.6 BOM with declarations.evidence (default spec version)
 json-contains output.attestation.cdx.json '"bomFormat": "CycloneDX"'
-json-contains output.attestation.cdx.json '"specVersion": "1.7"'
+json-contains output.attestation.cdx.json '"specVersion": "1.6"'
 json-contains output.attestation.cdx.json '"declarations"'
 json-contains output.attestation.cdx.json '"evidence"'
 

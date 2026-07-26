@@ -27,17 +27,40 @@ import (
 )
 
 // DefaultSpecVersion is the CycloneDX spec version emitted when the caller does
-// not request a specific one.
-const DefaultSpecVersion = "1.7"
+// not request a specific one. It is 1.6 because no released Dependency-Track
+// can ingest 1.7 yet; 1.7 stays available via --cyclonedx-spec-version.
+const DefaultSpecVersion = "1.6"
+
+// specVersionEntry pairs a CycloneDX spec version string with its
+// cyclonedx.SpecVersion. specVersions is the single ordered source of truth;
+// SupportedSpecVersions and specVersionsByString are both derived from it.
+type specVersionEntry struct {
+	name string
+	spec cyclonedx.SpecVersion
+}
+
+var specVersions = []specVersionEntry{
+	{"1.6", cyclonedx.SpecVersion1_6},
+	{"1.7", cyclonedx.SpecVersion1_7},
+}
 
 // SupportedSpecVersions lists the CycloneDX spec versions vens can emit, in
 // ascending order. Used for validation and help/error text.
-var SupportedSpecVersions = []string{"1.6", "1.7"}
+var SupportedSpecVersions = func() []string {
+	names := make([]string, len(specVersions))
+	for i, e := range specVersions {
+		names[i] = e.name
+	}
+	return names
+}()
 
-var specVersionsByString = map[string]cyclonedx.SpecVersion{
-	"1.6": cyclonedx.SpecVersion1_6,
-	"1.7": cyclonedx.SpecVersion1_7,
-}
+var specVersionsByString = func() map[string]cyclonedx.SpecVersion {
+	m := make(map[string]cyclonedx.SpecVersion, len(specVersions))
+	for _, e := range specVersions {
+		m[e.name] = e.spec
+	}
+	return m
+}()
 
 // ParseSpecVersion maps a CycloneDX spec version string (e.g. "1.6", "1.7") to
 // its cyclonedx.SpecVersion. It returns an error for any value outside

@@ -24,6 +24,7 @@ import (
 	"testing"
 	"time"
 
+	cyclonedx "github.com/CycloneDX/cyclonedx-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -146,7 +147,7 @@ func TestBuilder_Write_StructureAndFields(t *testing.T) {
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &got), "output:\n%s", buf.String())
 
 	assert.Equal(t, "CycloneDX", got.BomFormat)
-	assert.Equal(t, "1.7", got.SpecVersion)
+	assert.Equal(t, "1.6", got.SpecVersion)
 	assert.True(t, strings.HasPrefix(got.SerialNumber, "urn:uuid:"), "serialNumber=%q", got.SerialNumber)
 	assert.Equal(t, 1, got.Version)
 	assert.Equal(t, "2026-05-25T10:00:00Z", got.Metadata.Timestamp)
@@ -183,6 +184,31 @@ func TestBuilder_Write_StructureAndFields(t *testing.T) {
 	require.NoError(t, err, "raw_response not base64")
 	assert.Equal(t, raw, gotResp)
 	assert.Equal(t, "base64", encodings["raw_response"])
+}
+
+func TestBuilder_Write_SpecVersion(t *testing.T) {
+	cases := []struct {
+		name string
+		mod  func(*Opts)
+		want string
+	}{
+		{name: "explicit 1.7", mod: func(o *Opts) { o.SpecVersion = cyclonedx.SpecVersion1_7 }, want: "1.7"},
+		{name: "explicit 1.6", mod: func(o *Opts) { o.SpecVersion = cyclonedx.SpecVersion1_6 }, want: "1.6"},
+		{name: "zero defaults to 1.6", mod: nil, want: "1.6"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			b := newTestBuilder(t, tc.mod)
+			b.AddBatch("s", "h", []byte("{}"))
+			var buf bytes.Buffer
+			require.NoError(t, b.Write(&buf))
+			var got struct {
+				SpecVersion string `json:"specVersion"`
+			}
+			require.NoError(t, json.Unmarshal(buf.Bytes(), &got))
+			assert.Equal(t, tc.want, got.SpecVersion)
+		})
+	}
 }
 
 func TestBuilder_Write_NoVEXUUID_NoComponent(t *testing.T) {

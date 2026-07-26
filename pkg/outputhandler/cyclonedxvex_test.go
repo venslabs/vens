@@ -405,6 +405,7 @@ func TestCycloneDxVexWriter_Close_SpecVersion(t *testing.T) {
 			h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 1, "", tc.specVersion)
 
 			score := 42.0
+			const vector = "SL:7/M:7/O:7/S:7/ED:6/EE:6/A:6/ID:3/LC:7/LI:7/LAV:7/LAC:7/FD:7/RD:7/NC:7/PV:7"
 			if err := h.HandleVulnRatings([]VulnRating{
 				{
 					VulnID: "CVE-2024-1234",
@@ -413,6 +414,7 @@ func TestCycloneDxVexWriter_Close_SpecVersion(t *testing.T) {
 						Method:   cyclonedx.ScoringMethodOWASP,
 						Score:    &score,
 						Severity: cyclonedx.SeverityHigh,
+						Vector:   vector,
 					},
 					Source: &cyclonedx.Source{Name: "NVD"},
 				},
@@ -433,6 +435,30 @@ func TestCycloneDxVexWriter_Close_SpecVersion(t *testing.T) {
 			}
 			if doc.SpecVersion != tc.want {
 				t.Errorf("specVersion = %q, want %q", doc.SpecVersion, tc.want)
+			}
+
+			// Decode the emitted BOM back and check the OWASP rating survived
+			// the encode at this spec version.
+			bom := new(cyclonedx.BOM)
+			if err := cyclonedx.NewBOMDecoder(bytes.NewReader(buf.Bytes()), cyclonedx.BOMFileFormatJSON).Decode(bom); err != nil {
+				t.Fatalf("decode BOM: %v", err)
+			}
+			if bom.Vulnerabilities == nil || len(*bom.Vulnerabilities) != 1 {
+				t.Fatalf("decoded BOM has %v vulnerabilities, want 1", bom.Vulnerabilities)
+			}
+			ratings := (*bom.Vulnerabilities)[0].Ratings
+			if ratings == nil || len(*ratings) != 1 {
+				t.Fatalf("decoded vulnerability has %v ratings, want 1", ratings)
+			}
+			r := (*ratings)[0]
+			if r.Method != cyclonedx.ScoringMethodOWASP {
+				t.Errorf("rating method = %q, want %q", r.Method, cyclonedx.ScoringMethodOWASP)
+			}
+			if r.Score == nil {
+				t.Error("rating score is nil, want non-nil")
+			}
+			if r.Vector != vector {
+				t.Errorf("rating vector = %q, want %q", r.Vector, vector)
 			}
 		})
 	}
