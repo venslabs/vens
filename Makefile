@@ -8,7 +8,7 @@ GO_LDFLAGS ?= -s -w -X $(VERSION_SYMBOL)=$(VERSION)
 GO_BUILD ?= $(GO) build -trimpath -ldflags="$(GO_LDFLAGS)"
 # Bump by hand when a newer golangci-lint v2 lands: Dependabot tracks the
 # action SHA and go modules, not this pin, so it will otherwise go stale silently.
-GOLANGCI_VERSION ?= v2.12.2
+GOLANGCI_VERSION ?= v2.13.1
 GOPATH_BIN := $(shell $(GO) env GOBIN)
 ifeq ($(GOPATH_BIN),)
 GOPATH_BIN := $(shell $(GO) env GOPATH)/bin
