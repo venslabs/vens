@@ -37,9 +37,6 @@ func TestTrivyScanner_Parse_DataSource(t *testing.T) {
 							Name: "Debian OVAL",
 							URL:  "https://www.debian.org/security/oval/",
 						},
-						Vulnerability: dbtypes.Vulnerability{
-							Severity: "HIGH",
-						},
 					},
 				},
 			},
@@ -80,9 +77,6 @@ func TestTrivyScanner_Parse_NilDataSource(t *testing.T) {
 						PkgID:           "bar@2.0.0",
 						PkgName:         "bar",
 						DataSource:      nil,
-						Vulnerability: dbtypes.Vulnerability{
-							Severity: "MEDIUM",
-						},
 					},
 				},
 			},
