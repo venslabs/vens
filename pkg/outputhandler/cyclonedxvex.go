@@ -17,7 +17,6 @@ package outputhandler
 import (
 	"fmt"
 	"io"
-	"log/slog"
 	"strings"
 	"time"
 
@@ -130,9 +129,14 @@ func (c *cycloneDxVexWriter) Close() error {
 
 	vulnMap := make(map[string]*cyclonedx.Vulnerability)
 	affectsSet := make(map[string]map[string]bool)
+	var unreferenced []string
+	seenUnreferenced := make(map[string]bool)
 	for _, g := range c.r {
 		if g.BOMRef == "" {
-			slog.Warn("Skipping vulnerability without BOMRef", "vuln", g.VulnID)
+			if !seenUnreferenced[g.VulnID] {
+				seenUnreferenced[g.VulnID] = true
+				unreferenced = append(unreferenced, g.VulnID)
+			}
 			continue
 		}
 
@@ -158,6 +162,14 @@ func (c *cycloneDxVexWriter) Close() error {
 	vulns := make([]cyclonedx.Vulnerability, 0, len(vulnMap))
 	for _, v := range vulnMap {
 		vulns = append(vulns, *v)
+	}
+
+	// A rating we cannot attach to a component would drop out of the VEX. Silence
+	// there is a one-way failure: a CVE missing from the document can never block
+	// a build.
+	if len(unreferenced) > 0 {
+		return fmt.Errorf("no component to reference for %d scored vulnerabilities: %s",
+			len(unreferenced), strings.Join(unreferenced, ", "))
 	}
 
 	if len(vulns) > 0 {
