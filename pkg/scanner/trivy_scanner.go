@@ -34,16 +34,11 @@ func (s *TrivyScanner) Parse(data []byte) ([]generator.Vulnerability, error) {
 		return nil, fmt.Errorf("failed to parse Trivy report: %w", err)
 	}
 
-	purlCounts := make(map[string]int)
+	purlCounts := countComponentsPerPURL(report)
 	var vulns []generator.Vulnerability
 
 	for _, result := range report.Results {
 		for _, v := range result.Vulnerabilities {
-			if v.PkgIdentifier.PURL != nil {
-				purl := v.PkgIdentifier.PURL.ToString()
-				purlCounts[purl]++
-			}
-
 			// Calculate BOMRef using Trivy's logic
 			bomRef := calculateTrivyBOMRef(v.PkgIdentifier, v.PkgID, purlCounts)
 
@@ -79,13 +74,45 @@ func (s *TrivyScanner) Name() string {
 	return string(ScannerTrivy)
 }
 
+// countComponentsPerPURL counts distinct components behind each PURL. A report
+// has one row per (vulnerability, component), so a PURL repeats once per CVE:
+// only covering several components makes it unusable as a BOM-Ref.
+func countComponentsPerPURL(report trivytypes.Report) map[string]int {
+	components := make(map[string]map[string]struct{})
+
+	for _, result := range report.Results {
+		for _, v := range result.Vulnerabilities {
+			if v.PkgIdentifier.PURL == nil {
+				continue
+			}
+			purl := v.PkgIdentifier.PURL.ToString()
+
+			identity := v.PkgID
+			if identity == "" {
+				identity = v.PkgName + "@" + v.InstalledVersion
+			}
+
+			if components[purl] == nil {
+				components[purl] = make(map[string]struct{})
+			}
+			components[purl][identity] = struct{}{}
+		}
+	}
+
+	counts := make(map[string]int, len(components))
+	for purl, identities := range components {
+		counts[purl] = len(identities)
+	}
+	return counts
+}
+
 // calculateTrivyBOMRef calculates the BOM-Ref using Trivy's logic.
 // This follows the same algorithm as Trivy to ensure VEX compatibility.
 //
 // Logic (from Trivy pkg/sbom/core/bom.go):
 //  1. If BOMRef is already set, use it
 //  2. If no PURL, use fallback identifier (PkgID)
-//  3. If PURL is not unique (appears multiple times), use fallback identifier
+//  3. If the PURL covers more than one component, use fallback identifier
 //  4. Otherwise, use PURL
 //
 // See: https://github.com/aquasecurity/trivy/blob/v0.69.0/pkg/sbom/core/bom.go#L364
@@ -102,7 +129,7 @@ func calculateTrivyBOMRef(pkgIdentifier ftypes.PkgIdentifier, pkgID string, purl
 
 	purl := pkgIdentifier.PURL.ToString()
 
-	// 3. If PURL is not unique (appears multiple times), use fallback identifier
+	// 3. If the PURL covers more than one component, use fallback identifier
 	if purlCounts[purl] > 1 {
 		return pkgID
 	}
