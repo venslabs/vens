@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"strings"
 
-	ftypes "github.com/aquasecurity/trivy/pkg/fanal/types"
 	trivytypes "github.com/aquasecurity/trivy/pkg/types"
 	"github.com/venslabs/vens/pkg/generator"
 )
@@ -40,7 +39,7 @@ func (s *TrivyScanner) Parse(data []byte) ([]generator.Vulnerability, error) {
 	for _, result := range report.Results {
 		for _, v := range result.Vulnerabilities {
 			// Calculate BOMRef using Trivy's logic
-			bomRef := calculateTrivyBOMRef(v.PkgIdentifier, v.PkgID, purlCounts)
+			bomRef := calculateTrivyBOMRef(v, purlCounts)
 
 			vuln := generator.Vulnerability{
 				VulnID:           v.VulnerabilityID,
@@ -87,10 +86,7 @@ func countComponentsPerPURL(report trivytypes.Report) map[string]int {
 			}
 			purl := v.PkgIdentifier.PURL.ToString()
 
-			identity := v.PkgID
-			if identity == "" {
-				identity = v.PkgName + "@" + v.InstalledVersion
-			}
+			identity := componentIdentity(v)
 
 			if components[purl] == nil {
 				components[purl] = make(map[string]struct{})
@@ -106,32 +102,50 @@ func countComponentsPerPURL(report trivytypes.Report) map[string]int {
 	return counts
 }
 
+// componentIdentity is the component a finding sits on. Trivy leaves PkgID
+// empty on some ecosystems, pip among them, where name@version is the string it
+// writes itself everywhere else.
+func componentIdentity(v trivytypes.DetectedVulnerability) string {
+	if v.PkgID != "" {
+		return v.PkgID
+	}
+	if v.PkgName == "" {
+		return ""
+	}
+	return v.PkgName + "@" + v.InstalledVersion
+}
+
 // calculateTrivyBOMRef calculates the BOM-Ref using Trivy's logic.
 // This follows the same algorithm as Trivy to ensure VEX compatibility.
 //
 // Logic (from Trivy pkg/sbom/core/bom.go):
 //  1. If BOMRef is already set, use it
-//  2. If no PURL, use fallback identifier (PkgID)
-//  3. If the PURL covers more than one component, use fallback identifier
+//  2. If no PURL, use the component identity
+//  3. If the PURL covers more than one component, use the component identity
 //  4. Otherwise, use PURL
 //
+// An empty ref is dropped from the VEX further down, so rule 3 keeps the
+// ambiguous PURL rather than return nothing when there is no identity either.
+//
 // See: https://github.com/aquasecurity/trivy/blob/v0.69.0/pkg/sbom/core/bom.go#L364
-func calculateTrivyBOMRef(pkgIdentifier ftypes.PkgIdentifier, pkgID string, purlCounts map[string]int) string {
+func calculateTrivyBOMRef(v trivytypes.DetectedVulnerability, purlCounts map[string]int) string {
 	// 1. If BOMRef is already set, use it
-	if pkgIdentifier.BOMRef != "" {
-		return pkgIdentifier.BOMRef
+	if v.PkgIdentifier.BOMRef != "" {
+		return v.PkgIdentifier.BOMRef
 	}
 
-	// 2. If no PURL, use fallback identifier
-	if pkgIdentifier.PURL == nil {
-		return pkgID
+	identity := componentIdentity(v)
+
+	// 2. If no PURL, use the component identity
+	if v.PkgIdentifier.PURL == nil {
+		return identity
 	}
 
-	purl := pkgIdentifier.PURL.ToString()
+	purl := v.PkgIdentifier.PURL.ToString()
 
-	// 3. If the PURL covers more than one component, use fallback identifier
-	if purlCounts[purl] > 1 {
-		return pkgID
+	// 3. If the PURL covers more than one component, use the component identity
+	if purlCounts[purl] > 1 && identity != "" {
+		return identity
 	}
 
 	// 4. Otherwise, use PURL

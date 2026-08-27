@@ -221,3 +221,86 @@ func TestTrivyScanner_Parse_SharedPURLFallsBackToPkgID(t *testing.T) {
 		}
 	}
 }
+
+// Trivy leaves PkgID empty for pip. Before the fallback used name@version these
+// rows came out with no ref at all and were dropped from the VEX.
+func TestTrivyScanner_Parse_SharedPURLWithoutPkgIDStillGetsARef(t *testing.T) {
+	purl, err := packageurl.FromString("pkg:pypi/pip@25.0.1")
+	if err != nil {
+		t.Fatalf("FromString: %v", err)
+	}
+	id := ftypes.PkgIdentifier{PURL: &purl}
+
+	report := trivytypes.Report{
+		Results: []trivytypes.Result{
+			{
+				Target: "Python",
+				Vulnerabilities: []trivytypes.DetectedVulnerability{
+					{VulnerabilityID: "CVE-1", PkgName: "pip", InstalledVersion: "25.0.1", PkgIdentifier: id},
+					{VulnerabilityID: "CVE-2", PkgName: "pip-alt", InstalledVersion: "25.0.1", PkgIdentifier: id},
+				},
+			},
+		},
+	}
+
+	data, err := json.Marshal(report)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+
+	vulns, err := (&TrivyScanner{}).Parse(data)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+
+	want := map[string]string{"CVE-1": "pip@25.0.1", "CVE-2": "pip-alt@25.0.1"}
+	for _, v := range vulns {
+		if v.BOMRef != want[v.VulnID] {
+			t.Errorf("%s: BOMRef = %q, want %q", v.VulnID, v.BOMRef, want[v.VulnID])
+		}
+	}
+}
+
+func TestCalculateTrivyBOMRef_NeverEmptyWhenAnythingIdentifiesTheComponent(t *testing.T) {
+	purl, err := packageurl.FromString("pkg:generic/shared@1.0.0")
+	if err != nil {
+		t.Fatalf("FromString: %v", err)
+	}
+	shared := ftypes.PkgIdentifier{PURL: &purl}
+	counts := map[string]int{purl.String(): 2}
+
+	tests := []struct {
+		name string
+		v    trivytypes.DetectedVulnerability
+		want string
+	}{
+		{
+			name: "no purl, no pkgID",
+			v:    trivytypes.DetectedVulnerability{PkgName: "pip", InstalledVersion: "25.0.1"},
+			want: "pip@25.0.1",
+		},
+		{
+			name: "ambiguous purl, no pkgID",
+			v:    trivytypes.DetectedVulnerability{PkgName: "pip", InstalledVersion: "25.0.1", PkgIdentifier: shared},
+			want: "pip@25.0.1",
+		},
+		{
+			name: "ambiguous purl and nothing else, keep the purl",
+			v:    trivytypes.DetectedVulnerability{PkgIdentifier: shared},
+			want: purl.String(),
+		},
+		{
+			name: "nothing at all",
+			v:    trivytypes.DetectedVulnerability{},
+			want: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := calculateTrivyBOMRef(tt.v, counts); got != tt.want {
+				t.Errorf("calculateTrivyBOMRef() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}

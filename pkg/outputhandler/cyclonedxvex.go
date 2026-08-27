@@ -132,6 +132,9 @@ func (c *cycloneDxVexWriter) Close() error {
 	affectsSet := make(map[string]map[string]bool)
 	for _, g := range c.r {
 		if g.BOMRef == "" {
+			// Dropping it leaves the run at exit code 0 with a VEX short of a CVE,
+			// which for a gate only fails one way. Kept as a warning for now, see
+			// https://github.com/venslabs/vens/issues/272.
 			slog.Warn("Skipping vulnerability without BOMRef", "vuln", g.VulnID)
 			continue
 		}

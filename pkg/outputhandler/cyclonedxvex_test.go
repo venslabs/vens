@@ -463,3 +463,35 @@ func TestCycloneDxVexWriter_Close_SpecVersion(t *testing.T) {
 		})
 	}
 }
+
+// Current behaviour, tracked in #272: a rating with no component is warned about
+// and dropped, and the run still succeeds. Change this test when that changes.
+func TestCycloneDxVexWriter_Close_SkipsUnreferencedVuln(t *testing.T) {
+	var buf bytes.Buffer
+	h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 1, "", cyclonedx.SpecVersion1_7)
+
+	score := 42.0
+	rating := cyclonedx.VulnerabilityRating{
+		Method:   cyclonedx.ScoringMethodOWASP,
+		Score:    &score,
+		Severity: cyclonedx.SeverityHigh,
+	}
+	if err := h.HandleVulnRatings([]VulnRating{
+		{VulnID: "CVE-1", BOMRef: "pkg:npm/foo@1.0.0", Rating: rating},
+		{VulnID: "CVE-2", BOMRef: "", Rating: rating},
+	}); err != nil {
+		t.Fatalf("HandleVulnRatings: %v", err)
+	}
+
+	if err := h.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	out := buf.String()
+	if !strings.Contains(out, "CVE-1") {
+		t.Error("CVE-1 is missing from the VEX")
+	}
+	if strings.Contains(out, "CVE-2") {
+		t.Error("CVE-2 has no component, it should not be in the VEX")
+	}
+}
