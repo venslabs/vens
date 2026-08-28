@@ -195,3 +195,34 @@ func TestGenerate_Branches(t *testing.T) {
 		})
 	}
 }
+
+func TestGenerate_UnsupportedStructuredOutput(t *testing.T) {
+	const body = `{"error":{"code":400,"message":"Json mode is not enabled for models/gemini-1.5-flash",` +
+		`"status":"INVALID_ARGUMENT"}}`
+	srv := newTestServer(t, http.StatusBadRequest, body, nil)
+	c := newTestClient(t, srv.URL)
+
+	_, err := c.Generate(context.Background(), llm.Request{Human: "x", Schema: json.RawMessage(`{"type":"object"}`)})
+	if !errors.Is(err, llm.ErrUnsupportedStructuredOutput) {
+		t.Fatalf("err = %v, want llm.ErrUnsupportedStructuredOutput", err)
+	}
+	for _, want := range []string{`"` + testModel + `"`, "choosing-a-model.md", "Json mode is not enabled"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q does not mention %q", err, want)
+		}
+	}
+}
+
+func TestGenerate_OtherBadRequestIsNotStructuredOutput(t *testing.T) {
+	const body = `{"error":{"code":400,"message":"API key not valid. Please pass a valid API key.","status":"INVALID_ARGUMENT"}}`
+	srv := newTestServer(t, http.StatusBadRequest, body, nil)
+	c := newTestClient(t, srv.URL)
+
+	_, err := c.Generate(context.Background(), llm.Request{Human: "x", Schema: json.RawMessage(`{"type":"object"}`)})
+	if err == nil {
+		t.Fatal("Generate: want an error")
+	}
+	if errors.Is(err, llm.ErrUnsupportedStructuredOutput) {
+		t.Errorf("err = %v, want it classified as a plain provider error", err)
+	}
+}

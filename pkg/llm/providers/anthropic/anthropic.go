@@ -19,8 +19,11 @@ package anthropic
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net/http"
 	"os"
+	"strings"
 
 	sdk "github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
@@ -97,6 +100,10 @@ func (c *Client) Generate(ctx context.Context, req llm.Request) (string, error) 
 
 	msg, err := c.client.Messages.New(ctx, params)
 	if err != nil {
+		if detail, ok := unsupportedStructuredOutput(err); ok {
+			return "", fmt.Errorf("anthropic: %q: %w, see docs/concepts/choosing-a-model.md (%s)",
+				c.model, llm.ErrUnsupportedStructuredOutput, detail)
+		}
 		return "", fmt.Errorf("anthropic: message failed: %w", err)
 	}
 	if msg.StopReason == sdk.StopReasonMaxTokens {
@@ -109,4 +116,25 @@ func (c *Client) Generate(ctx context.Context, req llm.Request) (string, error) 
 		}
 	}
 	return "", fmt.Errorf("anthropic: no text content block in response")
+}
+
+func unsupportedStructuredOutput(err error) (string, bool) {
+	var apiErr *sdk.Error
+	if !errors.As(err, &apiErr) || apiErr.StatusCode != http.StatusBadRequest {
+		return "", false
+	}
+	var body struct {
+		Error struct {
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if json.Unmarshal([]byte(apiErr.RawJSON()), &body) != nil {
+		return "", false
+	}
+	for _, s := range []string{"output_config", "structured output"} {
+		if strings.Contains(strings.ToLower(body.Error.Message), s) {
+			return body.Error.Message, true
+		}
+	}
+	return "", false
 }

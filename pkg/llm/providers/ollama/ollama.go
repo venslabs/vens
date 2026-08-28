@@ -58,6 +58,8 @@ func (c *Client) Generate(ctx context.Context, req llm.Request) (string, error) 
 		},
 		Stream: &stream,
 	}
+	// Ollama constrains decoding server-side, so any model takes Format and there
+	// is no llm.ErrUnsupportedStructuredOutput rejection to translate.
 	if len(req.Schema) > 0 {
 		chatReq.Format = req.Schema
 	}

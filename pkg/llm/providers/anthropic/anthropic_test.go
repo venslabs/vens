@@ -263,3 +263,32 @@ func TestNewKeepsAConfiguredBaseURL(t *testing.T) {
 		t.Errorf("request URL = %q, want %q", got, want)
 	}
 }
+
+func TestGenerate_UnsupportedStructuredOutput(t *testing.T) {
+	const body = `{"type":"error","error":{"type":"invalid_request_error",` +
+		`"message":"output_config.format: Structured outputs are not supported for this model."}}`
+	c, _ := newTestClient(t, "claude-3-haiku-20240307", http.StatusBadRequest, body)
+
+	_, err := c.Generate(context.Background(), newReq())
+	if !errors.Is(err, llm.ErrUnsupportedStructuredOutput) {
+		t.Fatalf("err = %v, want llm.ErrUnsupportedStructuredOutput", err)
+	}
+	for _, want := range []string{`"claude-3-haiku-20240307"`, "choosing-a-model.md", "Structured outputs are not supported"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q does not mention %q", err, want)
+		}
+	}
+}
+
+func TestGenerate_OtherBadRequestIsNotStructuredOutput(t *testing.T) {
+	const body = `{"type":"error","error":{"type":"invalid_request_error","message":"max_tokens: must be greater than 0"}}`
+	c, _ := newTestClient(t, "claude-sonnet-4-5", http.StatusBadRequest, body)
+
+	_, err := c.Generate(context.Background(), newReq())
+	if err == nil {
+		t.Fatal("Generate: want an error")
+	}
+	if errors.Is(err, llm.ErrUnsupportedStructuredOutput) {
+		t.Errorf("err = %v, want it classified as a plain provider error", err)
+	}
+}

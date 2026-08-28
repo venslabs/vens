@@ -24,6 +24,18 @@ Set the model with the provider's `*_MODEL` env var (`OPENAI_MODEL`, `ANTHROPIC_
 
 ---
 
+## Native structured output is required
+
+Vens makes the provider constrain the answer to a JSON Schema — `response_format` on OpenAI, `output_config` on Anthropic, a response schema on Gemini. A model that cannot do it is refused by the provider on the first batch, before anything is written, and Vens names it:
+
+```
+openai: "gpt-4-turbo": model does not support native structured output, see docs/concepts/choosing-a-model.md (Invalid parameter: 'response_format' of type 'json_schema' is not supported with this model.)
+```
+
+Every model in the table above qualifies; older lines (GPT-3.5, GPT-4 Turbo, Claude 3.x, Gemini before 2.5) do not. Ollama is the exception — it constrains decoding server-side, so any model it serves takes the schema, which says nothing about whether the answer is worth having: see [local models](#local-models).
+
+---
+
 ## Why two things get measured, not one
 
 **CVE understanding** — can the model read a CVE and place its severity? This is nearly a solved, cheap problem: a $0.48 model ties a $4.12 one, and every 2026 model clears 2024's GPT-4.
