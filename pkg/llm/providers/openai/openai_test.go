@@ -305,3 +305,34 @@ func TestNewKeepsAConfiguredBaseURL(t *testing.T) {
 		t.Errorf("request URL = %q, want %q", got, want)
 	}
 }
+
+func TestGenerate_UnsupportedStructuredOutput(t *testing.T) {
+	const body = `{"error":{"message":"Invalid parameter: 'response_format' of type 'json_schema' is not supported with this model.",` +
+		`"type":"invalid_request_error","param":"response_format","code":null}}`
+	url, _ := fakeServer(t, http.StatusBadRequest, body)
+	c := newTestClient(t, "gpt-4-turbo", url)
+
+	_, err := c.Generate(context.Background(), llm.Request{Schema: json.RawMessage(testSchema)})
+	if !errors.Is(err, llm.ErrUnsupportedStructuredOutput) {
+		t.Fatalf("err = %v, want llm.ErrUnsupportedStructuredOutput", err)
+	}
+	for _, want := range []string{`"gpt-4-turbo"`, "choosing-a-model.md", "not supported with this model"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q does not mention %q", err, want)
+		}
+	}
+}
+
+func TestGenerate_OtherBadRequestIsNotStructuredOutput(t *testing.T) {
+	const body = `{"error":{"message":"Invalid value: 'nope'","type":"invalid_request_error","param":"model","code":null}}`
+	url, _ := fakeServer(t, http.StatusBadRequest, body)
+	c := newTestClient(t, "gpt-4o", url)
+
+	_, err := c.Generate(context.Background(), llm.Request{Schema: json.RawMessage(testSchema)})
+	if err == nil {
+		t.Fatal("Generate: want an error")
+	}
+	if errors.Is(err, llm.ErrUnsupportedStructuredOutput) {
+		t.Errorf("err = %v, want it classified as a plain provider error", err)
+	}
+}

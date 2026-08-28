@@ -29,6 +29,11 @@ import (
 // the batch and retry instead of failing the whole run.
 var ErrTruncated = errors.New("llm: response truncated at max output tokens")
 
+// ErrUnsupportedStructuredOutput reports that the model cannot do native
+// structured output. Providers detect it from the rejected request parameter,
+// never from a model list.
+var ErrUnsupportedStructuredOutput = errors.New("model does not support native structured output")
+
 // Supported LLM backends and selection helpers
 const (
 	Auto      = "auto"

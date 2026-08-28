@@ -20,8 +20,11 @@ package google
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net/http"
 	"os"
+	"strings"
 
 	"google.golang.org/genai"
 
@@ -81,6 +84,10 @@ func (c *Client) Generate(ctx context.Context, req llm.Request) (string, error) 
 
 	resp, err := c.genai.Models.GenerateContent(ctx, c.model, genai.Text(req.Human), cfg)
 	if err != nil {
+		if detail, ok := unsupportedStructuredOutput(err); ok {
+			return "", fmt.Errorf("google: %q: %w, see docs/concepts/choosing-a-model.md (%s)",
+				c.model, llm.ErrUnsupportedStructuredOutput, detail)
+		}
 		return "", fmt.Errorf("google: generate content: %w", err)
 	}
 	if len(resp.Candidates) > 0 && resp.Candidates[0].FinishReason == genai.FinishReasonMaxTokens {
@@ -103,4 +110,20 @@ func (c *Client) Generate(ctx context.Context, req llm.Request) (string, error) 
 	}
 
 	return text, nil
+}
+
+func unsupportedStructuredOutput(err error) (string, bool) {
+	var apiErr genai.APIError
+	if !errors.As(err, &apiErr) || apiErr.Code != http.StatusBadRequest {
+		return "", false
+	}
+	// Gemini names the field in either case, and says "Json mode" when the
+	// whole feature is missing; folding underscores covers both spellings.
+	msg := strings.ToLower(strings.ReplaceAll(apiErr.Message, "_", ""))
+	for _, s := range []string{"responsejsonschema", "responseschema", "json mode"} {
+		if strings.Contains(msg, s) {
+			return apiErr.Message, true
+		}
+	}
+	return "", false
 }

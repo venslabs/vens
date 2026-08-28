@@ -19,7 +19,9 @@ package openai
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 
@@ -104,6 +106,10 @@ func (c *Client) Generate(ctx context.Context, req llm.Request) (string, error) 
 
 	resp, err := c.api.Chat.Completions.New(ctx, params)
 	if err != nil {
+		if detail, ok := unsupportedStructuredOutput(err); ok {
+			return "", fmt.Errorf("openai: %q: %w, see docs/concepts/choosing-a-model.md (%s)",
+				c.model, llm.ErrUnsupportedStructuredOutput, detail)
+		}
 		return "", fmt.Errorf("openai: chat completion failed: %w", err)
 	}
 	if len(resp.Choices) == 0 {
@@ -129,4 +135,15 @@ func isReasoningModel(model string) bool {
 	m := strings.ToLower(model)
 	return strings.HasPrefix(m, "o1") || strings.HasPrefix(m, "o3") ||
 		strings.HasPrefix(m, "o4") || strings.HasPrefix(m, "gpt-5")
+}
+
+func unsupportedStructuredOutput(err error) (string, bool) {
+	var apiErr *openai.Error
+	if !errors.As(err, &apiErr) || apiErr.StatusCode != http.StatusBadRequest {
+		return "", false
+	}
+	if apiErr.Param != "response_format" && !strings.Contains(apiErr.Message, "response_format") {
+		return "", false
+	}
+	return apiErr.Message, true
 }
