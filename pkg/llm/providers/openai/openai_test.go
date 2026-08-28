@@ -25,6 +25,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/openai/openai-go/v3/option"
+
 	"github.com/venslabs/vens/pkg/llm"
 )
 
@@ -239,5 +241,67 @@ func TestGenerate_Branches(t *testing.T) {
 				t.Errorf("errors.Is(ErrTruncated) = %v, want %v", got, tc.wantTruncated)
 			}
 		})
+	}
+}
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+func capturingClient(got *string) option.RequestOption {
+	return option.WithHTTPClient(&http.Client{
+		Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+			*got = r.URL.String()
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     http.Header{"Content-Type": []string{"application/json"}},
+				Body:       io.NopCloser(strings.NewReader(successBody)),
+				Request:    r,
+			}, nil
+		}),
+	})
+}
+
+// Asserting what resolveBaseURL returns would keep passing with the bug back in
+// place, so assert the URL the SDK actually calls.
+func TestNewTargetsOpenAIWhenBaseURLIsEmpty(t *testing.T) {
+	t.Setenv("OPENAI_API_KEY", "test-key")
+	t.Setenv("OPENAI_BASE_URL", "")
+
+	var got string
+	c, err := newClient("gpt-4o", option.WithMaxRetries(0), capturingClient(&got))
+	if err != nil {
+		t.Fatalf("newClient: %v", err)
+	}
+	if _, err := c.Generate(context.Background(), llm.Request{
+		System: "you are a scorer",
+		Human:  "score this",
+		Schema: json.RawMessage(testSchema),
+	}); err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+
+	if want := defaultBaseURL + "chat/completions"; got != want {
+		t.Errorf("request URL = %q, want %q", got, want)
+	}
+}
+
+func TestNewKeepsAConfiguredBaseURL(t *testing.T) {
+	t.Setenv("OPENAI_API_KEY", "test-key")
+	t.Setenv("OPENAI_BASE_URL", "http://localhost:8080/v1/")
+
+	var got string
+	c, err := newClient("gpt-4o", option.WithMaxRetries(0), capturingClient(&got))
+	if err != nil {
+		t.Fatalf("newClient: %v", err)
+	}
+	if _, err := c.Generate(context.Background(), llm.Request{
+		Schema: json.RawMessage(testSchema),
+	}); err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+
+	if want := "http://localhost:8080/v1/chat/completions"; got != want {
+		t.Errorf("request URL = %q, want %q", got, want)
 	}
 }
