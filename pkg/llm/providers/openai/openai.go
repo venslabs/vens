@@ -30,6 +30,8 @@ import (
 	"github.com/venslabs/vens/pkg/llm"
 )
 
+const defaultBaseURL = "https://api.openai.com/v1/"
+
 type Client struct {
 	api   openai.Client
 	model string
@@ -37,17 +39,33 @@ type Client struct {
 
 // New builds a client from OPENAI_API_KEY (required) and OPENAI_BASE_URL (optional).
 func New(model string) (*Client, error) {
+	return newClient(model)
+}
+
+// newClient applies extra options last so tests can observe the base URL the
+// SDK ends up with.
+func newClient(model string, extra ...option.RequestOption) (*Client, error) {
 	key := os.Getenv("OPENAI_API_KEY")
 	if key == "" {
 		return nil, fmt.Errorf("openai: OPENAI_API_KEY is not set")
 	}
 
-	opts := []option.RequestOption{option.WithAPIKey(key)}
-	if base := os.Getenv("OPENAI_BASE_URL"); base != "" {
-		opts = append(opts, option.WithBaseURL(base))
+	// The SDK reads OPENAI_BASE_URL through LookupEnv, which reports a variable
+	// set to the empty string as present, so anything exporting it unconditionally
+	// sends requests to "/chat/completions" with no host. Always pass a base URL.
+	opts := []option.RequestOption{
+		option.WithAPIKey(key),
+		option.WithBaseURL(resolveBaseURL(os.Getenv("OPENAI_BASE_URL"))),
 	}
 
-	return &Client{api: openai.NewClient(opts...), model: model}, nil
+	return &Client{api: openai.NewClient(append(opts, extra...)...), model: model}, nil
+}
+
+func resolveBaseURL(env string) string {
+	if env == "" {
+		return defaultBaseURL
+	}
+	return env
 }
 
 // Generate runs a chat completion with native strict structured output and
