@@ -24,6 +24,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/CycloneDX/cyclonedx-go"
@@ -196,18 +197,14 @@ func (g *Generator) generateRiskScore(ctx context.Context, vulnBatch []Vulnerabi
 		}
 	}
 
-	scores, evidenceRef, err := g.evaluateOWASPScores(ctx, llmBatch)
+	answers, err := g.scoreAll(ctx, llmBatch)
 	if err != nil {
-		return fmt.Errorf("LLM evaluation failed: %w", err)
+		return err
 	}
 
 	group := make([]outputhandler.VulnRating, 0, len(vulnBatch))
-	scored := make(map[string]bool)
-	for _, entry := range scores {
-		if entry.VulnID == "" || scored[entry.VulnID] {
-			continue
-		}
-		scored[entry.VulnID] = true
+	for _, answer := range answers {
+		entry, evidenceRef := answer.entry, answer.evidenceRef
 
 		// Calculate final OWASP score using the formula:
 		// Risk = Likelihood × Impact = ((ThreatAgent + Vulnerability)/2) × ((TechImpact + BusinessImpact)/2)
@@ -286,6 +283,82 @@ func (g *Generator) generateRiskScore(ctx context.Context, vulnBatch []Vulnerabi
 		return h(group)
 	}
 	return nil
+}
+
+// answer pairs a model entry with the evidence bundle it came from, one per ask.
+type answer struct {
+	entry       llmOutputEntry
+	evidenceRef string
+}
+
+// scoreAll scores every vulnerability in the batch. A model can leave some out of
+// its answer without saying so; those are asked for again on their own, and still
+// missing after that fails the run — a VEX short of a CVE cannot gate a build.
+func (g *Generator) scoreAll(ctx context.Context, batch []LLMVulnerability) ([]answer, error) {
+	answers := make([]answer, 0, len(batch))
+	scored := make(map[string]bool, len(batch))
+
+	collect := func(entries []llmOutputEntry, evidenceRef string) {
+		for _, e := range entries {
+			if e.VulnID == "" || scored[e.VulnID] {
+				continue
+			}
+			scored[e.VulnID] = true
+			answers = append(answers, answer{entry: e, evidenceRef: evidenceRef})
+		}
+	}
+
+	entries, evidenceRef, err := g.evaluateOWASPScores(ctx, batch)
+	if err != nil {
+		return nil, fmt.Errorf("LLM evaluation failed: %w", err)
+	}
+	collect(entries, evidenceRef)
+
+	skipped := unscored(batch, scored)
+	if len(skipped) == 0 {
+		return answers, nil
+	}
+
+	// Counts go by distinct CVE: one hitting several components is several rows.
+	asked := len(unscored(batch, nil))
+
+	slog.WarnContext(ctx, "Model skipped vulnerabilities; asking again for those alone",
+		"skipped", len(skipped), "of", asked, "vulns", strings.Join(vulnIDs(skipped), ","))
+
+	entries, evidenceRef, err = g.evaluateOWASPScores(ctx, skipped)
+	if err != nil {
+		return nil, fmt.Errorf("LLM evaluation failed while asking again for %d vulnerabilities: %w", len(skipped), err)
+	}
+	collect(entries, evidenceRef)
+
+	if still := unscored(batch, scored); len(still) > 0 {
+		return nil, fmt.Errorf("model returned no score for %d of %d vulnerabilities, after asking again: %s",
+			len(still), asked, strings.Join(vulnIDs(still), ", "))
+	}
+	return answers, nil
+}
+
+func vulnIDs(vs []LLMVulnerability) []string {
+	ids := make([]string, len(vs))
+	for i, v := range vs {
+		ids[i] = v.VulnID
+	}
+	return ids
+}
+
+// unscored lists the vulnerabilities the model has not answered for, once each.
+// A nil scored map lists them all.
+func unscored(batch []LLMVulnerability, scored map[string]bool) []LLMVulnerability {
+	var out []LLMVulnerability
+	seen := make(map[string]bool, len(batch))
+	for _, v := range batch {
+		if v.VulnID == "" || scored[v.VulnID] || seen[v.VulnID] {
+			continue
+		}
+		seen[v.VulnID] = true
+		out = append(out, v)
+	}
+	return out
 }
 
 // evaluateOWASPScores calls the LLM to calculate the OWASP risk score for each vulnerability.
