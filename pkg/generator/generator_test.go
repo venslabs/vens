@@ -15,10 +15,12 @@
 package generator
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -149,4 +151,177 @@ func TestGenerator_Attestor_NoBatchOnLLMError(t *testing.T) {
 
 	require.Error(t, g.GenerateRiskScore(context.Background(), testVulns(3), nil))
 	require.Equal(t, 0, at.BatchCount())
+}
+
+// droppingLLM leaves the ids in drop out of its answer, with no error and no
+// mention. Unless always is set, it answers them the second time it is asked.
+type droppingLLM struct {
+	drop    map[string]bool
+	always  bool
+	asked   map[string]int
+	batches []int // size of every batch it was asked to score, in order
+}
+
+func newDroppingLLM(always bool, drop ...string) *droppingLLM {
+	m := &droppingLLM{always: always, drop: map[string]bool{}, asked: map[string]int{}}
+	for _, id := range drop {
+		m.drop[id] = true
+	}
+	return m
+}
+
+func (m *droppingLLM) Generate(_ context.Context, req llm.Request) (string, error) {
+	var in []struct {
+		VulnID string `json:"vulnId"`
+	}
+	if err := json.Unmarshal([]byte(req.Human), &in); err != nil {
+		return "", err
+	}
+	m.batches = append(m.batches, len(in))
+
+	// One ask per call, not per occurrence: a CVE can be listed several times.
+	counted := map[string]bool{}
+	for _, v := range in {
+		if !counted[v.VulnID] {
+			counted[v.VulnID] = true
+			m.asked[v.VulnID]++
+		}
+	}
+
+	out := llmOutput{Results: make([]llmOutputEntry, 0, len(in))}
+	answered := map[string]bool{}
+	for _, v := range in {
+		if m.drop[v.VulnID] && (m.always || m.asked[v.VulnID] == 1) {
+			continue
+		}
+		if answered[v.VulnID] {
+			continue // a model answers each CVE once, however often it is listed
+		}
+		answered[v.VulnID] = true
+		out.Results = append(out.Results, llmOutputEntry{
+			VulnID:             v.VulnID,
+			ThreatAgentScore:   5,
+			VulnerabilityScore: 5,
+			TechnicalImpact:    5,
+			BusinessImpact:     5,
+			Reasoning:          "mock",
+		})
+	}
+	b, err := json.Marshal(out)
+	return string(b), err
+}
+
+// CVEs left out of a batch are asked for again on their own, each scored once.
+func TestGenerator_AsksAgainForSkippedVulnerabilities(t *testing.T) {
+	m := newDroppingLLM(false, "CVE-2024-0001", "CVE-2024-0003")
+	g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 10})
+	require.NoError(t, err)
+
+	var emitted []outputhandler.VulnRating
+	h := func(group []outputhandler.VulnRating) error {
+		emitted = append(emitted, group...)
+		return nil
+	}
+
+	require.NoError(t, g.GenerateRiskScore(context.Background(), testVulns(5), h))
+
+	counts := map[string]int{}
+	for _, r := range emitted {
+		counts[r.VulnID]++
+	}
+	require.Len(t, counts, 5, "every CVE must be scored")
+	for id, n := range counts {
+		require.Equalf(t, 1, n, "CVE %s emitted %d times", id, n)
+	}
+	require.Equal(t, []int{5, 2}, m.batches, "the second ask must carry only the two skipped CVEs")
+}
+
+// A CVE the model never returns fails the run and is named, instead of going
+// missing at exit code 0.
+func TestGenerator_FailsWhenASkippedVulnerabilityNeverComesBack(t *testing.T) {
+	m := newDroppingLLM(true, "CVE-2024-0002")
+	g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 10})
+	require.NoError(t, err)
+
+	var emitted []outputhandler.VulnRating
+	h := func(group []outputhandler.VulnRating) error {
+		emitted = append(emitted, group...)
+		return nil
+	}
+
+	err = g.GenerateRiskScore(context.Background(), testVulns(4), h)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "CVE-2024-0002")
+	require.Empty(t, emitted, "an incomplete batch must not reach the VEX")
+	require.Len(t, m.batches, 2, "asked once, asked again, then gives up")
+}
+
+// A CVE hitting several components is asked for once, and lands on all of them.
+func TestGenerator_AsksOncePerSkippedVulnerability(t *testing.T) {
+	vulns := []Vulnerability{
+		{VulnID: "CVE-2024-0001", PkgName: "pkg", BOMRef: "a"},
+		{VulnID: "CVE-2024-0001", PkgName: "pkg", BOMRef: "b"},
+		{VulnID: "CVE-2024-0002", PkgName: "pkg", BOMRef: "c"},
+	}
+	m := newDroppingLLM(false, "CVE-2024-0001")
+	g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 10})
+	require.NoError(t, err)
+
+	var emitted []outputhandler.VulnRating
+	h := func(group []outputhandler.VulnRating) error {
+		emitted = append(emitted, group...)
+		return nil
+	}
+
+	require.NoError(t, g.GenerateRiskScore(context.Background(), vulns, h))
+	require.Equal(t, []int{3, 1}, m.batches, "the second ask must carry the CVE once, not once per component")
+
+	got := make([]string, 0, len(emitted))
+	for _, r := range emitted {
+		got = append(got, r.VulnID+"@"+r.BOMRef)
+	}
+	require.ElementsMatch(t, []string{"CVE-2024-0001@a", "CVE-2024-0001@b", "CVE-2024-0002@c"}, got,
+		"a CVE recovered on the second ask must land on every component it affects")
+}
+
+// The second ask is another LLM call, so its claims must cite its own bundle.
+func TestGenerator_Attestor_RetryClaimsCiteTheRetryBatch(t *testing.T) {
+	at := attestation.NewBuilder(attestation.Opts{Provider: "mock", Model: "mock"})
+	m := newDroppingLLM(false, "CVE-2024-0001")
+	g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 10})
+	require.NoError(t, err)
+	g.SetAttestor(at)
+
+	vulns := []Vulnerability{
+		{VulnID: "CVE-2024-0001", PkgName: "pkg", BOMRef: "a"},
+		{VulnID: "CVE-2024-0002", PkgName: "pkg", BOMRef: "b"},
+	}
+	require.NoError(t, g.GenerateRiskScore(context.Background(), vulns, nil))
+	require.Equal(t, 2, at.BatchCount())
+
+	var buf bytes.Buffer
+	require.NoError(t, at.Write(&buf))
+
+	var doc struct {
+		Declarations struct {
+			Claims []struct {
+				Predicate string   `json:"predicate"`
+				Evidence  []string `json:"evidence"`
+			} `json:"claims"`
+		} `json:"declarations"`
+	}
+	require.NoError(t, json.Unmarshal(buf.Bytes(), &doc))
+
+	cited := map[string]string{}
+	for _, c := range doc.Declarations.Claims {
+		require.Len(t, c.Evidence, 1)
+		switch {
+		case strings.Contains(c.Predicate, "CVE-2024-0001"):
+			cited["CVE-2024-0001"] = c.Evidence[0]
+		case strings.Contains(c.Predicate, "CVE-2024-0002"):
+			cited["CVE-2024-0002"] = c.Evidence[0]
+		}
+	}
+	require.Equal(t, "evidence-batch-1", cited["CVE-2024-0002"], "answered on the first ask")
+	require.Equal(t, "evidence-batch-2", cited["CVE-2024-0001"], "answered on the second")
 }
