@@ -39,16 +39,38 @@ type Client struct {
 	model  string
 }
 
+const defaultBaseURL = "https://api.anthropic.com/"
+
 // New builds a client from ANTHROPIC_API_KEY.
 func New(model string) (*Client, error) {
+	return newClient(model)
+}
+
+// newClient applies extra options last so tests can observe the base URL the
+// SDK ends up with.
+func newClient(model string, extra ...option.RequestOption) (*Client, error) {
 	key := os.Getenv("ANTHROPIC_API_KEY")
 	if key == "" {
 		return nil, fmt.Errorf("anthropic: ANTHROPIC_API_KEY is not set")
 	}
+	// The SDK reads ANTHROPIC_BASE_URL through LookupEnv, which reports a variable
+	// set to the empty string as present, so anything exporting it unconditionally
+	// sends requests to "/v1/messages" with no host. Always pass a base URL.
+	opts := []option.RequestOption{
+		option.WithAPIKey(key),
+		option.WithBaseURL(resolveBaseURL(os.Getenv("ANTHROPIC_BASE_URL"))),
+	}
 	return &Client{
-		client: sdk.NewClient(option.WithAPIKey(key)),
+		client: sdk.NewClient(append(opts, extra...)...),
 		model:  model,
 	}, nil
+}
+
+func resolveBaseURL(env string) string {
+	if env == "" {
+		return defaultBaseURL
+	}
+	return env
 }
 
 // Generate forces the response to conform to req.Schema using Anthropic's native
