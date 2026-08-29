@@ -3,7 +3,7 @@ module github.com/venslabs/vens
 go 1.26.3
 
 require (
-	github.com/CycloneDX/cyclonedx-go v0.11.0
+	github.com/CycloneDX/cyclonedx-go v0.12.0
 	github.com/anchore/grype v0.117.0
 	github.com/aquasecurity/trivy v0.74.0
 	github.com/aquasecurity/trivy-db v0.0.0-20260813095258-0e0340a01b57
