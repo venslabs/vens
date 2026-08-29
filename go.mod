@@ -8,7 +8,7 @@ require (
 	github.com/aquasecurity/trivy v0.74.0
 	github.com/aquasecurity/trivy-db v0.0.0-20260813095258-0e0340a01b57
 	github.com/google/uuid v1.6.0
-	github.com/package-url/packageurl-go v0.1.6
+	github.com/package-url/packageurl-go v0.1.7
 	github.com/rogpeppe/go-internal v1.16.0
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
