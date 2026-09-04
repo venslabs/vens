@@ -371,12 +371,12 @@ func (g *Generator) generateRiskScore(ctx context.Context, vulnBatch []Vulnerabi
 	return nil
 }
 
-// answer pairs a model entry with the evidence bundle it came from. One bundle
-// per LLM call, so every entry from the same call shares it. zeroLikelihood
-// marks a "not reachable here" verdict (see func zeroLikelihood), published
-// as-is with its reasoning logged at WARN. published marks an answer an
-// earlier batch already published: that batch logged its WARN line, so it is
-// not repeated.
+// answer pairs a model entry with the evidence bundle of the call it came from.
+// A retry is a second call, so the entries it recovers cite a different bundle.
+// zeroLikelihood marks a "not reachable here" verdict (see func
+// zeroLikelihood), published as-is with its reasoning logged at WARN. published
+// marks an answer an earlier batch already published: that batch logged its
+// WARN line, so it is not repeated.
 type answer struct {
 	entry          llmOutputEntry
 	evidenceRef    string
