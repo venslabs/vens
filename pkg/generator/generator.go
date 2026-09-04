@@ -285,7 +285,8 @@ func (g *Generator) generateRiskScore(ctx context.Context, vulnBatch []Vulnerabi
 	return nil
 }
 
-// answer pairs a model entry with the evidence bundle it came from, one per ask.
+// answer pairs a model entry with the evidence bundle it came from. One bundle
+// per LLM call, so every entry from the same call shares it.
 type answer struct {
 	entry       llmOutputEntry
 	evidenceRef string
