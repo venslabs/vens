@@ -95,6 +95,18 @@ Output is a [CycloneDX VEX](https://cyclonedx.org/capabilities/vex/) document; e
 
 The per-CVE reasoning from the LLM is logged to stderr as the command runs, and is captured alongside prompts/responses when you pass `--debug-dir <path>`. It is intentionally not embedded in the VEX file to keep the document strictly CycloneDX-compliant. For a durable, auditable record of how each CVE was scored, pass `--attest` to also write a CycloneDX attestation next to the VEX.
 
+## Where the scores land
+
+The VEX is not a dead end. [Dependency-Track 5.1+](https://github.com/DependencyTrack/dependency-track/pull/6210) reads the OWASP rating on import and puts it on every matching finding, audit trail included, so the contextual score shows up where your team already triages.
+
+Because the rating is stored per finding, the same CVE on the same component can score 2.0 in your internal project and 22.5 in the internet facing one.
+
+<p align="center">
+  <img src="docs/assets/vex-consumers.svg" alt="The VEX feeds the CI gate and Dependency-Track: the same CVE scores 2.0 in the internal context and 22.5 in the internet-facing one" width="720">
+</p>
+
+See [Send the scores to Dependency-Track](https://venslabs.github.io/vens/guides/dependency-track/).
+
 ## Configuration
 
 Create `config.yaml`:

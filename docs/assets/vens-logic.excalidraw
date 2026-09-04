@@ -347,6 +347,14 @@
         {
           "id": "arrow_vens_vex",
           "type": "arrow"
+        },
+        {
+          "id": "arrow_vex_ci",
+          "type": "arrow"
+        },
+        {
+          "id": "arrow_vex_dt",
+          "type": "arrow"
         }
       ],
       "updated": 1778084309132,
@@ -1318,6 +1326,276 @@
       "originalText": "",
       "autoResize": true,
       "lineHeight": 1.25
+    },
+    {
+      "angle": 0,
+      "fillStyle": "hachure",
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 3
+      },
+      "version": 1,
+      "isDeleted": false,
+      "updated": 1788561698583,
+      "link": null,
+      "locked": false,
+      "type": "rectangle",
+      "id": "ci_box",
+      "x": 820,
+      "y": 615,
+      "width": 340,
+      "height": 130,
+      "strokeColor": "#2f9e44",
+      "backgroundColor": "#d3f9d8",
+      "strokeWidth": 3,
+      "seed": 1942564023,
+      "versionNonce": 1779768263,
+      "boundElements": [
+        {
+          "type": "text",
+          "id": "ci_box_label"
+        },
+        {
+          "id": "arrow_vex_ci",
+          "type": "arrow"
+        }
+      ],
+      "index": "b0"
+    },
+    {
+      "angle": 0,
+      "fillStyle": "solid",
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "version": 1,
+      "isDeleted": false,
+      "updated": 1788561698583,
+      "link": null,
+      "locked": false,
+      "type": "text",
+      "id": "ci_box_label",
+      "x": 838.475,
+      "y": 656.25,
+      "width": 303.05,
+      "height": 47.5,
+      "strokeColor": "#2f9e44",
+      "backgroundColor": "transparent",
+      "strokeWidth": 1,
+      "seed": 1985917276,
+      "versionNonce": 1313429180,
+      "boundElements": [],
+      "text": "CI gate\nbuild fails on your threshold",
+      "fontSize": 19,
+      "fontFamily": 1,
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "containerId": "ci_box",
+      "originalText": "CI gate\nbuild fails on your threshold",
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "index": "b1"
+    },
+    {
+      "angle": 0,
+      "fillStyle": "hachure",
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 3
+      },
+      "version": 1,
+      "isDeleted": false,
+      "updated": 1788561698583,
+      "link": null,
+      "locked": false,
+      "type": "rectangle",
+      "id": "dt_box",
+      "x": 820,
+      "y": 780,
+      "width": 340,
+      "height": 130,
+      "strokeColor": "#0c8599",
+      "backgroundColor": "#c5f6fa",
+      "strokeWidth": 3,
+      "seed": 604885787,
+      "versionNonce": 746524808,
+      "boundElements": [
+        {
+          "type": "text",
+          "id": "dt_box_label"
+        },
+        {
+          "id": "arrow_vex_dt",
+          "type": "arrow"
+        }
+      ],
+      "index": "b2"
+    },
+    {
+      "angle": 0,
+      "fillStyle": "solid",
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "version": 1,
+      "isDeleted": false,
+      "updated": 1788561698583,
+      "link": null,
+      "locked": false,
+      "type": "text",
+      "id": "dt_box_label",
+      "x": 880.275,
+      "y": 821.25,
+      "width": 219.45000000000002,
+      "height": 47.5,
+      "strokeColor": "#0c8599",
+      "backgroundColor": "transparent",
+      "strokeWidth": 1,
+      "seed": 1909213112,
+      "versionNonce": 1153718357,
+      "boundElements": [],
+      "text": "Dependency-Track 5.1+\nscore on each finding",
+      "fontSize": 19,
+      "fontFamily": 1,
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "containerId": "dt_box",
+      "originalText": "Dependency-Track 5.1+\nscore on each finding",
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "index": "b3"
+    },
+    {
+      "angle": 0,
+      "fillStyle": "solid",
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "version": 1,
+      "isDeleted": false,
+      "updated": 1788561698583,
+      "link": null,
+      "locked": false,
+      "type": "arrow",
+      "id": "arrow_vex_ci",
+      "x": 745,
+      "y": 715,
+      "width": 70,
+      "height": 35,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "strokeWidth": 2,
+      "seed": 1168228350,
+      "versionNonce": 1095377852,
+      "boundElements": [],
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          70,
+          -35
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": {
+        "mode": "orbit",
+        "elementId": "vex_box",
+        "fixedPoint": [
+          1,
+          0.5
+        ]
+      },
+      "endBinding": {
+        "mode": "orbit",
+        "elementId": "ci_box",
+        "fixedPoint": [
+          0,
+          0.5
+        ]
+      },
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "index": "b4"
+    },
+    {
+      "angle": 0,
+      "fillStyle": "solid",
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "version": 1,
+      "isDeleted": false,
+      "updated": 1788561698583,
+      "link": null,
+      "locked": false,
+      "type": "arrow",
+      "id": "arrow_vex_dt",
+      "x": 745,
+      "y": 765,
+      "width": 70,
+      "height": 80,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "strokeWidth": 2,
+      "seed": 102935926,
+      "versionNonce": 809501832,
+      "boundElements": [],
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          70,
+          80
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": {
+        "mode": "orbit",
+        "elementId": "vex_box",
+        "fixedPoint": [
+          1,
+          0.5
+        ]
+      },
+      "endBinding": {
+        "mode": "orbit",
+        "elementId": "dt_box",
+        "fixedPoint": [
+          0,
+          0.5
+        ]
+      },
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "index": "b5"
     }
   ],
   "appState": {
