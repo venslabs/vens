@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 470" width="640" height="470" role="img" font-family="ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif">
+  <style>
+    .card { fill: #f6f8f9; stroke: #9fb3bb; }
+    .vens { fill: #cfe1e7; stroke: #3f8ba3; }
+    .t    { fill: #1f2b30; }
+    .dim  { fill: #55676e; }
+    .brand{ fill: #2c6b80; }
+    .ok   { fill: #2f7d32; }
+    .ko   { fill: #b3261e; }
+    .arw  { stroke: #7f9299; }
+    @media (prefers-color-scheme: dark) {
+      .card { fill: #232c30; stroke: #55676e; }
+      .vens { fill: #234853; stroke: #7fc4d6; }
+      .t    { fill: #e6edf0; }
+      .dim  { fill: #9fb3bb; }
+      .brand{ fill: #7fc4d6; }
+      .ok   { fill: #6cc070; }
+      .ko   { fill: #f0857c; }
+      .arw  { stroke: #7f9299; }
+    }
+  </style>
+
+  <!-- the two contexts -->
+  <rect class="card" x="10" y="12" width="290" height="66" rx="9" stroke-width="1.5"/>
+  <text class="dim"  x="155" y="38" text-anchor="middle" font-size="14">config.yaml</text>
+  <text class="t"    x="155" y="60" text-anchor="middle" font-size="15" font-weight="600">internal</text>
+
+  <rect class="card" x="340" y="12" width="290" height="66" rx="9" stroke-width="1.5"/>
+  <text class="dim"  x="485" y="38" text-anchor="middle" font-size="14">config.yaml</text>
+  <text class="t"    x="485" y="60" text-anchor="middle" font-size="15" font-weight="600">internet-facing</text>
+
+  <!-- vens -->
+  <rect class="vens" x="200" y="150" width="240" height="76" rx="9" stroke-width="2"/>
+  <text class="brand" x="320" y="180" text-anchor="middle" font-size="18" font-weight="700">vens</text>
+  <text class="brand" x="320" y="203" text-anchor="middle" font-size="13.5">CycloneDX VEX</text>
+
+  <path class="arw" d="M155 80 C155 120 230 120 262 146" fill="none" stroke-width="1.8" marker-end="url(#a)"/>
+  <path class="arw" d="M485 80 C485 120 410 120 378 146" fill="none" stroke-width="1.8" marker-end="url(#a)"/>
+
+  <!-- consumer 1: the CI gate -->
+  <rect class="card" x="10" y="290" width="290" height="130" rx="9" stroke-width="1.5"/>
+  <text class="t"   x="30" y="316" font-size="15" font-weight="700">CI gate</text>
+  <text class="dim" x="30" y="337" font-size="12.5">fail-on-severity: medium</text>
+  <circle class="ok" cx="37" cy="362" r="5"/>
+  <text class="t"  x="52" y="367" font-size="13">internal, 2.0 (info)</text>
+  <text class="ok" x="52" y="388" font-size="13" font-weight="600">build passes</text>
+  <circle class="ko" cx="180" cy="362" r="5"/>
+  <text class="t"  x="195" y="367" font-size="13">exposed, 22.5</text>
+  <text class="ko" x="195" y="388" font-size="13" font-weight="600">build fails</text>
+
+  <!-- consumer 2: the platform -->
+  <rect class="card" x="340" y="290" width="290" height="130" rx="9" stroke-width="1.5"/>
+  <text class="t"   x="360" y="316" font-size="15" font-weight="700">Dependency-Track 5.1+</text>
+  <text class="t"   x="360" y="341" font-size="13">the vector and the score land</text>
+  <text class="t"   x="360" y="361" font-size="13">on every matching finding,</text>
+  <text class="t"   x="360" y="381" font-size="13">with the audit trail</text>
+  <text class="dim" x="360" y="404" font-size="12" font-style="italic">each project keeps its own score</text>
+
+  <path class="arw" d="M262 230 C230 260 155 260 155 286" fill="none" stroke-width="1.8" marker-end="url(#a)"/>
+  <path class="arw" d="M378 230 C410 260 485 260 485 286" fill="none" stroke-width="1.8" marker-end="url(#a)"/>
+
+  <text class="dim" x="320" y="450" text-anchor="middle" font-size="13">the same CVE on the same component, scored twice</text>
+
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#7f9299"/>
+    </marker>
+  </defs>
+</svg>

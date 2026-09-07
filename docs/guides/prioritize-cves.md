@@ -141,7 +141,7 @@ trivy image my-registry/my-app:v1.2.3 \
   --show-suppressed
 ```
 
-Grype supports `--vex` as well. Dependency-Track can ingest the VEX file directly.
+Grype supports `--vex` as well. Dependency-Track reads the OWASP rating itself since 5.1, see [Send the scores to Dependency-Track](dependency-track.md).
 
 !!! note
     Vens emits OWASP ratings on every CVE — not a `not_affected` analysis state. To suppress CVEs below a contextual risk threshold, filter the VEX with `jq` as shown in [Put it in CI](#put-it-in-ci) below, or pre-process the VEX in your dashboard to drop low-score entries.
