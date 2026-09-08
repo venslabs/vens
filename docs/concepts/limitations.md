@@ -18,7 +18,7 @@ Mitigations Vens applies:
 
 If you need strict reproducibility for audit evidence at a point in time, pin a local Ollama model tag (model tags are immutable on disk) and archive `--debug-dir` output alongside the VEX. Together they give you a byte-exact record.
 
-You can also pass [`--attest`](../reference/generate.md#--attest) to write a CDXA sidecar that records, per CVE, the model, seed, temperature, and SHA-256 hashes of the prompt, scan report and `config.yaml`, plus the raw response. It captures the evidence to reproduce a run later. It is point-in-time evidence, not a cryptographic signature.
+You can also pass [`--attest`](../reference/generate.md#-attest) to write a CDXA sidecar that records, per CVE, the model, seed, temperature, and SHA-256 hashes of the prompt, scan report and `config.yaml`, plus the raw response. It captures the evidence to reproduce a run later. It is point-in-time evidence, not a cryptographic signature.
 
 ---
 
@@ -57,7 +57,7 @@ The CycloneDX VEX spec allows per-vulnerability `analysis.state`, `analysis.just
 - The LLM reasoning is not stable enough across runs to be embedded as a durable CycloneDX `justification` — that field is intended for human assertions.
 - Keeping the VEX strictly to numeric scoring means downstream tools can ingest it without trust assumptions about free-text fields.
 
-If you need a justification record (for audit), use `--debug-dir`, or pass [`--attest`](../reference/generate.md#--attest) to capture the per-CVE reasoning as structured CDXA claims (predicate plus reasoning) in a sidecar file, kept out of the VEX so downstream tools still ingest a clean document. See [`--debug-dir`](../reference/generate.md#--debug-dir-path).
+If you need a justification record (for audit), use `--debug-dir`, or pass [`--attest`](../reference/generate.md#-attest) to capture the per-CVE reasoning as structured CDXA claims (predicate plus reasoning) in a sidecar file, kept out of the VEX so downstream tools still ingest a clean document. See [`--debug-dir`](../reference/generate.md#-debug-dir-path).
 
 ---
 

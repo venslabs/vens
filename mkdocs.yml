@@ -1,5 +1,5 @@
 site_name: Vens
-site_description: Prioritize vulnerabilities by real risk, not just CVSS. Scores each CVE based on your system's actual context.
+site_description: Prioritize vulnerabilities by real risk, not just the generic CVSS score. Scores each CVE based on your system's actual context.
 site_url: https://venslabs.github.io/vens/
 repo_url: https://github.com/venslabs/vens
 repo_name: venslabs/vens
