@@ -79,7 +79,7 @@ The LLM returned text that is not valid JSON matching the expected schema. Most 
 
 ## My OWASP scores change between two runs with the same config
 
-This is expected within a small band. See the ["Reproducibility is best-effort"](reference/generate.md#--llm-seed-int) note in the `vens generate` reference: cloud LLM providers do not guarantee byte-deterministic decoding even at `temperature=0`. Vens mitigates drift by computing the final OWASP score in Go from the LLM's four 0-9 component scores — small component drift is averaged out — but you should expect **±1–3 points of variation on a minority of CVEs** between runs.
+This is expected within a small band. See the ["Reproducibility is best-effort"](reference/generate.md#-llm-seed-int) note in the `vens generate` reference: cloud LLM providers do not guarantee byte-deterministic decoding even at `temperature=0`. Vens mitigates drift by computing the final OWASP score in Go from the LLM's four 0-9 component scores — small component drift is averaged out — but you should expect **±1–3 points of variation on a minority of CVEs** between runs.
 
 What to do:
 
@@ -157,7 +157,7 @@ See [Describe your system context](guides/configuration.md) for the checklist.
 
 ## `sbom-serial-number must start with 'urn:uuid:'`
 
-You passed `--sbom-serial-number` but forgot the prefix. The value must look like `urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79`. This flag is **required** — see [`--sbom-serial-number`](reference/generate.md#--sbom-serial-number-urnuuid).
+You passed `--sbom-serial-number` but forgot the prefix. The value must look like `urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79`. This flag is **required** — see [`--sbom-serial-number`](reference/generate.md#-sbom-serial-number-urnuuid).
 
 ---
 

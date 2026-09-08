@@ -7,9 +7,11 @@
 
 ## The one-sentence answer
 
-**CVSS describes the vulnerability. OWASP Risk Rating describes the risk to _your_ system.**
+**A CVSS base score describes the vulnerability. OWASP Risk Rating describes the risk to _your_ system.**
 
-A CVE has one CVSS score, forever. It has as many OWASP scores as there are systems running the vulnerable component.
+The base score your scanner prints is the same wherever that component runs. A CVE has as many OWASP scores as there are systems running it.
+
+CVSS does have environmental metrics for exactly this, and they are the right idea. They also arrive empty: filling them takes a judgment per CVE and per asset that nobody produces at scale. That gap is what Vens fills.
 
 ---
 
@@ -19,7 +21,7 @@ A CVE has one CVSS score, forever. It has as many OWASP scores as there are syst
 
 Two services both contain `libfoo-1.2.3` with a hypothetical CVE `CVE-XXXX-YYYY`. The CVE is a denial-of-service in a CSV parsing function.
 
-**CVSS says:** 8.8 HIGH. This is the generic severity of the flaw. Same number for everyone.
+**CVSS says:** 8.8 HIGH. That is the base score, and it is the same wherever the component runs.
 
 **Vens says, for service A (internal dashboard, no CSV parsing in production):**
 ```
@@ -38,7 +40,7 @@ Reason: CSV upload is a direct user input. Internet exposure means high
         service. Compliance impact under GDPR breach reporting.
 ```
 
-Same CVE, same CVSS, two completely different risks. Vens quantifies that.
+Same CVE, same base score, two completely different risks. Vens quantifies that.
 
 ---
 
@@ -101,27 +103,27 @@ Fed by your `business_criticality` and `compliance_requirements`.
 
 ## Why scores go _down_ from CVSS
 
-The most common case. A CVE is CVSS 8.8 but:
+The most common case. A CVE has a base score of 8.8 but:
 
 - The vulnerable code path is not used in your build (LLM infers from CVE description + your `notes`)
 - You have compensating controls (WAF, segmentation)
 - The affected data is public
 - The service has low business criticality
 
-A generic 8.8 becomes, say, a contextual 10. **You should not patch it urgently.**
+A generic 8.8 becomes, say, 10 out of 81. **You should not patch it urgently.**
 
 ---
 
 ## Why scores go _up_ from CVSS
 
-Less common but critical. A CVE is CVSS 5.3 "medium" but:
+Less common but critical. A CVE has a base score of 5.3, "medium", but:
 
 - It leaks the exact type of data your system handles (PII)
 - You are under GDPR / PCI-DSS — one breach triggers disclosure obligations
 - The service is publicly exposed with no WAF
 - The business impact of a disclosed breach exceeds normal scoring bounds
 
-A generic 5.3 becomes, say, a contextual 52. **This is the CVE you patch first, and it was buried in your scanner report.**
+A generic 5.3 becomes, say, 52 out of 81. **This is the CVE you patch first, and it was buried in your scanner report.**
 
 ---
 
@@ -145,7 +147,7 @@ A generic 5.3 becomes, say, a contextual 52. **This is the CVE you patch first, 
 
 ## So what do I do with CVSS?
 
-CVSS still matters as the **input**. Your scanner produces it, Vens reads it, and the LLM uses it as a baseline before applying your context. You don't have to choose between the two — Vens is _CVSS plus context_, not CVSS replaced.
+The base score still matters as the **input**. Your scanner produces it, Vens reads it, and the LLM uses it as a baseline before applying your context. You don't have to choose between the two — Vens is _CVSS plus context_, not CVSS replaced.
 
 ---
 
