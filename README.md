@@ -13,7 +13,7 @@ The output is a [CycloneDX VEX](https://www.ntia.gov/files/ntia/publications/vex
 Your CI gate fails the build on it, and [Dependency-Track 5.1+](https://venslabs.github.io/vens/guides/dependency-track/) puts it on every matching finding.
 
 <p align="center">
-  <img src="docs/assets/vens-logic.png" alt="vens takes a scanner report, an SBOM and your system context, scores every CVE with an LLM, and emits a CycloneDX VEX that a CI gate and Dependency-Track consume" width="720">
+  <img src="docs/assets/vens-logic.png" alt="vens takes a scanner report and your system context, scores every CVE with an LLM, and emits a CycloneDX VEX plus a CDXA attestation that a CI gate and Dependency-Track consume" width="820">
 </p>
 
 ## Why vens?
