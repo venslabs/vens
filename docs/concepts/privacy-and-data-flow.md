@@ -104,13 +104,13 @@ These files contain exactly the same data the LLM receives. They are useful for 
 - your full architectural context (`notes` field),
 - every CVE identifier from the scanned image.
 
-Store it accordingly. See [`--debug-dir`](../reference/generate.md#--debug-dir-path) for retention guidance.
+Store it accordingly. See [`--debug-dir`](../reference/generate.md#-debug-dir-path) for retention guidance.
 
 ## Attestation file
 
 When you pass `--attest`, Vens writes a CycloneDX attestation next to the VEX (`<output>.attestation.cdx.json`). Per scored CVE it records the model and seed, SHA-256 hashes of the prompt, scanner report and `config.yaml`, and the **raw LLM response** (base64, not encrypted).
 
-The hashes are opaque, but the claims state the CVEs you scored and the model's reasoning in clear text, and the raw response can echo SBOM-derived context. So it carries the same sensitivity as the debug output: treat it as security evidence, keep it access-controlled, and out of public build artifacts. See [`--attest`](../reference/generate.md#--attest).
+The hashes are opaque, but the claims state the CVEs you scored and the model's reasoning in clear text, and the raw response can echo SBOM-derived context. So it carries the same sensitivity as the debug output: treat it as security evidence, keep it access-controlled, and out of public build artifacts. See [`--attest`](../reference/generate.md#-attest).
 
 ---
 

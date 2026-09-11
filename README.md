@@ -5,7 +5,7 @@
 [![GitHub Downloads][github-downloads-img]][release]
 [![Documentation][docs-img]][docs]
 
-# vens — Prioritize vulnerabilities by real risk, not just CVSS
+# vens — Prioritize vulnerabilities by real risk, not just the generic CVSS score
 
 **Your scanner found 300 CVEs. Which ones actually matter?** Vens takes a Trivy or Grype report, combines it with a description of _your_ system (exposure, data sensitivity, compliance, security controls), and scores every CVE based on its real risk to you — not just its generic severity.
 
@@ -20,7 +20,7 @@ Your CI gate fails the build on it, and [Dependency-Track 5.1+](https://venslabs
 
 OWASP scoring (`Risk = Likelihood × Impact`, 0-81) reflects your system's exposure, data sensitivity, and controls — not just generic CVE severity:
 
-| Scenario | CVSS (Generic) | OWASP (Contextual) | Why? |
+| Scenario | CVSS base | OWASP (Contextual) | Why? |
 |-----|----------------|-------------------|------|
 | Generic RCE in a library whose vulnerable path is not executed | 8.8 HIGH | **10.0 LOW** ⬇️ | Not reachable in your runtime |
 | Info leak in a PII handler running under GDPR | 5.3 MEDIUM | **52.0 HIGH** ⬆️ | PII leak + compliance impact |

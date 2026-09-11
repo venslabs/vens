@@ -106,7 +106,7 @@ vens generate \
 `--sbom-serial-number` is required by Vens so the BOM-Links resolve back to the SBOM. Dependency-Track does not read it: it matches on the vulnerability id.
 
 !!! warning "Keep the VEX at CycloneDX 1.6"
-    That is the default. A 1.7 document is rejected as an unrecognized spec version by every released Dependency-Track. See [`--cyclonedx-spec-version`](../reference/generate.md#--cyclonedx-spec-version-16--17).
+    That is the default. A 1.7 document is rejected as an unrecognized spec version by every released Dependency-Track. See [`--cyclonedx-spec-version`](../reference/generate.md#-cyclonedx-spec-version-1617).
 
 ## Step 5 — Apply the VEX
 
@@ -138,4 +138,4 @@ Over the API, `GET /api/v1/finding/project/$PROJECT` returns the vector and the 
 
 - **Ranking still follows CVSS.** Dependency-Track stores and displays the OWASP score, but severity, the findings list and the dashboards are still driven by CVSS. Two projects with very different contextual scores show the same severity breakdown.
 - **The 16-factor panel is not on the finding.** Dependency-Track's OWASP Risk Rating panel lives on the global vulnerability page and reads that vulnerability's own vector, which a VEX import does not touch.
-- **The scores come from an LLM.** They are a ranking aid, not a verdict. See [Limitations](../concepts/limitations.md), and pass [`--attest`](../reference/generate.md#--attest) to keep the per-CVE reasoning as audit evidence.
+- **The scores come from an LLM.** They are a ranking aid, not a verdict. See [Limitations](../concepts/limitations.md), and pass [`--attest`](../reference/generate.md#-attest) to keep the per-CVE reasoning as audit evidence.

@@ -1,6 +1,6 @@
 ---
 template: home.html
-title: Vens — Prioritize vulnerabilities by real risk, not just CVSS
+title: Vens — Prioritize vulnerabilities by real risk
 hide:
   - navigation
   - toc
