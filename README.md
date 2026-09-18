@@ -73,8 +73,8 @@ SBOM_SERIAL="urn:uuid:$(uuidgen | tr '[:upper:]' '[:lower:]')"
 # 4. Generate contextual risk scores
 vens generate --config-file config.yaml --sbom-serial-number "$SBOM_SERIAL" report.json output.vex.json
 
-# 5. Optionally fold the OWASP ratings back into the Trivy report
-vens enrich --vex output.vex.json report.json
+# 5. Optionally fold the OWASP ratings into a copy of the Trivy report
+vens enrich --vex output.vex.json --output enriched-report.json report.json
 ```
 
 Output is a [CycloneDX VEX](https://cyclonedx.org/capabilities/vex/) document; each vulnerability carries an OWASP rating:
@@ -130,7 +130,7 @@ context:
 Generate VEX with contextual OWASP scores:
 
 ```bash
-vens generate --config-file config.yaml INPUT OUTPUT
+vens generate --config-file config.yaml --sbom-serial-number urn:uuid:<uuid> INPUT OUTPUT
 ```
 
 **Supported scanners:**
@@ -139,6 +139,7 @@ vens generate --config-file config.yaml INPUT OUTPUT
 
 **Key flags:**
 - `--config-file` (required) - Path to config.yaml
+- `--sbom-serial-number` (required) - serialNumber of the CycloneDX SBOM paired with this scan, in `urn:uuid:<uuid>` form (`jq -r .serialNumber sbom.cdx.json`)
 - `--input-format` - Scanner format: `auto` | `trivy` | `grype` (default: `auto`)
 - `--llm` - LLM provider: `openai` | `anthropic` | `ollama` | `googleai` (default: `auto`)
 - `--llm-batch-size` - CVEs per request (default: `10`)
@@ -148,11 +149,15 @@ vens generate --config-file config.yaml INPUT OUTPUT
 
 ### `vens enrich`
 
-Apply VEX scores to your Trivy report:
+Copy the OWASP scores from a VEX into a Trivy report:
 
 ```bash
-vens enrich --vex output.vex.json report.json
+vens enrich --vex output.vex.json --output enriched-report.json report.json
 ```
+
+**Key flags:**
+- `--vex` (required) - Path to the VEX file written by `vens generate`
+- `--output` - Where to write the enriched report (default: stdout)
 
 ---
 

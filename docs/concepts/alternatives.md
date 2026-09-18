@@ -57,7 +57,7 @@ They answer different questions. vexllm answers "should I hide this CVE?"; Vens 
 
 Trivy and Grype both accept `--vex <file>` on the command line. They use it to apply `not_affected` states from an OpenVEX document onto the scanner output.
 
-- **This is complementary to Vens**, not an alternative. Vens emits a CycloneDX VEX with OWASP ratings; Trivy and Grype can ingest it with `--vex` to annotate their own output with the contextual ratings. See [Prioritize a CVE backlog → Step 5](../guides/prioritize-cves.md#step-5-feed-the-vex-back-to-your-scanner-platform).
+- **This is complementary to Vens**, not an alternative. It is also not the way to read Vens' output back: Vens emits a CycloneDX VEX with OWASP ratings and no `analysis` state, so `--vex` has nothing to apply. Use `vens enrich` on the Trivy JSON, or Dependency-Track 5.1+. See [Prioritize a CVE backlog → Step 5](../guides/prioritize-cves.md#step-5-feed-the-scores-back-to-your-tools).
 
 ---
 

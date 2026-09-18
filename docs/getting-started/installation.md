@@ -61,7 +61,7 @@ vens --version
     Make sure `$(go env GOPATH)/bin` is in your `$PATH`.
 
 !!! note
-    Pinning a specific version: `go install github.com/venslabs/vens/cmd/vens@v0.3.0`.
+    Pinning a specific version: `go install github.com/venslabs/vens/cmd/vens@v0.5.0`.
 
 ---
 
@@ -87,11 +87,20 @@ From now on, anywhere in this documentation where you see `vens <command>`, you 
 
 Download the latest release for your OS/architecture from the [releases page](https://github.com/venslabs/vens/releases), extract it, and put it in your `$PATH`.
 
-=== "Linux (x86_64)"
+=== "Linux (amd64)"
 
     ```bash
-    # Replace VERSION with the actual tag, e.g. v0.3.0
-    curl -L https://github.com/venslabs/vens/releases/download/VERSION/vens_Linux_x86_64.tar.gz \
+    # Replace VERSION with the release tag, e.g. v0.5.0
+    curl -L https://github.com/venslabs/vens/releases/download/VERSION/vens-VERSION-linux-amd64.tar.gz \
+      | tar -xz
+    sudo mv vens /usr/local/bin/
+    vens --version
+    ```
+
+=== "Linux (arm64)"
+
+    ```bash
+    curl -L https://github.com/venslabs/vens/releases/download/VERSION/vens-VERSION-linux-arm64.tar.gz \
       | tar -xz
     sudo mv vens /usr/local/bin/
     vens --version
@@ -100,7 +109,7 @@ Download the latest release for your OS/architecture from the [releases page](ht
 === "macOS (Apple Silicon)"
 
     ```bash
-    curl -L https://github.com/venslabs/vens/releases/download/VERSION/vens_Darwin_arm64.tar.gz \
+    curl -L https://github.com/venslabs/vens/releases/download/VERSION/vens-VERSION-darwin-arm64.tar.gz \
       | tar -xz
     sudo mv vens /usr/local/bin/
     vens --version
@@ -109,22 +118,14 @@ Download the latest release for your OS/architecture from the [releases page](ht
 === "macOS (Intel)"
 
     ```bash
-    curl -L https://github.com/venslabs/vens/releases/download/VERSION/vens_Darwin_x86_64.tar.gz \
+    curl -L https://github.com/venslabs/vens/releases/download/VERSION/vens-VERSION-darwin-amd64.tar.gz \
       | tar -xz
     sudo mv vens /usr/local/bin/
     vens --version
     ```
 
-=== "Windows"
-
-    Download `vens_Windows_x86_64.zip` from the releases page, extract it, and add the folder containing `vens.exe` to your `PATH`. Then in PowerShell:
-
-    ```powershell
-    vens --version
-    ```
-
 !!! note
-    Exact archive names follow the release assets. Check the [releases page](https://github.com/venslabs/vens/releases) for the file matching your platform if unsure.
+    Assets are named `vens-<tag>-<os>-<arch>.tar.gz`, built for linux and darwin on amd64 and arm64. There is no prebuilt Windows binary today, and `go install` does not build on Windows either: `vens generate` calls `syscall.Umask`, which Windows has no equivalent of. See the [releases page](https://github.com/venslabs/vens/releases) for the current tag.
 
 ---
 
@@ -193,10 +194,10 @@ Vens asks the LLM to return structured JSON with four 0–9 component scores per
     export GOOGLE_MODEL="gemini-2.5-flash"
     ```
 
-Auto-detection currently defaults to **OpenAI**. If you use a different provider, pass the `--llm` flag explicitly:
+`--llm` defaults to `auto`, and `auto` simply means **OpenAI**: it never looks at your environment to pick a provider. For anything else, pass the flag explicitly:
 
 ```bash
---llm openai      # default when auto
+--llm openai      # what auto resolves to
 --llm anthropic
 --llm googleai
 --llm ollama

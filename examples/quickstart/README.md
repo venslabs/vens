@@ -1,6 +1,6 @@
 # Quickstart Example
 
-This example demonstrates how **vens** transforms generic CVSS scores into contextual OWASP risk scores for a **Python 3.11 backend API** (107 CVEs).
+This example demonstrates how **vens** transforms generic CVSS scores into contextual OWASP risk scores for a **Python 3.11 backend API** (107 Trivy findings over 45 vulnerability ids).
 
 ## Why vens?
 
@@ -13,10 +13,14 @@ This example demonstrates how **vens** transforms generic CVSS scores into conte
 export OPENAI_API_KEY="sk-..."
 export OPENAI_MODEL="gpt-5.4-mini"
 
+# Pin one serial per service; a fresh UUID is fine for this example
+SBOM_UUID="urn:uuid:$(uuidgen | tr '[:upper:]' '[:lower:]')"
+
 # Using Trivy report (auto-detected)
 vens generate \
   --config-file config.yaml \
   --llm openai \
+  --sbom-serial-number "$SBOM_UUID" \
   reports/python-slim.trivy.json \
   output_vex.cdx.json
 
@@ -24,6 +28,7 @@ vens generate \
 vens generate \
   --config-file config.yaml \
   --llm openai \
+  --sbom-serial-number "$SBOM_UUID" \
   reports/python-slim.grype.json \
   output_vex.cdx.json
 ```
@@ -52,14 +57,14 @@ Prioritized List → Fix what matters for YOU
 
 ### Before (CVSS only)
 ```
-107 CVEs → Sort by CVSS score → Patch top 20
+107 findings → Sort by CVSS score → Patch top 20
 ❌ Waste time on CVE-2019-1010023 (CVSS 8.8, not exploitable)
 ❌ Miss CVE-2026-0915 (CVSS 5.3, but leaks PII under GDPR)
 ```
 
 ### After (OWASP contextual)
 ```
-107 CVEs → Sort by OWASP score → Patch real risks
+107 findings → Sort by OWASP score → Patch real risks
 ✅ Skip CVE-2019-1010023 (OWASP 10/81 - not applicable)
 ✅ Prioritize CVE-2026-0915 (OWASP 52/81 - GDPR risk)
 ```

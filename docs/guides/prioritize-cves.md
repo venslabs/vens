@@ -1,7 +1,7 @@
 # Prioritize a backlog of 300 CVEs
 
 **Who this is for:** security engineers staring at a massive CVE report and asking _"which ones do I patch first?"_.
-**By the end of this page:** you have a ranked list of the CVEs that actually matter for your system, and a suppressed view of the rest.
+**By the end of this page:** you have a ranked list of the CVEs that actually matter for your system, and a way to defer the rest.
 
 This is the most common use case for Vens. It takes ~3 minutes end to end.
 
@@ -24,8 +24,8 @@ Without context, every CVE looks equally urgent. You waste engineering time patc
 
 ```
 ┌────────────┐   ┌─────────┐   ┌──────────┐   ┌────────────┐   ┌──────────┐
-│  trivy     │──▶│  vens   │──▶│  jq      │──▶│  patch     │──▶│  trivy   │
-│  scan      │   │ generate│   │  sort    │   │  top N     │   │  --vex   │
+│  trivy     │──▶│  vens   │──▶│  jq      │──▶│  patch     │──▶│  vens    │
+│  scan      │   │ generate│   │  sort    │   │  top N     │   │  enrich  │
 └────────────┘   └─────────┘   └──────────┘   └────────────┘   └──────────┘
 ```
 
@@ -131,20 +131,26 @@ Example output:
 
 ---
 
-## Step 5 — Feed the VEX back to your scanner / platform
+## Step 5 — Feed the scores back to your tools
 
-Point Trivy at the VEX so CVEs are displayed with their contextual OWASP rating alongside the native scanner severity:
+Scanner `--vex` flags are not a route for these scores. Trivy reads a VEX for `analysis.state` values such as `not_affected`, and vens emits no analysis block at all (see [Limitations](../concepts/limitations.md)). `trivy image ... --vex output.vex.json` leaves the output unchanged, and `--show-suppressed` lists nothing. Grype takes VEX in CSAF or OpenVEX form, not CycloneDX, so a vens VEX gives it nothing either.
+
+Two routes that do work:
+
+**Trivy JSON.** `vens enrich` copies each OWASP score and vector onto the matching vulnerability, under `Custom`:
 
 ```bash
-trivy image my-registry/my-app:v1.2.3 \
-  --vex output.vex.json \
-  --show-suppressed
+vens enrich --vex output.vex.json --output enriched-report.json report.json
+
+jq '.Results[]?.Vulnerabilities[]? | {VulnerabilityID, Severity, owasp: .Custom.owasp_score}' enriched-report.json
 ```
 
-Grype supports `--vex` as well. Dependency-Track reads the OWASP rating itself since 5.1, see [Send the scores to Dependency-Track](dependency-track.md).
+`Severity` and the CVSS block stay exactly as Trivy wrote them, so read `Custom.owasp_score` in whatever consumes the JSON next.
+
+**Dependency-Track 5.1+.** It picks up the OWASP rating from the VEX and shows it on each finding. See [Send the scores to Dependency-Track](dependency-track.md).
 
 !!! note
-    Vens emits OWASP ratings on every CVE — not a `not_affected` analysis state. To suppress CVEs below a contextual risk threshold, filter the VEX with `jq` as shown in [Put it in CI](#put-it-in-ci) below, or pre-process the VEX in your dashboard to drop low-score entries.
+    Vens writes ratings only, never a `not_affected` state, so there is nothing for a scanner to suppress. To hide CVEs below a contextual threshold, filter the VEX with `jq` as shown in [Put it in CI](#put-it-in-ci), or drop low-score entries in your dashboard.
 
 ---
 

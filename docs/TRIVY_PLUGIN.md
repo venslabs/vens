@@ -19,15 +19,16 @@ export OPENAI_MODEL="gpt-5.4-mini"
 trivy image nginx:1.25 --format json --severity HIGH,CRITICAL > report.json
 
 # 3. Generate VEX with contextual OWASP scores
-trivy vens generate --config-file config.yaml report.json output.vex.json
+SBOM_UUID="urn:uuid:$(uuidgen | tr '[:upper:]' '[:lower:]')"
+trivy vens generate --config-file config.yaml --sbom-serial-number "$SBOM_UUID" report.json output.vex.json
 ```
 
-**Output example:**
+**Each vulnerability carries an OWASP rating:**
 
 ```json
 {
   "vulnerabilities": [{
-    "id": "CVE-2019-1010023",
+    "id": "CVE-XXXX-YYYY",
     "ratings": [{
       "method": "OWASP",
       "score": 10.0,
@@ -38,16 +39,18 @@ trivy vens generate --config-file config.yaml report.json output.vex.json
 }
 ```
 
+*Score and vector are illustrative; actual values depend on your `config.yaml` and the model.*
+
 ## Enrich Reports
 
 Add OWASP scores to your Trivy reports:
 
 ```bash
 # Generate VEX
-trivy vens generate --config-file config.yaml report.json vex.json
+trivy vens generate --config-file config.yaml --sbom-serial-number "$SBOM_UUID" report.json vex.json
 
 # Enrich report
-trivy vens enrich --vex vex.json report.json > enriched-report.json
+trivy vens enrich --vex vex.json --output enriched-report.json report.json
 ```
 
 ## Configuration
@@ -71,19 +74,21 @@ context:
 
 ## LLM Providers
 
-| Provider | Environment Variable | Example |
-|----------|---------------------|---------|
-| OpenAI (recommended) | `OPENAI_API_KEY` | `export OPENAI_MODEL="gpt-5.4-mini"` |
-| Anthropic | `ANTHROPIC_API_KEY` | `export ANTHROPIC_MODEL="claude-sonnet-4-6"` |
-| Ollama (local) | `OLLAMA_MODEL` | `export OLLAMA_MODEL="llama3"` |
-| Google AI | `GOOGLE_API_KEY` | `export GOOGLE_MODEL="gemini-2.5-flash"` |
+`--llm` defaults to `auto`, and `auto` means OpenAI. Nothing is detected from your environment, so pass the flag for any other provider.
 
-**Using Ollama:**
+| Provider | Flag | Credentials | Model variable |
+|----------|------|-------------|----------------|
+| OpenAI | `--llm openai` (default) | `OPENAI_API_KEY` | `OPENAI_MODEL`, default `gpt-5.4-mini` |
+| Anthropic | `--llm anthropic` | `ANTHROPIC_API_KEY` | `ANTHROPIC_MODEL`, default `claude-sonnet-4-6` |
+| Google AI | `--llm googleai` | `GOOGLE_API_KEY` or `GEMINI_API_KEY` | `GOOGLE_MODEL`, default `gemini-2.5-flash` |
+| Ollama (local) | `--llm ollama` | none | `OLLAMA_MODEL`, required, no default |
 
 ```bash
-export OLLAMA_MODEL="llama3"
-trivy vens generate --config-file config.yaml --llm ollama report.json output.json
+export ANTHROPIC_API_KEY="sk-ant-..."
+trivy vens generate --llm anthropic --config-file config.yaml --sbom-serial-number "$SBOM_UUID" report.json output.json
 ```
+
+Drop the flag and the Anthropic key above is ignored: vens calls OpenAI with the key from the Quick Start, and you pay for that run. If no `OPENAI_API_KEY` is exported, it stops instead with `openai: OPENAI_API_KEY is not set`.
 
 ## Commands
 
@@ -92,11 +97,12 @@ trivy vens generate --config-file config.yaml --llm ollama report.json output.js
 Generate VEX with OWASP scores:
 
 ```bash
-trivy vens generate --config-file config.yaml INPUT OUTPUT
+trivy vens generate --config-file CONFIG --sbom-serial-number urn:uuid:<uuid> INPUT OUTPUT
 ```
 
 **Key flags:**
 - `--config-file` (required) - Path to config.yaml
+- `--sbom-serial-number` (required) - serialNumber of the CycloneDX SBOM paired with this scan, in `urn:uuid:<uuid>` form. Get it with `jq -r .serialNumber sbom.cdx.json`.
 - `--llm` - LLM provider: `openai` | `anthropic` | `ollama` | `googleai`
 - `--llm-batch-size` - CVEs per request (default: `10`)
 

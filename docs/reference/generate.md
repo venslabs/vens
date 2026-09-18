@@ -55,15 +55,19 @@ SBOM_UUID="urn:uuid:$(uuidgen | tr '[:upper:]' '[:lower:]')"
 
 ### `--llm <provider>`
 
-Force a specific LLM provider. Default: `auto` (detected from exported environment variables).
+Pick the LLM provider. Default: `auto`, which resolves to `openai`. There is no detection: `auto` never looks at your environment to choose the provider, so an Anthropic or Gemini key on its own still sends the run to OpenAI, which then stops with `openai: OPENAI_API_KEY is not set`. Only the choice of provider ignores the environment; once it lands on OpenAI the run reads `OPENAI_MODEL`, `OPENAI_API_KEY` and, if you set it, `OPENAI_BASE_URL`.
 
-| Value | Provider | Env var used |
+| Value | Provider | Env vars |
 |---|---|---|
-| `auto` | First detected | — |
+| `auto` | OpenAI, same as `openai` | `OPENAI_API_KEY`, `OPENAI_MODEL` |
 | `openai` | OpenAI | `OPENAI_API_KEY`, `OPENAI_MODEL` |
 | `anthropic` | Anthropic Claude | `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` |
 | `googleai` | Google AI (Gemini) | `GOOGLE_API_KEY` (or `GEMINI_API_KEY`), `GOOGLE_MODEL` |
-| `ollama` | Ollama (local) | `OLLAMA_MODEL` |
+| `ollama` | Ollama (local) | `OLLAMA_MODEL` (required), `OLLAMA_HOST` |
+
+Any provider other than OpenAI needs an explicit `--llm`.
+
+The `*_MODEL` variables are optional for the three cloud providers and fall back to `gpt-5.4-mini`, `claude-sonnet-4-6` and `gemini-2.5-flash`, logged as a warning at startup. Ollama has no default: without `OLLAMA_MODEL` the run stops with `ollama: set the OLLAMA_MODEL environment variable`.
 
 ```bash
 vens generate --llm openai --config-file c.yaml --sbom-serial-number "$SBOM_UUID" in.json out.json

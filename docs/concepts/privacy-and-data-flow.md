@@ -86,7 +86,10 @@ If any of those answers are unacceptable for your data, **use Ollama** — the e
 
 ## Local / air-gapped deployment
 
-When you configure `OLLAMA_MODEL` and run Vens with `--llm ollama` (or let auto-detection pick Ollama), **no data leaves the machine running Ollama**. Vens makes HTTP requests to `http://localhost:11434` by default, or to `$OLLAMA_HOST` if you run Ollama on a different host inside your network.
+!!! warning "Ollama is never selected for you"
+    `--llm` defaults to `auto`, and `auto` resolves to OpenAI. No environment variable changes that. Setting `OLLAMA_MODEL` and forgetting `--llm ollama` sends every prompt, including `notes` verbatim, to `api.openai.com` when `OPENAI_API_KEY` is still exported. With no key the run fails instead. On a machine that must stay local, pass `--llm ollama` and unset `OPENAI_API_KEY`.
+
+When you configure `OLLAMA_MODEL` and run Vens with `--llm ollama`, **no data leaves the machine running Ollama**. Vens makes HTTP requests to `http://localhost:11434` by default, or to `$OLLAMA_HOST` if you run Ollama on a different host inside your network.
 
 For air-gapped networks: install Vens and Ollama on any box that can reach each other; no outbound internet connectivity is required after the initial model pull.
 
