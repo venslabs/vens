@@ -464,6 +464,73 @@ func TestCycloneDxVexWriter_Close_SpecVersion(t *testing.T) {
 	}
 }
 
+// Score 0 is a valid OWASP rating (info). Consumers that read ratings[].score
+// must see 0, not a missing key. Regression for #306.
+func TestCycloneDxVexWriter_Close_KeepsZeroOWASPScore(t *testing.T) {
+	for _, spec := range []cyclonedx.SpecVersion{cyclonedx.SpecVersion1_6, cyclonedx.SpecVersion1_7} {
+		t.Run(spec.String(), func(t *testing.T) {
+			var buf bytes.Buffer
+			h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 1, "", spec)
+
+			score := 0.0
+			const vector = "SL:1/M:1/O:1/S:1/ED:0/EE:0/A:0/ID:9/LC:0/LI:0/LAV:0/LAC:0/FD:0/RD:0/NC:0/PV:0"
+			if err := h.HandleVulnRatings([]VulnRating{
+				{
+					VulnID: "CVE-2026-8376",
+					BOMRef: "pkg:deb/debian/perl-base@5.36.0",
+					Rating: cyclonedx.VulnerabilityRating{
+						Method:   cyclonedx.ScoringMethodOWASP,
+						Score:    &score,
+						Severity: cyclonedx.SeverityInfo,
+						Vector:   vector,
+					},
+					Source: &cyclonedx.Source{Name: "NVD"},
+				},
+			}); err != nil {
+				t.Fatalf("HandleVulnRatings: %v", err)
+			}
+			if err := h.Close(); err != nil {
+				t.Fatalf("Close: %v", err)
+			}
+
+			raw := buf.String()
+			if !strings.Contains(raw, `"score"`) {
+				t.Fatalf("encoded VEX dropped the score key for a 0.0 rating:\n%s", raw)
+			}
+
+			var decoded struct {
+				Vulnerabilities []struct {
+					Ratings []struct {
+						Method   string   `json:"method"`
+						Score    *float64 `json:"score"`
+						Severity string   `json:"severity"`
+						Vector   string   `json:"vector"`
+					} `json:"ratings"`
+				} `json:"vulnerabilities"`
+			}
+			if err := json.Unmarshal(buf.Bytes(), &decoded); err != nil {
+				t.Fatalf("unmarshal: %v", err)
+			}
+			if len(decoded.Vulnerabilities) != 1 || len(decoded.Vulnerabilities[0].Ratings) != 1 {
+				t.Fatalf("got %+v, want 1 vuln with 1 rating", decoded)
+			}
+			r := decoded.Vulnerabilities[0].Ratings[0]
+			if r.Score == nil {
+				t.Fatal("ratings[0].score is null/missing, want 0")
+			}
+			if *r.Score != 0 {
+				t.Errorf("ratings[0].score = %v, want 0", *r.Score)
+			}
+			if r.Method != "OWASP" {
+				t.Errorf("method = %q, want OWASP", r.Method)
+			}
+			if r.Vector != vector {
+				t.Errorf("vector = %q, want %q", r.Vector, vector)
+			}
+		})
+	}
+}
+
 // Current behaviour, tracked in #272: a rating with no component is warned about
 // and dropped, and the run still succeeds. Change this test when that changes.
 func TestCycloneDxVexWriter_Close_SkipsUnreferencedVuln(t *testing.T) {

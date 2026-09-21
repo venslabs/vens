@@ -167,11 +167,29 @@ func (c *cycloneDxVexWriter) Close() error {
 		bom.Vulnerabilities = &vulns
 	}
 
+	// Encode() rather than EncodeVersion(): cyclonedx-go copies the BOM
+	// through encoding/gob, which omits a *float64 that points at 0, so
+	// OWASP ratings that scored exactly 0 lost their score key (#306).
+	bom.SpecVersion = c.specVersion
+	if schema := jsonSchemaFor(c.specVersion); schema != "" {
+		bom.JSONSchema = schema
+	}
 	enc := cyclonedx.NewBOMEncoder(c.w, cyclonedx.BOMFileFormatJSON)
 	enc.SetPretty(true)
-	if err := enc.EncodeVersion(bom, c.specVersion); err != nil {
+	if err := enc.Encode(bom); err != nil {
 		return err
 	}
 	c.closed = true
 	return nil
+}
+
+func jsonSchemaFor(v cyclonedx.SpecVersion) string {
+	switch v {
+	case cyclonedx.SpecVersion1_6:
+		return "http://cyclonedx.org/schema/bom-1.6.schema.json"
+	case cyclonedx.SpecVersion1_7:
+		return "http://cyclonedx.org/schema/bom-1.7.schema.json"
+	default:
+		return ""
+	}
 }
