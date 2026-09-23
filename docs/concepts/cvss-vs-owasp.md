@@ -147,7 +147,7 @@ A generic 5.3 becomes, say, 52 out of 81. **This is the CVE you patch first, and
 
 ## So what do I do with CVSS?
 
-The base score still matters as the **input**. Your scanner produces it, Vens reads it, and the LLM uses it as a baseline before applying your context. You don't have to choose between the two — Vens is _CVSS plus context_, not CVSS replaced.
+The base score still matters as the **input** that puts the CVE in your report at all. Vens does not read the number: the model gets the CVE title, description and the vendor severity label, then scores your context. You don't have to choose between the two, Vens is _CVSS plus context_, not CVSS replaced.
 
 ---
 
