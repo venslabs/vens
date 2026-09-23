@@ -129,7 +129,7 @@ Open `output.vex.json`. It is a CycloneDX 1.6 BOM (1.6 is the default; pass `--c
 3. `ratings[0].vector` — the full 16-factor OWASP Risk Rating vector
 
 !!! note "Reasoning"
-    Vens logs the LLM's per-CVE reasoning to stderr as it scores (and to `--debug-dir` if you set it). The reasoning is not written into the VEX file itself — the VEX stays strictly CycloneDX-compliant. See [`vens generate --debug-dir`](../reference/generate.md#--debug-dir-path) to capture every prompt and response for auditing.
+    Vens logs the LLM's per-CVE reasoning to stderr as it scores (and to `--debug-dir` if you set it). The reasoning is not written into the VEX file itself — the VEX stays strictly CycloneDX-compliant. See [`vens generate --debug-dir`](../reference/generate.md#-debug-dir-path) to capture every prompt and response for auditing.
 
 ---
 
