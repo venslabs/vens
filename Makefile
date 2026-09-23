@@ -50,7 +50,7 @@ _output/bin/vens:
 .PHONY: artifacts
 artifacts:
 	@mkdir -p _output
-	@for os in linux darwin; do \
+	@for os in linux darwin windows; do \
 		for arch in amd64 arm64; do \
 			ext=""; [ "$$os" = "windows" ] && ext=".exe"; \
 			echo "Building vens-$$os-$$arch$$ext"; \
