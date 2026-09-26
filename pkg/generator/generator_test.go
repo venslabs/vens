@@ -325,3 +325,66 @@ func TestGenerator_Attestor_RetryClaimsCiteTheRetryBatch(t *testing.T) {
 	require.Equal(t, "evidence-batch-1", cited["CVE-2024-0002"], "answered on the first ask")
 	require.Equal(t, "evidence-batch-2", cited["CVE-2024-0001"], "answered on the second")
 }
+
+// capturingLLM records the human prompt so tests can assert the CVE payload.
+type capturingLLM struct {
+	human string
+}
+
+func (m *capturingLLM) Generate(_ context.Context, req llm.Request) (string, error) {
+	m.human = req.Human
+	var in []struct {
+		VulnID string `json:"vulnId"`
+	}
+	if err := json.Unmarshal([]byte(req.Human), &in); err != nil {
+		return "", err
+	}
+	out := llmOutput{Results: make([]llmOutputEntry, 0, len(in))}
+	for _, v := range in {
+		out.Results = append(out.Results, llmOutputEntry{
+			VulnID:             v.VulnID,
+			ThreatAgentScore:   5,
+			VulnerabilityScore: 5,
+			TechnicalImpact:    5,
+			BusinessImpact:     5,
+			Reasoning:          "mock",
+		})
+	}
+	b, err := json.Marshal(out)
+	return string(b), err
+}
+
+func TestLLMVulnerability_JSONIncludesCVSS(t *testing.T) {
+	v := LLMVulnerability{
+		VulnID:   "CVE-2026-11824",
+		PkgName:  "libsqlite3-0",
+		Severity: "HIGH",
+		CVSS:     "CVSS:3.1/AV:L/AC:L/PR:N/UI:R/S:U/C:H/I:H/A:H",
+	}
+	b, err := json.Marshal(v)
+	require.NoError(t, err)
+	var got map[string]any
+	require.NoError(t, json.Unmarshal(b, &got))
+	require.Equal(t, "CVSS:3.1/AV:L/AC:L/PR:N/UI:R/S:U/C:H/I:H/A:H", got["cvss"])
+}
+
+func TestGenerator_SendsCVSSVectorToLLM(t *testing.T) {
+	m := &capturingLLM{}
+	g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 10})
+	require.NoError(t, err)
+
+	vulns := []Vulnerability{{
+		VulnID:   "CVE-2026-11824",
+		PkgName:  "libsqlite3-0",
+		BOMRef:   "pkg:deb/libsqlite3-0@3.40",
+		Severity: "HIGH",
+		CVSS:     "CVSS:3.1/AV:L/AC:L/PR:N/UI:R/S:U/C:H/I:H/A:H",
+	}}
+	require.NoError(t, g.GenerateRiskScore(context.Background(), vulns, nil))
+
+	var got []map[string]any
+	require.NoError(t, json.Unmarshal([]byte(m.human), &got))
+	require.Len(t, got, 1)
+	require.Equal(t, "CVSS:3.1/AV:L/AC:L/PR:N/UI:R/S:U/C:H/I:H/A:H", got[0]["cvss"],
+		"the LLM payload must carry the CVSS vector so attack-vector can be scored against exposure")
+}

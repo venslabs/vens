@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"strings"
 
+	dbtypes "github.com/aquasecurity/trivy-db/pkg/types"
 	trivytypes "github.com/aquasecurity/trivy/pkg/types"
 	"github.com/venslabs/vens/pkg/generator"
 )
@@ -56,6 +57,7 @@ func (s *TrivyScanner) Parse(data []byte) ([]generator.Vulnerability, error) {
 				// VendorSeverity because Trivy falls back to CVSS. Its resolution logic is
 				// unexported, so keep the resolved value until Trivy DB v3 drops it.
 				Severity: v.Severity, //nolint:staticcheck // SA1019, see above
+				CVSS:     trivyCVSSVector(v),
 			}
 			if v.DataSource != nil {
 				vuln.SourceName = trivyDataSourceToSourceName(string(v.DataSource.ID), v.VulnerabilityID)
@@ -71,6 +73,47 @@ func (s *TrivyScanner) Parse(data []byte) ([]generator.Vulnerability, error) {
 // Name returns the scanner identifier
 func (s *TrivyScanner) Name() string {
 	return string(ScannerTrivy)
+}
+
+func cvssVectorFromEntry(c dbtypes.CVSS) string {
+	switch {
+	case c.V40Vector != "":
+		return c.V40Vector
+	case c.V3Vector != "":
+		return c.V3Vector
+	case c.V2Vector != "":
+		return c.V2Vector
+	default:
+		return ""
+	}
+}
+
+// trivyCVSSVector picks one CVSS vector for the LLM. Prefer the source that
+// resolved severity, then nvd/redhat/ghsa, then any remaining vendor.
+func trivyCVSSVector(v trivytypes.DetectedVulnerability) string {
+	if len(v.CVSS) == 0 {
+		return ""
+	}
+	if v.SeveritySource != "" {
+		if c, ok := v.CVSS[v.SeveritySource]; ok {
+			if s := cvssVectorFromEntry(c); s != "" {
+				return s
+			}
+		}
+	}
+	for _, key := range []dbtypes.SourceID{"nvd", "redhat", "ghsa"} {
+		if c, ok := v.CVSS[key]; ok {
+			if s := cvssVectorFromEntry(c); s != "" {
+				return s
+			}
+		}
+	}
+	for _, c := range v.CVSS {
+		if s := cvssVectorFromEntry(c); s != "" {
+			return s
+		}
+	}
+	return ""
 }
 
 // countComponentsPerPURL counts distinct components behind each PURL. A report
