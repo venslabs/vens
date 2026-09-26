@@ -124,8 +124,30 @@ Download the latest release for your OS/architecture from the [releases page](ht
     vens --version
     ```
 
+=== "Windows (amd64)"
+
+    ```powershell
+    curl.exe -L -o vens.tar.gz https://github.com/venslabs/vens/releases/download/VERSION/vens-VERSION-windows-amd64.tar.gz
+    tar.exe -xzf vens.tar.gz
+    New-Item -ItemType Directory -Force "$env:LOCALAPPDATA\Programs\vens" | Out-Null
+    Move-Item -Force vens.exe "$env:LOCALAPPDATA\Programs\vens\"
+    $env:Path = "$env:LOCALAPPDATA\Programs\vens;$env:Path"
+    vens --version
+    ```
+
+=== "Windows (arm64)"
+
+    ```powershell
+    curl.exe -L -o vens.tar.gz https://github.com/venslabs/vens/releases/download/VERSION/vens-VERSION-windows-arm64.tar.gz
+    tar.exe -xzf vens.tar.gz
+    New-Item -ItemType Directory -Force "$env:LOCALAPPDATA\Programs\vens" | Out-Null
+    Move-Item -Force vens.exe "$env:LOCALAPPDATA\Programs\vens\"
+    $env:Path = "$env:LOCALAPPDATA\Programs\vens;$env:Path"
+    vens --version
+    ```
+
 !!! note
-    Assets are named `vens-<tag>-<os>-<arch>.tar.gz`, built for linux and darwin on amd64 and arm64 (the release Makefile targets those platforms only). There is no prebuilt Windows binary today, but `go install github.com/venslabs/vens/cmd/vens@latest` works on Windows from source. Compiling locally is not the same as shipping a release asset. See the [releases page](https://github.com/venslabs/vens/releases) for the current tag.
+    Assets are named `vens-<tag>-<os>-<arch>.tar.gz`, built for linux, darwin and windows on amd64 and arm64. The Windows archives hold `vens.exe` and ship from v0.5.1 onwards; for an earlier tag, install from source with `go install github.com/venslabs/vens/cmd/vens@latest`. The `$env:Path` assignment in the Windows tabs lasts for the current PowerShell session only — add the folder to your user PATH to keep it. See the [releases page](https://github.com/venslabs/vens/releases) for the current tag.
 
 ---
 
