@@ -22,6 +22,13 @@ tar -xzf vens-<VERSION>-<OS>-<ARCH>.tar.gz
 sudo mv vens /usr/local/bin/
 \`\`\`
 
+On Windows the archive holds \`vens.exe\`:
+\`\`\`powershell
+tar.exe -xzf vens-<VERSION>-windows-<ARCH>.tar.gz
+New-Item -ItemType Directory -Force "\$env:LOCALAPPDATA\\Programs\\vens" | Out-Null
+Move-Item -Force vens.exe "\$env:LOCALAPPDATA\\Programs\\vens\\"
+\`\`\`
+
 ### Verifying this release
 Release artifacts are signed with cosign keyless — Sigstore cert bound to the GitHub Actions release workflow identity.
 \`\`\`bash
