@@ -18,7 +18,7 @@ Mitigations Vens applies:
 
 If you need strict reproducibility for audit evidence at a point in time, pin a local Ollama model tag (model tags are immutable on disk) and archive `--debug-dir` output alongside the VEX. Together they give you a byte-exact record.
 
-You can also pass [`--attest`](../reference/generate.md#-attest) to write a CDXA sidecar that records, per CVE, the model, seed, temperature, and SHA-256 hashes of the prompt, scan report and `config.yaml`, plus the raw response. It captures the evidence to reproduce a run later. It is point-in-time evidence, not a cryptographic signature.
+You can also pass [`--attest`](../reference/generate.md#-attest) to write a CDXA sidecar that records, per CVE, the model, seed, temperature, and SHA-256 hashes of the prompt, scan report and `config.yaml`, plus the raw response. It captures the evidence to reproduce a run later. Pass [`--attest-signing-key`](../reference/generate.md#-attest-signing-key-path) to JSF-sign that sidecar so a consumer can detect tampering; without a signing key it remains point-in-time evidence, not a cryptographic signature.
 
 ---
 
