@@ -54,6 +54,7 @@ type Vulnerability struct {
 	Title            string
 	Description      string
 	Severity         string // NVD/vendor severity
+	CVSS             string // CVSS vector (e.g. CVSS:3.1/AV:L/...) so the LLM can match attack vector to exposure
 	SourceName       string
 	SourceURL        string
 }
@@ -69,6 +70,7 @@ type LLMVulnerability struct {
 	Title            string `json:"title"`
 	Description      string `json:"description,omitempty"`
 	Severity         string `json:"severity,omitempty"` // NVD/vendor severity as context
+	CVSS             string `json:"cvss,omitempty"`     // attack vector (AV) lives here, not in Severity
 }
 
 // llmOutputEntry represents the LLM response for a single vulnerability.
@@ -194,6 +196,7 @@ func (g *Generator) generateRiskScore(ctx context.Context, vulnBatch []Vulnerabi
 			Title:            v.Title,
 			Description:      v.Description,
 			Severity:         v.Severity,
+			CVSS:             v.CVSS,
 		}
 	}
 
