@@ -94,8 +94,8 @@ func FromAggregatedScores(threatAgent, vulnerability, technicalImpact, businessI
 		EaseOfDiscovery:    vul,
 		EaseOfExploit:      vul,
 		Awareness:          vul,
-		IntrusionDetection: 9 - vul, // Inverse: high vuln score = low detection
-
+		IntrusionDetection: vul, 
+		
 		// Technical Impact: distribute evenly across 4 factors
 		LossOfConfidentiality: tech,
 		LossOfIntegrity:       tech,
