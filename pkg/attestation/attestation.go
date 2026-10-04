@@ -17,6 +17,7 @@
 package attestation
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
@@ -45,6 +46,9 @@ type Opts struct {
 	// (SpecVersion1_6).
 	SpecVersion cyclonedx.SpecVersion
 	Now         func() time.Time
+	// Signer, when non-nil, attaches a BOM-level JSF signature (ES256) before
+	// the attestation is written. Claim-level signatures are not produced.
+	Signer *Signer
 }
 
 // ClaimInput is one scored CVE/component assessment to attest.
@@ -196,10 +200,22 @@ func (b *Builder) Write(w io.Writer) error {
 	}
 	bom.Declarations = decl
 
-	enc := cyclonedx.NewBOMEncoder(w, cyclonedx.BOMFileFormatJSON)
+	var buf bytes.Buffer
+	enc := cyclonedx.NewBOMEncoder(&buf, cyclonedx.BOMFileFormatJSON)
 	enc.SetPretty(true)
 	if err := enc.EncodeVersion(bom, b.opts.SpecVersion); err != nil {
 		return fmt.Errorf("attestation: encode: %w", err)
+	}
+	out := buf.Bytes()
+	if b.opts.Signer != nil {
+		signed, err := SignDocument(out, b.opts.Signer)
+		if err != nil {
+			return err
+		}
+		out = signed
+	}
+	if _, err := w.Write(out); err != nil {
+		return fmt.Errorf("attestation: write: %w", err)
 	}
 	return nil
 }

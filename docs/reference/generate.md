@@ -216,6 +216,45 @@ The producing `vens` version is recorded in `metadata.tools`. The attestation is
 !!! warning "The attestation is sensitive — store it like audit evidence"
     The claims spell out, in clear text, which CVEs you scored, their scores and the model's reasoning, and `raw_response` holds the full model reply **base64-encoded, not encrypted** (anyone with the file can decode it). The prompt, scanner report and config are kept only as SHA-256 hashes, so the raw vulnerability list is not embedded, but the assessment itself is fully readable. In CI, write the attestation to the same access-controlled store as your other security evidence, not to a public build artifact.
 
+### `--attest-signing-key <path>`
+
+Opt-in. Requires `--attest`. Signs the CDXA sidecar with a BOM-level [JSF](https://cyberphone.github.io/doc/security/jsf.html) signature (`signature.signers[]`, algorithm `ES256`) so a consumer can detect tampering. The key must be a **PKCS#8 PEM** ECDSA **P-256** (`prime256v1`) private key.
+
+```bash
+# generate a throwaway signing key (keep the private key out of the attestation store)
+openssl ecparam -name prime256v1 -genkey -noout \
+  | openssl pkcs8 -topk8 -nocrypt -out attest.key
+openssl ec -in attest.key -pubout -out attest.pub.pem
+
+vens generate --attest --attest-signing-key attest.key \
+  --config-file c.yaml \
+  --sbom-serial-number "$SBOM_UUID" \
+  report.json out.cdx.json
+# out.attestation.cdx.json carries signature.signers[0] {algorithm,keyId,publicKey,value}
+```
+
+Optional `--attest-signing-key-id <id>` sets the JSF `keyId` label (default: hex SHA-256 fingerprint of the public key's SPKI). The embedded `publicKey` is self-asserted integrity evidence only — pin `attest.pub.pem` (or the JWK) out of band for authenticity.
+
+Fail-closed: `--attest-signing-key` without `--attest`, `--attest-signing-key-id` without a key path, or an unreadable / non-P-256 key is a hard error before any output is written.
+
+**Verify** (CycloneDX JSON JSF — `cyclonedx-cli` cannot verify JSON signatures today):
+
+```bash
+npm install @cyclonedx/sign
+node --input-type=module -e '
+  import { verify } from "@cyclonedx/sign/jsf";
+  import { readFileSync } from "node:fs";
+  const doc = JSON.parse(readFileSync("out.attestation.cdx.json", "utf8"));
+  // Prefer pinning the public key you distributed out of band:
+  // const pinned = JSON.parse(readFileSync("pinned.jwk.json", "utf8"));
+  // const r = await verify(doc, { allowedAlgorithms: ["ES256"], publicKeys: new Map([[0, pinned]]) });
+  const r = await verify(doc, { allowedAlgorithms: ["ES256"] });
+  console.log("valid:", r.valid, r.signers.map(s => [s.algorithm, s.valid]));
+  process.exit(r.valid ? 0 : 1);'
+```
+
+Digest rule (for a custom verifier): SHA-256 of the [JCS](https://www.rfc-editor.org/rfc/rfc8785) form of the document with the signer's `value` deleted only — the `signature` object stays in the signed bytes (`{"signature":{"signers":[<signer without value>]}}`). Do not strip the whole `signature` member.
+
 ### `--sbom-version <int>`
 
 BOM-Link `version` number used alongside `--sbom-serial-number`. Default: `1`.
