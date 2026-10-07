@@ -14,4 +14,4 @@ Where vens has been presented, and where it is going next.
 | Date | Event | City | Format | Language | Slides | Video |
 |---|---|---|---|---|---|---|
 | 2026-09-24 | PlatformCon Live Day Paris | Paris, FR | 30 min | FR | [PDF](assets/platformcon-paris-2026.pdf) | |
-| 2026-06-25 | SecureChainCon | online | recorded | EN | | |
+| 2026-06-25 | SecureChainCon | online | recorded | EN | | [video](https://www.youtube.com/watch?v=Pnx1nqGAeSY) |
