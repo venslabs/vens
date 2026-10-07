@@ -304,3 +304,49 @@ func TestCalculateTrivyBOMRef_NeverEmptyWhenAnythingIdentifiesTheComponent(t *te
 		})
 	}
 }
+
+func TestTrivyScanner_Parse_CVSSPrefersSeveritySource(t *testing.T) {
+	redhat := "CVSS:3.1/AV:L/AC:L/PR:N/UI:R/S:U/C:H/I:H/A:H"
+	nvd := "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"
+	report := trivytypes.Report{
+		Results: []trivytypes.Result{
+			{
+				Target: "test",
+				Vulnerabilities: []trivytypes.DetectedVulnerability{
+					{
+						VulnerabilityID: "CVE-2026-11824",
+						PkgID:           "libsqlite3-0@3.40.0",
+						PkgName:         "libsqlite3-0",
+						SeveritySource:  "redhat",
+						Vulnerability: dbtypes.Vulnerability{
+							CVSS: dbtypes.VendorCVSS{
+								"nvd":    {V3Vector: nvd},
+								"redhat": {V3Vector: redhat},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	data, err := json.Marshal(report)
+	if err != nil {
+		t.Fatalf("marshal report: %v", err)
+	}
+	vulns, err := (&TrivyScanner{}).Parse(data)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if len(vulns) != 1 {
+		t.Fatalf("got %d vulns, want 1", len(vulns))
+	}
+	if vulns[0].CVSS != redhat {
+		t.Errorf("CVSS = %q, want SeveritySource vector %q", vulns[0].CVSS, redhat)
+	}
+}
+
+func TestTrivyCVSSVector_Empty(t *testing.T) {
+	if got := trivyCVSSVector(trivytypes.DetectedVulnerability{}); got != "" {
+		t.Errorf("empty CVSS map: got %q", got)
+	}
+}
