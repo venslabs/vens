@@ -11,7 +11,7 @@
 vens enrich --vex VEX_FILE [--output PATH] REPORT_FILE
 ```
 
-`vens enrich` takes a Trivy JSON report and annotates every vulnerability the VEX document scored, adding `Custom.owasp_score` and `Custom.owasp_vector`. Matching is on the vulnerability ID alone, and only ratings whose method is OWASP are read. Trivy's own `Severity` and CVSS fields stay as they are, and nothing else in the report changes.
+`vens enrich` takes a Trivy JSON report and annotates every vulnerability the VEX document scored, adding `Custom.owasp_score`, `Custom.owasp_severity`, and `Custom.owasp_vector`. Matching is on the vulnerability ID alone, and only ratings whose method is OWASP are read. Trivy's own `Severity` and CVSS fields stay as they are, and nothing else in the report changes.
 
 ```json
 {
@@ -19,12 +19,13 @@ vens enrich --vex VEX_FILE [--output PATH] REPORT_FILE
   "Severity": "HIGH",
   "Custom": {
     "owasp_score": 45.5,
+    "owasp_severity": "high",
     "owasp_vector": "SL:7/M:7/O:7/S:7/ED:6/EE:6/A:6/ID:3/LC:7/LI:7/LAV:7/LAC:7/FD:7/RD:7/NC:7/PV:7"
   }
 }
 ```
 
-`Severity` still holds Trivy's value. If you gate or sort downstream, read `Custom.owasp_score`. If a CVE appears more than once in the VEX, the last OWASP rating wins.
+`Severity` still holds Trivy's value. If you gate or sort downstream, read `Custom.owasp_severity` — the band derived from the OWASP rating, which keeps its meaning across scoring changes. `Custom.owasp_score` carries the raw number on vens's internal 0–81 scale; gate on the band, not the number. If a CVE appears more than once in the VEX, the last OWASP rating wins.
 
 Use it when your downstream tooling reads Trivy JSON directly and does not know how to parse a separate CycloneDX VEX.
 
@@ -72,10 +73,10 @@ The `enriched-report.json` is still a valid Trivy JSON report, so you can feed i
 
 ```bash
 vens enrich --vex vex.json report.json \
-  | jq '.Results[]?.Vulnerabilities[]? | {VulnerabilityID, Severity, owasp: .Custom.owasp_score}'
+  | jq '.Results[]?.Vulnerabilities[]? | {VulnerabilityID, Severity, owasp_severity: .Custom.owasp_severity, owasp_score: .Custom.owasp_score}'
 ```
 
-`Severity` is Trivy's own rating, unchanged. `owasp` is the contextual score on the 0 to 81 scale. A CVE the VEX did not score comes back as `owasp: null`.
+`Severity` is Trivy's own rating, unchanged. `owasp_severity` is the contextual severity band; `owasp_score` is the raw score on the 0 to 81 scale. A CVE the VEX did not score comes back with both as `null`.
 
 ---
 

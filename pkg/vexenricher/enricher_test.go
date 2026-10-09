@@ -175,3 +175,78 @@ func TestEnrichReport_VectorMapping(t *testing.T) {
 	assert.Equal(t, score, customMap3["owasp_score"])
 	assert.NotContains(t, customMap3, "owasp_vector")
 }
+
+func TestEnrichReport_SeverityMapping(t *testing.T) {
+	// The enricher copies the rating's severity band into Custom so
+	// downstream gates can read the band instead of the raw score.
+	score := 45.0
+	vex := cdx.BOM{
+		SpecVersion: cdx.SpecVersion1_5,
+		Vulnerabilities: &[]cdx.Vulnerability{
+			{
+				ID: "CVE-2023-1234",
+				Ratings: &[]cdx.VulnerabilityRating{
+					{
+						Method:   cdx.ScoringMethodOWASP,
+						Score:    &score,
+						Severity: cdx.SeverityHigh,
+					},
+				},
+			},
+			{
+				ID: "CVE-2023-9999",
+				Ratings: &[]cdx.VulnerabilityRating{
+					{
+						Method: cdx.ScoringMethodOWASP,
+						Score:  &score,
+						// No severity carried: owasp_severity must stay absent.
+					},
+				},
+			},
+		},
+	}
+	vexData, _ := json.Marshal(vex)
+
+	// Create a mock Trivy report
+	report := trivytypes.Report{
+		Results: trivytypes.Results{
+			{
+				Target: "test-target",
+				Vulnerabilities: []trivytypes.DetectedVulnerability{
+					{
+						VulnerabilityID: "CVE-2023-1234",
+						PkgName:         "lib-a",
+					},
+					{
+						VulnerabilityID: "CVE-2023-9999",
+						PkgName:         "lib-b",
+					},
+				},
+			},
+		},
+	}
+	reportData, _ := json.Marshal(report)
+
+	enricher, err := New(vexData)
+	require.NoError(t, err)
+
+	enrichedReport, err := enricher.EnrichReport(context.Background(), reportData)
+	require.NoError(t, err)
+
+	require.Len(t, enrichedReport.Results, 1)
+	require.Len(t, enrichedReport.Results[0].Vulnerabilities, 2)
+
+	// Rating carries a severity band: it must land in Custom.
+	vuln1 := enrichedReport.Results[0].Vulnerabilities[0]
+	assert.Equal(t, "CVE-2023-1234", vuln1.VulnerabilityID)
+	require.NotNil(t, vuln1.Custom)
+	customMap1 := vuln1.Custom.(map[string]interface{})
+	assert.Equal(t, "high", customMap1["owasp_severity"])
+
+	// Rating without a severity band: the key must stay absent.
+	vuln2 := enrichedReport.Results[0].Vulnerabilities[1]
+	assert.Equal(t, "CVE-2023-9999", vuln2.VulnerabilityID)
+	require.NotNil(t, vuln2.Custom)
+	customMap2 := vuln2.Custom.(map[string]interface{})
+	assert.NotContains(t, customMap2, "owasp_severity")
+}

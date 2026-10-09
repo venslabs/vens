@@ -30,6 +30,10 @@ type VEXEnricher struct {
 	OWASPScorePerVulnID map[string]float64
 	// Map of VulnerabilityID to OWASP Risk Rating vector string
 	OWASPVectorPerVulnID map[string]string
+	// Map of VulnerabilityID to OWASP severity band (critical/high/medium/low/info).
+	// The band survives scoring-scale changes, so downstream gates should
+	// prefer it over the raw score.
+	OWASPSeverityPerVulnID map[string]string
 }
 
 // New creates a new VEXEnricher from VEX data
@@ -40,8 +44,9 @@ func New(vexData []byte) (*VEXEnricher, error) {
 	}
 
 	enricher := &VEXEnricher{
-		OWASPScorePerVulnID:  make(map[string]float64),
-		OWASPVectorPerVulnID: make(map[string]string),
+		OWASPScorePerVulnID:    make(map[string]float64),
+		OWASPVectorPerVulnID:   make(map[string]string),
+		OWASPSeverityPerVulnID: make(map[string]string),
 	}
 
 	// Parse VEX vulnerabilities - extract OWASP ratings by Vulnerability ID
@@ -57,11 +62,12 @@ func New(vexData []byte) (*VEXEnricher, error) {
 					continue
 				}
 
-				// Map the score and vector to the vulnerability ID.
+				// Map the score, vector and severity to the vulnerability ID.
 				// Note: if multiple entries exist for the same CVE in VEX,
 				// we take the last one found.
 				enricher.OWASPScorePerVulnID[vuln.ID] = *rating.Score
 				enricher.OWASPVectorPerVulnID[vuln.ID] = rating.Vector
+				enricher.OWASPSeverityPerVulnID[vuln.ID] = string(rating.Severity)
 			}
 		}
 	}
@@ -87,7 +93,8 @@ func (e *VEXEnricher) EnrichReport(ctx context.Context, reportData []byte) (*tri
 
 			if score, ok := e.OWASPScorePerVulnID[vuln.VulnerabilityID]; ok {
 				vector := e.OWASPVectorPerVulnID[vuln.VulnerabilityID]
-				if e.applyRating(vuln, score, vector) {
+				severity := e.OWASPSeverityPerVulnID[vuln.VulnerabilityID]
+				if e.applyRating(vuln, score, vector, severity) {
 					enrichedCount++
 				}
 			}
@@ -102,8 +109,8 @@ func (e *VEXEnricher) EnrichReport(ctx context.Context, reportData []byte) (*tri
 }
 
 // applyRating sets the OWASP score (and, if present, the OWASP Risk Rating
-// vector) in the vulnerability's Custom field
-func (e *VEXEnricher) applyRating(vuln *trivytypes.DetectedVulnerability, score float64, vector string) bool {
+// vector and severity band) in the vulnerability's Custom field
+func (e *VEXEnricher) applyRating(vuln *trivytypes.DetectedVulnerability, score float64, vector string, severity string) bool {
 	if vuln.Custom == nil {
 		vuln.Custom = make(map[string]interface{})
 	}
@@ -122,6 +129,14 @@ func (e *VEXEnricher) applyRating(vuln *trivytypes.DetectedVulnerability, score 
 		customMap["owasp_vector"] = vector
 	} else {
 		delete(customMap, "owasp_vector")
+	}
+	// The severity band is the stable contract for downstream gates: the raw
+	// score lives on a vens-internal scale that may move, while the band
+	// keeps its meaning.
+	if severity != "" {
+		customMap["owasp_severity"] = severity
+	} else {
+		delete(customMap, "owasp_severity")
 	}
 	return true
 }
