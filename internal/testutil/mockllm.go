@@ -115,7 +115,9 @@ func deterministicScores(vulnID string) [4]float64 {
 		}
 	}
 
-	base := float64((hash % 6) + 3)
+	// Keep base in [3,8]: a negative hash remainder would otherwise clamp every
+	// factor to 0, which reads as a declined assessment (see vens#337), not a score.
+	base := float64(((hash%6)+6)%6 + 3)
 	return [4]float64{
 		clamp(base),
 		clamp(base + 1),

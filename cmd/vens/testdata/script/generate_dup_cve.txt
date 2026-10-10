@@ -1,8 +1,10 @@
 # Regression: the same CVE on two components must not collapse onto one.
 # The VEX must reference both affected components, and the attestation must
 # carry one claim per component with two distinct targets.
+# Batch size 1 forces the two components into separate batches: the second
+# batch must reuse the first batch's score instead of dropping its rows.
 
-exec vens generate --llm=mock --attest --config-file=config.yaml --sbom-serial-number=urn:uuid:11111111-1111-1111-1111-111111111111 report.json output.cdx.json
+exec vens generate --llm=mock --llm-batch-size=1 --attest --config-file=config.yaml --sbom-serial-number=urn:uuid:11111111-1111-1111-1111-111111111111 report.json output.cdx.json
 stderr 'Processing vulnerabilities'
 
 # VEX references both affected components

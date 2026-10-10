@@ -24,6 +24,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -139,24 +140,77 @@ func New(o Opts) (*Generator, error) {
 // SetAttestor attaches an attestation Builder after construction. Pass nil to disable.
 func (g *Generator) SetAttestor(b *attestation.Builder) { g.attestor = b }
 
+// scoringRun carries state shared across the batches of one GenerateRiskScore
+// call: the VulnIDs an earlier batch already scored (so one batch's declined answer
+// never kills a run another batch already scored), the first answer per CVE
+// (so a later batch reuses it instead of dropping the CVE's rows from the
+// VEX), and the CVEs declined or left unanswered after asking again (checked
+// once, at the end of the run, so batch order never decides the outcome).
+type scoringRun struct {
+	scored   map[string]bool
+	scores   map[string]answer
+	declined map[string]bool
+	missing  map[string]bool
+}
+
 // GenerateRiskScore generates contextual OWASP risk scores for the given vulnerabilities.
 // It uses the LLM to calculate the OWASP risk score for each vulnerability based on
 // the project context hints provided in config.yaml.
 func (g *Generator) GenerateRiskScore(ctx context.Context, vulns []Vulnerability, h func([]outputhandler.VulnRating) error) error {
-	return g.scoreInBatches(ctx, vulns, g.o.BatchSize, h)
+	run := &scoringRun{
+		scored:   make(map[string]bool),
+		scores:   make(map[string]answer),
+		declined: make(map[string]bool),
+		missing:  make(map[string]bool),
+	}
+	if err := g.scoreInBatches(ctx, vulns, g.o.BatchSize, run, h); err != nil {
+		return err
+	}
+	return run.checkUnassessed()
+}
+
+// checkUnassessed fails the run once, at the end, when the model declined to
+// assess CVEs or left them unanswered after asking again. Both categories are
+// listed, and both sides of the count are distinct CVEs — never package rows.
+func (run *scoringRun) checkUnassessed() error {
+	if len(run.declined) == 0 && len(run.missing) == 0 {
+		return nil
+	}
+	total := len(run.scored) + len(run.declined) + len(run.missing)
+	failed := len(run.declined) + len(run.missing)
+	var parts []string
+	if len(run.declined) > 0 {
+		parts = append(parts, fmt.Sprintf("declined to assess %d: %s (see https://github.com/venslabs/vens/issues/337)",
+			len(run.declined), strings.Join(sortedKeys(run.declined), ", ")))
+	}
+	if len(run.missing) > 0 {
+		parts = append(parts, fmt.Sprintf("returned no score for %d: %s",
+			len(run.missing), strings.Join(sortedKeys(run.missing), ", ")))
+	}
+	return fmt.Errorf("model failed to assess %d of %d vulnerabilities, after asking again: %s",
+		failed, total, strings.Join(parts, "; "))
+}
+
+func sortedKeys(m map[string]bool) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 // scoreInBatches scores vulns batchSize at a time. If a provider truncates a
 // batch at its output-token limit (llm.ErrTruncated), that batch is split in
 // half and retried; the split repeats on each further truncation, down to a
 // single CVE. Only a lone CVE that still truncates fails the run.
-func (g *Generator) scoreInBatches(ctx context.Context, vulns []Vulnerability, batchSize int, h func([]outputhandler.VulnRating) error) error {
+func (g *Generator) scoreInBatches(ctx context.Context, vulns []Vulnerability, batchSize int, run *scoringRun, h func([]outputhandler.VulnRating) error) error {
 	if batchSize < 1 {
 		batchSize = 1
 	}
 	for i := 0; i < len(vulns); i += batchSize {
 		batch := vulns[i:min(i+batchSize, len(vulns))]
-		err := g.generateRiskScore(ctx, batch, h)
+		err := g.generateRiskScore(ctx, batch, run, h)
 		if err == nil {
 			continue
 		}
@@ -164,7 +218,7 @@ func (g *Generator) scoreInBatches(ctx context.Context, vulns []Vulnerability, b
 			half := (len(batch) + 1) / 2
 			slog.WarnContext(ctx, "LLM truncated the batch; retrying with smaller batches",
 				"from", len(batch), "to", half)
-			if err := g.scoreInBatches(ctx, batch, half, h); err != nil {
+			if err := g.scoreInBatches(ctx, batch, half, run, h); err != nil {
 				return err
 			}
 			continue
@@ -174,7 +228,7 @@ func (g *Generator) scoreInBatches(ctx context.Context, vulns []Vulnerability, b
 	return nil
 }
 
-func (g *Generator) generateRiskScore(ctx context.Context, vulnBatch []Vulnerability, h func([]outputhandler.VulnRating) error) error {
+func (g *Generator) generateRiskScore(ctx context.Context, vulnBatch []Vulnerability, run *scoringRun, h func([]outputhandler.VulnRating) error) error {
 	if g.o.Config == nil {
 		return errors.New("config not initialized; load config.yaml first")
 	}
@@ -197,9 +251,12 @@ func (g *Generator) generateRiskScore(ctx context.Context, vulnBatch []Vulnerabi
 		}
 	}
 
-	answers, err := g.scoreAll(ctx, llmBatch)
+	answers, err := g.scoreAll(ctx, llmBatch, run)
 	if err != nil {
 		return err
+	}
+	for _, a := range answers {
+		run.scored[a.entry.VulnID] = true
 	}
 
 	group := make([]outputhandler.VulnRating, 0, len(vulnBatch))
@@ -292,20 +349,78 @@ type answer struct {
 	evidenceRef string
 }
 
+// tokenScore is the largest value the model writes on an impact axis as a
+// placeholder when it declines an assessment instead of scoring it: [0 0 1 1]
+// with "not reachable here" means the same as [0 0 0 1].
+const tokenScore = 1
+
+// declinedAssessment reports whether the model's answer is a declined
+// assessment rather than a genuine low score: both likelihood factors are
+// zero and the impact axes carry at most token values, so the OWASP score
+// computes to ~0 while carrying no signal. A zero reached through a non-zero
+// likelihood axis — e.g. CVE-2019-9192's [0 1 0 0] — is a genuine low score,
+// not a declined one.
+func declinedAssessment(e llmOutputEntry) bool {
+	return e.ThreatAgentScore == 0 && e.VulnerabilityScore == 0 &&
+		e.TechnicalImpact <= tokenScore && e.BusinessImpact <= tokenScore
+}
+
 // scoreAll scores every vulnerability in the batch. A model can leave some out of
-// its answer without saying so; those are asked for again on their own, and still
-// missing after that fails the run — a VEX short of a CVE cannot gate a build.
-func (g *Generator) scoreAll(ctx context.Context, batch []LLMVulnerability) ([]answer, error) {
+// its answer without saying so, or answer with a declined assessment (zeros);
+// those are asked for again on their own. Declined or still-unanswered CVEs after
+// the retry don't fail the batch: they're recorded on the run and checked once,
+// at the end of the run, so batch order never decides the outcome. CVEs an
+// earlier batch already scored are never re-asked; their first score is reused
+// so every component keeps its rows in the VEX.
+func (g *Generator) scoreAll(ctx context.Context, batch []LLMVulnerability, run *scoringRun) ([]answer, error) {
 	answers := make([]answer, 0, len(batch))
 	scored := make(map[string]bool, len(batch))
+	for id := range run.scored {
+		scored[id] = true
+	}
+	declined := make(map[string]bool)
 
 	collect := func(entries []llmOutputEntry, evidenceRef string) {
 		for _, e := range entries {
 			if e.VulnID == "" || scored[e.VulnID] {
 				continue
 			}
+			if declinedAssessment(e) {
+				// A declined assessment is the same as no answer: leave the
+				// CVE unscored so it is asked for again below.
+				declined[e.VulnID] = true
+				run.declined[e.VulnID] = true
+				delete(run.missing, e.VulnID)
+				continue
+			}
+			delete(declined, e.VulnID)
+			delete(run.declined, e.VulnID)
+			delete(run.missing, e.VulnID)
 			scored[e.VulnID] = true
-			answers = append(answers, answer{entry: e, evidenceRef: evidenceRef})
+			a := answer{entry: e, evidenceRef: evidenceRef}
+			if _, ok := run.scores[e.VulnID]; !ok {
+				run.scores[e.VulnID] = a
+			}
+			answers = append(answers, a)
+		}
+	}
+
+	// reuseFirstScores appends the first score of every batch CVE an earlier
+	// batch already scored, so this batch's components keep their rows in the
+	// VEX even when the model doesn't answer the CVE again.
+	reuseFirstScores := func() {
+		seen := make(map[string]bool, len(answers))
+		for _, a := range answers {
+			seen[a.entry.VulnID] = true
+		}
+		for _, v := range batch {
+			if v.VulnID == "" || seen[v.VulnID] {
+				continue
+			}
+			if first, ok := run.scores[v.VulnID]; ok {
+				answers = append(answers, first)
+				seen[v.VulnID] = true
+			}
 		}
 	}
 
@@ -317,6 +432,7 @@ func (g *Generator) scoreAll(ctx context.Context, batch []LLMVulnerability) ([]a
 
 	skipped := unscored(batch, scored)
 	if len(skipped) == 0 {
+		reuseFirstScores()
 		return answers, nil
 	}
 
@@ -332,10 +448,16 @@ func (g *Generator) scoreAll(ctx context.Context, batch []LLMVulnerability) ([]a
 	}
 	collect(entries, evidenceRef)
 
-	if still := unscored(batch, scored); len(still) > 0 {
-		return nil, fmt.Errorf("model returned no score for %d of %d vulnerabilities, after asking again: %s",
-			len(still), asked, strings.Join(vulnIDs(still), ", "))
+	// Declined or still-unanswered CVEs don't fail the batch: record them on
+	// the run; GenerateRiskScore checks once, at the end of the run.
+	for _, v := range unscored(batch, scored) {
+		if declined[v.VulnID] || run.declined[v.VulnID] {
+			run.declined[v.VulnID] = true
+		} else {
+			run.missing[v.VulnID] = true
+		}
 	}
+	reuseFirstScores()
 	return answers, nil
 }
 

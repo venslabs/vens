@@ -237,7 +237,9 @@ func TestGenerator_AsksAgainForSkippedVulnerabilities(t *testing.T) {
 }
 
 // A CVE the model never returns fails the run and is named, instead of going
-// missing at exit code 0.
+// missing at exit code 0. The check happens once, at the end of the run: the
+// scored CVEs are still handed to the handler, but the failed run commits no
+// VEX.
 func TestGenerator_FailsWhenASkippedVulnerabilityNeverComesBack(t *testing.T) {
 	m := newDroppingLLM(true, "CVE-2024-0002")
 	g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 10})
@@ -252,7 +254,9 @@ func TestGenerator_FailsWhenASkippedVulnerabilityNeverComesBack(t *testing.T) {
 	err = g.GenerateRiskScore(context.Background(), testVulns(4), h)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "CVE-2024-0002")
-	require.Empty(t, emitted, "an incomplete batch must not reach the VEX")
+	require.Contains(t, err.Error(), "returned no score for 1")
+	require.Contains(t, err.Error(), "1 of 4", "both sides count distinct CVEs")
+	require.Len(t, emitted, 3, "scored CVEs are emitted; the failed run commits no VEX")
 	require.Len(t, m.batches, 2, "asked once, asked again, then gives up")
 }
 
@@ -324,4 +328,265 @@ func TestGenerator_Attestor_RetryClaimsCiteTheRetryBatch(t *testing.T) {
 	}
 	require.Equal(t, "evidence-batch-1", cited["CVE-2024-0002"], "answered on the first ask")
 	require.Equal(t, "evidence-batch-2", cited["CVE-2024-0001"], "answered on the second")
+}
+
+// scriptedLLM answers per vulnerability per call, so tests can decline first
+// and score later, decline forever, or return genuine low scores.
+type scriptedLLM struct {
+	calls  int
+	answer func(call int, vulnID string) llmOutputEntry
+}
+
+func (m *scriptedLLM) Generate(_ context.Context, req llm.Request) (string, error) {
+	var in []struct {
+		VulnID string `json:"vulnId"`
+	}
+	if err := json.Unmarshal([]byte(req.Human), &in); err != nil {
+		return "", err
+	}
+	m.calls++
+
+	out := llmOutput{Results: make([]llmOutputEntry, 0, len(in))}
+	for _, v := range in {
+		e := m.answer(m.calls, v.VulnID)
+		e.VulnID = v.VulnID
+		out.Results = append(out.Results, e)
+	}
+	b, err := json.Marshal(out)
+	return string(b), err
+}
+
+// declinedEntry is the declined-assessment shape from
+// https://github.com/venslabs/vens/issues/337: zeros everywhere except a token
+// business impact, which still computes to a zero score.
+func declinedEntry() llmOutputEntry {
+	return llmOutputEntry{ThreatAgentScore: 0, VulnerabilityScore: 0, TechnicalImpact: 0, BusinessImpact: 1, Reasoning: "mock declined assessment"}
+}
+
+func scoredEntry() llmOutputEntry {
+	return llmOutputEntry{ThreatAgentScore: 5, VulnerabilityScore: 5, TechnicalImpact: 5, BusinessImpact: 5, Reasoning: "mock scored"}
+}
+
+// A declined assessment is the same as no answer: it is asked for again, and a
+// real score on the second ask lets the run succeed.
+func TestGenerator_DeclinedAssessmentAskedAgainThenSucceeds(t *testing.T) {
+	m := &scriptedLLM{answer: func(call int, _ string) llmOutputEntry {
+		if call == 1 {
+			return declinedEntry()
+		}
+		return scoredEntry()
+	}}
+	g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 10})
+	require.NoError(t, err)
+
+	var got []outputhandler.VulnRating
+	h := func(group []outputhandler.VulnRating) error {
+		got = append(got, group...)
+		return nil
+	}
+
+	require.NoError(t, g.GenerateRiskScore(context.Background(), testVulns(3), h))
+	require.Equal(t, 2, m.calls, "declined CVEs must be asked for again, like skipped ones")
+	require.Len(t, got, 3, "all vulnerabilities scored on the second ask")
+}
+
+// Still declined after asking again: the run fails instead of publishing
+// severity info, naming the CVEs and the run total (#337).
+func TestGenerator_DeclinedAssessmentTwiceFailsRun(t *testing.T) {
+	m := &scriptedLLM{answer: func(_ int, _ string) llmOutputEntry { return declinedEntry() }}
+	g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 10})
+	require.NoError(t, err)
+
+	called := false
+	h := func(group []outputhandler.VulnRating) error {
+		called = true
+		return nil
+	}
+
+	err = g.GenerateRiskScore(context.Background(), testVulns(3), h)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "declined to assess")
+	require.Contains(t, err.Error(), "3 of 3", "denominator must be the run total, not the batch")
+	require.Contains(t, err.Error(), "CVE-2024-0000")
+	require.False(t, called, "no ratings must be emitted when the run fails")
+	require.Equal(t, 2, m.calls, "one retry before failing")
+}
+
+// A zero reached through a non-zero axis is a genuine low score, not a
+// declined assessment: CVE-2019-9192's [0 1 0 0] is zero via the impact axis.
+func TestGenerator_GenuineZeroViaImpactAxisIsNotDeclined(t *testing.T) {
+	m := &scriptedLLM{answer: func(_ int, _ string) llmOutputEntry {
+		return llmOutputEntry{ThreatAgentScore: 0, VulnerabilityScore: 1, TechnicalImpact: 0, BusinessImpact: 0, Reasoning: "genuine low"}
+	}}
+	g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 10})
+	require.NoError(t, err)
+
+	require.NoError(t, g.GenerateRiskScore(context.Background(), testVulns(2), nil))
+	require.Equal(t, 1, m.calls, "genuine zeros are published, never re-asked")
+}
+
+// One batch's declined answer must not kill the run when an earlier batch
+// already scored the same CVE.
+func TestGenerator_DeclinedAfterEarlierBatchScoredDoesNotFailRun(t *testing.T) {
+	m := &scriptedLLM{answer: func(call int, _ string) llmOutputEntry {
+		// Batch 1 (call 1) scores CVE-2024-0000 fine; batch 2 declines it.
+		if call == 1 {
+			return scoredEntry()
+		}
+		return declinedEntry()
+	}}
+	g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 1})
+	require.NoError(t, err)
+
+	// Same CVE on two components straddling two batches.
+	vulns := []Vulnerability{
+		{VulnID: "CVE-2024-0000", PkgName: "pkg-a", Title: "t"},
+		{VulnID: "CVE-2024-0000", PkgName: "pkg-b", Title: "t"},
+	}
+
+	var got []outputhandler.VulnRating
+	h := func(group []outputhandler.VulnRating) error {
+		got = append(got, group...)
+		return nil
+	}
+
+	require.NoError(t, g.GenerateRiskScore(context.Background(), vulns, h))
+	require.Len(t, got, 2, "both components keep their rows: the second batch reuses the first score")
+}
+
+// A CVE in two batches reuses the first batch's score: the second batch's
+// components keep their rows in the VEX instead of disappearing silently.
+func TestGenerator_DupCVEReusesFirstScore(t *testing.T) {
+	m := &scriptedLLM{answer: func(call int, _ string) llmOutputEntry {
+		if call == 1 {
+			return llmOutputEntry{ThreatAgentScore: 5, VulnerabilityScore: 5, TechnicalImpact: 5, BusinessImpact: 5, Reasoning: "first"}
+		}
+		return llmOutputEntry{ThreatAgentScore: 9, VulnerabilityScore: 9, TechnicalImpact: 9, BusinessImpact: 9, Reasoning: "second"}
+	}}
+	g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 1})
+	require.NoError(t, err)
+
+	vulns := []Vulnerability{
+		{VulnID: "CVE-2024-0000", PkgName: "openssl", Title: "t"},
+		{VulnID: "CVE-2024-0000", PkgName: "libssl3", Title: "t"},
+	}
+
+	var got []outputhandler.VulnRating
+	h := func(group []outputhandler.VulnRating) error {
+		got = append(got, group...)
+		return nil
+	}
+
+	require.NoError(t, g.GenerateRiskScore(context.Background(), vulns, h))
+	require.Len(t, got, 2, "both components must keep their VEX rows")
+	pkgs := map[string]bool{}
+	for _, r := range got {
+		pkgs[r.BOMRef] = true
+	}
+	require.True(t, pkgs[""], "both ratings are emitted") // BOMRef unset in unit vulns
+	require.Equal(t, got[0].Rating.Score, got[1].Rating.Score, "second batch reuses the first score, not its own")
+}
+
+// Batch order must not decide the run: a batch that declines first must not
+// fail the run before a later batch can score the same CVE.
+func TestGenerator_DeclinedBatchFirstScoringBatchSecondSucceeds(t *testing.T) {
+	m := &scriptedLLM{answer: func(call int, _ string) llmOutputEntry {
+		// Batch 1 (call 1) declines; the retry (call 2) declines again; batch 2
+		// (call 3) scores.
+		if call <= 2 {
+			return declinedEntry()
+		}
+		return scoredEntry()
+	}}
+	g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 1})
+	require.NoError(t, err)
+
+	vulns := []Vulnerability{
+		{VulnID: "CVE-2024-0000", PkgName: "pkg-a", Title: "t"},
+		{VulnID: "CVE-2024-0000", PkgName: "pkg-b", Title: "t"},
+	}
+
+	var got []outputhandler.VulnRating
+	h := func(group []outputhandler.VulnRating) error {
+		got = append(got, group...)
+		return nil
+	}
+
+	require.NoError(t, g.GenerateRiskScore(context.Background(), vulns, h),
+		"the declining batch must not fail the run before the next batch scores the CVE")
+	require.Len(t, got, 1, "the later batch's component is rated from its score")
+}
+
+// [0 0 1 1] and [0 0 0 1] with the same "not reachable" reason mean the same
+// thing: token values on the impact axes don't make a decline genuine.
+func TestGenerator_TokenImpactValuesAreDeclined(t *testing.T) {
+	for _, shape := range [][4]float64{{0, 0, 1, 1}, {0, 0, 0, 1}, {0, 0, 0, 0}} {
+		e := llmOutputEntry{ThreatAgentScore: shape[0], VulnerabilityScore: shape[1], TechnicalImpact: shape[2], BusinessImpact: shape[3]}
+		require.True(t, declinedAssessment(e), "shape %v must count as declined", shape)
+	}
+	// A zero via a likelihood axis stays a genuine low score.
+	require.False(t, declinedAssessment(llmOutputEntry{ThreatAgentScore: 0, VulnerabilityScore: 1, TechnicalImpact: 0, BusinessImpact: 0}))
+
+	m := &scriptedLLM{answer: func(_ int, _ string) llmOutputEntry {
+		return llmOutputEntry{ThreatAgentScore: 0, VulnerabilityScore: 0, TechnicalImpact: 1, BusinessImpact: 1, Reasoning: "not reachable here"}
+	}}
+	g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 10})
+	require.NoError(t, err)
+
+	err = g.GenerateRiskScore(context.Background(), testVulns(2), nil)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "declined to assess")
+}
+
+// When a run has both declined and unanswered CVEs, the error lists both,
+// and both sides of the count are distinct CVEs — never package rows.
+func TestGenerator_ErrorListsDeclinedAndMissingWithCVECounts(t *testing.T) {
+	g, err := New(Opts{LLM: &declineAndDropLLM{}, Config: &riskconfig.Config{}, BatchSize: 10})
+	require.NoError(t, err)
+
+	// One declined CVE on two components (two rows), one scored CVE, one
+	// unanswered CVE: 4 rows, 3 distinct CVEs.
+	vulns := []Vulnerability{
+		{VulnID: "CVE-2024-0000", PkgName: "pkg-a", Title: "t"},
+		{VulnID: "CVE-2024-0000", PkgName: "pkg-b", Title: "t"},
+		{VulnID: "CVE-2024-0001", PkgName: "pkg-c", Title: "t"},
+		{VulnID: "CVE-2024-0002", PkgName: "pkg-d", Title: "t"},
+	}
+
+	err = g.GenerateRiskScore(context.Background(), vulns, nil)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "CVE-2024-0000", "declined CVE must be listed")
+	require.Contains(t, err.Error(), "CVE-2024-0002", "unanswered CVE must be listed")
+	require.Contains(t, err.Error(), "declined to assess 1")
+	require.Contains(t, err.Error(), "returned no score for 1")
+	require.Contains(t, err.Error(), "2 of 3", "2 failed of 3 distinct CVEs, not 4 rows")
+}
+
+// declineAndDropLLM declines CVE-2024-0000 and never answers CVE-2024-0002,
+// scoring everything else.
+type declineAndDropLLM struct{}
+
+func (declineAndDropLLM) Generate(_ context.Context, req llm.Request) (string, error) {
+	var in []struct {
+		VulnID string `json:"vulnId"`
+	}
+	if err := json.Unmarshal([]byte(req.Human), &in); err != nil {
+		return "", err
+	}
+	out := llmOutput{Results: make([]llmOutputEntry, 0, len(in))}
+	for _, v := range in {
+		var e llmOutputEntry
+		switch v.VulnID {
+		case "CVE-2024-0000":
+			e = declinedEntry()
+		case "CVE-2024-0002":
+			continue // never answered
+		default:
+			e = scoredEntry()
+		}
+		e.VulnID = v.VulnID
+		out.Results = append(out.Results, e)
+	}
+	b, err := json.Marshal(out)
+	return string(b), err
 }
