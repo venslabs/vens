@@ -36,6 +36,8 @@ type recordedReq struct {
 	body   map[string]any
 }
 
+func fptr(f float64) *float64 { return &f }
+
 func newTestServer(t *testing.T, status int, respBody string, rec *recordedReq) *httptest.Server {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -88,7 +90,7 @@ func TestGenerate_RequestShape(t *testing.T) {
 	c := newTestClient(t, srv.URL)
 
 	schema := json.RawMessage(`{"type":"object","properties":{"ok":{"type":"boolean"}},"additionalProperties":false}`)
-	req := llm.Request{System: "you are a scanner", Human: "score CVE-2021-1234", Schema: schema, Temperature: 0, Seed: 42}
+	req := llm.Request{System: "you are a scanner", Human: "score CVE-2021-1234", Schema: schema, Temperature: fptr(0), Seed: 42}
 
 	got, err := c.Generate(context.Background(), req)
 	if err != nil {

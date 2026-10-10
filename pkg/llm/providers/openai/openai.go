@@ -98,7 +98,9 @@ func (c *Client) Generate(ctx context.Context, req llm.Request) (string, error) 
 	// accept their default; every other model gets it, including 0 for
 	// deterministic scoring.
 	if !isReasoningModel(c.model) {
-		params.Temperature = openai.Float(req.Temperature)
+		// TODO(follow-up): forward req.Temperature only when non-nil instead of
+		// sending 0 when --llm-temperature wasn't passed.
+		params.Temperature = openai.Float(llm.TemperatureOrZero(req))
 	}
 	if req.Seed != 0 {
 		params.Seed = openai.Int(int64(req.Seed))

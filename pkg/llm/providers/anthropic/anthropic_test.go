@@ -76,10 +76,12 @@ func newReq() llm.Request {
 		System:      "you are vens",
 		Human:       "score these cves",
 		Schema:      json.RawMessage(`{"type":"object","properties":{"cves":{"type":"array"}}}`),
-		Temperature: 0,
-		Seed:        42, // Anthropic has no seed param; must be ignored
+		Temperature: ptr(0), // explicit --llm-temperature 0
+		Seed:        42,     // Anthropic has no seed param; must be ignored
 	}
 }
+
+func ptr(f float64) *float64 { return &f }
 
 // The outgoing request carries the schema in output_config.format, a hardcoded
 // max_tokens, an explicit temperature=0, the system block, and no seed.
@@ -290,5 +292,74 @@ func TestGenerate_OtherBadRequestIsNotStructuredOutput(t *testing.T) {
 	}
 	if errors.Is(err, llm.ErrUnsupportedStructuredOutput) {
 		t.Errorf("err = %v, want it classified as a plain provider error", err)
+	}
+}
+
+// Temperature is not sent unless the user explicitly passed --llm-temperature:
+// the flag defaults to 0.0, which is our choice, not the user's.
+func TestGenerate_TemperatureNotSentByDefault(t *testing.T) {
+	c, rec := newTestClient(t, "claude-sonnet-4-5", 200, successBody)
+
+	req := newReq()
+	req.Temperature = nil // --llm-temperature not passed
+	out, err := c.Generate(context.Background(), req)
+	if err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+	if out != `{"cves":[]}` {
+		t.Fatalf("out = %q", out)
+	}
+	if strings.Contains(rec.raw, "temperature") {
+		t.Errorf("temperature must be omitted when the flag was not passed, got: %s", rec.raw)
+	}
+}
+
+// A model known to refuse an explicit temperature fails before any call,
+// rather than silently dropping a parameter the user asked for.
+func TestGenerate_TemperatureRefusingModelFailsBeforeCall(t *testing.T) {
+	c, rec := newTestClient(t, "claude-sonnet-5", 200, successBody)
+
+	_, err := c.Generate(context.Background(), newReq()) // TemperatureSet: true
+	if err == nil || !strings.Contains(err.Error(), "refuses an explicit temperature") {
+		t.Fatalf("err = %v, want explicit-temperature refusal", err)
+	}
+	if !strings.Contains(err.Error(), "--llm-temperature") {
+		t.Errorf("err should tell the user what to do, got: %v", err)
+	}
+	if rec.hits != 0 {
+		t.Errorf("hits = %d, want 0 (fail before any call)", rec.hits)
+	}
+}
+
+// An unknown model that refuses the explicit temperature fails with a clear
+// message instead of retrying without it.
+func TestGenerate_UnknownModelRefusingTemperatureFails(t *testing.T) {
+	const deprecatedBody = "{\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\"," +
+		"\"message\":\"`temperature` is deprecated for this model.\"}}"
+
+	rec := &recordedReq{}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		rec.hits++
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = io.WriteString(w, deprecatedBody)
+	}))
+	t.Cleanup(srv.Close)
+
+	t.Setenv("ANTHROPIC_API_KEY", "test-key")
+	t.Setenv("ANTHROPIC_BASE_URL", srv.URL)
+
+	// claude-sonnet-4-6 is not on the refuse list: the refusal surfaces here.
+	c, err := New("claude-sonnet-4-6")
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	_, err = c.Generate(context.Background(), newReq()) // TemperatureSet: true
+	if err == nil || !strings.Contains(err.Error(), "refused the explicit --llm-temperature") {
+		t.Fatalf("err = %v, want clear refusal error", err)
+	}
+	if rec.hits != 1 {
+		t.Errorf("hits = %d, want 1 (no retry)", rec.hits)
 	}
 }

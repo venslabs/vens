@@ -144,9 +144,16 @@ func action(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	o.Temperature, err = flags.GetFloat64("llm-temperature")
-	if err != nil {
-		return err
+	// Temperature is only forwarded when the user actually passed
+	// --llm-temperature: the 0.0 default is our choice, not the user's, and
+	// some models (Anthropic's current generation) reject an explicit
+	// temperature outright.
+	if flags.Changed("llm-temperature") {
+		t, err := flags.GetFloat64("llm-temperature")
+		if err != nil {
+			return err
+		}
+		o.Temperature = &t
 	}
 	o.BatchSize, err = flags.GetInt("llm-batch-size")
 	if err != nil {
@@ -292,12 +299,19 @@ func action(cmd *cobra.Command, args []string) error {
 
 	var attestor *attestation.Builder
 	if attestEnabled {
+		// The attestation records the run's parameters; 0.0 is the flag's
+		// default, not the user's choice, but the attestation is a record of
+		// what was used, not a provider forward.
+		var temperature float64
+		if o.Temperature != nil {
+			temperature = *o.Temperature
+		}
 		attestor = attestation.NewBuilder(attestation.Opts{
 			VensVersion: version.GetVersion(),
 			Provider:    provider,
 			Model:       model,
 			Seed:        o.Seed,
-			Temperature: o.Temperature,
+			Temperature: temperature,
 			InputHash:   attestation.HashInput(inputB),
 			ConfigHash:  attestation.HashInput(cfgBytes),
 			VEXUUID:     vexUUID,

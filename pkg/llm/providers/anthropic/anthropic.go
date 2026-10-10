@@ -96,10 +96,21 @@ func (c *Client) Generate(ctx context.Context, req llm.Request) (string, error) 
 			Format: sdk.JSONOutputFormatParam{Schema: schema},
 		},
 	}
-	params.Temperature = param.NewOpt(req.Temperature)
+	if req.Temperature != nil && modelRefusesTemperature(c.model) {
+		return "", fmt.Errorf("anthropic: %q refuses an explicit temperature: omit --llm-temperature for this model", c.model)
+	}
+	if req.Temperature != nil {
+		params.Temperature = param.NewOpt(*req.Temperature)
+	}
 
 	msg, err := c.client.Messages.New(ctx, params)
 	if err != nil {
+		if req.Temperature != nil && temperatureDeprecated(err) {
+			// Unknown model, or a stale refuse-list: the API refused the
+			// explicit temperature. Fail with a clear message instead of
+			// retrying without it.
+			return "", fmt.Errorf("anthropic: %q refused the explicit --llm-temperature: omit the flag for this model", c.model)
+		}
 		if detail, ok := unsupportedStructuredOutput(err); ok {
 			return "", fmt.Errorf("anthropic: %q: %w, see docs/concepts/choosing-a-model.md (%s)",
 				c.model, llm.ErrUnsupportedStructuredOutput, detail)
@@ -116,6 +127,58 @@ func (c *Client) Generate(ctx context.Context, req llm.Request) (string, error) 
 		}
 	}
 	return "", fmt.Errorf("anthropic: no text content block in response")
+}
+
+// temperatureRefusingModels lists Anthropic model generations known to reject
+// an explicit temperature parameter outright ("`temperature` is deprecated for
+// this model."). Anthropic's capabilities object carries no temperature key,
+// and adjacent generations (sonnet-4-6 vs sonnet-5) report identical
+// capabilities while differing on temperature, so a best-effort list is the
+// only way to fail fast. A model missing from the list still fails with a
+// clear error after its first refused call instead of retrying.
+var temperatureRefusingModels = []string{
+	// Current generation; e.g. claude-sonnet-5. Extend as new generations
+	// confirm they refuse an explicit temperature.
+	"sonnet-5",
+	"opus-4-7",
+	"opus-4-8",
+	"opus-5",
+	"opus-5-5",
+	"fable",
+}
+
+// modelRefusesTemperature reports whether model is a known temperature refuser.
+//
+// TODO: move this into a shared helper package so every provider can reuse the
+// same model-refusal list (follow-up ticket).
+func modelRefusesTemperature(model string) bool {
+	m := strings.ToLower(model)
+	for _, known := range temperatureRefusingModels {
+		if strings.Contains(m, known) {
+			return true
+		}
+	}
+	return false
+}
+
+// temperatureDeprecated reports whether err is the API refusing an explicit
+// temperature parameter. Current model generations (e.g. claude-sonnet-5)
+// reject it with a 400 instead of ignoring it; the caller fails with a clear
+// error rather than retrying with the parameter omitted.
+func temperatureDeprecated(err error) bool {
+	var apiErr *sdk.Error
+	if !errors.As(err, &apiErr) || apiErr.StatusCode != http.StatusBadRequest {
+		return false
+	}
+	var body struct {
+		Error struct {
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if json.Unmarshal([]byte(apiErr.RawJSON()), &body) != nil {
+		return false
+	}
+	return strings.Contains(body.Error.Message, "`temperature` is deprecated for this model.")
 }
 
 func unsupportedStructuredOutput(err error) (string, bool) {

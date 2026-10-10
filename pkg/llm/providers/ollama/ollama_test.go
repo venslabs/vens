@@ -31,6 +31,8 @@ import (
 
 // newFakeServer registers a POST /api/chat handler that records the decoded
 // request and replies with the given NDJSON body (one or more JSON lines).
+func fptr(f float64) *float64 { return &f }
+
 func newFakeServer(t *testing.T, status int, body string, captured *oapi.ChatRequest) *httptest.Server {
 	t.Helper()
 	mux := http.NewServeMux()
@@ -80,7 +82,7 @@ func TestGenerate_RequestShapeAndSuccess(t *testing.T) {
 		System:      "sys",
 		Human:       "hum",
 		Schema:      schema,
-		Temperature: 0,
+		Temperature: fptr(0),
 		Seed:        42,
 	})
 	if err != nil {

@@ -64,7 +64,9 @@ func (c *Client) Generate(ctx context.Context, req llm.Request) (string, error) 
 		chatReq.Format = req.Schema
 	}
 
-	chatReq.Options = map[string]any{"temperature": req.Temperature}
+	// TODO(follow-up): forward req.Temperature only when non-nil instead of
+	// sending 0 when --llm-temperature wasn't passed.
+	chatReq.Options = map[string]any{"temperature": llm.TemperatureOrZero(req)}
 	if req.Seed != 0 {
 		chatReq.Options["seed"] = req.Seed
 	}

@@ -77,7 +77,9 @@ func (c *Client) Generate(ctx context.Context, req llm.Request) (string, error) 
 		// SystemInstruction is a dedicated system turn; its role is ignored.
 		cfg.SystemInstruction = genai.NewContentFromText(req.System, "")
 	}
-	cfg.Temperature = genai.Ptr(float32(req.Temperature))
+	// TODO(follow-up): forward req.Temperature only when non-nil instead of
+	// sending 0 when --llm-temperature wasn't passed.
+	cfg.Temperature = genai.Ptr(float32(llm.TemperatureOrZero(req)))
 	if req.Seed != 0 {
 		cfg.Seed = genai.Ptr(int32(req.Seed))
 	}

@@ -90,8 +90,10 @@ type llmOutput struct {
 
 // Opts configures the Generator.
 type Opts struct {
-	LLM         llm.Client
-	Temperature float64
+	LLM llm.Client
+	// Temperature is the sampling temperature forwarded to the provider, nil
+	// when the user did not pass --llm-temperature.
+	Temperature *float64
 	BatchSize   int // Avoid high values to avoid rate limit
 	Seed        int
 

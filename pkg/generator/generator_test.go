@@ -325,3 +325,63 @@ func TestGenerator_Attestor_RetryClaimsCiteTheRetryBatch(t *testing.T) {
 	require.Equal(t, "evidence-batch-1", cited["CVE-2024-0002"], "answered on the first ask")
 	require.Equal(t, "evidence-batch-2", cited["CVE-2024-0001"], "answered on the second")
 }
+
+// recordingLLM records the temperature of every request it receives and
+// scores each CVE deterministically, so tests can assert what the generator
+// forwarded to the provider.
+type recordingLLM struct {
+	temperatures []*float64
+}
+
+func (m *recordingLLM) Generate(_ context.Context, req llm.Request) (string, error) {
+	m.temperatures = append(m.temperatures, req.Temperature)
+	var in []struct {
+		VulnID string `json:"vulnId"`
+	}
+	if err := json.Unmarshal([]byte(req.Human), &in); err != nil {
+		return "", err
+	}
+	out := llmOutput{Results: make([]llmOutputEntry, 0, len(in))}
+	for _, v := range in {
+		out.Results = append(out.Results, llmOutputEntry{
+			VulnID:             v.VulnID,
+			ThreatAgentScore:   5,
+			VulnerabilityScore: 5,
+			TechnicalImpact:    5,
+			BusinessImpact:     5,
+			Reasoning:          "mock",
+		})
+	}
+	b, err := json.Marshal(out)
+	return string(b), err
+}
+
+// --llm-temperature must reach the provider request exactly as passed, and
+// stay absent (nil) when the flag wasn't given.
+func TestGenerator_TemperatureReachesRequest(t *testing.T) {
+	t.Run("explicit temperature is forwarded", func(t *testing.T) {
+		m := &recordingLLM{}
+		temp := 0.7
+		g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, Temperature: &temp, BatchSize: 10})
+		require.NoError(t, err)
+
+		require.NoError(t, g.GenerateRiskScore(context.Background(), testVulns(2), nil))
+		require.NotEmpty(t, m.temperatures, "expected at least one LLM call")
+		for _, got := range m.temperatures {
+			require.NotNil(t, got, "request must carry the explicit temperature")
+			require.Equal(t, 0.7, *got)
+		}
+	})
+
+	t.Run("nil when the flag was not passed", func(t *testing.T) {
+		m := &recordingLLM{}
+		g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 10})
+		require.NoError(t, err)
+
+		require.NoError(t, g.GenerateRiskScore(context.Background(), testVulns(2), nil))
+		require.NotEmpty(t, m.temperatures, "expected at least one LLM call")
+		for _, got := range m.temperatures {
+			require.Nil(t, got, "request must not carry a temperature when the flag was not passed")
+		}
+	})
+}

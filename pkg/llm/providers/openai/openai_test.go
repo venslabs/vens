@@ -84,6 +84,8 @@ func fakeServer(t *testing.T, status int, respBody string) (url string, captured
 	return srv.URL, &body
 }
 
+func fptr(f float64) *float64 { return &f }
+
 func newTestClient(t *testing.T, model, baseURL string) *Client {
 	t.Helper()
 	t.Setenv("OPENAI_API_KEY", "test-key")
@@ -105,7 +107,7 @@ func TestGenerate_RequestShape(t *testing.T) {
 		System:      "you are a scorer",
 		Human:       "score this",
 		Schema:      json.RawMessage(testSchema),
-		Temperature: 0,
+		Temperature: fptr(0),
 		Seed:        42,
 	}); err != nil {
 		t.Fatalf("Generate: %v", err)
@@ -163,7 +165,7 @@ func TestGenerate_OmitsTemperatureAndSeed(t *testing.T) {
 		c := newTestClient(t, "o3-mini", url)
 		if _, err := c.Generate(context.Background(), llm.Request{
 			Schema:      json.RawMessage(testSchema),
-			Temperature: 0.7,
+			Temperature: fptr(0.7),
 		}); err != nil {
 			t.Fatalf("Generate: %v", err)
 		}
