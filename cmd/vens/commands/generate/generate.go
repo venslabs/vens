@@ -72,6 +72,8 @@ The LLM calculates the OWASP risk score (0-81) for each vulnerability using:
 	flags.String("sbom-serial-number", "", "SBOM serial number for BOM-Link (format: urn:uuid:...)")
 	flags.Int("sbom-version", 1, "SBOM version for BOM-Link (default: 1)")
 	flags.Bool("attest", false, "Emit a CycloneDX Attestations (CDXA) sibling file with prompt hash, input hash, model, seed, raw LLM response")
+	flags.String("attest-signing-key", "", "PKCS#8 PEM EC P-256 private key used to JSF-sign the --attest sidecar (requires --attest)")
+	flags.String("attest-signing-key-id", "", "Optional key id recorded in the JSF signature (default: SHA-256 fingerprint of the public key)")
 
 	return cmd
 }
@@ -162,6 +164,18 @@ func action(cmd *cobra.Command, args []string) error {
 	}
 
 	attestEnabled, err := flags.GetBool("attest")
+	if err != nil {
+		return err
+	}
+	attestSigningKeyPath, err := flags.GetString("attest-signing-key")
+	if err != nil {
+		return err
+	}
+	attestSigningKeyID, err := flags.GetString("attest-signing-key-id")
+	if err != nil {
+		return err
+	}
+	attestSigner, err := resolveAttestSigner(attestEnabled, attestSigningKeyPath, attestSigningKeyID)
 	if err != nil {
 		return err
 	}
@@ -303,6 +317,7 @@ func action(cmd *cobra.Command, args []string) error {
 			VEXUUID:     vexUUID,
 			VEXVersion:  sbomVersion,
 			SpecVersion: specVersion,
+			Signer:      attestSigner,
 		})
 		g.SetAttestor(attestor)
 	}
@@ -344,6 +359,29 @@ func action(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+// resolveAttestSigner validates --attest-signing-key / --attest-signing-key-id
+// fail-closed: a key without --attest, a key-id without a key, or an unreadable
+// / unsupported key is an error before any output is written.
+func resolveAttestSigner(attestEnabled bool, keyPath, keyID string) (*attestation.Signer, error) {
+	if keyID != "" && keyPath == "" {
+		return nil, fmt.Errorf("--attest-signing-key-id requires --attest-signing-key")
+	}
+	if keyPath == "" {
+		return nil, nil
+	}
+	if !attestEnabled {
+		return nil, fmt.Errorf("--attest-signing-key requires --attest")
+	}
+	key, err := attestation.LoadSigningKey(keyPath)
+	if err != nil {
+		return nil, err
+	}
+	if keyID == "" {
+		keyID = attestation.DefaultKeyID(&key.PublicKey)
+	}
+	return &attestation.Signer{Key: key, KeyID: keyID}, nil
 }
 
 // tempOutputFile creates a temp file next to outputPath (same directory, so

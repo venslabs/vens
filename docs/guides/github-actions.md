@@ -44,7 +44,7 @@ The `llm-api-key` is passed as an environment variable (never a CLI argument) an
 
 ## Attestation
 
-Set `attest: "true"` to also emit a [CycloneDX attestation](https://cyclonedx.org/capabilities/attestations/) next to the VEX, recording how each CVE was scored (model, seed, prompt/input/config hashes, raw response) for audit and reproduction. Add the `attestation-file` output to your `upload-artifact` paths to keep it. It is evidence, not a cryptographic signature, and includes the model's reasoning in clear text, so keep it access-controlled. Requires vens-action v0.2.0.
+Set `attest: "true"` to also emit a [CycloneDX attestation](https://cyclonedx.org/capabilities/attestations/) next to the VEX, recording how each CVE was scored (model, seed, prompt/input/config hashes, raw response) for audit and reproduction. Add the `attestation-file` output to your `upload-artifact` paths to keep it. Without a signing key it is evidence, not a cryptographic signature; sign it with [`--attest-signing-key`](../reference/generate.md#-attest-signing-key-path) when you need tamper detection. It includes the model's reasoning in clear text, so keep it access-controlled. Requires vens-action v0.2.0.
 
 ## Using the mock provider in CI
 

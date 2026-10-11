@@ -1,0 +1,34 @@
+# --attest with a bad signing key fails closed
+
+! exec vens generate --llm=mock --attest --attest-signing-key=bad.key --config-file=config.yaml --sbom-serial-number=urn:uuid:11111111-2222-3333-4444-555555555555 report.json output.cdx.json
+stderr 'signing key'
+! exists output.cdx.json
+! exists output.attestation.cdx.json
+
+-- bad.key --
+-----BEGIN PRIVATE KEY-----
+not-a-real-key
+-----END PRIVATE KEY-----
+-- config.yaml --
+project:
+  name: "attest-bad-key"
+  description: "Fail-closed bad signing key"
+context:
+  exposure: "internet"
+  data_sensitivity: "high"
+  business_criticality: "critical"
+-- report.json --
+{
+  "SchemaVersion": 2,
+  "CreatedAt": "2024-01-15T10:00:00Z",
+  "ArtifactName": "nginx:1.25",
+  "ArtifactType": "container_image",
+  "Results": [
+    {
+      "Target": "nginx:1.25 (debian 12.4)",
+      "Class": "os-pkgs",
+      "Type": "debian",
+      "Vulnerabilities": []
+    }
+  ]
+}

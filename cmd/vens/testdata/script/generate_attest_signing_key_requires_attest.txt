@@ -1,0 +1,36 @@
+# --attest-signing-key without --attest fails closed before writing output
+
+! exec vens generate --llm=mock --attest-signing-key=attest.key --config-file=config.yaml --sbom-serial-number=urn:uuid:11111111-2222-3333-4444-555555555555 report.json output.cdx.json
+stderr '--attest-signing-key requires --attest'
+! exists output.cdx.json
+! exists output.attestation.cdx.json
+
+-- attest.key --
+-----BEGIN PRIVATE KEY-----
+MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgb7bwIiljNK7GCDQ7
+AylQK39IRuRYqHU1irQBqq9ZxaShRANCAATlcF9VSrnPGR4ateTDZBxczE/iADNX
+gAmsZINq6PlSdy9pnqa7dXzgDCNxGYr74uLA6Ez5tiA3wnlXT0EFJX/d
+-----END PRIVATE KEY-----
+-- config.yaml --
+project:
+  name: "attest-key-requires-attest"
+  description: "Fail-closed signing key without --attest"
+context:
+  exposure: "internet"
+  data_sensitivity: "high"
+  business_criticality: "critical"
+-- report.json --
+{
+  "SchemaVersion": 2,
+  "CreatedAt": "2024-01-15T10:00:00Z",
+  "ArtifactName": "nginx:1.25",
+  "ArtifactType": "container_image",
+  "Results": [
+    {
+      "Target": "nginx:1.25 (debian 12.4)",
+      "Class": "os-pkgs",
+      "Type": "debian",
+      "Vulnerabilities": []
+    }
+  ]
+}

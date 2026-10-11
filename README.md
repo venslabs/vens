@@ -146,6 +146,7 @@ vens generate --config-file config.yaml --sbom-serial-number urn:uuid:<uuid> INP
 - `--debug-dir` - Save prompts/responses for debugging
 - `--cyclonedx-spec-version` - CycloneDX spec version for the VEX output: `1.6` | `1.7` (default: `1.6`, which released Dependency-Track versions can ingest; opt up to `1.7` if your consumer supports it)
 - `--attest` - Emit a CycloneDX attestation sidecar recording how each CVE was scored (model, seed, prompt/input/config hashes, reasoning, raw response) for audit and reproduction
+- `--attest-signing-key` - PKCS#8 PEM EC P-256 key to JSF-sign the `--attest` sidecar (optional `--attest-signing-key-id`)
 
 ### `vens enrich`
 
