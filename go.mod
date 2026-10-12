@@ -1,6 +1,6 @@
 module github.com/venslabs/vens
 
-go 1.26.3
+go 1.26.9
 
 require (
 	github.com/CycloneDX/cyclonedx-go v0.12.0
