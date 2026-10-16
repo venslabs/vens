@@ -279,7 +279,7 @@ func TestGenerator_AsksOncePerSkippedVulnerability(t *testing.T) {
 	}
 
 	require.NoError(t, g.GenerateRiskScore(context.Background(), vulns, h))
-	require.Equal(t, []int{3, 1}, m.batches, "the second ask must carry the CVE once, not once per component")
+	require.Equal(t, []int{2, 1}, m.batches, "each ask must carry the CVE once, not once per component")
 
 	got := make([]string, 0, len(emitted))
 	for _, r := range emitted {
@@ -637,55 +637,92 @@ func TestGenerator_DupCVEReusesFirstScore(t *testing.T) {
 	}
 }
 
-// Score reuse works in both directions: a batch that gets no answer for a CVE
-// holds its components back, and when a later batch scores the CVE those rows
-// are filled in with that score instead of dropping out of the VEX.
-func TestGenerator_LaterBatchScoreBackfillsEarlierBatchRows(t *testing.T) {
-	m := &scriptedLLM{
-		answer: func(_ int, _ string) llmOutputEntry { return scoredEntry() },
-		// Batch 1 (call 1) and its retry (call 2) get no answer; batch 2
-		// (call 3) scores the CVE.
-		skip: func(call int, id string) bool {
-			return id == "CVE-2024-0000" && call <= 2
-		},
-	}
-	g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 1})
-	require.NoError(t, err)
-
-	vulns := []Vulnerability{
-		{VulnID: "CVE-2024-0000", PkgName: "pkg-a", Title: "t", BOMRef: "a"},
-		{VulnID: "CVE-2024-0000", PkgName: "pkg-b", Title: "t", BOMRef: "b"},
-	}
-
-	var got []outputhandler.VulnRating
-	h := func(group []outputhandler.VulnRating) error {
-		got = append(got, group...)
-		return nil
-	}
-
-	require.NoError(t, g.GenerateRiskScore(context.Background(), vulns, h))
-	require.Equal(t, 3, m.calls, "batch 1, its retry, then batch 2")
-	require.Len(t, got, 2, "the earlier batch's component row is kept and filled in once the CVE is scored")
-	refs := map[string]bool{}
-	for _, r := range got {
-		refs[r.BOMRef] = true
-		require.NotNil(t, r.Rating.Score)
-		require.Greater(t, *r.Rating.Score, 0.0, "rows carry the later batch's real score")
-	}
-	require.True(t, refs["a"] && refs["b"], "both components keep their VEX rows")
-	require.Equal(t, *got[0].Rating.Score, *got[1].Rating.Score, "both rows carry the same score")
+// Rows are grouped by CVE before batching, so a multi-component CVE is asked
+// about exactly once however the rows would have been batched: the published
+// score cannot depend on --llm-batch-size anymore.
+// countingLLM answers every prompt entry like scriptedLLM but also records
+// how many entries each LLM call carried, so a test can assert a
+// multi-component CVE occupies exactly one prompt entry.
+type countingLLM struct {
+	scriptedLLM
+	sizes []int
 }
 
-// A CVE held back on two components, because neither the batch nor its retry
-// answered it, is filled in once a later batch scores it: one row and one
-// claim per component, in scanner order.
-func TestGenerator_HeldBackCVEOnTwoComponentsFilledInOnce(t *testing.T) {
+func (m *countingLLM) Generate(ctx context.Context, req llm.Request) (string, error) {
+	var in []struct {
+		VulnID string `json:"vulnId"`
+	}
+	if err := json.Unmarshal([]byte(req.Human), &in); err != nil {
+		return "", err
+	}
+	m.sizes = append(m.sizes, len(in))
+	return m.scriptedLLM.Generate(ctx, req)
+}
+
+// Rows are grouped by CVE before batching, so a multi-component CVE is asked
+// about exactly once however the rows would have been batched: the published
+// score cannot depend on --llm-batch-size anymore.
+func TestGenerator_MultiComponentCVEAskedOnceRegardlessOfBatchSize(t *testing.T) {
+	run := func(batchSize int) ([]outputhandler.VulnRating, []int) {
+		m := &countingLLM{scriptedLLM: scriptedLLM{
+			answer: func(_ int, _ string) llmOutputEntry { return scoredEntry() },
+		}}
+		g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: batchSize})
+		require.NoError(t, err)
+
+		vulns := []Vulnerability{
+			{VulnID: "CVE-2024-0000", PkgName: "pkg-a", Title: "t", BOMRef: "a"},
+			{VulnID: "CVE-2024-1111", PkgName: "other", Title: "t", BOMRef: "other"},
+			{VulnID: "CVE-2024-0000", PkgName: "pkg-b", Title: "t", BOMRef: "b"},
+		}
+
+		var got []outputhandler.VulnRating
+		h := func(group []outputhandler.VulnRating) error {
+			got = append(got, group...)
+			return nil
+		}
+		require.NoError(t, g.GenerateRiskScore(context.Background(), vulns, h))
+		return got, m.sizes
+	}
+
+	got1, sizes1 := run(1)
+	got10, sizes10 := run(10)
+
+	// Two distinct CVEs: batch size 1 scores them in two calls, batch size 10
+	// in one call, but CVE-2024-0000 is a single prompt entry either way.
+	require.Equal(t, []int{1, 1}, sizes1)
+	require.Equal(t, []int{2}, sizes10)
+
+	// Same published score for every component row, at either batch size.
+	scoreOf := func(rs []outputhandler.VulnRating) float64 {
+		require.NotEmpty(t, rs)
+		s := *rs[0].Rating.Score
+		for _, r := range rs[1:] {
+			require.Equal(t, s, *r.Rating.Score)
+		}
+		return s
+	}
+	require.Len(t, got1, 3)
+	require.Len(t, got10, 3)
+	require.Equal(t, scoreOf(got1), scoreOf(got10), "published score must not depend on batch size")
+
+	refs := func(rs []outputhandler.VulnRating) []string {
+		var out []string
+		for _, r := range rs {
+			out = append(out, r.BOMRef)
+		}
+		return out
+	}
+	require.Equal(t, []string{"a", "b", "other"}, refs(got1), "each CVE's component rows stay together in scanner order")
+}
+
+// A multi-component CVE keeps one row and one attestation claim per component,
+// in scanner order, even when its rows would previously have spanned batches:
+// the CVE is grouped before batching and asked about exactly once.
+func TestGenerator_MultiComponentCVEOneRowAndClaimPerComponent(t *testing.T) {
 	at := attestation.NewBuilder(attestation.Opts{Provider: "mock", Model: "mock"})
 	m := &scriptedLLM{
 		answer: func(_ int, _ string) llmOutputEntry { return scoredEntry() },
-		// Batch 1 (call 1) and its retry (call 2) get no answer; batch 2
-		// (call 3) scores the CVE.
-		skip: func(call int, _ string) bool { return call <= 2 },
 	}
 	g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 2})
 	require.NoError(t, err)
@@ -706,7 +743,7 @@ func TestGenerator_HeldBackCVEOnTwoComponentsFilledInOnce(t *testing.T) {
 	}
 
 	require.NoError(t, g.GenerateRiskScore(context.Background(), vulns, h))
-	require.Equal(t, 3, m.calls, "batch 1, its retry, then batch 2")
+	require.Equal(t, 1, m.calls, "the CVE is grouped before batching: one call, one prompt entry")
 	require.Equal(t, []string{"a", "b", "c"}, rows)
 
 	var buf bytes.Buffer

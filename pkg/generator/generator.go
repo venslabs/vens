@@ -143,17 +143,40 @@ func New(o Opts) (*Generator, error) {
 func (g *Generator) SetAttestor(b *attestation.Builder) { g.attestor = b }
 
 // scoringRun carries state shared across the batches of one GenerateRiskScore
-// call: the CVEs already scored, the first answer per CVE (a later batch
-// leaves that CVE out of its prompt and reuses the answer, so its other
-// components keep their rows), the components of CVEs no batch
-// could score yet (held back as pending, and filled in once a later batch
-// scores the CVE), and the CVEs left unanswered after asking again (checked
-// once, at the end of the run, so batch order never decides the outcome).
+// call: the CVEs already scored, the first answer per CVE, the components of
+// CVEs no batch could score yet (held back as pending), and the CVEs left
+// unanswered after asking again (checked once, at the end of the run, so
+// batch order never decides the outcome). Rows are grouped by CVE before
+// batching, so a CVE lives in exactly one batch; the run state is a safety
+// net for the truncation-retry path.
 type scoringRun struct {
 	scored  map[string]bool
 	scores  map[string]answer
 	missing map[string]bool
 	pending map[string][]Vulnerability
+}
+
+// groupVulnsByCVE groups the flat (CVE, component) scanner rows by CVE,
+// preserving first-seen scanner order. Batching operates on these groups, so
+// a multi-component CVE occupies exactly one prompt entry in exactly one
+// batch: the published score no longer depends on --llm-batch-size, and the
+// model is not asked (and paid for) once per component.
+func groupVulnsByCVE(vulns []Vulnerability) [][]Vulnerability {
+	var groups [][]Vulnerability
+	index := make(map[string]int, len(vulns))
+	for _, v := range vulns {
+		if v.VulnID == "" {
+			// scoreAll drops empty IDs without emitting ratings; keep that.
+			continue
+		}
+		if i, ok := index[v.VulnID]; ok {
+			groups[i] = append(groups[i], v)
+			continue
+		}
+		index[v.VulnID] = len(groups)
+		groups = append(groups, []Vulnerability{v})
+	}
+	return groups
 }
 
 // GenerateRiskScore generates contextual OWASP risk scores for the given vulnerabilities.
@@ -166,7 +189,7 @@ func (g *Generator) GenerateRiskScore(ctx context.Context, vulns []Vulnerability
 		missing: make(map[string]bool),
 		pending: make(map[string][]Vulnerability),
 	}
-	if err := g.scoreInBatches(ctx, vulns, g.o.BatchSize, run, h); err != nil {
+	if err := g.scoreInBatches(ctx, groupVulnsByCVE(vulns), g.o.BatchSize, run, h); err != nil {
 		return err
 	}
 	return run.checkUnassessed()
@@ -192,16 +215,16 @@ func sortedKeys(m map[string]bool) []string {
 	return keys
 }
 
-// scoreInBatches scores vulns batchSize at a time. If a provider truncates a
+// scoreInBatches scores CVE groups batchSize at a time. If a provider truncates a
 // batch at its output-token limit (llm.ErrTruncated), that batch is split in
 // half and retried; the split repeats on each further truncation, down to a
 // single CVE. Only a lone CVE that still truncates fails the run.
-func (g *Generator) scoreInBatches(ctx context.Context, vulns []Vulnerability, batchSize int, run *scoringRun, h func([]outputhandler.VulnRating) error) error {
+func (g *Generator) scoreInBatches(ctx context.Context, groups [][]Vulnerability, batchSize int, run *scoringRun, h func([]outputhandler.VulnRating) error) error {
 	if batchSize < 1 {
 		batchSize = 1
 	}
-	for i := 0; i < len(vulns); i += batchSize {
-		batch := vulns[i:min(i+batchSize, len(vulns))]
+	for i := 0; i < len(groups); i += batchSize {
+		batch := groups[i:min(i+batchSize, len(groups))]
 		err := g.generateRiskScore(ctx, batch, run, h)
 		if err == nil {
 			continue
@@ -220,27 +243,29 @@ func (g *Generator) scoreInBatches(ctx context.Context, vulns []Vulnerability, b
 	return nil
 }
 
-func (g *Generator) generateRiskScore(ctx context.Context, vulnBatch []Vulnerability, run *scoringRun, h func([]outputhandler.VulnRating) error) error {
+func (g *Generator) generateRiskScore(ctx context.Context, batch [][]Vulnerability, run *scoringRun, h func([]outputhandler.VulnRating) error) error {
 	if g.o.Config == nil {
 		return errors.New("config not initialized; load config.yaml first")
 	}
 
-	// A CVE can affect several components in one batch, so group every component
-	// under its VulnID. Keying by VulnID alone would keep only the last one.
-	vulnsByID := make(map[string][]Vulnerability, len(vulnBatch))
-	llmBatch := make([]LLMVulnerability, len(vulnBatch))
-	for i, v := range vulnBatch {
-		vulnsByID[v.VulnID] = append(vulnsByID[v.VulnID], v)
-		llmBatch[i] = LLMVulnerability{
-			VulnID:           v.VulnID,
-			PkgID:            v.PkgID,
-			PkgName:          v.PkgName,
-			InstalledVersion: v.InstalledVersion,
-			FixedVersion:     v.FixedVersion,
-			Title:            v.Title,
-			Description:      v.Description,
-			Severity:         v.Severity,
-		}
+	// The batch holds one group per CVE. Build exactly one LLM entry per CVE
+	// (the first row's fields stand in for the CVE) while keeping every
+	// component row, so the VEX still gets one rating per (CVE, component).
+	vulnsByID := make(map[string][]Vulnerability, len(batch))
+	llmBatch := make([]LLMVulnerability, 0, len(batch))
+	for _, group := range batch {
+		rep := group[0]
+		vulnsByID[rep.VulnID] = append(vulnsByID[rep.VulnID], group...)
+		llmBatch = append(llmBatch, LLMVulnerability{
+			VulnID:           rep.VulnID,
+			PkgID:            rep.PkgID,
+			PkgName:          rep.PkgName,
+			InstalledVersion: rep.InstalledVersion,
+			FixedVersion:     rep.FixedVersion,
+			Title:            rep.Title,
+			Description:      rep.Description,
+			Severity:         rep.Severity,
+		})
 	}
 
 	answers, err := g.scoreAll(ctx, llmBatch, run)
@@ -251,7 +276,11 @@ func (g *Generator) generateRiskScore(ctx context.Context, vulnBatch []Vulnerabi
 		run.scored[a.entry.VulnID] = true
 	}
 
-	group := make([]outputhandler.VulnRating, 0, len(vulnBatch))
+	rows := 0
+	for _, group := range batch {
+		rows += len(group)
+	}
+	group := make([]outputhandler.VulnRating, 0, rows)
 	for _, answer := range answers {
 		entry, evidenceRef := answer.entry, answer.evidenceRef
 
