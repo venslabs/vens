@@ -117,3 +117,36 @@ func ResolveModel(name string) (provider, model string, defaulted bool) {
 	}
 	return
 }
+
+// temperatureRefusingModels lists model ids known to reject an explicit
+// temperature parameter outright ("`temperature` is deprecated for this
+// model."). The list is provider-neutral: it holds ids whichever provider
+// serves them. What happens to a model missing from the list is up to each
+// provider — today only the anthropic provider turns the first refused call
+// into a clear error instead of retrying. Capabilities objects carry no
+// temperature key, and adjacent generations can report identical capabilities
+// while differing on temperature, so a best-effort list is the only way to
+// fail fast.
+var temperatureRefusingModels = []string{
+	// Current generation; e.g. claude-sonnet-5. Extend as new generations
+	// confirm they refuse an explicit temperature.
+	"sonnet-5",
+	"opus-4-7",
+	"opus-4-8",
+	"opus-5",
+	"opus-5-5",
+	"fable",
+}
+
+// ModelRefusesTemperature reports whether model is a known temperature
+// refuser. The list holds model ids known to reject an explicit temperature,
+// whichever provider serves them; only the anthropic provider calls it today.
+func ModelRefusesTemperature(model string) bool {
+	m := strings.ToLower(model)
+	for _, known := range temperatureRefusingModels {
+		if strings.Contains(m, known) {
+			return true
+		}
+	}
+	return false
+}

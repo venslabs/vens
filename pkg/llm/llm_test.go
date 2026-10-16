@@ -79,3 +79,27 @@ func TestIsRateLimit(t *testing.T) {
 	}
 	assert.False(t, isRateLimit(nil))
 }
+
+func TestModelRefusesTemperature(t *testing.T) {
+	tests := []struct {
+		name  string
+		model string
+		want  bool
+	}{
+		{name: "sonnet-5", model: "claude-sonnet-5", want: true},
+		{name: "opus-4-7", model: "claude-opus-4-7", want: true},
+		{name: "opus-5", model: "claude-opus-5", want: true},
+		{name: "aws opus-4-8", model: "us.anthropic.claude-opus-4-8-v1:0", want: true},
+		{name: "opus-5-5", model: "claude-opus-5-5", want: true},
+		{name: "fable-5-1", model: "claude-fable-5-1", want: true},
+		{name: "uppercase sonnet-5", model: "CLAUDE-SONNET-5", want: true},
+		{name: "sonnet-4-6", model: "claude-sonnet-4-6", want: false},
+		{name: "dated opus-4-5", model: "claude-opus-4-5-20251101", want: false},
+		{name: "gpt-5", model: "gpt-5", want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, ModelRefusesTemperature(tt.model))
+		})
+	}
+}

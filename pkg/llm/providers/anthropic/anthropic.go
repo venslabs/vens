@@ -96,7 +96,7 @@ func (c *Client) Generate(ctx context.Context, req llm.Request) (string, error) 
 			Format: sdk.JSONOutputFormatParam{Schema: schema},
 		},
 	}
-	if req.Temperature != nil && modelRefusesTemperature(c.model) {
+	if req.Temperature != nil && llm.ModelRefusesTemperature(c.model) {
 		return "", fmt.Errorf("anthropic: %q refuses an explicit temperature: omit --llm-temperature for this model", c.model)
 	}
 	if req.Temperature != nil {
@@ -127,38 +127,6 @@ func (c *Client) Generate(ctx context.Context, req llm.Request) (string, error) 
 		}
 	}
 	return "", fmt.Errorf("anthropic: no text content block in response")
-}
-
-// temperatureRefusingModels lists Anthropic model generations known to reject
-// an explicit temperature parameter outright ("`temperature` is deprecated for
-// this model."). Anthropic's capabilities object carries no temperature key,
-// and adjacent generations (sonnet-4-6 vs sonnet-5) report identical
-// capabilities while differing on temperature, so a best-effort list is the
-// only way to fail fast. A model missing from the list still fails with a
-// clear error after its first refused call instead of retrying.
-var temperatureRefusingModels = []string{
-	// Current generation; e.g. claude-sonnet-5. Extend as new generations
-	// confirm they refuse an explicit temperature.
-	"sonnet-5",
-	"opus-4-7",
-	"opus-4-8",
-	"opus-5",
-	"opus-5-5",
-	"fable",
-}
-
-// modelRefusesTemperature reports whether model is a known temperature refuser.
-//
-// TODO: move this into a shared helper package so every provider can reuse the
-// same model-refusal list (follow-up ticket).
-func modelRefusesTemperature(model string) bool {
-	m := strings.ToLower(model)
-	for _, known := range temperatureRefusingModels {
-		if strings.Contains(m, known) {
-			return true
-		}
-	}
-	return false
 }
 
 // temperatureDeprecated reports whether err is the API refusing an explicit
