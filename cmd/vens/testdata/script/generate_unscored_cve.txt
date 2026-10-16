@@ -1,9 +1,11 @@
 # A CVE the model never scores, even when asked again, fails the run at the
-# end: the CVE is named, and neither the VEX nor the attestation is written.
-
+# first batch when no later batch covers it: the rows after it are never
+# scored, so CVE-2024-1234 must not appear as scored. Neither the VEX nor the
+# attestation is written.
 env VENS_MOCK_LLM_SKIP=CVE-2024-5678
-! exec vens generate --llm=mock --attest --config-file=config.yaml --sbom-serial-number=urn:uuid:22222222-2222-2222-2222-222222222222 report.json out.cdx.json
-stderr 'model returned no score for 1 of 2 vulnerabilities, after asking again: CVE-2024-5678'
+! exec vens generate --llm=mock --llm-batch-size=1 --attest --config-file=config.yaml --sbom-serial-number=urn:uuid:22222222-2222-2222-2222-222222222222 report.json out.cdx.json
+stderr 'model returned no score for 1 of 1 vulnerabilities after asking again, and no later batch covers them: CVE-2024-5678'
+! stderr 'Scored vulnerability.*CVE-2024-1234'
 ! exists out.cdx.json
 ! exists out.attestation.cdx.json
 ! exec sh -c 'ls .vens-*.tmp'
@@ -29,20 +31,20 @@ context:
       "Type": "debian",
       "Vulnerabilities": [
         {
-          "VulnerabilityID": "CVE-2024-1234",
-          "PkgName": "openssl",
-          "InstalledVersion": "3.0.11",
-          "Severity": "HIGH",
-          "Title": "Scored CVE",
-          "PkgIdentifier": { "PURL": "pkg:deb/debian/openssl@3.0.11" }
-        },
-        {
           "VulnerabilityID": "CVE-2024-5678",
           "PkgName": "curl",
           "InstalledVersion": "7.88.1",
           "Severity": "HIGH",
           "Title": "CVE the model never scores",
           "PkgIdentifier": { "PURL": "pkg:deb/debian/curl@7.88.1" }
+        },
+        {
+          "VulnerabilityID": "CVE-2024-1234",
+          "PkgName": "openssl",
+          "InstalledVersion": "3.0.11",
+          "Severity": "HIGH",
+          "Title": "Scored CVE",
+          "PkgIdentifier": { "PURL": "pkg:deb/debian/openssl@3.0.11" }
         }
       ]
     }

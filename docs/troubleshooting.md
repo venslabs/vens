@@ -121,7 +121,7 @@ Vens processes CVEs in batches (default 10, tunable via `--llm-batch-size`). Pro
 - **Rate limit on a batch** → Vens retries that batch up to 10 times with a 10 s backoff (`pkg/llm`). If all retries fail, the whole `vens generate` run exits with a non-zero status and the output VEX file is not written. This is intentional — a partial VEX would be misleading.
 - **LLM returns malformed JSON that cannot be parsed** → Vens exits with `unable to parse LLM output: ...`. The failing batch is included in the error message; use `--debug-dir` to capture the exact prompt so you can reproduce or downgrade the batch size.
 - **Network error / provider outage mid-batch** → same behaviour: exit non-zero, no partial VEX.
-- **The LLM leaves a CVE out of its answer** → Vens asks for it again on its own. If it is still missing and no later batch scores it through another package, the run fails at the end, names the CVE and writes no VEX.
+- **The LLM leaves a CVE out of its answer** → Vens asks for it again on its own. If it is still missing and no later batch has it through another package, the run stops there, names the missing CVEs and writes no VEX.
 - **The LLM gives a CVE zero likelihood** (usually "not reachable here") → Vens publishes it as-is, so it lands as `info`, and logs the model's reasoning at WARN. That passes a `fail-on-severity` gate set to `low` or above: read those lines before trusting it.
 
 For CI pipelines, this means you should either:
