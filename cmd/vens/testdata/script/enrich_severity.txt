@@ -1,0 +1,119 @@
+# Test vens enrich writes owasp_severity from the OWASP rating's severity band
+
+exec vens enrich --vex vex.json --output enriched-report.json report.json
+
+exists enriched-report.json
+
+# Pin the full enriched report: json-eq fails on a dropped key, an empty
+# band, or any CVE the enrich loop touches that we did not account for.
+json-eq enriched-report.json expected.json
+
+-- vex.json --
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "vulnerabilities": [
+    {
+      "id": "CVE-2024-1234",
+      "ratings": [
+        {
+          "method": "OWASP",
+          "score": 45.5,
+          "severity": "high",
+          "vector": "SL:7/M:7/O:7/S:7/ED:6/EE:6/A:6/ID:3/LC:7/LI:7/LAV:7/LAC:7/FD:7/RD:7/NC:7/PV:7"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2024-5678",
+      "ratings": [
+        {
+          "method": "OWASP",
+          "score": 12
+        }
+      ]
+    }
+  ]
+}
+-- report.json --
+{
+  "SchemaVersion": 2,
+  "CreatedAt": "2024-01-15T10:00:00Z",
+  "ArtifactName": "nginx:1.25",
+  "ArtifactType": "container_image",
+  "Results": [
+    {
+      "Target": "nginx:1.25 (debian 12.4)",
+      "Class": "os-pkgs",
+      "Type": "debian",
+      "Vulnerabilities": [
+        {
+          "VulnerabilityID": "CVE-2024-1234",
+          "PkgName": "openssl",
+          "InstalledVersion": "3.0.11-1~deb12u2",
+          "Severity": "HIGH",
+          "Custom": {
+            "owasp_severity": "low"
+          }
+        },
+        {
+          "VulnerabilityID": "CVE-2024-5678",
+          "PkgName": "libpng",
+          "InstalledVersion": "1.6.37-3",
+          "Severity": "MEDIUM",
+          "Custom": {
+            "owasp_severity": "low"
+          }
+        },
+        {
+          "VulnerabilityID": "CVE-2024-9999",
+          "PkgName": "zlib",
+          "InstalledVersion": "1.2.11",
+          "Severity": "LOW"
+        }
+      ]
+    }
+  ]
+}
+-- expected.json --
+{
+  "SchemaVersion": 2,
+  "CreatedAt": "2024-01-15T10:00:00Z",
+  "ArtifactName": "nginx:1.25",
+  "ArtifactType": "container_image",
+  "Results": [
+    {
+      "Target": "nginx:1.25 (debian 12.4)",
+      "Class": "os-pkgs",
+      "Type": "debian",
+      "Vulnerabilities": [
+        {
+          "VulnerabilityID": "CVE-2024-1234",
+          "PkgName": "openssl",
+          "InstalledVersion": "3.0.11-1~deb12u2",
+          "Custom": {
+            "owasp_score": 45.5,
+            "owasp_severity": "high",
+            "owasp_vector": "SL:7/M:7/O:7/S:7/ED:6/EE:6/A:6/ID:3/LC:7/LI:7/LAV:7/LAC:7/FD:7/RD:7/NC:7/PV:7"
+          },
+          "Severity": "HIGH"
+        },
+        {
+          "VulnerabilityID": "CVE-2024-5678",
+          "PkgName": "libpng",
+          "InstalledVersion": "1.6.37-3",
+          "Custom": {
+            "owasp_score": 12
+          },
+          "Severity": "MEDIUM"
+        },
+        {
+          "VulnerabilityID": "CVE-2024-9999",
+          "PkgName": "zlib",
+          "InstalledVersion": "1.2.11",
+          "Severity": "LOW"
+        }
+      ]
+    }
+  ]
+}

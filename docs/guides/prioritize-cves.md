@@ -124,7 +124,7 @@ Example output:
 ]
 ```
 
-**These are the CVEs you patch first.** Everything below a threshold (e.g. score < 20) can be deferred or suppressed.
+**These are the CVEs you patch first.** Everything in the low and info bands can be deferred or suppressed.
 
 !!! tip "Where is the reasoning?"
     Vens prints the LLM's per-CVE reasoning to stderr as it runs, and dumps every prompt and response to disk if you pass `--debug-dir ./debug`. The reasoning is intentionally not embedded in the VEX file — VEX stays a pure CycloneDX document. Use `--debug-dir` for audits.
@@ -137,15 +137,18 @@ Scanner `--vex` flags are not a route for these scores. Trivy reads a VEX for `a
 
 Two routes that do work:
 
-**Trivy JSON.** `vens enrich` copies each OWASP score and vector onto the matching vulnerability, under `Custom`:
+**Trivy JSON.** `vens enrich` copies each OWASP score, severity band, and vector onto the matching vulnerability, under `Custom`:
 
 ```bash
 vens enrich --vex output.vex.json --output enriched-report.json report.json
 
-jq '.Results[]?.Vulnerabilities[]? | {VulnerabilityID, Severity, owasp: .Custom.owasp_score}' enriched-report.json
+jq '.Results[]?.Vulnerabilities[]? | {VulnerabilityID, Severity, owasp_severity: .Custom.owasp_severity, owasp_score: .Custom.owasp_score}' enriched-report.json
 ```
 
-`Severity` and the CVSS block stay exactly as Trivy wrote them, so read `Custom.owasp_score` in whatever consumes the JSON next.
+`Severity` and the CVSS block stay exactly as Trivy wrote them, so read `Custom.owasp_severity` in whatever consumes the JSON next. Reach for the raw `Custom.owasp_score` only when you need the number itself — it lives on vens's internal 0–81 scale and its mapping may change.
+
+!!! note "From the next release"
+    `owasp_severity` isn't written by any release yet (v0.5.0 doesn't emit it) — it lands with the next one. The docs deploy from main, so it shows here first.
 
 **Dependency-Track 5.1+.** It picks up the OWASP rating from the VEX and shows it on each finding. See [Send the scores to Dependency-Track](dependency-track.md).
 
@@ -180,10 +183,12 @@ For a turnkey Action, see [GitHub Actions integration](github-actions.md). The m
 
 - name: Fail on high contextual risk
   run: |
-    HIGH_COUNT=$(jq '[.vulnerabilities[] | select(.ratings[0].score >= 40)] | length' vex.json)
+    # Gate on the band, it's the field vens commits to for gates and the one
+    # vens-action's fail-on-severity reads; re-check the threshold when venslabs/vens#310 ships.
+    HIGH_COUNT=$(jq '[.vulnerabilities[] | select(any(.ratings[]?; .method == "OWASP" and (.severity | IN("high", "critical"))))] | length' vex.json)
     if [ "$HIGH_COUNT" -gt 0 ]; then
       echo "::error::$HIGH_COUNT CVEs above contextual threshold"
-      jq '[.vulnerabilities[] | select(.ratings[0].score >= 40) | {id, score: .ratings[0].score}]' vex.json
+      jq '[.vulnerabilities[] | {id} + (.ratings[]? | select(.method == "OWASP" and (.severity | IN("high", "critical"))) | {score, severity})]' vex.json
       exit 1
     fi
 
