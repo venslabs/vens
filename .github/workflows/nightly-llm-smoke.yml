@@ -1,0 +1,80 @@
+name: Nightly LLM smoke test
+
+# Runs `vens generate` against each real LLM provider with a small committed
+# report and asserts the VEX is valid and scored. Tracked in
+# https://github.com/venslabs/vens/issues/175.
+#
+# The run steps only execute when the provider's API key is present as a repo
+# secret, so the workflow is a no-op on PRs (secrets are not available to
+# fork PRs) and on forks that have not configured keys. Configure the secrets
+# under Settings > Secrets and variables > Actions:
+#   OPENAI_API_KEY, ANTHROPIC_API_KEY, GOOGLE_API_KEY (or GEMINI_API_KEY)
+
+on:
+  schedule:
+    - cron: "0 5 * * *" # nightly, 05:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: smoke (${{ matrix.provider }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        provider: [openai, anthropic, google]
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: 'stable'
+
+      # A missing key is not a failure: PRs from forks never have secrets, so
+      # the provider jobs skip and the workflow stays green.
+      - name: Provider key present?
+        id: key
+        run: |
+          case "${{ matrix.provider }}" in
+            openai)    test -n "${OPENAI_API_KEY:-}" ;;
+            anthropic) test -n "${ANTHROPIC_API_KEY:-}" ;;
+            google)    test -n "${GOOGLE_API_KEY:-${GEMINI_API_KEY:-}}" ;;
+            *)         exit 1 ;;
+          esac \
+            && echo "present=true" >> "$GITHUB_OUTPUT" \
+            || echo "present=false" >> "$GITHUB_OUTPUT"
+
+      - name: No key configured, skipping
+        if: steps.key.outputs.present != 'true'
+        run: echo "No API key secret for provider '${{ matrix.provider }}'; skipping smoke test."
+
+      - name: Build vens
+        if: steps.key.outputs.present == 'true'
+        run: go build -o vens ./cmd/vens
+
+      - name: Generate VEX
+        if: steps.key.outputs.present == 'true'
+        run: ./vens generate --config-file examples/quickstart/config.yaml --llm "${{ matrix.provider }}" --sbom-serial-number=urn:uuid:7d1c3f9e-4b2a-4c8e-9d6f-2a1b3c4d5e6f .github/smoke/report.trivy.json "smoke-${{ matrix.provider }}.cdx.json"
+
+      - name: Assert valid scored VEX
+        if: steps.key.outputs.present == 'true'
+        run: |
+          jq -e '
+            .bomFormat == "CycloneDX"
+            and ((.vulnerabilities // []) | length > 0)
+            and ([.vulnerabilities[] | select(((.ratings // []) | length) == 0)] | length == 0)
+            and ([.vulnerabilities[].ratings[] | select(.method != "OWASP" or ((.vector // "") | length) == 0)] | length == 0)
+          ' "smoke-${{ matrix.provider }}.cdx.json" > /dev/null
