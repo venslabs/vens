@@ -1,0 +1,97 @@
+# Copyright 2026 venslabs
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Nightly smoke test against the real LLM providers (issue #175).
+#
+# The unit tests and the --llm=mock testscripts never touch a real API, so a
+# response-format change on a provider side would go unnoticed until a user
+# hit it. This workflow runs `vens generate` against each real provider on a
+# tiny report and asserts a valid *scored* VEX.
+#
+# Keys come from repo secrets. A provider whose key secret is absent is
+# skipped gracefully (the job succeeds with a notice), so the workflow stays
+# green on forks and before secrets are configured — and it never runs on
+# pull requests, so PRs from forks cannot exfiltrate keys.
+name: Nightly LLM smoke test
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - provider: openai
+            key_env: OPENAI_API_KEY
+          - provider: anthropic
+            key_env: ANTHROPIC_API_KEY
+          - provider: googleai
+            key_env: GOOGLE_API_KEY
+          # Ollama runs against a local server, so it needs no key.
+          - provider: ollama
+            key_env: ''
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: "go.mod"
+
+      - name: Build vens
+        run: go build -o vens ./cmd/vens
+
+      - name: Start Ollama
+        if: matrix.provider == 'ollama'
+        run: |
+          curl -fsSL https://ollama.com/install.sh | sh
+          ollama serve > /tmp/ollama.log 2>&1 &
+          for i in $(seq 1 30); do
+            ollama list > /dev/null 2>&1 && break
+            sleep 2
+          done
+          ollama pull qwen2.5:0.5b
+
+      - name: Smoke test ${{ matrix.provider }}
+        env:
+          PROVIDER: ${{ matrix.provider }}
+          KEY_ENV: ${{ matrix.key_env }}
+          OLLAMA_MODEL: qwen2.5:0.5b
+        run: |
+          if [ -n "$KEY_ENV" ] && [ -z "${!KEY_ENV}" ]; then
+            echo "::notice::Skipping $PROVIDER smoke test: the $KEY_ENV secret is not set."
+            exit 0
+          fi
+          ./vens generate --llm="$PROVIDER" \
+            --config-file=.github/llm-smoke/config.yaml \
+            --sbom-serial-number=urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79 \
+            .github/llm-smoke/report.json vex.cdx.json
+          python3 .github/llm-smoke/check-vex.py vex.cdx.json
