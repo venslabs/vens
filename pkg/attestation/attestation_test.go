@@ -331,6 +331,57 @@ func TestBuilder_Write_Claims(t *testing.T) {
 	assert.ElementsMatch(t, []string{d.Claims[0].BomRef, d.Claims[1].BomRef}, at.Map[0].Claims)
 }
 
+// A claim marked reused must say in its predicate that the score was carried
+// over from the CVE's first assessment, while a fresh claim must not.
+func TestBuilder_Write_ReusedClaimMarksPredicate(t *testing.T) {
+	b := newTestBuilder(t, nil)
+	ref := b.AddBatch("sys", "hum", []byte(`{"results":[]}`))
+
+	fresh := ClaimInput{
+		VulnID: "CVE-2024-1234", CompRef: "pkg:deb/debian/openssl@3.0.11",
+		CompName: "openssl", CompVersion: "3.0.11", PURL: "pkg:deb/debian/openssl@3.0.11",
+		Score: 56, Severity: "high", Reasoning: "RCE",
+	}
+	b.AddClaim(ref, fresh)
+
+	reused := fresh
+	reused.CompRef = "pkg:deb/debian/libssl3@3.0.11"
+	reused.CompName = "libssl3"
+	reused.PURL = "pkg:deb/debian/libssl3@3.0.11"
+	reused.Reused = true
+	b.AddClaim(ref, reused)
+
+	var buf bytes.Buffer
+	require.NoError(t, b.Write(&buf))
+	var got struct {
+		Declarations struct {
+			Claims []struct {
+				Target    string   `json:"target"`
+				Predicate string   `json:"predicate"`
+				Evidence  []string `json:"evidence"`
+			} `json:"claims"`
+		} `json:"declarations"`
+	}
+	require.NoError(t, json.Unmarshal(buf.Bytes(), &got), "output:\n%s", buf.String())
+	require.Len(t, got.Declarations.Claims, 2)
+
+	byTarget := map[string]struct {
+		Predicate string
+		Evidence  []string
+	}{}
+	for _, c := range got.Declarations.Claims {
+		byTarget[c.Target] = struct {
+			Predicate string
+			Evidence  []string
+		}{c.Predicate, c.Evidence}
+	}
+
+	assert.NotContains(t, byTarget["pkg:deb/debian/openssl@3.0.11"].Predicate, "reused")
+	assert.Contains(t, byTarget["pkg:deb/debian/libssl3@3.0.11"].Predicate, "score reused from the first assessment of this CVE")
+	assert.Equal(t, []string{ref}, byTarget["pkg:deb/debian/libssl3@3.0.11"].Evidence,
+		"a reused claim still cites the first batch's evidence bundle")
+}
+
 func TestBuilder_AddClaim_EmptyCompRefSkipped(t *testing.T) {
 	b := newTestBuilder(t, nil)
 	ref := b.AddBatch("s", "h", []byte("{}"))

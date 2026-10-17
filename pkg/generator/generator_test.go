@@ -637,6 +637,58 @@ func TestGenerator_DupCVEReusesFirstScore(t *testing.T) {
 	}
 }
 
+// When a later batch reuses an earlier batch's score for a CVE, the
+// attestation claim for that batch's package must be marked as reused:
+// its cited evidence bundle is the first call's, whose prompt never
+// mentioned this package.
+func TestGenerator_Attestor_ReusedScoreMarksClaim(t *testing.T) {
+	m := &scriptedLLM{
+		answer: func(_ int, _ string) llmOutputEntry { return scoredEntry() },
+	}
+	g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 1})
+	require.NoError(t, err)
+	at := attestation.NewBuilder(attestation.Opts{Provider: "mock", Model: "mock"})
+	g.SetAttestor(at)
+
+	vulns := []Vulnerability{
+		{VulnID: "CVE-2024-0000", PkgName: "openssl", Title: "t", BOMRef: "openssl"},
+		{VulnID: "CVE-2024-0000", PkgName: "libssl3", Title: "t", BOMRef: "libssl3"},
+	}
+	require.NoError(t, g.GenerateRiskScore(context.Background(), vulns, nil))
+	require.Equal(t, 1, m.calls, "the second batch must not ask about an already-scored CVE")
+
+	var buf bytes.Buffer
+	require.NoError(t, at.Write(&buf))
+	var got struct {
+		Declarations struct {
+			Claims []struct {
+				Target    string   `json:"target"`
+				Predicate string   `json:"predicate"`
+				Evidence  []string `json:"evidence"`
+			} `json:"claims"`
+		} `json:"declarations"`
+	}
+	require.NoError(t, json.Unmarshal(buf.Bytes(), &got), "output:\n%s", buf.String())
+	require.Len(t, got.Declarations.Claims, 2, "both components must keep their attestation claims")
+
+	byTarget := map[string]struct {
+		Predicate string
+		Evidence  []string
+	}{}
+	for _, c := range got.Declarations.Claims {
+		byTarget[c.Target] = struct {
+			Predicate string
+			Evidence  []string
+		}{c.Predicate, c.Evidence}
+	}
+
+	assert.NotContains(t, byTarget["openssl"].Predicate, "reused",
+		"the first package was in the prompt behind the cited evidence")
+	assert.Contains(t, byTarget["libssl3"].Predicate, "score reused from the first assessment of this CVE")
+	assert.Equal(t, byTarget["openssl"].Evidence, byTarget["libssl3"].Evidence,
+		"the reused claim cites the first call's evidence bundle")
+}
+
 // Score reuse works in both directions: a batch that gets no answer for a CVE
 // holds its components back, and when a later batch scores the CVE those rows
 // are filled in with that score instead of dropping out of the VEX.

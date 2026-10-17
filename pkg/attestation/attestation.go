@@ -60,6 +60,11 @@ type ClaimInput struct {
 	Score       float64
 	Severity    string
 	Reasoning   string
+	// Reused marks a claim whose score was carried over from the batch that
+	// first assessed the CVE, rather than from an LLM call whose prompt
+	// mentioned this package. The claim still cites the first batch's
+	// evidence bundle, and says so.
+	Reused bool
 }
 
 // Builder collects per-batch evidence and per-CVE claims, then emits a
@@ -258,10 +263,18 @@ func (b *Builder) addClaims(decl *cyclonedx.Declarations) {
 	refs := make([]cyclonedx.BOMReference, 0, len(b.claims))
 	for i, c := range b.claims {
 		ref := fmt.Sprintf("claim-%d", i+1)
+		predicate := fmt.Sprintf("%s on %s %s assessed at OWASP risk %.2f (%s)",
+			c.in.VulnID, c.in.CompName, c.in.CompVersion, c.in.Score, c.in.Severity)
+		if c.in.Reused {
+			// The score was carried over from the CVE's first assessment; the
+			// cited evidence bundle's prompt never mentioned this package.
+			predicate += "; score reused from the first assessment of this CVE" +
+				" (this package was not in that batch's prompt)"
+		}
 		claims = append(claims, cyclonedx.Claim{
 			BOMRef:    ref,
 			Target:    cyclonedx.BOMReference(c.in.CompRef),
-			Predicate: fmt.Sprintf("%s on %s %s assessed at OWASP risk %.2f (%s)", c.in.VulnID, c.in.CompName, c.in.CompVersion, c.in.Score, c.in.Severity),
+			Predicate: predicate,
 			Reasoning: c.in.Reasoning,
 			Evidence:  &[]cyclonedx.BOMReference{cyclonedx.BOMReference(c.evidenceRef)},
 		})

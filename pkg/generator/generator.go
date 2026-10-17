@@ -341,6 +341,7 @@ func (g *Generator) generateRiskScore(ctx context.Context, vulnBatch []Vulnerabi
 					Score:       score,
 					Severity:    severity,
 					Reasoning:   entry.Reasoning,
+					Reused:      answer.reused,
 				})
 			}
 		}
@@ -376,12 +377,15 @@ func (g *Generator) generateRiskScore(ctx context.Context, vulnBatch []Vulnerabi
 // marks a "not reachable here" verdict (see func zeroLikelihood), published
 // as-is with its reasoning logged at WARN. published marks an answer an
 // earlier batch already published: that batch logged its WARN line, so it is
-// not repeated.
+// not repeated. reused marks an answer pulled from an earlier batch's score
+// (see reuseFirstScores): the evidence bundle it cites comes from that first
+// call, whose prompt never mentioned the later batch's package.
 type answer struct {
 	entry          llmOutputEntry
 	evidenceRef    string
 	zeroLikelihood bool
 	published      bool
+	reused         bool
 }
 
 // zeroLikelihood reports whether both likelihood factors are 0, which makes
@@ -460,8 +464,11 @@ func (g *Generator) scoreAll(ctx context.Context, batch []LLMVulnerability, run 
 			if first, ok := run.scores[v.VulnID]; ok {
 				// Pulled from an earlier batch's score, not obtained in this
 				// call. That batch did not always publish it: one split after
-				// a truncated retry never did.
+				// a truncated retry never did. Mark it reused so the
+				// attestation claim says the cited prompt did not include this
+				// package.
 				first.published = run.scored[v.VulnID]
+				first.reused = true
 				answers = append(answers, first)
 				seen[v.VulnID] = true
 			}
