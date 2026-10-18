@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"os"
 	"path/filepath"
 	"sort"
@@ -256,20 +257,23 @@ func (g *Generator) generateRiskScore(ctx context.Context, vulnBatch []Vulnerabi
 
 		// Calculate final OWASP score using the formula:
 		// Risk = Likelihood × Impact = ((ThreatAgent + Vulnerability)/2) × ((TechImpact + BusinessImpact)/2)
-		likelihoodScore := (entry.ThreatAgentScore + entry.VulnerabilityScore) / 2.0
-		impactScore := (entry.TechnicalImpact + entry.BusinessImpact) / 2.0
+		// The aggregates are rounded first so the published score can be
+		// recomputed from its own vector, which carries them rounded (#358).
+		ta, vuln, tech, bus := roundedAggregates(
+			entry.ThreatAgentScore,
+			entry.VulnerabilityScore,
+			entry.TechnicalImpact,
+			entry.BusinessImpact,
+		)
+		likelihoodScore := (ta + vuln) / 2.0
+		impactScore := (tech + bus) / 2.0
 		owaspScore := likelihoodScore * impactScore // Range: 0-81
 
 		score := clampScore(owaspScore)
 		severity := riskconfig.RiskSeverity(score)
 
 		// Generate OWASP RR vector in standard format
-		vector := owasp.FromAggregatedScores(
-			entry.ThreatAgentScore,
-			entry.VulnerabilityScore,
-			entry.TechnicalImpact,
-			entry.BusinessImpact,
-		)
+		vector := owasp.FromAggregatedScores(ta, vuln, tech, bus)
 		vectorString := vector.String()
 
 		comps := vulnsByID[entry.VulnID]
@@ -735,6 +739,15 @@ func (g *Generator) buildOutputExample() string {
     }
   ]
 }`
+}
+
+// roundedAggregates rounds the model's raw factor aggregates to integers.
+// The published OWASP RR vector carries them rounded
+// (owasp.FromAggregatedScores rounds each aggregate), so scoring from the
+// rounded values keeps the published score recomputable from its own
+// vector (#358).
+func roundedAggregates(threatAgent, vulnerability, technicalImpact, businessImpact float64) (ta, vuln, tech, bus float64) {
+	return math.Round(threatAgent), math.Round(vulnerability), math.Round(technicalImpact), math.Round(businessImpact)
 }
 
 // clampScore ensures the score is within [0, 81].

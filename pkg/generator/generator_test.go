@@ -30,6 +30,7 @@ import (
 	"github.com/venslabs/vens/pkg/attestation"
 	"github.com/venslabs/vens/pkg/llm"
 	"github.com/venslabs/vens/pkg/outputhandler"
+	"github.com/venslabs/vens/pkg/owasp"
 	"github.com/venslabs/vens/pkg/riskconfig"
 )
 
@@ -1021,4 +1022,33 @@ func TestGenerator_ZeroLikelihoodWarnSurvivesTruncatedRetry(t *testing.T) {
 		}
 	}
 	require.Equal(t, 1, warns, "the verdict is logged once, even when the retry truncates")
+}
+
+// The published score must be recomputable from its own vector: the vector
+// carries the aggregates rounded, so scoring also runs on the rounded
+// values (#358).
+func TestRoundedAggregates_ScoreMatchesVectorRecomputation(t *testing.T) {
+	cases := [][4]float64{
+		{7.5, 8.2, 6.4, 7.6}, // non-integers, like the model's raw output
+		{3, 4, 4, 5},
+		{0, 0, 0, 0},
+		{9, 9, 9, 9},
+		{0.4, 0.4, 0.4, 0.4},
+	}
+	for _, c := range cases {
+		ta, vuln, tech, bus := roundedAggregates(c[0], c[1], c[2], c[3])
+		published := clampScore(((ta + vuln) / 2.0) * ((tech + bus) / 2.0))
+
+		vector := owasp.FromAggregatedScores(ta, vuln, tech, bus)
+		// Each vector factor group carries one rounded aggregate; the
+		// group average is the aggregate itself.
+		rta := float64(vector.SkillLevel+vector.Motive+vector.Opportunity+vector.Size) / 4.0
+		rvuln := float64(vector.EaseOfDiscovery+vector.EaseOfExploit+vector.Awareness+vector.IntrusionDetection) / 4.0
+		rtech := float64(vector.LossOfConfidentiality+vector.LossOfIntegrity+vector.LossOfAvailability+vector.LossOfAccountability) / 4.0
+		rbus := float64(vector.FinancialDamage+vector.ReputationDamage+vector.NonCompliance+vector.PrivacyViolation) / 4.0
+		recomputed := clampScore(((rta + rvuln) / 2.0) * ((rtech + rbus) / 2.0))
+
+		require.Equal(t, published, recomputed,
+			"aggregates %v: published score must match the score recomputed from vector %q", c, vector.String())
+	}
 }
