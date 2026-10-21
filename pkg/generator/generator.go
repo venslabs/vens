@@ -255,17 +255,14 @@ func (g *Generator) generateRiskScore(ctx context.Context, vulnBatch []Vulnerabi
 	for _, answer := range answers {
 		entry, evidenceRef := answer.entry, answer.evidenceRef
 
-		// Calculate final OWASP score using the formula:
-		// Risk = Likelihood × Impact = ((ThreatAgent + Vulnerability)/2) × ((TechImpact + BusinessImpact)/2)
-		// The aggregates are rounded first so the published score can be
-		// recomputed from its own vector, which carries them rounded (#358).
-		ta, vulnAgg, tech, bus := roundedAggregates(
-			entry.ThreatAgentScore,
+		// The aggregates arrive rounded from parse time, so the published
+		// score can be recomputed from its own vector, which carries them
+		// rounded (#358).
+		ta, vul, tech, bus := entry.ThreatAgentScore,
 			entry.VulnerabilityScore,
 			entry.TechnicalImpact,
-			entry.BusinessImpact,
-		)
-		likelihoodScore := (ta + vulnAgg) / 2.0
+			entry.BusinessImpact
+		likelihoodScore := (ta + vul) / 2.0
 		impactScore := (tech + bus) / 2.0
 		owaspScore := likelihoodScore * impactScore // Range: 0-81
 
@@ -273,7 +270,7 @@ func (g *Generator) generateRiskScore(ctx context.Context, vulnBatch []Vulnerabi
 		severity := riskconfig.RiskSeverity(score)
 
 		// Generate OWASP RR vector in standard format
-		vector := owasp.FromAggregatedScores(ta, vulnAgg, tech, bus)
+		vector := owasp.FromAggregatedScores(ta, vul, tech, bus)
 		vectorString := vector.String()
 
 		comps := vulnsByID[entry.VulnID]
@@ -595,10 +592,13 @@ func (g *Generator) evaluateOWASPScores(ctx context.Context, vulns []LLMVulnerab
 	for i := range resp.Results {
 		entry := &resp.Results[i]
 
-		entry.ThreatAgentScore = clampScore09(entry.ThreatAgentScore)
-		entry.VulnerabilityScore = clampScore09(entry.VulnerabilityScore)
-		entry.TechnicalImpact = clampScore09(entry.TechnicalImpact)
-		entry.BusinessImpact = clampScore09(entry.BusinessImpact)
+		// Round once here so the score, the vector, zeroLikelihood and the
+		// debug log below all see the same integers; the attested
+		// raw_response keeps the raw model answer (#358).
+		entry.ThreatAgentScore = math.Round(clampScore09(entry.ThreatAgentScore))
+		entry.VulnerabilityScore = math.Round(clampScore09(entry.VulnerabilityScore))
+		entry.TechnicalImpact = math.Round(clampScore09(entry.TechnicalImpact))
+		entry.BusinessImpact = math.Round(clampScore09(entry.BusinessImpact))
 
 		slog.DebugContext(ctx, "owasp_components",
 			"vuln", entry.VulnID,
@@ -739,15 +739,6 @@ func (g *Generator) buildOutputExample() string {
     }
   ]
 }`
-}
-
-// roundedAggregates rounds the model's raw factor aggregates to integers.
-// The published OWASP RR vector carries them rounded
-// (owasp.FromAggregatedScores rounds each aggregate), so scoring from the
-// rounded values keeps the published score recomputable from its own
-// vector (#358).
-func roundedAggregates(threatAgent, vulnerability, technicalImpact, businessImpact float64) (ta, vuln, tech, bus float64) {
-	return math.Round(threatAgent), math.Round(vulnerability), math.Round(technicalImpact), math.Round(businessImpact)
 }
 
 // clampScore ensures the score is within [0, 81].
