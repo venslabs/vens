@@ -142,28 +142,6 @@ func TestGenerator_TruncationOnSingleCVEFails(t *testing.T) {
 	require.True(t, errors.Is(err, llm.ErrTruncated))
 }
 
-// A split half still sees the rows after it. CVE-2024-0100 sits on rows 1 and
-// 7 of one batch of 10, split twice; the model skips it until its third ask.
-// The row-7 half scores it, so the run must not fail in the row-1 half.
-func TestGenerator_SplitHalfSeesLaterRows(t *testing.T) {
-	m := &truncatingLLM{maxPerCall: 3, skip: map[string]int{"CVE-2024-0100": 2}}
-	g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 10})
-	require.NoError(t, err)
-
-	vulns := testVulns(10)
-	vulns[1].VulnID, vulns[1].BOMRef = "CVE-2024-0100", "x1"
-	vulns[7].VulnID, vulns[7].BOMRef = "CVE-2024-0100", "x2"
-	var emitted []outputhandler.VulnRating
-	h := func(group []outputhandler.VulnRating) error {
-		emitted = append(emitted, group...)
-		return nil
-	}
-
-	require.NoError(t, g.GenerateRiskScore(context.Background(), vulns, h))
-	require.Len(t, emitted, 10, "every row is emitted, both CVE-2024-0100 rows included")
-	require.Equal(t, 3, m.asked["CVE-2024-0100"], "skipped, asked again, then scored with row 7")
-}
-
 // A CVE that can't be scored still stops the run inside a split half of the
 // second batch: the half's end is counted from the start of the run.
 func TestGenerator_FailsFastInSplitOfLaterBatch(t *testing.T) {
@@ -297,8 +275,9 @@ func TestGenerator_AsksAgainForSkippedVulnerabilities(t *testing.T) {
 }
 
 // A CVE the model never returns fails the run and is named, instead of going
-// missing at exit code 0. No later row has it, so the batch fails right after
-// the retry, before emitting anything.
+// missing at exit code 0. Grouping puts the CVE in exactly one batch, so the
+// run fails right after the ask-again, before emitting anything: the failed
+// run commits no VEX.
 func TestGenerator_FailsWhenASkippedVulnerabilityNeverComesBack(t *testing.T) {
 	m := newDroppingLLM(true, "CVE-2024-0002")
 	g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 10})
@@ -311,10 +290,9 @@ func TestGenerator_FailsWhenASkippedVulnerabilityNeverComesBack(t *testing.T) {
 	}
 
 	err = g.GenerateRiskScore(context.Background(), testVulns(4), h)
-	require.Error(t, err)
 	require.EqualError(t, err, "model returned no score for CVE-2024-0002 after asking again; stopping the run")
-	require.Len(t, emitted, 0, "the batch fails before emitting; the failed run commits no VEX")
-	require.Len(t, m.batches, 2, "asked once, asked again, then gives up")
+	require.Empty(t, emitted, "the batch fails before emitting; the failed run commits no VEX")
+	require.Equal(t, []int{4, 1}, m.batches, "asked once, asked again, then gives up")
 }
 
 // An unanswered CVE with no later row stops the run before the next batches
@@ -327,23 +305,6 @@ func TestGenerator_FailsFastWithoutScoringLaterBatches(t *testing.T) {
 	err = g.GenerateRiskScore(context.Background(), testVulns(4), nil)
 	require.EqualError(t, err, "model returned no score for CVE-2024-0000 after asking again; stopping the run")
 	require.Equal(t, []int{2, 1}, m.batches, "the second batch must never be asked about")
-}
-
-// A CVE on two rows that is never answered waits for its last row, then stops
-// the run there: the row after it is never asked.
-func TestGenerator_FailsFastAtLastRowOfCVE(t *testing.T) {
-	m := newDroppingLLM(true, "CVE-2024-0000")
-	g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 1})
-	require.NoError(t, err)
-
-	vulns := []Vulnerability{
-		{VulnID: "CVE-2024-0000", PkgName: "openssl", Title: "t"},
-		{VulnID: "CVE-2024-0000", PkgName: "libssl3", Title: "t"},
-		{VulnID: "CVE-2024-0001", PkgName: "curl", Title: "t"},
-	}
-	err = g.GenerateRiskScore(context.Background(), vulns, nil)
-	require.EqualError(t, err, "model returned no score for CVE-2024-0000 after asking again; stopping the run")
-	require.Equal(t, []int{1, 1, 1, 1}, m.batches, "asked and asked again at both rows, curl never asked")
 }
 
 // A CVE hitting several components is asked for once, and lands on all of them.
@@ -364,7 +325,7 @@ func TestGenerator_AsksOncePerSkippedVulnerability(t *testing.T) {
 	}
 
 	require.NoError(t, g.GenerateRiskScore(context.Background(), vulns, h))
-	require.Equal(t, []int{3, 1}, m.batches, "the second ask must carry the CVE once, not once per component")
+	require.Equal(t, []int{2, 1}, m.batches, "each ask must carry the CVE once, not once per component")
 
 	got := make([]string, 0, len(emitted))
 	for _, r := range emitted {
@@ -558,8 +519,9 @@ func TestGenerator_ZeroLikelihoodLogsReasoningAtWarn(t *testing.T) {
 	}
 }
 
-// A zero-likelihood verdict is logged once, by the batch that first publishes
-// it, not again by a later batch that reuses it.
+// A zero-likelihood verdict is logged once, by the batch that publishes it.
+// With grouping, a CVE's components are one group in one batch, so there is
+// exactly one ask and one WARN, however many components the CVE hits.
 func TestGenerator_ZeroLikelihoodLogsOnceAcrossBatches(t *testing.T) {
 	m := &scriptedLLM{answer: func(_ int, _ string) llmOutputEntry { return zeroLikelihoodEntry() }}
 	g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 1})
@@ -567,8 +529,7 @@ func TestGenerator_ZeroLikelihoodLogsOnceAcrossBatches(t *testing.T) {
 
 	logs := withCapturedLogs(t)
 
-	// Same CVE on two components straddling two batches: the second batch
-	// reuses the first batch's verdict instead of asking again.
+	// Same CVE on two components: grouped before batching, asked about once.
 	vulns := []Vulnerability{
 		{VulnID: "CVE-2024-0000", PkgName: "pkg-a", Title: "t"},
 		{VulnID: "CVE-2024-0000", PkgName: "pkg-b", Title: "t"},
@@ -581,7 +542,8 @@ func TestGenerator_ZeroLikelihoodLogsOnceAcrossBatches(t *testing.T) {
 	}
 
 	require.NoError(t, g.GenerateRiskScore(context.Background(), vulns, h))
-	require.Len(t, got, 2, "both batches publish the verdict")
+	require.Equal(t, 1, m.calls, "one group, one batch, one ask")
+	require.Len(t, got, 2, "both components keep their VEX rows")
 
 	verdicts := 0
 	for _, r := range logs.records {
@@ -691,138 +653,13 @@ func TestGenerator_GenuineZeroIsNotZeroLikelihood(t *testing.T) {
 
 // A CVE in two batches is asked about once: the second batch leaves it out of
 // its prompt and reuses the first score, so its component keeps its VEX row.
-func TestGenerator_DupCVEReusesFirstScore(t *testing.T) {
-	m := &scriptedLLM{answer: func(call int, _ string) llmOutputEntry {
-		if call == 1 {
-			return llmOutputEntry{ThreatAgentScore: 5, VulnerabilityScore: 5, TechnicalImpact: 5, BusinessImpact: 5, Reasoning: "first"}
-		}
-		return llmOutputEntry{ThreatAgentScore: 9, VulnerabilityScore: 9, TechnicalImpact: 9, BusinessImpact: 9, Reasoning: "second"}
-	}}
-	g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 1})
-	require.NoError(t, err)
-
-	vulns := []Vulnerability{
-		{VulnID: "CVE-2024-0000", PkgName: "openssl", Title: "t", BOMRef: "openssl"},
-		{VulnID: "CVE-2024-0000", PkgName: "libssl3", Title: "t", BOMRef: "libssl3"},
-	}
-
-	var got []outputhandler.VulnRating
-	h := func(group []outputhandler.VulnRating) error {
-		got = append(got, group...)
-		return nil
-	}
-
-	require.NoError(t, g.GenerateRiskScore(context.Background(), vulns, h))
-	require.Equal(t, 1, m.calls, "the second batch must not ask about an already-scored CVE")
-	require.Len(t, got, 2, "both components must keep their VEX rows")
-	require.Equal(t, "openssl", got[0].BOMRef)
-	require.Equal(t, "libssl3", got[1].BOMRef)
-	for _, r := range got {
-		require.Equal(t, 25.0, *r.Rating.Score, "both rows carry the first score")
-	}
-}
-
-// When a later batch reuses an earlier batch's score for a CVE, the
-// attestation claim for that batch's package must be marked as reused:
-// its cited evidence bundle is the first call's, whose prompt never
-// mentioned this package.
-func TestGenerator_Attestor_ReusedScoreMarksClaim(t *testing.T) {
-	m := &scriptedLLM{
-		answer: func(_ int, _ string) llmOutputEntry { return scoredEntry() },
-	}
-	g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 1})
-	require.NoError(t, err)
-	at := attestation.NewBuilder(attestation.Opts{Provider: "mock", Model: "mock"})
-	g.SetAttestor(at)
-
-	vulns := []Vulnerability{
-		{VulnID: "CVE-2024-0000", PkgName: "openssl", Title: "t", BOMRef: "openssl"},
-		{VulnID: "CVE-2024-0000", PkgName: "libssl3", Title: "t", BOMRef: "libssl3"},
-	}
-	require.NoError(t, g.GenerateRiskScore(context.Background(), vulns, nil))
-	require.Equal(t, 1, m.calls, "the second batch must not ask about an already-scored CVE")
-
-	var buf bytes.Buffer
-	require.NoError(t, at.Write(&buf))
-	var got struct {
-		Declarations struct {
-			Claims []struct {
-				Target    string   `json:"target"`
-				Predicate string   `json:"predicate"`
-				Evidence  []string `json:"evidence"`
-			} `json:"claims"`
-		} `json:"declarations"`
-	}
-	require.NoError(t, json.Unmarshal(buf.Bytes(), &got), "output:\n%s", buf.String())
-	require.Len(t, got.Declarations.Claims, 2, "both components must keep their attestation claims")
-
-	byTarget := map[string]struct {
-		Predicate string
-		Evidence  []string
-	}{}
-	for _, c := range got.Declarations.Claims {
-		byTarget[c.Target] = struct {
-			Predicate string
-			Evidence  []string
-		}{c.Predicate, c.Evidence}
-	}
-
-	assert.NotContains(t, byTarget["openssl"].Predicate, "this package was not in the cited batch's prompt",
-		"the first package was in the prompt behind the cited evidence")
-	assert.Contains(t, byTarget["libssl3"].Predicate, "this package was not in the cited batch's prompt")
-	assert.Equal(t, byTarget["openssl"].Evidence, byTarget["libssl3"].Evidence,
-		"the reused claim cites the first call's evidence bundle")
-}
-
-// Score reuse works in both directions: a batch that gets no answer for a CVE
-// holds its components back, and when a later batch scores the CVE those rows
-// are filled in with that score instead of dropping out of the VEX.
-func TestGenerator_LaterBatchScoreBackfillsEarlierBatchRows(t *testing.T) {
-	m := &scriptedLLM{
-		answer: func(_ int, _ string) llmOutputEntry { return scoredEntry() },
-		// Batch 1 (call 1) and its retry (call 2) get no answer; batch 2
-		// (call 3) scores the CVE.
-		skip: func(call int, id string) bool {
-			return id == "CVE-2024-0000" && call <= 2
-		},
-	}
-	g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 1})
-	require.NoError(t, err)
-
-	vulns := []Vulnerability{
-		{VulnID: "CVE-2024-0000", PkgName: "pkg-a", Title: "t", BOMRef: "a"},
-		{VulnID: "CVE-2024-0000", PkgName: "pkg-b", Title: "t", BOMRef: "b"},
-	}
-
-	var got []outputhandler.VulnRating
-	h := func(group []outputhandler.VulnRating) error {
-		got = append(got, group...)
-		return nil
-	}
-
-	require.NoError(t, g.GenerateRiskScore(context.Background(), vulns, h))
-	require.Equal(t, 3, m.calls, "batch 1, its retry, then batch 2")
-	require.Len(t, got, 2, "the earlier batch's component row is kept and filled in once the CVE is scored")
-	refs := map[string]bool{}
-	for _, r := range got {
-		refs[r.BOMRef] = true
-		require.NotNil(t, r.Rating.Score)
-		require.Greater(t, *r.Rating.Score, 0.0, "rows carry the later batch's real score")
-	}
-	require.True(t, refs["a"] && refs["b"], "both components keep their VEX rows")
-	require.Equal(t, *got[0].Rating.Score, *got[1].Rating.Score, "both rows carry the same score")
-}
-
-// A CVE held back on two components, because neither the batch nor its retry
-// answered it, is filled in once a later batch scores it: one row and one
-// claim per component, in scanner order.
-func TestGenerator_HeldBackCVEOnTwoComponentsFilledInOnce(t *testing.T) {
+// A multi-component CVE keeps one row and one attestation claim per component,
+// in scanner order, even when its rows would previously have spanned batches:
+// the CVE is grouped before batching and asked about exactly once.
+func TestGenerator_MultiComponentCVEOneRowAndClaimPerComponent(t *testing.T) {
 	at := attestation.NewBuilder(attestation.Opts{Provider: "mock", Model: "mock"})
 	m := &scriptedLLM{
 		answer: func(_ int, _ string) llmOutputEntry { return scoredEntry() },
-		// Batch 1 (call 1) and its retry (call 2) get no answer; batch 2
-		// (call 3) scores the CVE.
-		skip: func(call int, _ string) bool { return call <= 2 },
 	}
 	g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 2})
 	require.NoError(t, err)
@@ -843,7 +680,7 @@ func TestGenerator_HeldBackCVEOnTwoComponentsFilledInOnce(t *testing.T) {
 	}
 
 	require.NoError(t, g.GenerateRiskScore(context.Background(), vulns, h))
-	require.Equal(t, 3, m.calls, "batch 1, its retry, then batch 2")
+	require.Equal(t, 1, m.calls, "the CVE is grouped before batching: one call, one prompt entry")
 	require.Equal(t, []string{"a", "b", "c"}, rows)
 
 	var buf bytes.Buffer
@@ -859,31 +696,147 @@ func TestGenerator_HeldBackCVEOnTwoComponentsFilledInOnce(t *testing.T) {
 	}
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &doc))
 	var targets []string
-	byTarget := map[string]struct {
-		Predicate string
-		Evidence  []string
-	}{}
 	for _, c := range doc.Declarations.Claims {
 		targets = append(targets, c.Target)
-		byTarget[c.Target] = struct {
-			Predicate string
-			Evidence  []string
-		}{c.Predicate, c.Evidence}
+		// The one call that asked about the CVE listed every package, so no
+		// claim says its package was missing from the cited prompt.
+		assert.NotContains(t, c.Predicate, "this package was not in the cited batch's prompt", "target %s", c.Target)
+		assert.Equal(t, []string{"evidence-batch-1"}, c.Evidence, "target %s", c.Target)
 	}
 	require.Equal(t, []string{"a", "b", "c"}, targets)
+}
 
-	// The held-back rows were filled in by batch 2, whose prompt never had
-	// their packages: their claims cite that later call's evidence and must
-	// say so. Row c was in that prompt, so its claim stays clean.
-	for _, target := range []string{"a", "b"} {
-		assert.Contains(t, byTarget[target].Predicate, "this package was not in the cited batch's prompt",
-			"target %s was held back and filled in by a later batch", target)
+// promptEntry mirrors the JSON shape of one LLM prompt entry, so a test can
+// assert what the model was shown for a CVE.
+type promptEntry struct {
+	VulnID   string `json:"vulnId"`
+	Packages []struct {
+		PkgName          string `json:"pkgName"`
+		InstalledVersion string `json:"installedVersion"`
+		FixedVersion     string `json:"fixedVersion"`
+	} `json:"packages"`
+}
+
+// countingLLM records every prompt's entries, so a test can assert a
+// multi-component CVE occupies exactly one prompt entry and that the entry
+// carries every affected package.
+type countingLLM struct {
+	scriptedLLM
+	sizes   []int
+	prompts [][]promptEntry
+}
+
+func (m *countingLLM) Generate(ctx context.Context, req llm.Request) (string, error) {
+	var in []promptEntry
+	if err := json.Unmarshal([]byte(req.Human), &in); err != nil {
+		return "", err
 	}
-	assert.NotContains(t, byTarget["c"].Predicate, "this package was not in the cited batch's prompt")
-	assert.Equal(t, byTarget["a"].Evidence, byTarget["b"].Evidence)
-	assert.Equal(t, byTarget["b"].Evidence, byTarget["c"].Evidence,
-		"all three rows cite the later batch's evidence bundle")
-	assert.Equal(t, []string{"evidence-batch-3"}, byTarget["c"].Evidence)
+	m.sizes = append(m.sizes, len(in))
+	m.prompts = append(m.prompts, in)
+	return m.scriptedLLM.Generate(ctx, req)
+}
+
+// Rows are grouped by CVE before batching, so a multi-component CVE is asked
+// about exactly once however the rows would have been batched. The answers
+// differ per call, so the published score proves the CVE was scored from its
+// single prompt entry, not from first-answer-wins across scattered asks; the
+// entry carries every affected package (name, version, fixed version each),
+// in deterministic sorted order, not just the first row's package in scanner
+// order.
+func TestGenerator_MultiComponentCVEAskedOnceRegardlessOfBatchSize(t *testing.T) {
+	first := llmOutputEntry{ThreatAgentScore: 5, VulnerabilityScore: 5, TechnicalImpact: 5, BusinessImpact: 5, Reasoning: "first"}
+	second := llmOutputEntry{ThreatAgentScore: 9, VulnerabilityScore: 9, TechnicalImpact: 9, BusinessImpact: 9, Reasoning: "second"}
+
+	run := func(batchSize int) ([]outputhandler.VulnRating, *countingLLM) {
+		m := &countingLLM{scriptedLLM: scriptedLLM{
+			answer: func(call int, _ string) llmOutputEntry {
+				if call == 1 {
+					return first
+				}
+				return second
+			},
+		}}
+		g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: batchSize})
+		require.NoError(t, err)
+
+		vulns := []Vulnerability{
+			{VulnID: "CVE-2024-0000", PkgName: "pkg-b", InstalledVersion: "2.0", FixedVersion: "2.1", Title: "t", BOMRef: "b"},
+			{VulnID: "CVE-2024-1111", PkgName: "other", InstalledVersion: "1.0", Title: "t", BOMRef: "other"},
+			{VulnID: "CVE-2024-0000", PkgName: "pkg-a", InstalledVersion: "1.0", FixedVersion: "1.2", Title: "t", BOMRef: "a"},
+		}
+
+		var got []outputhandler.VulnRating
+		h := func(group []outputhandler.VulnRating) error {
+			got = append(got, group...)
+			return nil
+		}
+		require.NoError(t, g.GenerateRiskScore(context.Background(), vulns, h))
+		return got, m
+	}
+
+	got1, m1 := run(1)
+	got10, m10 := run(10)
+
+	// Two distinct CVEs: batch size 1 scores them in two calls, batch size 10
+	// in one call, but CVE-2024-0000 is a single prompt entry either way.
+	require.Equal(t, []int{1, 1}, m1.sizes)
+	require.Equal(t, []int{2}, m10.sizes)
+
+	// The single entry for CVE-2024-0000 carries every affected package with
+	// its versions, in deterministic sorted order: the scanner order here is
+	// pkg-b then pkg-a, so sorted order proves the prompt never depends on it.
+	pkgsOf := func(prompts [][]promptEntry, vulnID string) [][3]string {
+		for _, p := range prompts {
+			for _, e := range p {
+				if e.VulnID == vulnID {
+					var out [][3]string
+					for _, pkg := range e.Packages {
+						out = append(out, [3]string{pkg.PkgName, pkg.InstalledVersion, pkg.FixedVersion})
+					}
+					return out
+				}
+			}
+		}
+		return nil
+	}
+	wantPkgs := [][3]string{{"pkg-a", "1.0", "1.2"}, {"pkg-b", "2.0", "2.1"}}
+	require.Equal(t, wantPkgs, pkgsOf(m1.prompts, "CVE-2024-0000"))
+	require.Equal(t, wantPkgs, pkgsOf(m10.prompts, "CVE-2024-0000"))
+
+	// The CVE is asked once, so its score comes from that call's answer at
+	// either batch size (the "first" answer: 25.0), identical on every
+	// component row. The per-call answers genuinely differ: CVE-2024-1111
+	// scores 81.0 at batch size 1 (second call) and 25.0 at batch size 10
+	// (first call), which is expected and unrelated to the CVE under test.
+	for _, rs := range [][]outputhandler.VulnRating{got1, got10} {
+		require.Len(t, rs, 3)
+		for _, r := range rs {
+			if r.VulnID == "CVE-2024-0000" {
+				require.Equal(t, 25.0, *r.Rating.Score, "the CVE's single ask decides its score")
+			}
+		}
+	}
+	byID := func(rs []outputhandler.VulnRating) map[string]float64 {
+		out := map[string]float64{}
+		for _, r := range rs {
+			out[r.VulnID] = *r.Rating.Score
+		}
+		return out
+	}
+	require.Equal(t, 81.0, byID(got1)["CVE-2024-1111"], "per-call answers must actually differ")
+	require.Equal(t, 25.0, byID(got10)["CVE-2024-1111"])
+
+	// The VEX rows stay in scanner order (pkg-b, pkg-a, then other) even
+	// though the prompt's package list is sorted.
+	refs := func(rs []outputhandler.VulnRating) []string {
+		var out []string
+		for _, r := range rs {
+			out = append(out, r.BOMRef)
+		}
+		return out
+	}
+	require.Equal(t, []string{"b", "a", "other"}, refs(got1))
+	require.Equal(t, []string{"b", "a", "other"}, refs(got10))
 }
 
 // Zero likelihood is what makes a verdict "not reachable here", whatever impact
@@ -906,8 +859,8 @@ func TestZeroLikelihood(t *testing.T) {
 	}
 }
 
-// The error names each unanswered CVE once, in order, never once per row.
-func TestGenerator_ErrorNamesEachMissingCVEOnce(t *testing.T) {
+// The fail-fast error names each unanswered CVE once, sorted, never once per row.
+func TestGenerator_ErrorNamesEachUnansweredCVEOnce(t *testing.T) {
 	m := newDroppingLLM(true, "CVE-2024-0000", "CVE-2024-0002")
 	g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 10})
 	require.NoError(t, err)
@@ -920,18 +873,6 @@ func TestGenerator_ErrorNamesEachMissingCVEOnce(t *testing.T) {
 	}
 	err = g.GenerateRiskScore(context.Background(), vulns, nil)
 	require.EqualError(t, err, "model returned no score for CVE-2024-0000, CVE-2024-0002 after asking again; stopping the run")
-}
-
-// checkUnassessed, the end-of-run safety net, counts distinct CVEs, not rows.
-func TestScoringRun_CheckUnassessed(t *testing.T) {
-	require.NoError(t, (&scoringRun{scored: map[string]bool{"CVE-2024-0001": true}, missing: map[string]bool{}}).checkUnassessed())
-
-	run := &scoringRun{
-		scored:  map[string]bool{"CVE-2024-0001": true},
-		missing: map[string]bool{"CVE-2024-0002": true, "CVE-2024-0000": true},
-	}
-	require.EqualError(t, run.checkUnassessed(),
-		"model returned no score for 2 of 3 vulnerabilities, after asking again: CVE-2024-0000, CVE-2024-0002")
 }
 
 // recordingLLM records the temperature of every request it receives and
@@ -1087,10 +1028,9 @@ func (m *truncatedRetryLLM) Generate(_ context.Context, req llm.Request) (string
 	return string(b), err
 }
 
-// The zero-likelihood WARN still fires once when the retry truncates and the
-// split batch reuses the first answer, which no batch had published yet. The
-// sub-batch's rows were all in the first call's prompt, so neither claim may
-// say its package was missing from the cited batch's prompt.
+// The zero-likelihood WARN still fires once when the retry truncates: the split
+// halves re-ask their own CVE groups, and the half that publishes the verdict
+// logs it.
 func TestGenerator_ZeroLikelihoodWarnSurvivesTruncatedRetry(t *testing.T) {
 	m := &truncatedRetryLLM{}
 	g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 2})
@@ -1128,14 +1068,14 @@ func TestGenerator_ZeroLikelihoodWarnSurvivesTruncatedRetry(t *testing.T) {
 	require.Len(t, got.Declarations.Claims, 2)
 	for _, c := range got.Declarations.Claims {
 		assert.NotContains(t, c.Predicate, "this package was not in the cited batch's prompt",
-			"target %s: the row was in the first call's prompt, so the claim must not say otherwise", c.Target)
+			"target %s: the row was in the cited call's prompt, so the claim must not say otherwise", c.Target)
 	}
 	byTarget := map[string][]string{}
 	for _, c := range got.Declarations.Claims {
 		byTarget[c.Target] = c.Evidence
 	}
-	assert.Equal(t, []string{"evidence-batch-1"}, byTarget["a"],
-		"the reused answer keeps citing the first call's evidence bundle")
+	assert.Equal(t, []string{"evidence-batch-2"}, byTarget["a"],
+		"the half that publishes the verdict asked its CVE again, so its claim cites that call's bundle")
 }
 
 // The published score must be recomputable from its own vector, which
@@ -1448,9 +1388,9 @@ func TestGenerator_LogsBatchCompositionAndRunSummary(t *testing.T) {
 		}
 	}
 	require.Len(t, batches, 2, "one debug line per batch")
-	require.Equal(t, int64(2), batches[0].attrs["rows"])
+	require.Equal(t, int64(2), batches[0].attrs["cves"])
 	require.Equal(t, "CVE-2024-0000,CVE-2024-0001", batches[0].attrs["vulns"])
-	require.Equal(t, int64(2), batches[1].attrs["rows"])
+	require.Equal(t, int64(2), batches[1].attrs["cves"])
 	require.Equal(t, "CVE-2024-0002,CVE-2024-0003", batches[1].attrs["vulns"])
 
 	summary := runSummary(t, logs)
@@ -1500,48 +1440,12 @@ func TestGenerator_RunSummaryCVECountSkipsRowsWithoutID(t *testing.T) {
 	require.Equal(t, int64(2), summary.attrs["cves"])
 }
 
-// Leaving a scored CVE out of the prompt and reusing its first score is one
-// decision: one debug line per CVE, naming the bundle the reused score cites.
-func TestGenerator_LogsScoreReuseFromEarlierBatch(t *testing.T) {
-	m := &scriptedLLM{answer: func(_ int, _ string) llmOutputEntry { return scoredEntry() }}
-	g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 1})
-	require.NoError(t, err)
-	g.SetAttestor(attestation.NewBuilder(attestation.Opts{Provider: "mock", Model: "mock"}))
-
-	logs := withCapturedLogs(t)
-	vulns := []Vulnerability{
-		{VulnID: "CVE-2024-0000", PkgName: "pkg-a", Title: "t", BOMRef: "a"},
-		{VulnID: "CVE-2024-0000", PkgName: "pkg-b", Title: "t", BOMRef: "b"},
-	}
-	require.NoError(t, g.GenerateRiskScore(context.Background(), vulns, nil))
-
-	// The debug lines of the second batch, after its composition line.
-	var second []capturedRecord
-	batches := 0
-	for _, r := range logs.records {
-		if r.level != slog.LevelDebug {
-			continue
-		}
-		if r.msg == "scoring batch" {
-			batches++
-			continue
-		}
-		if batches == 2 {
-			second = append(second, r)
-		}
-	}
-	require.Len(t, second, 1, "one decision, one line")
-	require.Equal(t, "reusing an earlier batch's first score", second[0].msg)
-	require.Equal(t, "CVE-2024-0000", second[0].attrs["vuln"])
-	require.Equal(t, "evidence-batch-1", second[0].attrs["evidence_ref"])
-}
-
-// A split names both halves at debug level; a CVE the model skips in both the
-// ask and the ask-again waits for a later row instead of failing. The fake is
-// deterministic, so the summary's counts are exact: 8 LLM calls, 3 of them
-// truncated (rows 0-9, 0-4 and 5-9), 1 ask-again (rows 0-2) and 3 splits.
-func TestGenerator_LogsSplitHoldBackAndSummaryCounts(t *testing.T) {
-	m := &truncatingLLM{maxPerCall: 3, skip: map[string]int{"CVE-2024-0100": 2}}
+// A split names both halves at debug level. The fake is deterministic, so the
+// summary's counts are exact: 8 LLM calls, 3 of them truncated (the nine CVEs,
+// then the first five and the last four), 1 ask-again (CVE-2024-0100, skipped
+// once) and 3 splits.
+func TestGenerator_LogsSplitAndSummaryCounts(t *testing.T) {
+	m := &truncatingLLM{maxPerCall: 3, skip: map[string]int{"CVE-2024-0100": 1}}
 	g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 10})
 	require.NoError(t, err)
 
@@ -1551,21 +1455,15 @@ func TestGenerator_LogsSplitHoldBackAndSummaryCounts(t *testing.T) {
 	vulns[7].VulnID, vulns[7].BOMRef = "CVE-2024-0100", "x2"
 	require.NoError(t, g.GenerateRiskScore(context.Background(), vulns, nil))
 
-	var splits, holdBacks int
+	splits := 0
 	for _, r := range logs.records {
-		switch {
-		case r.level == slog.LevelDebug && r.msg == "splitting truncated batch":
+		if r.level == slog.LevelDebug && r.msg == "splitting truncated batch" {
 			splits++
-			require.NotEmpty(t, r.attrs["first_half"], "the split must name the rows each half keeps")
-			require.NotEmpty(t, r.attrs["second_half"], "the split must name the rows each half keeps")
-		case r.level == slog.LevelDebug && r.msg == "holding back rows until a later batch scores the CVE":
-			if r.attrs["vuln"] == "CVE-2024-0100" {
-				holdBacks++
-			}
+			require.NotEmpty(t, r.attrs["first_half"], "the split must name the CVEs each half keeps")
+			require.NotEmpty(t, r.attrs["second_half"], "the split must name the CVEs each half keeps")
 		}
 	}
-	require.Equal(t, 3, splits, "rows 0-9, then rows 0-4 and 5-9")
-	require.Equal(t, 1, holdBacks, "CVE-2024-0100 waits for its later row once")
+	require.Equal(t, 3, splits, "the nine CVEs, then the first five and the last four")
 
 	summary := runSummary(t, logs)
 	require.Equal(t, int64(10), summary.attrs["rows"])
