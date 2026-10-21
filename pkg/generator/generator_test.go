@@ -30,7 +30,6 @@ import (
 	"github.com/venslabs/vens/pkg/attestation"
 	"github.com/venslabs/vens/pkg/llm"
 	"github.com/venslabs/vens/pkg/outputhandler"
-	"github.com/venslabs/vens/pkg/owasp"
 	"github.com/venslabs/vens/pkg/riskconfig"
 )
 
@@ -1024,31 +1023,25 @@ func TestGenerator_ZeroLikelihoodWarnSurvivesTruncatedRetry(t *testing.T) {
 	require.Equal(t, 1, warns, "the verdict is logged once, even when the retry truncates")
 }
 
-// The published score must be recomputable from its own vector: the vector
-// carries the aggregates rounded, so scoring also runs on the rounded
-// values (#358).
-func TestRoundedAggregates_ScoreMatchesVectorRecomputation(t *testing.T) {
-	cases := [][4]float64{
-		{7.5, 8.2, 6.4, 7.6}, // non-integers, like the model's raw output
-		{3, 4, 4, 5},
-		{0, 0, 0, 0},
-		{9, 9, 9, 9},
-		{0.4, 0.4, 0.4, 0.4},
-	}
-	for _, c := range cases {
-		ta, vuln, tech, bus := roundedAggregates(c[0], c[1], c[2], c[3])
-		published := clampScore(((ta + vuln) / 2.0) * ((tech + bus) / 2.0))
+// The published score must be recomputable from its own vector, which
+// carries the aggregates rounded: scoring runs on the values rounded once
+// at parse time, end to end through GenerateRiskScore (#358).
+func TestGenerator_ScoreMatchesVectorRecomputation(t *testing.T) {
+	m := &scriptedLLM{answer: func(_ int, _ string) llmOutputEntry {
+		// The #358 case: vulnerability 7.5 rounds to 8, so the published
+		// score is (7+8)/2 * (9+9)/2 = 67.5 with ED:8 in the vector.
+		return llmOutputEntry{ThreatAgentScore: 7, VulnerabilityScore: 7.5, TechnicalImpact: 9, BusinessImpact: 9, Reasoning: "the #358 case"}
+	}}
+	g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 10})
+	require.NoError(t, err)
 
-		vector := owasp.FromAggregatedScores(ta, vuln, tech, bus)
-		// Each vector factor group carries one rounded aggregate; the
-		// group average is the aggregate itself.
-		rta := float64(vector.SkillLevel+vector.Motive+vector.Opportunity+vector.Size) / 4.0
-		rvuln := float64(vector.EaseOfDiscovery+vector.EaseOfExploit+vector.Awareness+vector.IntrusionDetection) / 4.0
-		rtech := float64(vector.LossOfConfidentiality+vector.LossOfIntegrity+vector.LossOfAvailability+vector.LossOfAccountability) / 4.0
-		rbus := float64(vector.FinancialDamage+vector.ReputationDamage+vector.NonCompliance+vector.PrivacyViolation) / 4.0
-		recomputed := clampScore(((rta + rvuln) / 2.0) * ((rtech + rbus) / 2.0))
-
-		require.Equal(t, published, recomputed,
-			"aggregates %v: published score must match the score recomputed from vector %q", c, vector.String())
-	}
+	var got []outputhandler.VulnRating
+	require.NoError(t, g.GenerateRiskScore(context.Background(), testVulns(1), func(group []outputhandler.VulnRating) error {
+		got = append(got, group...)
+		return nil
+	}))
+	require.Len(t, got, 1, "the vulnerability keeps its VEX row")
+	require.NotNil(t, got[0].Rating.Score)
+	require.Equal(t, 67.5, *got[0].Rating.Score, "score is computed from the rounded aggregates")
+	require.Contains(t, got[0].Rating.Vector, "ED:8", "vector carries the rounded vulnerability aggregate")
 }
