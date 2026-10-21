@@ -72,6 +72,7 @@ The LLM calculates the OWASP risk score (0-81) for each vulnerability using:
 	flags.String("sbom-serial-number", "", "SBOM serial number for BOM-Link (format: urn:uuid:...)")
 	flags.Int("sbom-version", 1, "SBOM version for BOM-Link (default: 1)")
 	flags.Bool("attest", false, "Emit a CycloneDX Attestations (CDXA) sibling file with prompt hash, input hash, model, seed, raw LLM response")
+	flags.Bool("vex-analysis-detail", false, "Emit an analysis block with the score justification in VEX output (opt-in: Dependency-Track 5.1+ unsuppresses findings when an analysis block carries no state)")
 
 	return cmd
 }
@@ -239,11 +240,16 @@ func action(cmd *cobra.Command, args []string) error {
 	// The VEX gets its own serialNumber; the attestation links back to it.
 	vexUUID := uuid.NewString()
 
+	analysisDetail, err := flags.GetBool("vex-analysis-detail")
+	if err != nil {
+		return err
+	}
+
 	var newHandler func(w io.Writer) outputhandler.OutputHandler
 	switch outputFormat {
 	case "cyclonedxvex":
 		newHandler = func(w io.Writer) outputhandler.OutputHandler {
-			return outputhandler.NewCycloneDxVexOutputHandler(w, sbomUUID, sbomVersion, vexUUID, specVersion)
+			return outputhandler.NewCycloneDxVexOutputHandler(w, sbomUUID, sbomVersion, vexUUID, specVersion, analysisDetail)
 		}
 	default:
 		return fmt.Errorf("unknown output format %q", outputFormat)

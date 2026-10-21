@@ -25,7 +25,7 @@ import (
 
 func TestCycloneDxVexWriter_Close_SerialNumber(t *testing.T) {
 	var buf bytes.Buffer
-	h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 1, "", cyclonedx.SpecVersion1_7)
+	h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 1, "", cyclonedx.SpecVersion1_7, false)
 
 	score := 42.0
 	err := h.HandleVulnRatings([]VulnRating{
@@ -69,7 +69,7 @@ func TestCycloneDxVexWriter_Close_SerialNumber(t *testing.T) {
 
 func TestCycloneDxVexWriter_Close_VersionFromSBOM(t *testing.T) {
 	var buf bytes.Buffer
-	h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 3, "", cyclonedx.SpecVersion1_7)
+	h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 3, "", cyclonedx.SpecVersion1_7, false)
 
 	if err := h.Close(); err != nil {
 		t.Fatalf("Close: %v", err)
@@ -87,7 +87,7 @@ func TestCycloneDxVexWriter_Close_VersionFromSBOM(t *testing.T) {
 
 func TestCycloneDxVexWriter_Close_Metadata(t *testing.T) {
 	var buf bytes.Buffer
-	h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 1, "", cyclonedx.SpecVersion1_7)
+	h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 1, "", cyclonedx.SpecVersion1_7, false)
 
 	if err := h.Close(); err != nil {
 		t.Fatalf("Close: %v", err)
@@ -129,7 +129,7 @@ func TestCycloneDxVexWriter_Close_Metadata(t *testing.T) {
 
 func TestCycloneDxVexWriter_Close_VulnerabilitySource(t *testing.T) {
 	var buf bytes.Buffer
-	h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 1, "", cyclonedx.SpecVersion1_7)
+	h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 1, "", cyclonedx.SpecVersion1_7, false)
 
 	score := 42.0
 	err := h.HandleVulnRatings([]VulnRating{
@@ -215,7 +215,7 @@ func TestCycloneDxVexWriter_Close_VulnerabilitySource(t *testing.T) {
 
 func TestCycloneDxVexWriter_Close_MergesDuplicateVulnIDs(t *testing.T) {
 	var buf bytes.Buffer
-	h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 1, "", cyclonedx.SpecVersion1_7)
+	h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 1, "", cyclonedx.SpecVersion1_7, false)
 
 	score := 42.0
 	err := h.HandleVulnRatings([]VulnRating{
@@ -291,7 +291,7 @@ func TestCycloneDxVexWriter_Close_MergesDuplicateVulnIDs(t *testing.T) {
 
 func TestCycloneDxVexWriter_Close_DeduplicatesAffectsRefs(t *testing.T) {
 	var buf bytes.Buffer
-	h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 1, "", cyclonedx.SpecVersion1_7)
+	h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 1, "", cyclonedx.SpecVersion1_7, false)
 
 	score := 42.0
 	err := h.HandleVulnRatings([]VulnRating{
@@ -341,7 +341,7 @@ func TestCycloneDxVexWriter_Close_DeduplicatesAffectsRefs(t *testing.T) {
 
 func TestCycloneDxVexWriter_Close_Idempotent(t *testing.T) {
 	var buf bytes.Buffer
-	h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 1, "", cyclonedx.SpecVersion1_7)
+	h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 1, "", cyclonedx.SpecVersion1_7, false)
 
 	if err := h.Close(); err != nil {
 		t.Fatalf("first Close: %v", err)
@@ -402,7 +402,7 @@ func TestCycloneDxVexWriter_Close_SpecVersion(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 1, "", tc.specVersion)
+			h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 1, "", tc.specVersion, false)
 
 			score := 42.0
 			const vector = "SL:7/M:7/O:7/S:7/ED:6/EE:6/A:6/ID:3/LC:7/LI:7/LAV:7/LAC:7/FD:7/RD:7/NC:7/PV:7"
@@ -470,7 +470,7 @@ func TestCycloneDxVexWriter_Close_KeepsZeroOWASPScore(t *testing.T) {
 	for _, spec := range []cyclonedx.SpecVersion{cyclonedx.SpecVersion1_6, cyclonedx.SpecVersion1_7} {
 		t.Run(spec.String(), func(t *testing.T) {
 			var buf bytes.Buffer
-			h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 1, "", spec)
+			h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 1, "", spec, false)
 
 			score := 0.0
 			const vector = "SL:1/M:1/O:1/S:1/ED:0/EE:0/A:0/ID:9/LC:0/LI:0/LAV:0/LAC:0/FD:0/RD:0/NC:0/PV:0"
@@ -535,7 +535,7 @@ func TestCycloneDxVexWriter_Close_KeepsZeroOWASPScore(t *testing.T) {
 // and dropped, and the run still succeeds. Change this test when that changes.
 func TestCycloneDxVexWriter_Close_SkipsUnreferencedVuln(t *testing.T) {
 	var buf bytes.Buffer
-	h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 1, "", cyclonedx.SpecVersion1_7)
+	h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 1, "", cyclonedx.SpecVersion1_7, false)
 
 	score := 42.0
 	rating := cyclonedx.VulnerabilityRating{
@@ -560,5 +560,105 @@ func TestCycloneDxVexWriter_Close_SkipsUnreferencedVuln(t *testing.T) {
 	}
 	if strings.Contains(out, "CVE-2") {
 		t.Error("CVE-2 has no component, it should not be in the VEX")
+	}
+}
+
+// analysis.detail is opt-in: by default no analysis block is emitted at
+// all, so Dependency-Track keeps going through the rating branch and never
+// touches suppression (#316).
+func TestCycloneDxVexWriter_Close_AnalysisDetail(t *testing.T) {
+	const vector = "SL:1/M:8/O:4/S:2/ED:6/EE:8/A:5/ID:2/LC:2/LI:9/LAV:9/LAC:7/FD:7/RD:5/NC:2/PV:9"
+
+	encode := func(analysisDetail bool) *string {
+		var buf bytes.Buffer
+		h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 1, "", cyclonedx.SpecVersion1_6, analysisDetail)
+
+		score := 45.0
+		if err := h.HandleVulnRatings([]VulnRating{
+			{
+				VulnID: "CVE-2026-1234",
+				BOMRef: "pkg:npm/foo@1.0.0",
+				Rating: cyclonedx.VulnerabilityRating{
+					Method:   cyclonedx.ScoringMethodOWASP,
+					Score:    &score,
+					Severity: cyclonedx.SeverityHigh,
+					Vector:   vector,
+				},
+				Source: &cyclonedx.Source{Name: "NVD"},
+			},
+		}); err != nil {
+			t.Fatalf("HandleVulnRatings: %v", err)
+		}
+		if err := h.Close(); err != nil {
+			t.Fatalf("Close: %v", err)
+		}
+
+		var decoded struct {
+			Vulnerabilities []struct {
+				ID       string `json:"id"`
+				Analysis *struct {
+					Detail string `json:"detail"`
+				} `json:"analysis"`
+			} `json:"vulnerabilities"`
+		}
+		if err := json.Unmarshal(buf.Bytes(), &decoded); err != nil {
+			t.Fatalf("unmarshal: %v", err)
+		}
+		if len(decoded.Vulnerabilities) != 1 {
+			t.Fatalf("got %d vulns, want 1", len(decoded.Vulnerabilities))
+		}
+		if decoded.Vulnerabilities[0].Analysis == nil {
+			return nil
+		}
+		d := decoded.Vulnerabilities[0].Analysis.Detail
+		return &d
+	}
+
+	// Default (opt-out): no analysis block at all.
+	if got := encode(false); got != nil {
+		t.Errorf("analysis = %q, want no analysis block by default", *got)
+	}
+
+	// Opt-in: the block carries the score justification.
+	got := encode(true)
+	if got == nil {
+		t.Fatal("vulnerabilities[0].analysis is missing with the opt-in flag")
+	}
+	want := `OWASP risk rating 45.00 (high) from vector "SL:1/M:8/O:4/S:2/ED:6/EE:8/A:5/ID:2/LC:2/LI:9/LAV:9/LAC:7/FD:7/RD:5/NC:2/PV:9".`
+	if *got != want {
+		t.Errorf("analysis.detail = %q, want %q", *got, want)
+	}
+}
+
+func TestAnalysisDetail(t *testing.T) {
+	score := 7.5
+	got := analysisDetail(cyclonedx.VulnerabilityRating{
+		Method:   cyclonedx.ScoringMethodOWASP,
+		Score:    &score,
+		Severity: cyclonedx.SeverityLow,
+		Vector:   "SL:0/M:0/O:0/S:0/ED:0/EE:0/A:0/ID:9/LC:0/LI:0/LAV:0/LAC:0/FD:1/RD:1/NC:1/PV:1",
+	})
+	want := `OWASP risk rating 7.50 (low) from vector "SL:0/M:0/O:0/S:0/ED:0/EE:0/A:0/ID:9/LC:0/LI:0/LAV:0/LAC:0/FD:1/RD:1/NC:1/PV:1".`
+	if got != want {
+		t.Errorf("analysisDetail = %q, want %q", got, want)
+	}
+
+	// The score prints with two decimals so the text never disagrees with
+	// the published value (56.25 reads 56.25, not 56.2).
+	score = 56.25
+	got = analysisDetail(cyclonedx.VulnerabilityRating{
+		Method:   cyclonedx.ScoringMethodOWASP,
+		Score:    &score,
+		Severity: cyclonedx.SeverityHigh,
+		Vector:   "v",
+	})
+	if !strings.HasPrefix(got, "OWASP risk rating 56.25") {
+		t.Errorf("analysisDetail with 56.25 = %q, want the 56.25 prefix", got)
+	}
+
+	// A nil score must not panic; it degrades to 0.00.
+	got = analysisDetail(cyclonedx.VulnerabilityRating{Method: cyclonedx.ScoringMethodOWASP})
+	if !strings.HasPrefix(got, "OWASP risk rating 0.00") {
+		t.Errorf("analysisDetail with nil score = %q, want 0.00 prefix", got)
 	}
 }
