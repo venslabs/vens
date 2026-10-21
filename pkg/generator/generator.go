@@ -259,13 +259,13 @@ func (g *Generator) generateRiskScore(ctx context.Context, vulnBatch []Vulnerabi
 		// Risk = Likelihood × Impact = ((ThreatAgent + Vulnerability)/2) × ((TechImpact + BusinessImpact)/2)
 		// The aggregates are rounded first so the published score can be
 		// recomputed from its own vector, which carries them rounded (#358).
-		ta, vuln, tech, bus := roundedAggregates(
+		ta, vulnAgg, tech, bus := roundedAggregates(
 			entry.ThreatAgentScore,
 			entry.VulnerabilityScore,
 			entry.TechnicalImpact,
 			entry.BusinessImpact,
 		)
-		likelihoodScore := (ta + vuln) / 2.0
+		likelihoodScore := (ta + vulnAgg) / 2.0
 		impactScore := (tech + bus) / 2.0
 		owaspScore := likelihoodScore * impactScore // Range: 0-81
 
@@ -273,7 +273,7 @@ func (g *Generator) generateRiskScore(ctx context.Context, vulnBatch []Vulnerabi
 		severity := riskconfig.RiskSeverity(score)
 
 		// Generate OWASP RR vector in standard format
-		vector := owasp.FromAggregatedScores(ta, vuln, tech, bus)
+		vector := owasp.FromAggregatedScores(ta, vulnAgg, tech, bus)
 		vectorString := vector.String()
 
 		comps := vulnsByID[entry.VulnID]
