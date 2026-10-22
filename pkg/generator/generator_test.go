@@ -1022,3 +1022,26 @@ func TestGenerator_ZeroLikelihoodWarnSurvivesTruncatedRetry(t *testing.T) {
 	}
 	require.Equal(t, 1, warns, "the verdict is logged once, even when the retry truncates")
 }
+
+// The published score must be recomputable from its own vector, which
+// carries the aggregates rounded: scoring runs on the values rounded once
+// at parse time, end to end through GenerateRiskScore (#358).
+func TestGenerator_ScoreMatchesVectorRecomputation(t *testing.T) {
+	m := &scriptedLLM{answer: func(_ int, _ string) llmOutputEntry {
+		// The #358 case: vulnerability 7.5 rounds to 8, so the published
+		// score is (7+8)/2 * (9+9)/2 = 67.5 with ED:8 in the vector.
+		return llmOutputEntry{ThreatAgentScore: 7, VulnerabilityScore: 7.5, TechnicalImpact: 9, BusinessImpact: 9, Reasoning: "the #358 case"}
+	}}
+	g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 10})
+	require.NoError(t, err)
+
+	var got []outputhandler.VulnRating
+	require.NoError(t, g.GenerateRiskScore(context.Background(), testVulns(1), func(group []outputhandler.VulnRating) error {
+		got = append(got, group...)
+		return nil
+	}))
+	require.Len(t, got, 1, "the vulnerability keeps its VEX row")
+	require.NotNil(t, got[0].Rating.Score)
+	require.Equal(t, 67.5, *got[0].Rating.Score, "score is computed from the rounded aggregates")
+	require.Contains(t, got[0].Rating.Vector, "ED:8", "vector carries the rounded vulnerability aggregate")
+}
