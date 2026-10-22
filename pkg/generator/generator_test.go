@@ -1022,3 +1022,110 @@ func TestGenerator_ZeroLikelihoodWarnSurvivesTruncatedRetry(t *testing.T) {
 	}
 	require.Equal(t, 1, warns, "the verdict is logged once, even when the retry truncates")
 }
+
+// Every batch logs its composition at debug level, and the run closes with an
+// INFO summary of rows, distinct CVEs, LLM calls, ask-again retries and splits.
+func TestGenerator_LogsBatchCompositionAndRunSummary(t *testing.T) {
+	m := &scriptedLLM{answer: func(_ int, _ string) llmOutputEntry { return scoredEntry() }}
+	g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 2})
+	require.NoError(t, err)
+
+	logs := withCapturedLogs(t)
+	require.NoError(t, g.GenerateRiskScore(context.Background(), testVulns(4), nil))
+
+	var batches []capturedRecord
+	var summary *capturedRecord
+	for _, r := range logs.records {
+		switch {
+		case r.level == slog.LevelDebug && r.msg == "scoring batch":
+			batches = append(batches, r)
+		case r.level == slog.LevelInfo && r.msg == "Scoring run complete":
+			require.Nil(t, summary, "one summary per run")
+			cp := r
+			summary = &cp
+		}
+	}
+	require.Len(t, batches, 2, "one debug line per batch")
+	require.Equal(t, int64(2), batches[0].attrs["rows"])
+	require.Equal(t, "CVE-2024-0000,CVE-2024-0001", batches[0].attrs["vulns"])
+	require.Equal(t, int64(2), batches[1].attrs["rows"])
+	require.Equal(t, "CVE-2024-0002,CVE-2024-0003", batches[1].attrs["vulns"])
+
+	require.NotNil(t, summary, "the run must end with an INFO summary")
+	require.Equal(t, int64(4), summary.attrs["rows"])
+	require.Equal(t, int64(4), summary.attrs["cves"])
+	require.Equal(t, int64(2), summary.attrs["llm_calls"])
+	require.Equal(t, int64(0), summary.attrs["retries"])
+	require.Equal(t, int64(0), summary.attrs["splits"])
+}
+
+// Leaving a CVE out of the prompt and reusing its first score are two separate
+// decisions; both are logged at debug level.
+func TestGenerator_LogsScoreReuseFromEarlierBatch(t *testing.T) {
+	m := &scriptedLLM{answer: func(_ int, _ string) llmOutputEntry { return scoredEntry() }}
+	g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 1})
+	require.NoError(t, err)
+
+	logs := withCapturedLogs(t)
+	vulns := []Vulnerability{
+		{VulnID: "CVE-2024-0000", PkgName: "pkg-a", Title: "t", BOMRef: "a"},
+		{VulnID: "CVE-2024-0000", PkgName: "pkg-b", Title: "t", BOMRef: "b"},
+	}
+	require.NoError(t, g.GenerateRiskScore(context.Background(), vulns, nil))
+
+	var omitted, reused int
+	for _, r := range logs.records {
+		switch {
+		case r.level == slog.LevelDebug && r.msg == "leaving scored CVEs out of the prompt; reusing their first score":
+			require.Equal(t, "CVE-2024-0000", r.attrs["vulns"])
+			omitted++
+		case r.level == slog.LevelDebug && r.msg == "reusing an earlier batch's first score":
+			require.Equal(t, "CVE-2024-0000", r.attrs["vuln"])
+			reused++
+		}
+	}
+	require.Equal(t, 1, omitted, "the second batch leaves the already-scored CVE out of its prompt")
+	require.Equal(t, 1, reused, "the second batch reuses the first score")
+}
+
+// A split names both halves at debug level; a CVE the model skips in both the
+// ask and the ask-again waits for a later row instead of failing, and the
+// summary counts the splits and the retry.
+func TestGenerator_LogsSplitHoldBackAndSummaryCounts(t *testing.T) {
+	m := &truncatingLLM{maxPerCall: 3, skip: map[string]int{"CVE-2024-0100": 2}}
+	g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 10})
+	require.NoError(t, err)
+
+	logs := withCapturedLogs(t)
+	vulns := testVulns(10)
+	vulns[1].VulnID, vulns[1].BOMRef = "CVE-2024-0100", "x1"
+	vulns[7].VulnID, vulns[7].BOMRef = "CVE-2024-0100", "x2"
+	require.NoError(t, g.GenerateRiskScore(context.Background(), vulns, nil))
+
+	var splits, holdBacks int
+	var summary *capturedRecord
+	for _, r := range logs.records {
+		switch {
+		case r.level == slog.LevelDebug && r.msg == "splitting truncated batch":
+			splits++
+			require.NotEmpty(t, r.attrs["first_half"], "the split must name the rows each half keeps")
+			require.NotEmpty(t, r.attrs["second_half"], "the split must name the rows each half keeps")
+		case r.level == slog.LevelDebug && r.msg == "holding back rows until a later batch scores the CVE":
+			if r.attrs["vuln"] == "CVE-2024-0100" {
+				holdBacks++
+			}
+		case r.level == slog.LevelInfo && r.msg == "Scoring run complete":
+			require.Nil(t, summary, "one summary per run")
+			cp := r
+			summary = &cp
+		}
+	}
+	require.Greater(t, splits, 0, "truncated batches must log their split halves")
+	require.Equal(t, 1, holdBacks, "CVE-2024-0100 waits for its later row once")
+	require.NotNil(t, summary, "the run must end with an INFO summary")
+	require.Equal(t, int64(10), summary.attrs["rows"])
+	require.Equal(t, int64(9), summary.attrs["cves"])
+	require.Greater(t, summary.attrs["llm_calls"], int64(2))
+	require.Greater(t, summary.attrs["retries"], int64(0))
+	require.Equal(t, int64(splits), summary.attrs["splits"], "the summary must count every split")
+}

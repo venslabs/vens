@@ -149,6 +149,12 @@ type scoringRun struct {
 	missing map[string]bool            // unanswered CVEs a later row can still score
 	pending map[string][]Vulnerability // rows held back until their CVE is scored
 	lastRow map[string]int             // index of each CVE's last row in the run
+
+	// Counters for the end-of-run summary: evaluateOWASPScores invocations,
+	// asks-again for CVEs the model skipped, and truncated-batch splits.
+	llmCalls int
+	retries  int
+	splits   int
 }
 
 // GenerateRiskScore generates contextual OWASP risk scores for the given vulnerabilities.
@@ -168,7 +174,20 @@ func (g *Generator) GenerateRiskScore(ctx context.Context, vulns []Vulnerability
 	if err := g.scoreInBatches(ctx, vulns, 0, g.o.BatchSize, run, h); err != nil {
 		return err
 	}
-	return run.checkUnassessed()
+	if err := run.checkUnassessed(); err != nil {
+		return err
+	}
+	// Counts are distinct CVEs, not rows; LLM calls count every
+	// evaluateOWASPScores invocation, retries the asks-again for skipped
+	// CVEs, splits the truncated-batch splits.
+	slog.InfoContext(ctx, "Scoring run complete",
+		"rows", len(vulns),
+		"cves", len(run.lastRow),
+		"llm_calls", run.llmCalls,
+		"retries", run.retries,
+		"splits", run.splits,
+	)
+	return nil
 }
 
 // checkUnassessed is a safety net: scoreAll already stops the run when an
@@ -200,14 +219,25 @@ func (g *Generator) scoreInBatches(ctx context.Context, vulns []Vulnerability, o
 	}
 	for i := 0; i < len(vulns); i += batchSize {
 		batch := vulns[i:min(i+batchSize, len(vulns))]
+		slog.DebugContext(ctx, "scoring batch",
+			"rows", len(batch),
+			"vulns", strings.Join(rowIDs(batch), ","),
+		)
 		err := g.generateRiskScore(ctx, batch, offset+i+len(batch), run, h)
 		if err == nil {
 			continue
 		}
 		if errors.Is(err, llm.ErrTruncated) && len(batch) > 1 {
 			half := (len(batch) + 1) / 2
+			run.splits++
 			slog.WarnContext(ctx, "LLM truncated the batch; retrying with smaller batches",
 				"from", len(batch), "to", half)
+			// The WARN above doesn't show which rows each half keeps, which
+			// is what you reach for when a split behaves oddly.
+			slog.DebugContext(ctx, "splitting truncated batch",
+				"first_half", strings.Join(rowIDs(batch[:half]), ","),
+				"second_half", strings.Join(rowIDs(batch[half:]), ","),
+			)
 			if err := g.scoreInBatches(ctx, batch, offset+i, half, run, h); err != nil {
 				return err
 			}
@@ -216,6 +246,15 @@ func (g *Generator) scoreInBatches(ctx context.Context, vulns []Vulnerability, o
 		return err
 	}
 	return nil
+}
+
+// rowIDs lists the VulnID of every row in scanner order, once per row.
+func rowIDs(vs []Vulnerability) []string {
+	ids := make([]string, len(vs))
+	for i, v := range vs {
+		ids[i] = v.VulnID
+	}
+	return ids
 }
 
 // generateRiskScore scores one batch; end is the run index just past it.
@@ -405,14 +444,25 @@ func (g *Generator) scoreAll(ctx context.Context, batch []LLMVulnerability, end 
 	// Leave out every CVE an earlier batch already scored: asking the model
 	// about it again would only have its answer dropped.
 	var toAsk []LLMVulnerability
+	var omitted []string
+	omittedSeen := make(map[string]bool)
 	for _, v := range batch {
 		if v.VulnID == "" {
 			continue
 		}
 		if _, ok := run.scores[v.VulnID]; ok {
+			if !omittedSeen[v.VulnID] {
+				omittedSeen[v.VulnID] = true
+				omitted = append(omitted, v.VulnID)
+			}
 			continue
 		}
 		toAsk = append(toAsk, v)
+	}
+	if len(omitted) > 0 {
+		slog.DebugContext(ctx, "leaving scored CVEs out of the prompt; reusing their first score",
+			"vulns", strings.Join(omitted, ","),
+		)
 	}
 
 	collect := func(entries []llmOutputEntry, asked []LLMVulnerability, evidenceRef string) {
@@ -460,6 +510,9 @@ func (g *Generator) scoreAll(ctx context.Context, batch []LLMVulnerability, end 
 				// call. That batch did not always publish it: one split after
 				// a truncated retry never did.
 				first.published = run.scored[v.VulnID]
+				slog.DebugContext(ctx, "reusing an earlier batch's first score",
+					"vuln", v.VulnID,
+				)
 				answers = append(answers, first)
 				seen[v.VulnID] = true
 			}
@@ -467,6 +520,7 @@ func (g *Generator) scoreAll(ctx context.Context, batch []LLMVulnerability, end 
 	}
 
 	if len(toAsk) > 0 {
+		run.llmCalls++
 		entries, evidenceRef, err := g.evaluateOWASPScores(ctx, toAsk)
 		if err != nil {
 			return nil, fmt.Errorf("LLM evaluation failed: %w", err)
@@ -478,6 +532,8 @@ func (g *Generator) scoreAll(ctx context.Context, batch []LLMVulnerability, end 
 			slog.WarnContext(ctx, "Model skipped vulnerabilities; asking again for those alone",
 				"skipped", len(skipped), "of", len(unscored(toAsk, nil)), "vulns", strings.Join(vulnIDs(skipped), ","))
 
+			run.retries++
+			run.llmCalls++
 			entries, evidenceRef, err = g.evaluateOWASPScores(ctx, skipped)
 			if err != nil {
 				return nil, fmt.Errorf("LLM evaluation failed while asking again for %d vulnerabilities: %w", len(skipped), err)
@@ -491,6 +547,9 @@ func (g *Generator) scoreAll(ctx context.Context, batch []LLMVulnerability, end 
 			for _, v := range unscored(toAsk, scored) {
 				if run.lastRow[v.VulnID] >= end {
 					run.missing[v.VulnID] = true
+					slog.DebugContext(ctx, "holding back rows until a later batch scores the CVE",
+						"vuln", v.VulnID,
+					)
 					continue
 				}
 				uncovered = append(uncovered, v.VulnID)
