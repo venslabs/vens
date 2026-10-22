@@ -1022,3 +1022,84 @@ func TestGenerator_ZeroLikelihoodWarnSurvivesTruncatedRetry(t *testing.T) {
 	}
 	require.Equal(t, 1, warns, "the verdict is logged once, even when the retry truncates")
 }
+
+// A zero-likelihood answer with no reasoning is a refusal, not a verdict
+// (issue #337): the run fails fast instead of publishing it as info.
+func TestGenerator_ZeroLikelihoodWithoutReasoningFailsFast(t *testing.T) {
+	m := &scriptedLLM{answer: func(_ int, _ string) llmOutputEntry {
+		return llmOutputEntry{ThreatAgentScore: 0, VulnerabilityScore: 0, TechnicalImpact: 0, BusinessImpact: 1}
+	}}
+	g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 10})
+	require.NoError(t, err)
+
+	var got []outputhandler.VulnRating
+	h := func(group []outputhandler.VulnRating) error {
+		got = append(got, group...)
+		return nil
+	}
+
+	err = g.GenerateRiskScore(context.Background(), testVulns(2), h)
+	require.EqualError(t, err, "model refused to assess CVE-2024-0000, CVE-2024-0001 after asking again (zero scores, no reasoning); stopping the run")
+	require.Empty(t, got, "nothing is published when the model refuses")
+}
+
+// A refusal on the first ask is asked about again alone: if the model then
+// answers with reasoning, the "not reachable here" verdict is published and
+// the run succeeds.
+func TestGenerator_ZeroLikelihoodRefusalRecoveredOnReask(t *testing.T) {
+	m := &scriptedLLM{answer: func(call int, _ string) llmOutputEntry {
+		if call == 1 {
+			return llmOutputEntry{ThreatAgentScore: 0, VulnerabilityScore: 0, TechnicalImpact: 0, BusinessImpact: 1}
+		}
+		return llmOutputEntry{ThreatAgentScore: 0, VulnerabilityScore: 0, TechnicalImpact: 0, BusinessImpact: 1, Reasoning: "not reachable here"}
+	}}
+	g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 10})
+	require.NoError(t, err)
+
+	var got []outputhandler.VulnRating
+	h := func(group []outputhandler.VulnRating) error {
+		got = append(got, group...)
+		return nil
+	}
+
+	require.NoError(t, g.GenerateRiskScore(context.Background(), testVulns(2), h))
+	require.Len(t, got, 2, "the verdict is published once the model answers with reasoning")
+}
+
+// A refusal on the first ask that the ask-again simply omits is a plain skip,
+// not a refusal: refusal is tracked per answer on the ask-again, so the run
+// must report it with the generic message, not "refused".
+func TestGenerator_RefusalOmittedOnReaskIsPlainSkip(t *testing.T) {
+	m := &scriptedLLM{
+		answer: func(_ int, _ string) llmOutputEntry {
+			return llmOutputEntry{ThreatAgentScore: 0, VulnerabilityScore: 0, TechnicalImpact: 0, BusinessImpact: 1}
+		},
+		// The ask-again (call 2) omits the CVEs instead of refusing them.
+		skip: func(call int, _ string) bool { return call == 2 },
+	}
+	g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 10})
+	require.NoError(t, err)
+
+	err = g.GenerateRiskScore(context.Background(), testVulns(2), nil)
+	require.EqualError(t, err, "model returned no score for CVE-2024-0000, CVE-2024-0001 after asking again; stopping the run")
+}
+
+// A mixed batch (one CVE refused, one plain skipped) names the refused CVE
+// instead of falling back to the generic message that drops the refusal.
+func TestGenerator_MixedRefusedAndSkippedNamesRefused(t *testing.T) {
+	m := &scriptedLLM{
+		answer: func(_ int, id string) llmOutputEntry {
+			if id == "CVE-2024-0000" {
+				return llmOutputEntry{ThreatAgentScore: 0, VulnerabilityScore: 0, TechnicalImpact: 0, BusinessImpact: 1}
+			}
+			return scoredEntry()
+		},
+		// CVE-2024-0001 is never answered, on either call.
+		skip: func(_ int, id string) bool { return id == "CVE-2024-0001" },
+	}
+	g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 10})
+	require.NoError(t, err)
+
+	err = g.GenerateRiskScore(context.Background(), testVulns(2), nil)
+	require.EqualError(t, err, "model refused to assess CVE-2024-0000 (zero scores, no reasoning) and returned no score for CVE-2024-0001 after asking again; stopping the run")
+}
