@@ -25,6 +25,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/venslabs/vens/internal/testutil"
 	"github.com/venslabs/vens/pkg/attestation"
@@ -714,6 +715,58 @@ func TestGenerator_DupCVEReusesFirstScore(t *testing.T) {
 	}
 }
 
+// When a later batch reuses an earlier batch's score for a CVE, the
+// attestation claim for that batch's package must be marked as reused:
+// its cited evidence bundle is the first call's, whose prompt never
+// mentioned this package.
+func TestGenerator_Attestor_ReusedScoreMarksClaim(t *testing.T) {
+	m := &scriptedLLM{
+		answer: func(_ int, _ string) llmOutputEntry { return scoredEntry() },
+	}
+	g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 1})
+	require.NoError(t, err)
+	at := attestation.NewBuilder(attestation.Opts{Provider: "mock", Model: "mock"})
+	g.SetAttestor(at)
+
+	vulns := []Vulnerability{
+		{VulnID: "CVE-2024-0000", PkgName: "openssl", Title: "t", BOMRef: "openssl"},
+		{VulnID: "CVE-2024-0000", PkgName: "libssl3", Title: "t", BOMRef: "libssl3"},
+	}
+	require.NoError(t, g.GenerateRiskScore(context.Background(), vulns, nil))
+	require.Equal(t, 1, m.calls, "the second batch must not ask about an already-scored CVE")
+
+	var buf bytes.Buffer
+	require.NoError(t, at.Write(&buf))
+	var got struct {
+		Declarations struct {
+			Claims []struct {
+				Target    string   `json:"target"`
+				Predicate string   `json:"predicate"`
+				Evidence  []string `json:"evidence"`
+			} `json:"claims"`
+		} `json:"declarations"`
+	}
+	require.NoError(t, json.Unmarshal(buf.Bytes(), &got), "output:\n%s", buf.String())
+	require.Len(t, got.Declarations.Claims, 2, "both components must keep their attestation claims")
+
+	byTarget := map[string]struct {
+		Predicate string
+		Evidence  []string
+	}{}
+	for _, c := range got.Declarations.Claims {
+		byTarget[c.Target] = struct {
+			Predicate string
+			Evidence  []string
+		}{c.Predicate, c.Evidence}
+	}
+
+	assert.NotContains(t, byTarget["openssl"].Predicate, "reused",
+		"the first package was in the prompt behind the cited evidence")
+	assert.Contains(t, byTarget["libssl3"].Predicate, "this package was not in the cited batch's prompt")
+	assert.Equal(t, byTarget["openssl"].Evidence, byTarget["libssl3"].Evidence,
+		"the reused claim cites the first call's evidence bundle")
+}
+
 // Score reuse works in both directions: a batch that gets no answer for a CVE
 // holds its components back, and when a later batch scores the CVE those rows
 // are filled in with that score instead of dropping out of the VEX.
@@ -791,16 +844,39 @@ func TestGenerator_HeldBackCVEOnTwoComponentsFilledInOnce(t *testing.T) {
 	var doc struct {
 		Declarations struct {
 			Claims []struct {
-				Target string `json:"target"`
+				Target    string   `json:"target"`
+				Predicate string   `json:"predicate"`
+				Evidence  []string `json:"evidence"`
 			} `json:"claims"`
 		} `json:"declarations"`
 	}
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &doc))
 	var targets []string
+	byTarget := map[string]struct {
+		Predicate string
+		Evidence  []string
+	}{}
 	for _, c := range doc.Declarations.Claims {
 		targets = append(targets, c.Target)
+		byTarget[c.Target] = struct {
+			Predicate string
+			Evidence  []string
+		}{c.Predicate, c.Evidence}
 	}
 	require.Equal(t, []string{"a", "b", "c"}, targets)
+
+	// The held-back rows were filled in by batch 2, whose prompt never had
+	// their packages: their claims cite that later call's evidence and must
+	// say so. Row c was in that prompt, so its claim stays clean.
+	for _, target := range []string{"a", "b"} {
+		assert.Contains(t, byTarget[target].Predicate, "this package was not in the cited batch's prompt",
+			"target %s was held back and filled in by a later batch", target)
+	}
+	assert.NotContains(t, byTarget["c"].Predicate, "this package was not in the cited batch's prompt")
+	assert.Equal(t, byTarget["a"].Evidence, byTarget["b"].Evidence)
+	assert.Equal(t, byTarget["b"].Evidence, byTarget["c"].Evidence,
+		"all three rows cite the later batch's evidence bundle")
+	assert.Equal(t, []string{"evidence-batch-3"}, byTarget["c"].Evidence)
 }
 
 // Zero likelihood is what makes a verdict "not reachable here", whatever impact
@@ -1005,14 +1081,22 @@ func (m *truncatedRetryLLM) Generate(_ context.Context, req llm.Request) (string
 }
 
 // The zero-likelihood WARN still fires once when the retry truncates and the
-// split batch reuses the first answer, which no batch had published yet.
+// split batch reuses the first answer, which no batch had published yet. The
+// sub-batch's rows were all in the first call's prompt, so neither claim may
+// say its package was missing from the cited batch's prompt.
 func TestGenerator_ZeroLikelihoodWarnSurvivesTruncatedRetry(t *testing.T) {
 	m := &truncatedRetryLLM{}
 	g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 2})
 	require.NoError(t, err)
+	at := attestation.NewBuilder(attestation.Opts{Provider: "mock", Model: "mock"})
+	g.SetAttestor(at)
 
 	logs := withCapturedLogs(t)
-	require.NoError(t, g.GenerateRiskScore(context.Background(), testVulns(2), nil))
+	vulns := []Vulnerability{
+		{VulnID: "CVE-2024-0000", PkgName: "pkg-a", Title: "t", BOMRef: "a"},
+		{VulnID: "CVE-2024-0001", PkgName: "pkg-b", Title: "t", BOMRef: "b"},
+	}
+	require.NoError(t, g.GenerateRiskScore(context.Background(), vulns, nil))
 
 	warns := 0
 	for _, r := range logs.records {
@@ -1021,4 +1105,28 @@ func TestGenerator_ZeroLikelihoodWarnSurvivesTruncatedRetry(t *testing.T) {
 		}
 	}
 	require.Equal(t, 1, warns, "the verdict is logged once, even when the retry truncates")
+
+	var buf bytes.Buffer
+	require.NoError(t, at.Write(&buf))
+	var got struct {
+		Declarations struct {
+			Claims []struct {
+				Target    string   `json:"target"`
+				Predicate string   `json:"predicate"`
+				Evidence  []string `json:"evidence"`
+			} `json:"claims"`
+		} `json:"declarations"`
+	}
+	require.NoError(t, json.Unmarshal(buf.Bytes(), &got), "output:\n%s", buf.String())
+	require.Len(t, got.Declarations.Claims, 2)
+	for _, c := range got.Declarations.Claims {
+		assert.NotContains(t, c.Predicate, "this package was not in the cited batch's prompt",
+			"target %s: the row was in the first call's prompt, so the claim must not say otherwise", c.Target)
+	}
+	byTarget := map[string][]string{}
+	for _, c := range got.Declarations.Claims {
+		byTarget[c.Target] = c.Evidence
+	}
+	assert.Equal(t, []string{"evidence-batch-1"}, byTarget["a"],
+		"the reused answer keeps citing the first call's evidence bundle")
 }

@@ -340,6 +340,11 @@ func (g *Generator) generateRiskScore(ctx context.Context, vulnBatch []Vulnerabi
 					Score:       score,
 					Severity:    severity,
 					Reasoning:   entry.Reasoning,
+					// Mark the claim when its row was not in the cited
+					// call's prompt: a reused first score for another
+					// batch's package, or a held-back row filled in by a
+					// later batch.
+					Reused: !answer.prompted[promptRow{v.PkgName, v.InstalledVersion}],
 				})
 			}
 		}
@@ -375,12 +380,21 @@ func (g *Generator) generateRiskScore(ctx context.Context, vulnBatch []Vulnerabi
 // marks a "not reachable here" verdict (see func zeroLikelihood), published
 // as-is with its reasoning logged at WARN. published marks an answer an
 // earlier batch already published: that batch logged its WARN line, so it is
-// not repeated.
+// not repeated. prompted is the set of (package, version) rows the call behind
+// this answer was asked about; a claim whose row is not in it must say so,
+// because its cited evidence bundle's prompt never mentioned that package.
 type answer struct {
 	entry          llmOutputEntry
 	evidenceRef    string
 	zeroLikelihood bool
 	published      bool
+	prompted       map[promptRow]bool
+}
+
+// promptRow identifies one package row a prompt was asked about.
+type promptRow struct {
+	name    string
+	version string
 }
 
 // zeroLikelihood reports whether both likelihood factors are 0, which makes
@@ -417,10 +431,12 @@ func (g *Generator) scoreAll(ctx context.Context, batch []LLMVulnerability, end 
 
 	collect := func(entries []llmOutputEntry, asked []LLMVulnerability, evidenceRef string) {
 		askedIDs := make(map[string]bool, len(asked))
+		prompted := make(map[promptRow]bool, len(asked))
 		for _, v := range asked {
 			if v.VulnID != "" {
 				askedIDs[v.VulnID] = true
 			}
+			prompted[promptRow{v.PkgName, v.InstalledVersion}] = true
 		}
 		for _, e := range entries {
 			// Only keep answers for CVEs that were in this call's prompt. An
@@ -437,7 +453,7 @@ func (g *Generator) scoreAll(ctx context.Context, batch []LLMVulnerability, end 
 			}
 			scored[e.VulnID] = true
 			delete(run.missing, e.VulnID)
-			a := answer{entry: e, evidenceRef: evidenceRef, zeroLikelihood: zeroLikelihood(e)}
+			a := answer{entry: e, evidenceRef: evidenceRef, zeroLikelihood: zeroLikelihood(e), prompted: prompted}
 			run.scores[e.VulnID] = a
 			answers = append(answers, a)
 		}
@@ -458,7 +474,10 @@ func (g *Generator) scoreAll(ctx context.Context, batch []LLMVulnerability, end 
 			if first, ok := run.scores[v.VulnID]; ok {
 				// Pulled from an earlier batch's score, not obtained in this
 				// call. That batch did not always publish it: one split after
-				// a truncated retry never did.
+				// a truncated retry never did. Whether the claim for this
+				// batch's row says the cited prompt skipped its package is
+				// decided per row from the answer's prompted set, in
+				// generateRiskScore.
 				first.published = run.scored[v.VulnID]
 				answers = append(answers, first)
 				seen[v.VulnID] = true
