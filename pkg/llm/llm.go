@@ -138,13 +138,34 @@ var temperatureRefusingModels = []string{
 	"fable",
 }
 
+// temperatureRefusingModelPrefixes lists model id prefixes known to reject an
+// explicit temperature outright. These are matched by prefix, not substring:
+// an "o1" entry must not catch ollama's "marco-o1".
+var temperatureRefusingModelPrefixes = []string{
+	// OpenAI reasoning models; e.g. o1-mini, o3, o4-mini, gpt-5-nano. Extend
+	// as new reasoning generations confirm they refuse an explicit temperature.
+	"o1",
+	"o3",
+	"o4",
+	"gpt-5",
+}
+
 // ModelRefusesTemperature reports whether model is a known temperature
-// refuser. The list holds model ids known to reject an explicit temperature,
-// whichever provider serves them; only the anthropic provider calls it today.
+// refuser. The lists hold model ids known to reject an explicit temperature,
+// whichever provider serves them; substring entries catch Anthropic ids
+// anywhere in the id, while the o1/o3/o4/gpt-5* entries match by prefix so
+// they don't catch ids like ollama's "marco-o1". What happens to a model
+// missing from the lists is up to each provider (today anthropic and openai
+// turn the refusal into a clear error).
 func ModelRefusesTemperature(model string) bool {
 	m := strings.ToLower(model)
 	for _, known := range temperatureRefusingModels {
 		if strings.Contains(m, known) {
+			return true
+		}
+	}
+	for _, prefix := range temperatureRefusingModelPrefixes {
+		if strings.HasPrefix(m, prefix) {
 			return true
 		}
 	}
