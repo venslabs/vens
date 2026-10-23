@@ -5,7 +5,7 @@ go 1.27.0
 require (
 	github.com/CycloneDX/cyclonedx-go v0.12.0
 	github.com/anchore/grype v0.120.1
-	github.com/anthropics/anthropic-sdk-go v1.80.0
+	github.com/anthropics/anthropic-sdk-go v1.83.0
 	github.com/aquasecurity/trivy v0.75.0
 	github.com/aquasecurity/trivy-db v0.0.0-20261001090913-650c4091f951
 	github.com/google/uuid v1.6.0
