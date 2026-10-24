@@ -1,0 +1,27 @@
+# `vens init` writes a config that `vens generate` accepts: the required
+# questions are answered, optional ones are skipped with empty lines, and a
+# second run without --force refuses to overwrite the file it just wrote.
+
+stdin answers.txt
+exec vens init --output config.yaml
+stdout 'Wrote config.yaml'
+grep 'name: my-api' config.yaml
+grep 'exposure: internet' config.yaml
+grep 'data_sensitivity: high' config.yaml
+grep 'business_criticality: critical' config.yaml
+grep 'GDPR' config.yaml
+
+# A second run without --force refuses to overwrite.
+! exec vens init --output config.yaml
+stderr 'already exists'
+
+-- answers.txt --
+my-api
+Backend API
+internet
+high
+critical
+
+gdpr
+
+Handles customer data
