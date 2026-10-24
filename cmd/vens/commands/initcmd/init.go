@@ -124,7 +124,9 @@ func action(cmd *cobra.Command, args []string) error {
 	if err := os.WriteFile(output, []byte(out), 0644); err != nil {
 		return fmt.Errorf("writing config file %q: %w", output, err)
 	}
-	fmt.Fprintf(cmd.OutOrStdout(), "Wrote %s\n", output)
+	if _, err := fmt.Fprintf(cmd.OutOrStdout(), "Wrote %s\n", output); err != nil {
+		return fmt.Errorf("writing output: %w", err)
+	}
 	return nil
 }
 
@@ -148,7 +150,9 @@ func (p *prompter) readLine() (string, error) {
 
 func (p *prompter) askRequired(question string) (string, error) {
 	for {
-		fmt.Fprintf(p.out, "%s: ", question)
+		if _, err := fmt.Fprintf(p.out, "%s: ", question); err != nil {
+			return "", fmt.Errorf("writing prompt: %w", err)
+		}
 		answer, err := p.readLine()
 		if err != nil {
 			return "", fmt.Errorf("reading %q: %w", question, err)
@@ -156,12 +160,16 @@ func (p *prompter) askRequired(question string) (string, error) {
 		if answer != "" {
 			return answer, nil
 		}
-		fmt.Fprintln(p.out, "A value is required.")
+		if _, err := fmt.Fprintln(p.out, "A value is required."); err != nil {
+			return "", fmt.Errorf("writing prompt: %w", err)
+		}
 	}
 }
 
 func (p *prompter) askOptional(question string) (string, error) {
-	fmt.Fprintf(p.out, "%s (optional, Enter to skip): ", question)
+	if _, err := fmt.Fprintf(p.out, "%s (optional, Enter to skip): ", question); err != nil {
+		return "", fmt.Errorf("writing prompt: %w", err)
+	}
 	answer, err := p.readLine()
 	if err != nil {
 		return "", fmt.Errorf("reading %q: %w", question, err)
@@ -171,7 +179,9 @@ func (p *prompter) askOptional(question string) (string, error) {
 
 func (p *prompter) askChoice(question string, valid []string) (string, error) {
 	for {
-		fmt.Fprintf(p.out, "%s [%s]: ", question, strings.Join(valid, "/"))
+		if _, err := fmt.Fprintf(p.out, "%s [%s]: ", question, strings.Join(valid, "/")); err != nil {
+			return "", fmt.Errorf("writing prompt: %w", err)
+		}
 		answer, err := p.readLine()
 		if err != nil {
 			return "", fmt.Errorf("reading %q: %w", question, err)
@@ -181,13 +191,17 @@ func (p *prompter) askChoice(question string, valid []string) (string, error) {
 				return v, nil
 			}
 		}
-		fmt.Fprintf(p.out, "Must be one of: %s.\n", strings.Join(valid, ", "))
+		if _, err := fmt.Fprintf(p.out, "Must be one of: %s.\n", strings.Join(valid, ", ")); err != nil {
+			return "", fmt.Errorf("writing prompt: %w", err)
+		}
 	}
 }
 
 func (p *prompter) askOptionalChoice(question string, valid []string) (string, error) {
 	for {
-		fmt.Fprintf(p.out, "%s (optional) [%s]: ", question, strings.Join(valid, "/"))
+		if _, err := fmt.Fprintf(p.out, "%s (optional) [%s]: ", question, strings.Join(valid, "/")); err != nil {
+			return "", fmt.Errorf("writing prompt: %w", err)
+		}
 		answer, err := p.readLine()
 		if err != nil {
 			return "", fmt.Errorf("reading %q: %w", question, err)
@@ -200,14 +214,18 @@ func (p *prompter) askOptionalChoice(question string, valid []string) (string, e
 				return v, nil
 			}
 		}
-		fmt.Fprintf(p.out, "Must be one of: %s.\n", strings.Join(valid, ", "))
+		if _, err := fmt.Fprintf(p.out, "Must be one of: %s.\n", strings.Join(valid, ", ")); err != nil {
+			return "", fmt.Errorf("writing prompt: %w", err)
+		}
 	}
 }
 
 func (p *prompter) askCompliance() ([]string, error) {
 	valid := []string{"PCI-DSS", "HIPAA", "GDPR", "SOX", "ISO27001", "FedRAMP", "NIST", "CCPA", "SOC2", "FISMA", "ITAR", "CMMC"}
 	for {
-		fmt.Fprintf(p.out, "Compliance requirements, comma-separated (optional) [%s]: ", strings.Join(valid, ", "))
+		if _, err := fmt.Fprintf(p.out, "Compliance requirements, comma-separated (optional) [%s]: ", strings.Join(valid, ", ")); err != nil {
+			return nil, fmt.Errorf("writing prompt: %w", err)
+		}
 		answer, err := p.readLine()
 		if err != nil {
 			return nil, fmt.Errorf("reading compliance requirements: %w", err)
@@ -236,7 +254,9 @@ func (p *prompter) askCompliance() ([]string, error) {
 			}
 		}
 		if unknown != "" {
-			fmt.Fprintf(p.out, "Unknown framework %q (valid: %s).\n", unknown, strings.Join(valid, ", "))
+			if _, err := fmt.Fprintf(p.out, "Unknown framework %q (valid: %s).\n", unknown, strings.Join(valid, ", ")); err != nil {
+			return nil, fmt.Errorf("writing prompt: %w", err)
+		}
 			continue
 		}
 		return chosen, nil
