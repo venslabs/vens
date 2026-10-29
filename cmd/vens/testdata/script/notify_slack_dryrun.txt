@@ -1,0 +1,41 @@
+# Notify reads a VEX and prints the Slack message with --dry-run
+
+exec vens notify --vex vex.cdx.json --to slack --dry-run
+stdout '\*vens scan:\* 2 vulnerabilities scored'
+stdout 'critical: 1'
+stdout 'low: 1'
+stdout 'CVE-2024-1234'
+stdout '63.0 .critical.'
+
+# An unknown target is rejected with the supported list
+! exec vens notify --vex vex.cdx.json --to jira --dry-run
+stderr 'unknown notify target'
+stderr 'jira'
+
+# A missing VEX file fails cleanly
+! exec vens notify --vex does-not-exist.cdx.json --to slack --dry-run
+stderr 'failed to read VEX file'
+
+-- vex.cdx.json --
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "version": 1,
+  "vulnerabilities": [
+    {
+      "bom-ref": "urn:cdx:abc/1#pkg-a",
+      "id": "CVE-2024-1234",
+      "ratings": [
+        {"method": "OWASP", "score": 63.0, "severity": "critical"}
+      ],
+      "affects": [{"ref": "urn:cdx:abc/1#pkg-a"}]
+    },
+    {
+      "bom-ref": "urn:cdx:abc/1#pkg-b",
+      "id": "CVE-2024-5678",
+      "ratings": [
+        {"method": "OWASP", "score": 12.0, "severity": "low"}
+      ]
+    }
+  ]
+}
