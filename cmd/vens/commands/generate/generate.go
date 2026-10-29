@@ -255,6 +255,10 @@ func action(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to parse vulnerabilities: %w", err)
 	}
 
+	if err := checkBOMRefs(vulns); err != nil {
+		return err
+	}
+
 	// Flags are validated and the report has parsed; only now is it safe to
 	// prepare the output. Write to a temp file in the destination directory
 	// and rename it into place only on success, so a failure during
@@ -351,6 +355,21 @@ func action(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+// checkBOMRefs fails the run when a parsed vulnerability has no component
+// to point at (empty BOMRef). It runs before GenerateRiskScore so the run
+// never pays for LLM calls on a report that cannot produce a VEX; Close
+// keeps the same check as a backstop for ratings arriving by other paths.
+// A row with no VulnID is never scored, so it is left out here too.
+func checkBOMRefs(vulns []generator.Vulnerability) error {
+	var ids []string
+	for _, v := range vulns {
+		if v.VulnID != "" && v.BOMRef == "" {
+			ids = append(ids, v.VulnID)
+		}
+	}
+	return outputhandler.UnreferencedError("cannot generate VEX", ids)
 }
 
 // tempOutputFile creates a temp file next to outputPath (same directory, so

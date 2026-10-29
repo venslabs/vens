@@ -124,7 +124,8 @@ func componentIdentity(v trivytypes.DetectedVulnerability) string {
 //  3. If the PURL covers more than one component, use the component identity
 //  4. Otherwise, use PURL
 //
-// An empty ref is dropped from the VEX further down, so rule 3 keeps the
+// An empty ref fails the run before scoring (the generate command checks
+// parsed reports, and Close fails as a backstop), so rule 3 keeps the
 // ambiguous PURL rather than return nothing when there is no identity either.
 //
 // See: https://github.com/aquasecurity/trivy/blob/v0.69.0/pkg/sbom/core/bom.go#L364

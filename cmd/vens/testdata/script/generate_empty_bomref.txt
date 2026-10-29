@@ -1,0 +1,25 @@
+# #272: a report entry with no PURL, PkgID or PkgName stops the run before any
+# LLM call: the mock fails if called, and no VEX, attestation or temp file is left.
+env VENS_MOCK_LLM_FAIL=1
+! exec vens generate --llm=mock --attest --config-file=config.yaml --sbom-serial-number=urn:uuid:22222222-2222-2222-2222-222222222222 report.json out.cdx.json
+stderr 'cannot generate VEX: 1 vulnerability with no component \(empty BOMRef\): CVE-2024-5678'
+! stderr 'forced failure'
+! exists out.cdx.json
+! exists out.attestation.cdx.json
+! exec sh -c 'ls .vens-*.tmp'
+
+-- config.yaml --
+project:
+  name: "empty-bomref-test"
+  description: "A report entry with no component"
+context:
+  exposure: "internet"
+  data_sensitivity: "high"
+  business_criticality: "critical"
+-- report.json --
+{"SchemaVersion": 2, "ArtifactName": "demo", "ArtifactType": "container_image", "Results": [{"Target": "demo (debian 12)", "Class": "os-pkgs", "Type": "debian", "Vulnerabilities": [
+  {"VulnerabilityID": "CVE-2024-5678", "Severity": "HIGH", "Title": "No PURL, PkgID or PkgName"},
+  {"VulnerabilityID": "CVE-2024-1234", "PkgName": "openssl", "InstalledVersion": "3.0.11", "Severity": "HIGH", "Title": "Referenced", "PkgIdentifier": {"PURL": "pkg:deb/debian/openssl@3.0.11"}},
+  {"VulnerabilityID": "CVE-2024-5678", "PkgName": "zlib", "InstalledVersion": "1.2.13", "Severity": "HIGH", "Title": "Same CVE, referenced", "PkgIdentifier": {"PURL": "pkg:deb/debian/zlib@1.2.13"}},
+  {"VulnerabilityID": "", "Severity": "HIGH", "Title": "No ID, no component"}
+]}]}

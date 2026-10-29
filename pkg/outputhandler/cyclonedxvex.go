@@ -17,7 +17,6 @@ package outputhandler
 import (
 	"fmt"
 	"io"
-	"log/slog"
 	"slices"
 	"strings"
 	"time"
@@ -77,6 +76,7 @@ func ParseSpecVersion(s string) (cyclonedx.SpecVersion, error) {
 // vulnerability ratings and emits a proper CycloneDX VEX BOM on Close.
 // vexUUID is the VEX document's serialNumber UUID; pass "" to generate one.
 // specVersion selects the CycloneDX spec version the BOM is encoded to.
+// Close fails and writes nothing when a rating has an empty BOMRef.
 func NewCycloneDxVexOutputHandler(w io.Writer, sbomUUID string, sbomVersion int, vexUUID string, specVersion cyclonedx.SpecVersion) OutputHandler {
 	return &cycloneDxVexWriter{
 		w:           w,
@@ -131,12 +131,15 @@ func (c *cycloneDxVexWriter) Close() error {
 
 	vulnMap := make(map[string]*cyclonedx.Vulnerability)
 	affectsSet := make(map[string]map[string]bool)
+	var unreferenced []string
 	for _, g := range c.r {
 		if g.BOMRef == "" {
-			// Dropping it leaves the run at exit code 0 with a VEX short of a CVE,
-			// which for a gate only fails one way. Kept as a warning for now, see
-			// https://github.com/venslabs/vens/issues/272.
-			slog.Warn("Skipping vulnerability without BOMRef", "vuln", g.VulnID)
+			// A scored vulnerability with no component to point at must fail
+			// the run, not drop out with a warning: a warning still exits 0
+			// with a VEX short of a CVE, which a gate cannot tell from
+			// clean (#272). The same call #269 already made for a missing
+			// score. Nothing is encoded yet, so failing here writes no VEX.
+			unreferenced = append(unreferenced, g.VulnID)
 			continue
 		}
 
@@ -157,6 +160,10 @@ func (c *cycloneDxVexWriter) Close() error {
 			Affects: &[]cyclonedx.Affects{{Ref: bomLink}},
 		}
 		affectsSet[g.VulnID] = map[string]bool{bomLink: true}
+	}
+
+	if err := UnreferencedError("cannot emit VEX", unreferenced); err != nil {
+		return err
 	}
 
 	vulns := make([]cyclonedx.Vulnerability, 0, len(vulnMap))

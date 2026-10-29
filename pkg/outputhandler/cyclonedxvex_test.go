@@ -532,9 +532,10 @@ func TestCycloneDxVexWriter_Close_KeepsZeroOWASPScore(t *testing.T) {
 	}
 }
 
-// Current behaviour, tracked in #272: a rating with no component is warned about
-// and dropped, and the run still succeeds. Change this test when that changes.
-func TestCycloneDxVexWriter_Close_SkipsUnreferencedVuln(t *testing.T) {
+// #272: a scored rating with no component fails the run instead of being
+// warned about and dropped, so a gate cannot pass on a VEX short of a CVE.
+// Nothing is written: Close returns before encoding.
+func TestCycloneDxVexWriter_Close_FailsOnUnreferencedVuln(t *testing.T) {
 	var buf bytes.Buffer
 	h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 1, "", cyclonedx.SpecVersion1_7)
 
@@ -547,20 +548,20 @@ func TestCycloneDxVexWriter_Close_SkipsUnreferencedVuln(t *testing.T) {
 	if err := h.HandleVulnRatings([]VulnRating{
 		{VulnID: "CVE-1", BOMRef: "pkg:npm/foo@1.0.0", Rating: rating},
 		{VulnID: "CVE-2", BOMRef: "", Rating: rating},
+		{VulnID: "CVE-3", BOMRef: "", Rating: rating},
 	}); err != nil {
 		t.Fatalf("HandleVulnRatings: %v", err)
 	}
 
-	if err := h.Close(); err != nil {
-		t.Fatalf("Close: %v", err)
+	err := h.Close()
+	if err == nil {
+		t.Fatal("Close: expected an error for vulnerabilities without BOMRef, got nil")
 	}
-
-	out := buf.String()
-	if !strings.Contains(out, "CVE-1") {
-		t.Error("CVE-1 is missing from the VEX")
+	if want := "cannot emit VEX: 2 vulnerabilities with no component (empty BOMRef): CVE-2, CVE-3"; err.Error() != want {
+		t.Errorf("Close() = %v, want %q", err, want)
 	}
-	if strings.Contains(out, "CVE-2") {
-		t.Error("CVE-2 has no component, it should not be in the VEX")
+	if buf.Len() != 0 {
+		t.Errorf("no VEX should be written when Close fails, got %d bytes", buf.Len())
 	}
 }
 

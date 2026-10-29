@@ -114,6 +114,12 @@ Note: `--input-format` examples in this page omit `--sbom-serial-number` for bre
 
 ---
 
+## `cannot generate VEX: ... (empty BOMRef)`
+
+A row in the scanner report gives Vens nothing to point the VEX at: no usable PURL and no package ID (Trivy also falls back to the package name). Vens stops right after reading the report, before any LLM call, and writes no VEX. The error names CVEs, not rows: in the report, find each CVE's row with no PURL and no package ID, fix or remove it, and run again.
+
+---
+
 ## What happens if the LLM fails on one batch?
 
 Vens processes CVEs in batches (default 10, tunable via `--llm-batch-size`). Provider errors fail the whole run; a CVE the model leaves out or gives zero likelihood is handled CVE by CVE:
