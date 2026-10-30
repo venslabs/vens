@@ -1,0 +1,139 @@
+{
+  "SchemaVersion": 2,
+  "Results": [
+    {
+      "Target": "python:3.11-slim (debian 13.3)",
+      "Class": "os-pkgs",
+      "Type": "debian",
+      "Vulnerabilities": [
+        {
+          "VulnerabilityID": "CVE-2011-3374",
+          "PkgID": "apt@3.0.3",
+          "PkgName": "apt",
+          "PkgIdentifier": {
+            "PURL": "pkg:deb/debian/apt@3.0.3?arch=amd64&distro=debian-13.3",
+            "UID": "ee5909b019090ce0"
+          },
+          "InstalledVersion": "3.0.3",
+          "Status": "affected",
+          "Layer": {
+            "Digest": "sha256:119d43eec815e5f9a47da3a7d59454581b1e204b0c34db86f171b7ceb3336533",
+            "DiffID": "sha256:e50a58335e1366e2581fe61794c1651afe2fe04e881e795aa166f24f4fc78d92"
+          },
+          "SeveritySource": "debian",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2011-3374",
+          "DataSource": {
+            "ID": "debian",
+            "Name": "Debian Security Tracker",
+            "URL": "https://salsa.debian.org/security-tracker-team/security-tracker"
+          },
+          "Fingerprint": "sha256:fd9dec5918faa91dbb97f7025e98debe757f2a332bbaa9c9e12fc6fd997b8739",
+          "Title": "It was found that apt-key in apt, all versions, do not correctly valid ...",
+          "Description": "It was found that apt-key in apt, all versions, do not correctly validate gpg keys with the master keyring, leading to a potential man-in-the-middle attack.",
+          "Severity": "LOW",
+          "CweIDs": [
+            "CWE-347"
+          ],
+          "VendorSeverity": {
+            "debian": 1,
+            "nvd": 1
+          },
+          "CVSS": {
+            "nvd": {
+              "V2Vector": "AV:N/AC:M/Au:N/C:N/I:P/A:N",
+              "V3Vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:L/A:N",
+              "V2Score": 4.3,
+              "V3Score": 3.7
+            }
+          },
+          "References": [
+            "https://access.redhat.com/security/cve/cve-2011-3374",
+            "https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=642480",
+            "https://people.canonical.com/~ubuntu-security/cve/2011/CVE-2011-3374.html",
+            "https://seclists.org/fulldisclosure/2011/Sep/221",
+            "https://security-tracker.debian.org/tracker/CVE-2011-3374",
+            "https://snyk.io/vuln/SNYK-LINUX-APT-116518",
+            "https://ubuntu.com/security/CVE-2011-3374"
+          ],
+          "PublishedDate": "2019-11-26T00:15:11.03Z",
+          "LastModifiedDate": "2024-11-21T01:30:22.61Z"
+        },
+        {
+          "VulnerabilityID": "TEMP-0841856-B18BAF",
+          "PkgID": "bash@5.2.37-2+b7",
+          "PkgName": "bash",
+          "PkgIdentifier": {
+            "PURL": "pkg:deb/debian/bash@5.2.37-2%2Bb7?arch=amd64&distro=debian-13.3",
+            "UID": "f3f6aed02568dce2"
+          },
+          "InstalledVersion": "5.2.37-2+b7",
+          "Status": "affected",
+          "Layer": {
+            "Digest": "sha256:119d43eec815e5f9a47da3a7d59454581b1e204b0c34db86f171b7ceb3336533",
+            "DiffID": "sha256:e50a58335e1366e2581fe61794c1651afe2fe04e881e795aa166f24f4fc78d92"
+          },
+          "SeveritySource": "debian",
+          "PrimaryURL": "https://security-tracker.debian.org/tracker/TEMP-0841856-B18BAF",
+          "DataSource": {
+            "ID": "debian",
+            "Name": "Debian Security Tracker",
+            "URL": "https://salsa.debian.org/security-tracker-team/security-tracker"
+          },
+          "Fingerprint": "sha256:02dcdcff52996f4aed2e21e87f256b1cdd1f139c1e5d1e8b6f84586507e57521",
+          "Title": "[Privilege escalation possible to other user than root]",
+          "Severity": "LOW",
+          "VendorSeverity": {
+            "debian": 1
+          }
+        },
+        {
+          "VulnerabilityID": "CVE-2025-14104",
+          "PkgID": "bsdutils@1:2.41-5",
+          "PkgName": "bsdutils",
+          "PkgIdentifier": {
+            "PURL": "pkg:deb/debian/bsdutils@2.41-5?arch=amd64&distro=debian-13.3&epoch=1",
+            "UID": "c9de60be80a96a27"
+          },
+          "InstalledVersion": "1:2.41-5",
+          "Status": "affected",
+          "Layer": {
+            "Digest": "sha256:119d43eec815e5f9a47da3a7d59454581b1e204b0c34db86f171b7ceb3336533",
+            "DiffID": "sha256:e50a58335e1366e2581fe61794c1651afe2fe04e881e795aa166f24f4fc78d92"
+          },
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2025-14104",
+          "DataSource": {
+            "ID": "debian",
+            "Name": "Debian Security Tracker",
+            "URL": "https://salsa.debian.org/security-tracker-team/security-tracker"
+          },
+          "Fingerprint": "sha256:fadad72e3e9fbb8ae7a4727c4070a78692e9d009fc79fef6ad1f65ec039d7b41",
+          "Title": "util-linux: util-linux: Heap buffer overread in setpwnam() when processing 256-byte usernames",
+          "Description": "A flaw was found in util-linux. This vulnerability allows a heap buffer overread when processing 256-byte usernames, specifically within the `setpwnam()` function, affecting SUID (Set User ID) login-utils utilities writing to the password database.",
+          "Severity": "MEDIUM",
+          "CweIDs": [
+            "CWE-125"
+          ],
+          "VendorSeverity": {
+            "azure": 2,
+            "cbl-mariner": 2,
+            "redhat": 2
+          },
+          "CVSS": {
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:L/AC:L/PR:L/UI:N/S:U/C:L/I:N/A:H",
+              "V3Score": 6.1
+            }
+          },
+          "References": [
+            "https://access.redhat.com/security/cve/CVE-2025-14104",
+            "https://bugzilla.redhat.com/show_bug.cgi?id=2419369",
+            "https://nvd.nist.gov/vuln/detail/CVE-2025-14104",
+            "https://www.cve.org/CVERecord?id=CVE-2025-14104"
+          ],
+          "PublishedDate": "2025-12-05T17:16:03.117Z",
+          "LastModifiedDate": "2025-12-08T18:26:49.133Z"
+        }
+      ]
+    }
+  ]
+}
