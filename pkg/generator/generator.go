@@ -110,6 +110,9 @@ type Opts struct {
 type Generator struct {
 	o        Opts
 	attestor *attestation.Builder
+	// debugBatches counts LLM calls so --debug-dir keeps one prompt pair
+	// per batch instead of overwriting system.prompt/human.prompt (#359).
+	debugBatches int
 }
 
 // New creates a new Generator with the given options.
@@ -553,11 +556,16 @@ func (g *Generator) evaluateOWASPScores(ctx context.Context, vulns []LLMVulnerab
 	humanPrompt := string(vulnsJSON)
 
 	if g.o.DebugDir != "" {
-		if err := os.WriteFile(filepath.Join(g.o.DebugDir, "system.prompt"), []byte(systemPrompt), 0644); err != nil {
-			slog.ErrorContext(ctx, "failed to write system.prompt", "error", err)
+		// One file pair per LLM call: fixed names would let every batch
+		// overwrite the previous one, hiding what the model was asked (#359).
+		g.debugBatches++
+		sysName := fmt.Sprintf("batch-%03d.system.prompt", g.debugBatches)
+		humanName := fmt.Sprintf("batch-%03d.human.prompt", g.debugBatches)
+		if err := os.WriteFile(filepath.Join(g.o.DebugDir, sysName), []byte(systemPrompt), 0644); err != nil {
+			slog.ErrorContext(ctx, "failed to write "+sysName, "error", err)
 		}
-		if err := os.WriteFile(filepath.Join(g.o.DebugDir, "human.prompt"), []byte(humanPrompt), 0644); err != nil {
-			slog.ErrorContext(ctx, "failed to write human.prompt", "error", err)
+		if err := os.WriteFile(filepath.Join(g.o.DebugDir, humanName), []byte(humanPrompt), 0644); err != nil {
+			slog.ErrorContext(ctx, "failed to write "+humanName, "error", err)
 		}
 	}
 

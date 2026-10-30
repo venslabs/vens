@@ -21,6 +21,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -1021,4 +1023,29 @@ func TestGenerator_ZeroLikelihoodWarnSurvivesTruncatedRetry(t *testing.T) {
 		}
 	}
 	require.Equal(t, 1, warns, "the verdict is logged once, even when the retry truncates")
+}
+
+// --debug-dir keeps one prompt pair per LLM call instead of letting each
+// batch overwrite system.prompt/human.prompt (#359).
+func TestDebugDir_WritesOnePromptPairPerBatch(t *testing.T) {
+	dir := t.TempDir()
+	g, err := New(Opts{LLM: &testutil.MockLLM{}, Config: &riskconfig.Config{}, BatchSize: 1, DebugDir: dir})
+	require.NoError(t, err)
+
+	require.NoError(t, g.GenerateRiskScore(context.Background(), testVulns(2), nil))
+
+	for i := 1; i <= 2; i++ {
+		sys := filepath.Join(dir, fmt.Sprintf("batch-%03d.system.prompt", i))
+		human := filepath.Join(dir, fmt.Sprintf("batch-%03d.human.prompt", i))
+		require.FileExists(t, sys)
+		require.FileExists(t, human)
+	}
+	require.NoFileExists(t, filepath.Join(dir, "system.prompt"))
+	require.NoFileExists(t, filepath.Join(dir, "human.prompt"))
+
+	// Each batch's human prompt names only its own CVE.
+	second, err := os.ReadFile(filepath.Join(dir, "batch-002.human.prompt"))
+	require.NoError(t, err)
+	require.Contains(t, string(second), "CVE-2024-0001")
+	require.NotContains(t, string(second), "CVE-2024-0000")
 }
