@@ -95,7 +95,19 @@ func TestModelRefusesTemperature(t *testing.T) {
 		{name: "uppercase sonnet-5", model: "CLAUDE-SONNET-5", want: true},
 		{name: "sonnet-4-6", model: "claude-sonnet-4-6", want: false},
 		{name: "dated opus-4-5", model: "claude-opus-4-5-20251101", want: false},
-		{name: "gpt-5", model: "gpt-5", want: false},
+		// OpenAI reasoning models refuse an explicit temperature; the ids
+		// match by prefix (#351).
+		{name: "o1", model: "o1", want: true},
+		{name: "o1-mini", model: "o1-mini", want: true},
+		{name: "o3-mini", model: "o3-mini", want: true},
+		{name: "o4-mini", model: "o4-mini", want: true},
+		{name: "gpt-5", model: "gpt-5", want: true},
+		{name: "gpt-5-mini", model: "gpt-5-mini", want: true},
+		{name: "uppercase o1-mini", model: "O1-MINI", want: true},
+		// Prefix, not substring: ollama's marco-o1 takes a temperature.
+		{name: "ollama marco-o1", model: "marco-o1", want: false},
+		{name: "gpt-4o", model: "gpt-4o", want: false},
+		{name: "gpt-4.1", model: "gpt-4.1", want: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
