@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"os"
 	"path/filepath"
 	"sort"
@@ -254,22 +255,22 @@ func (g *Generator) generateRiskScore(ctx context.Context, vulnBatch []Vulnerabi
 	for _, answer := range answers {
 		entry, evidenceRef := answer.entry, answer.evidenceRef
 
-		// Calculate final OWASP score using the formula:
-		// Risk = Likelihood × Impact = ((ThreatAgent + Vulnerability)/2) × ((TechImpact + BusinessImpact)/2)
-		likelihoodScore := (entry.ThreatAgentScore + entry.VulnerabilityScore) / 2.0
-		impactScore := (entry.TechnicalImpact + entry.BusinessImpact) / 2.0
+		// The aggregates arrive rounded from parse time, so the published
+		// score can be recomputed from its own vector, which carries them
+		// rounded (#358).
+		ta, vul, tech, bus := entry.ThreatAgentScore,
+			entry.VulnerabilityScore,
+			entry.TechnicalImpact,
+			entry.BusinessImpact
+		likelihoodScore := (ta + vul) / 2.0
+		impactScore := (tech + bus) / 2.0
 		owaspScore := likelihoodScore * impactScore // Range: 0-81
 
 		score := clampScore(owaspScore)
 		severity := riskconfig.RiskSeverity(score)
 
 		// Generate OWASP RR vector in standard format
-		vector := owasp.FromAggregatedScores(
-			entry.ThreatAgentScore,
-			entry.VulnerabilityScore,
-			entry.TechnicalImpact,
-			entry.BusinessImpact,
-		)
+		vector := owasp.FromAggregatedScores(ta, vul, tech, bus)
 		vectorString := vector.String()
 
 		comps := vulnsByID[entry.VulnID]
@@ -591,10 +592,13 @@ func (g *Generator) evaluateOWASPScores(ctx context.Context, vulns []LLMVulnerab
 	for i := range resp.Results {
 		entry := &resp.Results[i]
 
-		entry.ThreatAgentScore = clampScore09(entry.ThreatAgentScore)
-		entry.VulnerabilityScore = clampScore09(entry.VulnerabilityScore)
-		entry.TechnicalImpact = clampScore09(entry.TechnicalImpact)
-		entry.BusinessImpact = clampScore09(entry.BusinessImpact)
+		// Round once here so the score, the vector, zeroLikelihood and the
+		// debug log below all see the same integers; the attested
+		// raw_response keeps the raw model answer (#358).
+		entry.ThreatAgentScore = math.Round(clampScore09(entry.ThreatAgentScore))
+		entry.VulnerabilityScore = math.Round(clampScore09(entry.VulnerabilityScore))
+		entry.TechnicalImpact = math.Round(clampScore09(entry.TechnicalImpact))
+		entry.BusinessImpact = math.Round(clampScore09(entry.BusinessImpact))
 
 		slog.DebugContext(ctx, "owasp_components",
 			"vuln", entry.VulnID,
