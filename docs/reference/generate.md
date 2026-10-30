@@ -195,7 +195,7 @@ vens generate --attest \
 
 **What it contains** (CDX BOM at the same spec version as the VEX — `1.6` by default, or whatever `--cyclonedx-spec-version` selects — everything under `declarations`):
 
-- `claims[]` — one per scored CVE/affected component: the assessment (`predicate` + `reasoning`), linked to its target component and to the evidence that backs it
+- `claims[]` — one per scored CVE/affected component: the assessment (`predicate` + `reasoning`), linked to its target component and to the evidence that backs it. When a claim's package and version were not in the prompt of the batch it cites (a later batch reusing the CVE's first score, or a held-back row filled in by a later batch), its predicate ends with "; this package was not in the cited batch's prompt".
 - `targets.components[]` — the affected components the claims point at
 - `evidence[]` — one per LLM batch, recording how the scoring was produced:
     - `generation_method` — `llm`
