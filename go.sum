@@ -844,8 +844,8 @@ github.com/ollama/ollama v0.40.11 h1:GUkxzLCXBp8Q91knrkHOUE0JtVBI0pkadCk2A2PuFUc
 github.com/ollama/ollama v0.40.11/go.mod h1:VB1qenaqFHAY/oJ9tMYSg9cJjehUpa9gL45FzN4/rsg=
 github.com/onsi/gomega v1.34.1 h1:EUMJIKUjM8sKjYbtxQI9A4z2o+rruxnzNvpknOXie6k=
 github.com/onsi/gomega v1.34.1/go.mod h1:kU1QgUvBDLXBJq618Xvm2LUX6rSAfRaFRTcdOeDLwwY=
-github.com/openai/openai-go/v3 v3.83.0 h1:CICDFZzWCw2iP16AzFEA4igKfUH2Fs1N5nUBlqyREAQ=
-github.com/openai/openai-go/v3 v3.83.0/go.mod h1:i+lM+NFmWP+Yd+fYKEaPxUINBx+vZtRmY5gaszSfsiQ=
+github.com/openai/openai-go/v3 v3.89.0 h1:SATskJs9DV8H2FRBgW3NF6Hdm5OuZu/8USoDNd3c2/c=
+github.com/openai/openai-go/v3 v3.89.0/go.mod h1:TQHvyB61TWJ7oEf7wnq4NAM/TatuqnUCJ+qbKj8POsE=
 github.com/opencontainers/go-digest v1.0.0 h1:apOUWs51W5PlhuyGyz9FCeeBIOUDA/6nW8Oi/yOhh5U=
 github.com/opencontainers/go-digest v1.0.0/go.mod h1:0JzlMkj0TRzQZfJkVvzbP0HBR3IKzErnv2BNG4W4MAM=
 github.com/opencontainers/image-spec v1.1.1 h1:y0fUlFfIZhPF1W537XOLg0/fcx6zcHCJwooC2xJA040=
