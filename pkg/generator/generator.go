@@ -104,12 +104,23 @@ type Opts struct {
 
 	// Config carries user-provided context hints loaded from config.yaml.
 	Config *riskconfig.Config
+
+	// MaxSpend caps the run's estimated LLM spend in USD; <= 0 means no
+	// limit. Before each LLM call the generator estimates that call's cost
+	// and stops the run with a BudgetExceededError when the call would push
+	// the run past the cap.
+	MaxSpend float64
+	// Provider and Model identify the LLM backend; used only to look up a
+	// rough input price for the MaxSpend budget gate.
+	Provider string
+	Model    string
 }
 
 // Generator produces OWASP risk scores using LLM analysis.
 type Generator struct {
-	o        Opts
-	attestor *attestation.Builder
+	o          Opts
+	attestor   *attestation.Builder
+	pricePer1K float64 // rough USD per 1K input tokens, from Provider/Model
 }
 
 // New creates a new Generator with the given options.
@@ -121,6 +132,7 @@ func New(o Opts) (*Generator, error) {
 	if g.o.LLM == nil {
 		return nil, errors.New("no model")
 	}
+	g.pricePer1K = llm.PricePer1KInput(o.Provider, o.Model)
 	if g.o.BatchSize == 0 {
 		g.o.BatchSize = DefaultBatchSize
 	}
@@ -149,6 +161,22 @@ type scoringRun struct {
 	missing map[string]bool            // unanswered CVEs a later row can still score
 	pending map[string][]Vulnerability // rows held back until their CVE is scored
 	lastRow map[string]int             // index of each CVE's last row in the run
+	spent   float64                    // estimated USD of LLM spend so far
+}
+
+// BudgetExceededError reports that the next LLM call would push the run's
+// estimated spend past the --max-spend cap. The run stops before the call
+// is made, so no further cost is incurred; whatever was already scored is
+// described so the user can re-run with a higher cap or smaller input.
+type BudgetExceededError struct {
+	Limit  float64 // the --max-spend cap in USD
+	Spent  float64 // estimated USD already spent this run
+	Scored int     // distinct CVEs already scored before the abort
+}
+
+func (e *BudgetExceededError) Error() string {
+	return fmt.Sprintf("LLM spend budget exceeded: estimated spend $%.4f would pass the $%.2f budget with the next call (%d CVEs already scored); stopping the run",
+		e.Spent, e.Limit, e.Scored)
 }
 
 // GenerateRiskScore generates contextual OWASP risk scores for the given vulnerabilities.
@@ -467,7 +495,7 @@ func (g *Generator) scoreAll(ctx context.Context, batch []LLMVulnerability, end 
 	}
 
 	if len(toAsk) > 0 {
-		entries, evidenceRef, err := g.evaluateOWASPScores(ctx, toAsk)
+		entries, evidenceRef, err := g.evaluateOWASPScores(ctx, toAsk, run)
 		if err != nil {
 			return nil, fmt.Errorf("LLM evaluation failed: %w", err)
 		}
@@ -478,7 +506,7 @@ func (g *Generator) scoreAll(ctx context.Context, batch []LLMVulnerability, end 
 			slog.WarnContext(ctx, "Model skipped vulnerabilities; asking again for those alone",
 				"skipped", len(skipped), "of", len(unscored(toAsk, nil)), "vulns", strings.Join(vulnIDs(skipped), ","))
 
-			entries, evidenceRef, err = g.evaluateOWASPScores(ctx, skipped)
+			entries, evidenceRef, err = g.evaluateOWASPScores(ctx, skipped, run)
 			if err != nil {
 				return nil, fmt.Errorf("LLM evaluation failed while asking again for %d vulnerabilities: %w", len(skipped), err)
 			}
@@ -531,7 +559,7 @@ func unscored(batch []LLMVulnerability, scored map[string]bool) []LLMVulnerabili
 
 // evaluateOWASPScores calls the LLM to calculate the OWASP risk score for each vulnerability.
 // The LLM uses the project context hints to determine the appropriate score.
-func (g *Generator) evaluateOWASPScores(ctx context.Context, vulns []LLMVulnerability) ([]llmOutputEntry, string, error) {
+func (g *Generator) evaluateOWASPScores(ctx context.Context, vulns []LLMVulnerability, run *scoringRun) ([]llmOutputEntry, string, error) {
 	if g.o.LLM == nil {
 		return nil, "", errors.New("no LLM configured")
 	}
@@ -569,6 +597,19 @@ func (g *Generator) evaluateOWASPScores(ctx context.Context, vulns []LLMVulnerab
 		Seed:        g.o.Seed,
 	}
 
+	// The budget gate runs just before the LLM call: estimate this call's
+	// cost and stop the run when it would push estimated spend past
+	// --max-spend. Retries, split batches and re-asked CVEs all re-enter
+	// this check, so no call can slip past the cap.
+	callCost := g.estimateCallCost(systemPrompt, humanPrompt)
+	if g.o.MaxSpend > 0 && g.pricePer1K > 0 && run.spent+callCost > g.o.MaxSpend {
+		return nil, "", &BudgetExceededError{
+			Limit:  g.o.MaxSpend,
+			Spent:  run.spent,
+			Scored: len(run.scored),
+		}
+	}
+
 	var raw string
 	if err := llm.RetryOnRateLimit(ctx, g.o.SleepOnRateLimit, g.o.RetryOnRateLimit, func(c context.Context) error {
 		var e error
@@ -577,6 +618,9 @@ func (g *Generator) evaluateOWASPScores(ctx context.Context, vulns []LLMVulnerab
 	}); err != nil {
 		return nil, "", err
 	}
+
+	// The call went through and was billed whether parsing succeeds or not.
+	run.spent += callCost
 
 	var evidenceRef string
 	if g.attestor != nil {
@@ -607,6 +651,15 @@ func (g *Generator) evaluateOWASPScores(ctx context.Context, vulns []LLMVulnerab
 	}
 
 	return resp.Results, evidenceRef, nil
+}
+
+// estimateCallCost returns the rough USD cost of one LLM call with the given
+// prompts: input tokens estimated at ~4 chars per token, priced by the
+// provider/model's rough input rate. Output tokens are not estimated and
+// rate-limit retries are not counted — this is a guardrail, not a bill.
+func (g *Generator) estimateCallCost(systemPrompt, humanPrompt string) float64 {
+	tokens := llm.EstimateInputTokens(systemPrompt) + llm.EstimateInputTokens(humanPrompt)
+	return float64(tokens) / 1000 * g.pricePer1K
 }
 
 // buildSystemPrompt creates the system prompt for OWASP score calculation.
