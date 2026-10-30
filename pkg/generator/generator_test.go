@@ -513,7 +513,7 @@ func TestGenerator_ZeroLikelihoodPublishedAsIs(t *testing.T) {
 // Every zero-likelihood answer lands as info, so its reasoning is logged at
 // WARN in place of the INFO line, whatever impact the model gave.
 func TestGenerator_ZeroLikelihoodLogsReasoningAtWarn(t *testing.T) {
-	for _, shape := range [][4]float64{{0, 0, 0, 1}, {0, 0, 8, 8}} {
+	for _, shape := range [][4]float64{{0, 0, 0, 1}, {0, 0, 8, 8}, {0.4, 0.4, 8, 8}} {
 		t.Run(fmt.Sprint(shape), func(t *testing.T) {
 			m := &scriptedLLM{answer: func(_ int, _ string) llmOutputEntry {
 				return llmOutputEntry{ThreatAgentScore: shape[0], VulnerabilityScore: shape[1],
