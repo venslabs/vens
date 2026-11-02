@@ -118,15 +118,7 @@ func (c *cycloneDxVexWriter) Close() error {
 	bom.Version = c.sbomVersion
 	bom.Metadata = &cyclonedx.Metadata{
 		Timestamp: time.Now().UTC().Format(time.RFC3339),
-		Tools: &cyclonedx.ToolsChoice{
-			Components: &[]cyclonedx.Component{
-				{
-					Type:    cyclonedx.ComponentTypeApplication,
-					Name:    "vens",
-					Version: version.GetVersion(),
-				},
-			},
-		},
+		Tools:     scoringTool(),
 	}
 
 	vulnMap := make(map[string]*cyclonedx.Vulnerability)
@@ -157,6 +149,7 @@ func (c *cycloneDxVexWriter) Close() error {
 			ID:      g.VulnID,
 			Source:  g.Source,
 			Ratings: &[]cyclonedx.VulnerabilityRating{g.Rating},
+			Tools:   scoringTool(),
 			Affects: &[]cyclonedx.Affects{{Ref: bomLink}},
 		}
 		affectsSet[g.VulnID] = map[string]bool{bomLink: true}
@@ -196,6 +189,23 @@ func (c *cycloneDxVexWriter) Close() error {
 	}
 	c.closed = true
 	return nil
+}
+
+// scoringTool names the tool that scored a vulnerability, with its version.
+// metadata.tools names the document's producer; vulnerabilities[].tools is
+// the per-rating scoring method version (#325) — the version a consumer
+// needs the day the scoring computation changes. It is the same component in
+// both places so the two can never drift apart.
+func scoringTool() *cyclonedx.ToolsChoice {
+	return &cyclonedx.ToolsChoice{
+		Components: &[]cyclonedx.Component{
+			{
+				Type:    cyclonedx.ComponentTypeApplication,
+				Name:    "vens",
+				Version: version.GetVersion(),
+			},
+		},
+	}
 }
 
 func jsonSchemaFor(v cyclonedx.SpecVersion) string {

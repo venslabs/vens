@@ -621,3 +621,52 @@ func TestCycloneDxVexWriter_Close_DeterministicVulnerabilityOrder(t *testing.T) 
 		}
 	}
 }
+
+func TestCycloneDxVexWriter_Close_VulnerabilityTools(t *testing.T) {
+	var buf bytes.Buffer
+	h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 1, "", cyclonedx.SpecVersion1_7)
+
+	score := 7.5
+	err := h.HandleVulnRatings([]VulnRating{
+		{
+			VulnID: "CVE-2024-1234",
+			BOMRef: "pkg:npm/foo@1.0.0",
+			Rating: cyclonedx.VulnerabilityRating{
+				Method:   cyclonedx.ScoringMethodOWASP,
+				Score:    &score,
+				Severity: cyclonedx.SeverityHigh,
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleVulnRatings: %v", err)
+	}
+
+	if err := h.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	var bom cyclonedx.BOM
+	if err := json.Unmarshal(buf.Bytes(), &bom); err != nil {
+		t.Fatalf("unmarshal BOM: %v", err)
+	}
+
+	if bom.Vulnerabilities == nil || len(*bom.Vulnerabilities) != 1 {
+		t.Fatalf("expected exactly 1 vulnerability, got %v", bom.Vulnerabilities)
+	}
+	v := (*bom.Vulnerabilities)[0]
+	if v.Tools == nil || v.Tools.Components == nil {
+		t.Fatal("vulnerabilities[].tools.components is nil")
+	}
+	components := *v.Tools.Components
+	if len(components) != 1 {
+		t.Fatalf("vulnerabilities[].tools.components = %d entries, want 1", len(components))
+	}
+	c := components[0]
+	if c.Name != "vens" {
+		t.Errorf("vulnerabilities[].tools component name = %q, want %q", c.Name, "vens")
+	}
+	if c.Version == "" {
+		t.Error("vulnerabilities[].tools component version is empty")
+	}
+}
