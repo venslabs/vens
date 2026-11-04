@@ -72,6 +72,7 @@ The LLM calculates the OWASP risk score (0-81) for each vulnerability using:
 	flags.String("sbom-serial-number", "", "SBOM serial number for BOM-Link (format: urn:uuid:...)")
 	flags.Int("sbom-version", 1, "SBOM version for BOM-Link (default: 1)")
 	flags.Bool("attest", false, "Emit a CycloneDX Attestations (CDXA) sibling file with prompt hash, input hash, model, seed, raw LLM response")
+	flags.Float64("max-spend", 0, "Budget cap in USD for the run's estimated LLM spend; 0 means no limit. When the next LLM call would exceed it, the run stops with an error before the call is made.")
 
 	return cmd
 }
@@ -144,6 +145,18 @@ func action(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	// Provider/model feed the --max-spend price lookup; informational otherwise.
+	o.Provider, o.Model = provider, model
+
+	maxSpend, err := flags.GetFloat64("max-spend")
+	if err != nil {
+		return err
+	}
+	if maxSpend < 0 {
+		return fmt.Errorf("--max-spend must be >= 0")
+	}
+	o.MaxSpend = maxSpend
+
 	// Temperature is only forwarded when the user actually passed
 	// --llm-temperature: the 0.0 default is our choice, not the user's, and
 	// some models (Anthropic's current generation) reject an explicit
