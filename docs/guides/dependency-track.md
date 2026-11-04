@@ -126,7 +126,7 @@ Importing again overwrites the previous values, so a scheduled run keeps the sco
 Open the project, go to **Audit Vulnerabilities**, and select a finding. The audit trail carries the change, commented `CycloneDX VEX`:
 
 ```
-OWASP Vector: (None) → SL:5/M:5/O:5/S:5/ED:4/EE:4/A:4/ID:5/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5
+OWASP Vector: (None) → SL:5/M:5/O:5/S:5/ED:4/EE:4/A:4/ID:4/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5
 OWASP Score:  (None) → 22.5
 ```
 

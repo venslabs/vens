@@ -13,8 +13,8 @@ vens enrich --vex VEX_FILE [--output PATH] REPORT_FILE
 
 `vens enrich` takes a Trivy JSON report and annotates every vulnerability the VEX document scored, adding `Custom.owasp_score`, `Custom.owasp_severity`, and `Custom.owasp_vector`. Matching is on the vulnerability ID alone, and only ratings whose method is OWASP are read. Trivy's own `Severity` and CVSS fields stay as they are, and nothing else in the report changes.
 
-!!! note "From the next release"
-    `owasp_severity` isn't written by any release yet (v0.5.0 doesn't emit it) — it lands with the next one. The docs deploy from main, so it shows here first.
+!!! note "From v0.6.0"
+    `owasp_severity` is written from v0.6.0 on. v0.5.0 and earlier don't emit it.
 
 ```json
 {
@@ -23,7 +23,7 @@ vens enrich --vex VEX_FILE [--output PATH] REPORT_FILE
   "Custom": {
     "owasp_score": 45.5,
     "owasp_severity": "high",
-    "owasp_vector": "SL:7/M:7/O:7/S:7/ED:6/EE:6/A:6/ID:3/LC:7/LI:7/LAV:7/LAC:7/FD:7/RD:7/NC:7/PV:7"
+    "owasp_vector": "SL:7/M:7/O:7/S:7/ED:6/EE:6/A:6/ID:6/LC:7/LI:7/LAV:7/LAC:7/FD:7/RD:7/NC:7/PV:7"
   }
 }
 ```

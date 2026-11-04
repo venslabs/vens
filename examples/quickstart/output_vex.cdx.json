@@ -11,7 +11,7 @@
           "score": 27.5,
           "severity": "medium",
           "method": "OWASP",
-          "vector": "SL:7/M:7/O:7/S:7/ED:4/EE:4/A:4/ID:5/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
+          "vector": "SL:7/M:7/O:7/S:7/ED:4/EE:4/A:4/ID:4/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
         }
       ]
     },
@@ -22,7 +22,7 @@
           "score": 12,
           "severity": "low",
           "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:6/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
+          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:3/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
         }
       ]
     },
@@ -33,7 +33,7 @@
           "score": 38.5,
           "severity": "medium",
           "method": "OWASP",
-          "vector": "SL:5/M:5/O:5/S:5/ED:6/EE:6/A:6/ID:3/LC:7/LI:7/LAV:7/LAC:7/FD:7/RD:7/NC:7/PV:7"
+          "vector": "SL:5/M:5/O:5/S:5/ED:6/EE:6/A:6/ID:6/LC:7/LI:7/LAV:7/LAC:7/FD:7/RD:7/NC:7/PV:7"
         }
       ]
     },
@@ -44,7 +44,7 @@
           "score": 20,
           "severity": "medium",
           "method": "OWASP",
-          "vector": "SL:4/M:4/O:4/S:4/ED:4/EE:4/A:4/ID:5/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
+          "vector": "SL:4/M:4/O:4/S:4/ED:4/EE:4/A:4/ID:4/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
         }
       ]
     },
@@ -55,7 +55,7 @@
           "score": 12,
           "severity": "low",
           "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:6/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
+          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:3/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
         }
       ]
     },
@@ -66,7 +66,7 @@
           "score": 20,
           "severity": "medium",
           "method": "OWASP",
-          "vector": "SL:4/M:4/O:4/S:4/ED:4/EE:4/A:4/ID:5/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
+          "vector": "SL:4/M:4/O:4/S:4/ED:4/EE:4/A:4/ID:4/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
         }
       ]
     },
@@ -77,7 +77,7 @@
           "score": 42.5,
           "severity": "high",
           "method": "OWASP",
-          "vector": "SL:5/M:5/O:5/S:5/ED:5/EE:5/A:5/ID:4/LC:8/LI:8/LAV:8/LAC:8/FD:9/RD:9/NC:9/PV:9"
+          "vector": "SL:5/M:5/O:5/S:5/ED:5/EE:5/A:5/ID:5/LC:8/LI:8/LAV:8/LAC:8/FD:9/RD:9/NC:9/PV:9"
         }
       ]
     },
@@ -88,7 +88,7 @@
           "score": 27,
           "severity": "medium",
           "method": "OWASP",
-          "vector": "SL:5/M:5/O:5/S:5/ED:4/EE:4/A:4/ID:5/LC:6/LI:6/LAV:6/LAC:6/FD:6/RD:6/NC:6/PV:6"
+          "vector": "SL:5/M:5/O:5/S:5/ED:4/EE:4/A:4/ID:4/LC:6/LI:6/LAV:6/LAC:6/FD:6/RD:6/NC:6/PV:6"
         }
       ]
     },
@@ -99,7 +99,7 @@
           "score": 45.5,
           "severity": "high",
           "method": "OWASP",
-          "vector": "SL:7/M:7/O:7/S:7/ED:6/EE:6/A:6/ID:3/LC:7/LI:7/LAV:7/LAC:7/FD:7/RD:7/NC:7/PV:7"
+          "vector": "SL:7/M:7/O:7/S:7/ED:6/EE:6/A:6/ID:6/LC:7/LI:7/LAV:7/LAC:7/FD:7/RD:7/NC:7/PV:7"
         }
       ]
     },
@@ -110,7 +110,7 @@
           "score": 12,
           "severity": "low",
           "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:6/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
+          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:3/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
         }
       ]
     },
@@ -121,7 +121,7 @@
           "score": 7.5,
           "severity": "low",
           "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:2/EE:2/A:2/ID:7/LC:3/LI:3/LAV:3/LAC:3/FD:3/RD:3/NC:3/PV:3"
+          "vector": "SL:3/M:3/O:3/S:3/ED:2/EE:2/A:2/ID:2/LC:3/LI:3/LAV:3/LAC:3/FD:3/RD:3/NC:3/PV:3"
         }
       ]
     },
@@ -132,7 +132,7 @@
           "score": 6,
           "severity": "low",
           "method": "OWASP",
-          "vector": "SL:2/M:2/O:2/S:2/ED:2/EE:2/A:2/ID:7/LC:3/LI:3/LAV:3/LAC:3/FD:3/RD:3/NC:3/PV:3"
+          "vector": "SL:2/M:2/O:2/S:2/ED:2/EE:2/A:2/ID:2/LC:3/LI:3/LAV:3/LAC:3/FD:3/RD:3/NC:3/PV:3"
         }
       ]
     },
@@ -143,7 +143,7 @@
           "score": 6,
           "severity": "low",
           "method": "OWASP",
-          "vector": "SL:2/M:2/O:2/S:2/ED:2/EE:2/A:2/ID:7/LC:3/LI:3/LAV:3/LAC:3/FD:3/RD:3/NC:3/PV:3"
+          "vector": "SL:2/M:2/O:2/S:2/ED:2/EE:2/A:2/ID:2/LC:3/LI:3/LAV:3/LAC:3/FD:3/RD:3/NC:3/PV:3"
         }
       ]
     },
@@ -154,7 +154,7 @@
           "score": 6,
           "severity": "low",
           "method": "OWASP",
-          "vector": "SL:2/M:2/O:2/S:2/ED:2/EE:2/A:2/ID:7/LC:3/LI:3/LAV:3/LAC:3/FD:3/RD:3/NC:3/PV:3"
+          "vector": "SL:2/M:2/O:2/S:2/ED:2/EE:2/A:2/ID:2/LC:3/LI:3/LAV:3/LAC:3/FD:3/RD:3/NC:3/PV:3"
         }
       ]
     },
@@ -165,7 +165,7 @@
           "score": 6,
           "severity": "low",
           "method": "OWASP",
-          "vector": "SL:2/M:2/O:2/S:2/ED:2/EE:2/A:2/ID:7/LC:3/LI:3/LAV:3/LAC:3/FD:3/RD:3/NC:3/PV:3"
+          "vector": "SL:2/M:2/O:2/S:2/ED:2/EE:2/A:2/ID:2/LC:3/LI:3/LAV:3/LAC:3/FD:3/RD:3/NC:3/PV:3"
         }
       ]
     },
@@ -176,7 +176,7 @@
           "score": 6,
           "severity": "low",
           "method": "OWASP",
-          "vector": "SL:2/M:2/O:2/S:2/ED:2/EE:2/A:2/ID:7/LC:3/LI:3/LAV:3/LAC:3/FD:3/RD:3/NC:3/PV:3"
+          "vector": "SL:2/M:2/O:2/S:2/ED:2/EE:2/A:2/ID:2/LC:3/LI:3/LAV:3/LAC:3/FD:3/RD:3/NC:3/PV:3"
         }
       ]
     },
@@ -187,7 +187,7 @@
           "score": 44,
           "severity": "high",
           "method": "OWASP",
-          "vector": "SL:5/M:5/O:5/S:5/ED:6/EE:6/A:6/ID:3/LC:8/LI:8/LAV:8/LAC:8/FD:8/RD:8/NC:8/PV:8"
+          "vector": "SL:5/M:5/O:5/S:5/ED:6/EE:6/A:6/ID:6/LC:8/LI:8/LAV:8/LAC:8/FD:8/RD:8/NC:8/PV:8"
         }
       ]
     },
@@ -198,7 +198,7 @@
           "score": 15.75,
           "severity": "low",
           "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:4/EE:4/A:4/ID:5/LC:4/LI:4/LAV:4/LAC:4/FD:5/RD:5/NC:5/PV:5"
+          "vector": "SL:3/M:3/O:3/S:3/ED:4/EE:4/A:4/ID:4/LC:4/LI:4/LAV:4/LAC:4/FD:5/RD:5/NC:5/PV:5"
         }
       ]
     },
@@ -209,7 +209,7 @@
           "score": 45.5,
           "severity": "high",
           "method": "OWASP",
-          "vector": "SL:7/M:7/O:7/S:7/ED:6/EE:6/A:6/ID:3/LC:7/LI:7/LAV:7/LAC:7/FD:7/RD:7/NC:7/PV:7"
+          "vector": "SL:7/M:7/O:7/S:7/ED:6/EE:6/A:6/ID:6/LC:7/LI:7/LAV:7/LAC:7/FD:7/RD:7/NC:7/PV:7"
         }
       ]
     },
@@ -220,7 +220,7 @@
           "score": 12,
           "severity": "low",
           "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:6/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
+          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:3/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
         }
       ]
     },
@@ -231,7 +231,7 @@
           "score": 12,
           "severity": "low",
           "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:6/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
+          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:3/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
         }
       ]
     },
@@ -242,7 +242,7 @@
           "score": 10,
           "severity": "low",
           "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:2/EE:2/A:2/ID:7/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
+          "vector": "SL:3/M:3/O:3/S:3/ED:2/EE:2/A:2/ID:2/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
         }
       ]
     },
@@ -253,7 +253,7 @@
           "score": 10,
           "severity": "low",
           "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:2/EE:2/A:2/ID:7/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
+          "vector": "SL:3/M:3/O:3/S:3/ED:2/EE:2/A:2/ID:2/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
         }
       ]
     },
@@ -264,7 +264,7 @@
           "score": 10,
           "severity": "low",
           "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:2/EE:2/A:2/ID:7/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
+          "vector": "SL:3/M:3/O:3/S:3/ED:2/EE:2/A:2/ID:2/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
         }
       ]
     },
@@ -275,7 +275,7 @@
           "score": 10,
           "severity": "low",
           "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:2/EE:2/A:2/ID:7/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
+          "vector": "SL:3/M:3/O:3/S:3/ED:2/EE:2/A:2/ID:2/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
         }
       ]
     },
@@ -286,7 +286,7 @@
           "score": 10,
           "severity": "low",
           "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:2/EE:2/A:2/ID:7/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
+          "vector": "SL:3/M:3/O:3/S:3/ED:2/EE:2/A:2/ID:2/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
         }
       ]
     },
@@ -297,7 +297,7 @@
           "score": 15.75,
           "severity": "low",
           "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:4/EE:4/A:4/ID:5/LC:4/LI:4/LAV:4/LAC:4/FD:5/RD:5/NC:5/PV:5"
+          "vector": "SL:3/M:3/O:3/S:3/ED:4/EE:4/A:4/ID:4/LC:4/LI:4/LAV:4/LAC:4/FD:5/RD:5/NC:5/PV:5"
         }
       ]
     },
@@ -308,7 +308,7 @@
           "score": 17.5,
           "severity": "low",
           "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:4/EE:4/A:4/ID:5/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
+          "vector": "SL:3/M:3/O:3/S:3/ED:4/EE:4/A:4/ID:4/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
         }
       ]
     },
@@ -319,7 +319,7 @@
           "score": 31.5,
           "severity": "medium",
           "method": "OWASP",
-          "vector": "SL:4/M:4/O:4/S:4/ED:5/EE:5/A:5/ID:4/LC:7/LI:7/LAV:7/LAC:7/FD:7/RD:7/NC:7/PV:7"
+          "vector": "SL:4/M:4/O:4/S:4/ED:5/EE:5/A:5/ID:5/LC:7/LI:7/LAV:7/LAC:7/FD:7/RD:7/NC:7/PV:7"
         }
       ]
     },
@@ -330,7 +330,7 @@
           "score": 12,
           "severity": "low",
           "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:6/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
+          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:3/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
         }
       ]
     },
@@ -341,7 +341,7 @@
           "score": 27,
           "severity": "medium",
           "method": "OWASP",
-          "vector": "SL:4/M:4/O:4/S:4/ED:5/EE:5/A:5/ID:4/LC:6/LI:6/LAV:6/LAC:6/FD:6/RD:6/NC:6/PV:6"
+          "vector": "SL:4/M:4/O:4/S:4/ED:5/EE:5/A:5/ID:5/LC:6/LI:6/LAV:6/LAC:6/FD:6/RD:6/NC:6/PV:6"
         }
       ]
     },
@@ -352,7 +352,7 @@
           "score": 13.5,
           "severity": "low",
           "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:6/LC:4/LI:4/LAV:4/LAC:4/FD:5/RD:5/NC:5/PV:5"
+          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:3/LC:4/LI:4/LAV:4/LAC:4/FD:5/RD:5/NC:5/PV:5"
         }
       ]
     },
@@ -363,7 +363,7 @@
           "score": 76.5,
           "severity": "critical",
           "method": "OWASP",
-          "vector": "SL:9/M:9/O:9/S:9/ED:8/EE:8/A:8/ID:1/LC:9/LI:9/LAV:9/LAC:9/FD:9/RD:9/NC:9/PV:9"
+          "vector": "SL:9/M:9/O:9/S:9/ED:8/EE:8/A:8/ID:8/LC:9/LI:9/LAV:9/LAC:9/FD:9/RD:9/NC:9/PV:9"
         }
       ]
     },
@@ -374,7 +374,7 @@
           "score": 60,
           "severity": "critical",
           "method": "OWASP",
-          "vector": "SL:8/M:8/O:8/S:8/ED:7/EE:7/A:7/ID:2/LC:8/LI:8/LAV:8/LAC:8/FD:8/RD:8/NC:8/PV:8"
+          "vector": "SL:8/M:8/O:8/S:8/ED:7/EE:7/A:7/ID:7/LC:8/LI:8/LAV:8/LAC:8/FD:8/RD:8/NC:8/PV:8"
         }
       ]
     },
@@ -385,7 +385,7 @@
           "score": 38.5,
           "severity": "medium",
           "method": "OWASP",
-          "vector": "SL:6/M:6/O:6/S:6/ED:5/EE:5/A:5/ID:4/LC:7/LI:7/LAV:7/LAC:7/FD:7/RD:7/NC:7/PV:7"
+          "vector": "SL:6/M:6/O:6/S:6/ED:5/EE:5/A:5/ID:5/LC:7/LI:7/LAV:7/LAC:7/FD:7/RD:7/NC:7/PV:7"
         }
       ]
     },
@@ -396,7 +396,7 @@
           "score": 27,
           "severity": "medium",
           "method": "OWASP",
-          "vector": "SL:5/M:5/O:5/S:5/ED:4/EE:4/A:4/ID:5/LC:6/LI:6/LAV:6/LAC:6/FD:6/RD:6/NC:6/PV:6"
+          "vector": "SL:5/M:5/O:5/S:5/ED:4/EE:4/A:4/ID:4/LC:6/LI:6/LAV:6/LAC:6/FD:6/RD:6/NC:6/PV:6"
         }
       ]
     },
@@ -407,7 +407,7 @@
           "score": 27,
           "severity": "medium",
           "method": "OWASP",
-          "vector": "SL:4/M:4/O:4/S:4/ED:5/EE:5/A:5/ID:4/LC:6/LI:6/LAV:6/LAC:6/FD:6/RD:6/NC:6/PV:6"
+          "vector": "SL:4/M:4/O:4/S:4/ED:5/EE:5/A:5/ID:5/LC:6/LI:6/LAV:6/LAC:6/FD:6/RD:6/NC:6/PV:6"
         }
       ]
     },
@@ -418,7 +418,7 @@
           "score": 30,
           "severity": "medium",
           "method": "OWASP",
-          "vector": "SL:5/M:5/O:5/S:5/ED:5/EE:5/A:5/ID:4/LC:6/LI:6/LAV:6/LAC:6/FD:6/RD:6/NC:6/PV:6"
+          "vector": "SL:5/M:5/O:5/S:5/ED:5/EE:5/A:5/ID:5/LC:6/LI:6/LAV:6/LAC:6/FD:6/RD:6/NC:6/PV:6"
         }
       ]
     },
@@ -429,7 +429,7 @@
           "score": 20,
           "severity": "medium",
           "method": "OWASP",
-          "vector": "SL:4/M:4/O:4/S:4/ED:4/EE:4/A:4/ID:5/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
+          "vector": "SL:4/M:4/O:4/S:4/ED:4/EE:4/A:4/ID:4/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
         }
       ]
     },
@@ -440,7 +440,7 @@
           "score": 20,
           "severity": "medium",
           "method": "OWASP",
-          "vector": "SL:4/M:4/O:4/S:4/ED:4/EE:4/A:4/ID:5/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
+          "vector": "SL:4/M:4/O:4/S:4/ED:4/EE:4/A:4/ID:4/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
         }
       ]
     },
@@ -451,7 +451,7 @@
           "score": 20,
           "severity": "medium",
           "method": "OWASP",
-          "vector": "SL:4/M:4/O:4/S:4/ED:4/EE:4/A:4/ID:5/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
+          "vector": "SL:4/M:4/O:4/S:4/ED:4/EE:4/A:4/ID:4/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
         }
       ]
     },
@@ -462,7 +462,7 @@
           "score": 20,
           "severity": "medium",
           "method": "OWASP",
-          "vector": "SL:4/M:4/O:4/S:4/ED:4/EE:4/A:4/ID:5/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
+          "vector": "SL:4/M:4/O:4/S:4/ED:4/EE:4/A:4/ID:4/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
         }
       ]
     },
@@ -473,7 +473,7 @@
           "score": 20,
           "severity": "medium",
           "method": "OWASP",
-          "vector": "SL:4/M:4/O:4/S:4/ED:4/EE:4/A:4/ID:5/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
+          "vector": "SL:4/M:4/O:4/S:4/ED:4/EE:4/A:4/ID:4/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
         }
       ]
     },
@@ -484,7 +484,7 @@
           "score": 20,
           "severity": "medium",
           "method": "OWASP",
-          "vector": "SL:4/M:4/O:4/S:4/ED:4/EE:4/A:4/ID:5/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
+          "vector": "SL:4/M:4/O:4/S:4/ED:4/EE:4/A:4/ID:4/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
         }
       ]
     },
@@ -495,7 +495,7 @@
           "score": 17.5,
           "severity": "low",
           "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:4/EE:4/A:4/ID:5/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
+          "vector": "SL:3/M:3/O:3/S:3/ED:4/EE:4/A:4/ID:4/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
         }
       ]
     },
@@ -506,7 +506,7 @@
           "score": 12,
           "severity": "low",
           "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:6/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
+          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:3/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
         }
       ]
     },
@@ -517,7 +517,7 @@
           "score": 12,
           "severity": "low",
           "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:6/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
+          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:3/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
         }
       ]
     },
@@ -528,7 +528,7 @@
           "score": 12,
           "severity": "low",
           "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:6/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
+          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:3/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
         }
       ]
     },
@@ -539,7 +539,7 @@
           "score": 20,
           "severity": "medium",
           "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:5/EE:5/A:5/ID:4/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
+          "vector": "SL:3/M:3/O:3/S:3/ED:5/EE:5/A:5/ID:5/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
         }
       ]
     },
@@ -550,7 +550,7 @@
           "score": 20,
           "severity": "medium",
           "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:5/EE:5/A:5/ID:4/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
+          "vector": "SL:3/M:3/O:3/S:3/ED:5/EE:5/A:5/ID:5/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
         }
       ]
     },
@@ -561,7 +561,7 @@
           "score": 17.5,
           "severity": "low",
           "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:4/EE:4/A:4/ID:5/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
+          "vector": "SL:3/M:3/O:3/S:3/ED:4/EE:4/A:4/ID:4/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
         }
       ]
     },
@@ -572,7 +572,7 @@
           "score": 29.25,
           "severity": "medium",
           "method": "OWASP",
-          "vector": "SL:4/M:4/O:4/S:4/ED:5/EE:5/A:5/ID:4/LC:6/LI:6/LAV:6/LAC:6/FD:7/RD:7/NC:7/PV:7"
+          "vector": "SL:4/M:4/O:4/S:4/ED:5/EE:5/A:5/ID:5/LC:6/LI:6/LAV:6/LAC:6/FD:7/RD:7/NC:7/PV:7"
         }
       ]
     },
@@ -583,7 +583,7 @@
           "score": 12,
           "severity": "low",
           "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:6/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
+          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:3/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
         }
       ]
     },
@@ -594,7 +594,7 @@
           "score": 17.5,
           "severity": "low",
           "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:4/EE:4/A:4/ID:5/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
+          "vector": "SL:3/M:3/O:3/S:3/ED:4/EE:4/A:4/ID:4/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
         }
       ]
     },
@@ -605,7 +605,7 @@
           "score": 12,
           "severity": "low",
           "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:6/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
+          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:3/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
         }
       ]
     },
@@ -616,7 +616,7 @@
           "score": 72.25,
           "severity": "critical",
           "method": "OWASP",
-          "vector": "SL:9/M:9/O:9/S:9/ED:8/EE:8/A:8/ID:1/LC:8/LI:8/LAV:8/LAC:8/FD:9/RD:9/NC:9/PV:9"
+          "vector": "SL:9/M:9/O:9/S:9/ED:8/EE:8/A:8/ID:8/LC:8/LI:8/LAV:8/LAC:8/FD:9/RD:9/NC:9/PV:9"
         }
       ]
     },
@@ -627,7 +627,7 @@
           "score": 45.5,
           "severity": "high",
           "method": "OWASP",
-          "vector": "SL:7/M:7/O:7/S:7/ED:6/EE:6/A:6/ID:3/LC:7/LI:7/LAV:7/LAC:7/FD:7/RD:7/NC:7/PV:7"
+          "vector": "SL:7/M:7/O:7/S:7/ED:6/EE:6/A:6/ID:6/LC:7/LI:7/LAV:7/LAC:7/FD:7/RD:7/NC:7/PV:7"
         }
       ]
     },
@@ -638,7 +638,7 @@
           "score": 30,
           "severity": "medium",
           "method": "OWASP",
-          "vector": "SL:5/M:5/O:5/S:5/ED:5/EE:5/A:5/ID:4/LC:6/LI:6/LAV:6/LAC:6/FD:6/RD:6/NC:6/PV:6"
+          "vector": "SL:5/M:5/O:5/S:5/ED:5/EE:5/A:5/ID:5/LC:6/LI:6/LAV:6/LAC:6/FD:6/RD:6/NC:6/PV:6"
         }
       ]
     },
@@ -649,7 +649,7 @@
           "score": 20,
           "severity": "medium",
           "method": "OWASP",
-          "vector": "SL:4/M:4/O:4/S:4/ED:4/EE:4/A:4/ID:5/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
+          "vector": "SL:4/M:4/O:4/S:4/ED:4/EE:4/A:4/ID:4/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
         }
       ]
     },
@@ -660,7 +660,7 @@
           "score": 20,
           "severity": "medium",
           "method": "OWASP",
-          "vector": "SL:4/M:4/O:4/S:4/ED:4/EE:4/A:4/ID:5/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
+          "vector": "SL:4/M:4/O:4/S:4/ED:4/EE:4/A:4/ID:4/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
         }
       ]
     },
@@ -671,7 +671,7 @@
           "score": 25,
           "severity": "medium",
           "method": "OWASP",
-          "vector": "SL:5/M:5/O:5/S:5/ED:5/EE:5/A:5/ID:4/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
+          "vector": "SL:5/M:5/O:5/S:5/ED:5/EE:5/A:5/ID:5/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
         }
       ]
     },
@@ -682,7 +682,7 @@
           "score": 12,
           "severity": "low",
           "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:6/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
+          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:3/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
         }
       ]
     },
@@ -693,7 +693,7 @@
           "score": 12,
           "severity": "low",
           "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:6/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
+          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:3/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
         }
       ]
     },
@@ -704,7 +704,7 @@
           "score": 12,
           "severity": "low",
           "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:6/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
+          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:3/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
         }
       ]
     },
@@ -715,7 +715,7 @@
           "score": 12,
           "severity": "low",
           "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:6/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
+          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:3/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
         }
       ]
     },
@@ -726,7 +726,7 @@
           "score": 15,
           "severity": "low",
           "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:6/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
+          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:3/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
         }
       ]
     },
@@ -737,7 +737,7 @@
           "score": 15,
           "severity": "low",
           "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:6/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
+          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:3/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
         }
       ]
     },
@@ -748,7 +748,7 @@
           "score": 68,
           "severity": "critical",
           "method": "OWASP",
-          "vector": "SL:8/M:8/O:8/S:8/ED:8/EE:8/A:8/ID:1/LC:8/LI:8/LAV:8/LAC:8/FD:9/RD:9/NC:9/PV:9"
+          "vector": "SL:8/M:8/O:8/S:8/ED:8/EE:8/A:8/ID:8/LC:8/LI:8/LAV:8/LAC:8/FD:9/RD:9/NC:9/PV:9"
         }
       ]
     },
@@ -759,7 +759,7 @@
           "score": 55.25,
           "severity": "high",
           "method": "OWASP",
-          "vector": "SL:7/M:7/O:7/S:7/ED:6/EE:6/A:6/ID:3/LC:8/LI:8/LAV:8/LAC:8/FD:9/RD:9/NC:9/PV:9"
+          "vector": "SL:7/M:7/O:7/S:7/ED:6/EE:6/A:6/ID:6/LC:8/LI:8/LAV:8/LAC:8/FD:9/RD:9/NC:9/PV:9"
         }
       ]
     },
@@ -770,7 +770,7 @@
           "score": 24,
           "severity": "medium",
           "method": "OWASP",
-          "vector": "SL:4/M:4/O:4/S:4/ED:4/EE:4/A:4/ID:5/LC:5/LI:5/LAV:5/LAC:5/FD:7/RD:7/NC:7/PV:7"
+          "vector": "SL:4/M:4/O:4/S:4/ED:4/EE:4/A:4/ID:4/LC:5/LI:5/LAV:5/LAC:5/FD:7/RD:7/NC:7/PV:7"
         }
       ]
     },
@@ -781,7 +781,7 @@
           "score": 15,
           "severity": "low",
           "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:6/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
+          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:3/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
         }
       ]
     },
@@ -792,7 +792,7 @@
           "score": 15,
           "severity": "low",
           "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:6/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
+          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:3/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
         }
       ]
     },
@@ -803,7 +803,7 @@
           "score": 20,
           "severity": "medium",
           "method": "OWASP",
-          "vector": "SL:4/M:4/O:4/S:4/ED:4/EE:4/A:4/ID:5/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
+          "vector": "SL:4/M:4/O:4/S:4/ED:4/EE:4/A:4/ID:4/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
         }
       ]
     },
@@ -814,7 +814,7 @@
           "score": 15,
           "severity": "low",
           "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:6/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
+          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:3/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
         }
       ]
     },
@@ -825,7 +825,7 @@
           "score": 15,
           "severity": "low",
           "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:6/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
+          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:3/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
         }
       ]
     },
@@ -836,7 +836,7 @@
           "score": 15.75,
           "severity": "low",
           "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:4/EE:4/A:4/ID:5/LC:4/LI:4/LAV:4/LAC:4/FD:5/RD:5/NC:5/PV:5"
+          "vector": "SL:3/M:3/O:3/S:3/ED:4/EE:4/A:4/ID:4/LC:4/LI:4/LAV:4/LAC:4/FD:5/RD:5/NC:5/PV:5"
         }
       ]
     },
@@ -847,7 +847,7 @@
           "score": 15.75,
           "severity": "low",
           "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:4/EE:4/A:4/ID:5/LC:4/LI:4/LAV:4/LAC:4/FD:5/RD:5/NC:5/PV:5"
+          "vector": "SL:3/M:3/O:3/S:3/ED:4/EE:4/A:4/ID:4/LC:4/LI:4/LAV:4/LAC:4/FD:5/RD:5/NC:5/PV:5"
         }
       ]
     },
@@ -858,7 +858,7 @@
           "score": 15.75,
           "severity": "low",
           "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:4/EE:4/A:4/ID:5/LC:4/LI:4/LAV:4/LAC:4/FD:5/RD:5/NC:5/PV:5"
+          "vector": "SL:3/M:3/O:3/S:3/ED:4/EE:4/A:4/ID:4/LC:4/LI:4/LAV:4/LAC:4/FD:5/RD:5/NC:5/PV:5"
         }
       ]
     },
@@ -869,7 +869,7 @@
           "score": 15.75,
           "severity": "low",
           "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:4/EE:4/A:4/ID:5/LC:4/LI:4/LAV:4/LAC:4/FD:5/RD:5/NC:5/PV:5"
+          "vector": "SL:3/M:3/O:3/S:3/ED:4/EE:4/A:4/ID:4/LC:4/LI:4/LAV:4/LAC:4/FD:5/RD:5/NC:5/PV:5"
         }
       ]
     },
@@ -880,7 +880,7 @@
           "score": 8.75,
           "severity": "low",
           "method": "OWASP",
-          "vector": "SL:2/M:2/O:2/S:2/ED:3/EE:3/A:3/ID:6/LC:3/LI:3/LAV:3/LAC:3/FD:4/RD:4/NC:4/PV:4"
+          "vector": "SL:2/M:2/O:2/S:2/ED:3/EE:3/A:3/ID:3/LC:3/LI:3/LAV:3/LAC:3/FD:4/RD:4/NC:4/PV:4"
         }
       ]
     },
@@ -891,7 +891,7 @@
           "score": 8.75,
           "severity": "low",
           "method": "OWASP",
-          "vector": "SL:2/M:2/O:2/S:2/ED:3/EE:3/A:3/ID:6/LC:3/LI:3/LAV:3/LAC:3/FD:4/RD:4/NC:4/PV:4"
+          "vector": "SL:2/M:2/O:2/S:2/ED:3/EE:3/A:3/ID:3/LC:3/LI:3/LAV:3/LAC:3/FD:4/RD:4/NC:4/PV:4"
         }
       ]
     },
@@ -902,7 +902,7 @@
           "score": 8.75,
           "severity": "low",
           "method": "OWASP",
-          "vector": "SL:2/M:2/O:2/S:2/ED:3/EE:3/A:3/ID:6/LC:3/LI:3/LAV:3/LAC:3/FD:4/RD:4/NC:4/PV:4"
+          "vector": "SL:2/M:2/O:2/S:2/ED:3/EE:3/A:3/ID:3/LC:3/LI:3/LAV:3/LAC:3/FD:4/RD:4/NC:4/PV:4"
         }
       ]
     },
@@ -913,7 +913,7 @@
           "score": 8.75,
           "severity": "low",
           "method": "OWASP",
-          "vector": "SL:2/M:2/O:2/S:2/ED:3/EE:3/A:3/ID:6/LC:3/LI:3/LAV:3/LAC:3/FD:4/RD:4/NC:4/PV:4"
+          "vector": "SL:2/M:2/O:2/S:2/ED:3/EE:3/A:3/ID:3/LC:3/LI:3/LAV:3/LAC:3/FD:4/RD:4/NC:4/PV:4"
         }
       ]
     },
@@ -924,7 +924,7 @@
           "score": 8.75,
           "severity": "low",
           "method": "OWASP",
-          "vector": "SL:2/M:2/O:2/S:2/ED:3/EE:3/A:3/ID:6/LC:3/LI:3/LAV:3/LAC:3/FD:4/RD:4/NC:4/PV:4"
+          "vector": "SL:2/M:2/O:2/S:2/ED:3/EE:3/A:3/ID:3/LC:3/LI:3/LAV:3/LAC:3/FD:4/RD:4/NC:4/PV:4"
         }
       ]
     },
@@ -935,7 +935,7 @@
           "score": 8.75,
           "severity": "low",
           "method": "OWASP",
-          "vector": "SL:2/M:2/O:2/S:2/ED:3/EE:3/A:3/ID:6/LC:3/LI:3/LAV:3/LAC:3/FD:4/RD:4/NC:4/PV:4"
+          "vector": "SL:2/M:2/O:2/S:2/ED:3/EE:3/A:3/ID:3/LC:3/LI:3/LAV:3/LAC:3/FD:4/RD:4/NC:4/PV:4"
         }
       ]
     },
@@ -946,7 +946,7 @@
           "score": 5,
           "severity": "low",
           "method": "OWASP",
-          "vector": "SL:2/M:2/O:2/S:2/ED:2/EE:2/A:2/ID:7/LC:2/LI:2/LAV:2/LAC:2/FD:3/RD:3/NC:3/PV:3"
+          "vector": "SL:2/M:2/O:2/S:2/ED:2/EE:2/A:2/ID:2/LC:2/LI:2/LAV:2/LAC:2/FD:3/RD:3/NC:3/PV:3"
         }
       ]
     },
@@ -957,7 +957,7 @@
           "score": 31.5,
           "severity": "medium",
           "method": "OWASP",
-          "vector": "SL:4/M:4/O:4/S:4/ED:5/EE:5/A:5/ID:4/LC:7/LI:7/LAV:7/LAC:7/FD:7/RD:7/NC:7/PV:7"
+          "vector": "SL:4/M:4/O:4/S:4/ED:5/EE:5/A:5/ID:5/LC:7/LI:7/LAV:7/LAC:7/FD:7/RD:7/NC:7/PV:7"
         }
       ]
     },
@@ -968,7 +968,7 @@
           "score": 13.5,
           "severity": "low",
           "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:6/LC:4/LI:4/LAV:4/LAC:4/FD:5/RD:5/NC:5/PV:5"
+          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:3/LC:4/LI:4/LAV:4/LAC:4/FD:5/RD:5/NC:5/PV:5"
         }
       ]
     },
@@ -979,7 +979,7 @@
           "score": 68,
           "severity": "critical",
           "method": "OWASP",
-          "vector": "SL:8/M:8/O:8/S:8/ED:8/EE:8/A:8/ID:1/LC:8/LI:8/LAV:8/LAC:8/FD:9/RD:9/NC:9/PV:9"
+          "vector": "SL:8/M:8/O:8/S:8/ED:8/EE:8/A:8/ID:8/LC:8/LI:8/LAV:8/LAC:8/FD:9/RD:9/NC:9/PV:9"
         }
       ]
     },
@@ -990,7 +990,7 @@
           "score": 32.5,
           "severity": "medium",
           "method": "OWASP",
-          "vector": "SL:5/M:5/O:5/S:5/ED:5/EE:5/A:5/ID:4/LC:6/LI:6/LAV:6/LAC:6/FD:7/RD:7/NC:7/PV:7"
+          "vector": "SL:5/M:5/O:5/S:5/ED:5/EE:5/A:5/ID:5/LC:6/LI:6/LAV:6/LAC:6/FD:7/RD:7/NC:7/PV:7"
         }
       ]
     },
@@ -1001,7 +1001,7 @@
           "score": 68,
           "severity": "critical",
           "method": "OWASP",
-          "vector": "SL:8/M:8/O:8/S:8/ED:8/EE:8/A:8/ID:1/LC:8/LI:8/LAV:8/LAC:8/FD:9/RD:9/NC:9/PV:9"
+          "vector": "SL:8/M:8/O:8/S:8/ED:8/EE:8/A:8/ID:8/LC:8/LI:8/LAV:8/LAC:8/FD:9/RD:9/NC:9/PV:9"
         }
       ]
     }
