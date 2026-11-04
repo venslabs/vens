@@ -228,7 +228,7 @@ Vens asks the LLM to return structured JSON with four 0–9 component scores per
 !!! warning "LLM cost"
     Cloud LLM pricing depends on model, prompt size, and CVE count. Vens does not estimate cost.
 
-    For an exact number, run once against your provider and read the billing dashboard. For a pre-run estimate, run with `--debug-dir ./debug`, count the tokens in `debug/system.prompt`, and plug into your provider's pricing page (the `human.prompt` file is overwritten on every batch and output tokens are not captured, so this is approximate).
+    For an exact number, run once against your provider and read the billing dashboard. For a pre-run estimate, run with `--debug-dir ./debug`, count the tokens in the run's `debug/run-*/batch-*.prompt` files (input) and `batch-*.response` files (output), and plug them into your provider's pricing page (this is approximate).
 
     For zero-cost or air-gapped runs, use Ollama.
 

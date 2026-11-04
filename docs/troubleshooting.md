@@ -13,7 +13,7 @@ DEBUG=1 vens generate \
   report.json vex.json
 ```
 
-`--debug-dir` writes the system prompt and the raw LLM response for every batch to disk. `DEBUG=1` raises the log level to `debug` and shows per-CVE component scores.
+`--debug-dir` writes the prompts and the raw LLM response of every LLM call to disk, in a `run-*` subdirectory of its own for each run. `DEBUG=1` raises the log level to `debug` and shows per-CVE component scores.
 
 ---
 
@@ -73,7 +73,7 @@ The LLM returned text that is not valid JSON matching the expected schema. Most 
     - `llama3.1:8b`, `mistral:7b` — work with `--llm-batch-size 3` to `5`.
     - Anything smaller (`phi3:mini`, `gemma:2b`, …) — expect frequent failures; use only for smoke tests.
 - **Prompt truncation on small context windows.** Reduce `--llm-batch-size`.
-- **Provider-side safety filter** trimmed the response. Inspect `vens-debug/system.prompt` and `vens-debug/human.prompt` and re-run the batch that failed.
+- **Provider-side safety filter** trimmed the response. The reply that failed to parse is the last `batch-NNNNN.response` in the run's `vens-debug/run-*/` directory, next to the two prompts that produced it: inspect them and re-run the batch that failed.
 
 ---
 
@@ -178,11 +178,12 @@ vens generate \
   --config-file config.yaml \
   --sbom-serial-number "$SBOM_UUID" \
   report.json vex.json
-ls debug/
-# system.prompt  human.prompt
+ls debug/run-*/
+# batch-00001.human.prompt  batch-00001.response  batch-00001.system.prompt
+# ...
 ```
 
-Per-CVE component scores and reasoning are also logged to stderr at `INFO` / `DEBUG` level.
+Each `batch-NNNNN.response` is the model's raw reply, reasoning included, for the CVEs in the `batch-NNNNN.human.prompt` beside it. Per-CVE component scores and reasoning are also logged to stderr at `INFO` / `DEBUG` level.
 
 ---
 

@@ -97,15 +97,17 @@ For air-gapped networks: install Vens and Ollama on any box that can reach each 
 
 ## Debug directory
 
-When you pass `--debug-dir <path>`, Vens writes to disk:
+When you pass `--debug-dir <path>`, Vens creates one `run-*` directory per run inside it and writes there, for each LLM call:
 
-- `system.prompt` — the full system prompt sent to the LLM, including your `config.yaml` context (and `notes`).
-- `human.prompt` — the full JSON array of CVEs sent to the LLM.
+- `batch-NNNNN.system.prompt` — the full system prompt sent to the LLM, including your `config.yaml` context (and `notes`).
+- `batch-NNNNN.human.prompt` — the JSON array of CVEs sent in that call.
+- `batch-NNNNN.response` — the model's raw reply, with its reasoning for each CVE.
 
-These files contain exactly the same data the LLM receives. They are useful for audit and troubleshooting, but they inherit the same sensitivity as the prompts themselves. Treat `--debug-dir` output as containing:
+The prompts contain exactly the same data the LLM receives, and the responses what it sends back. They are useful for audit and troubleshooting, but they inherit the same sensitivity as the prompts themselves. On Linux and macOS, Vens makes each run directory and its files readable by your user only (`0700` and `0600`). Treat `--debug-dir` output as containing:
 
 - your full architectural context (`notes` field),
-- every CVE identifier from the scanned image.
+- every CVE identifier from the scanned image,
+- the model's reasoning about each CVE in your context.
 
 Store it accordingly. See [`--debug-dir`](../reference/generate.md#-debug-dir-path) for retention guidance.
 

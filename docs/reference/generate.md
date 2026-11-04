@@ -127,7 +127,9 @@ vens generate --cyclonedx-spec-version 1.7 \
 
 ### `--debug-dir <path>`
 
-Directory where Vens writes the prompts it sends to the LLM. Useful for auditing scores, debugging unexpected results, and producing evidence for compliance reviews.
+Directory where Vens writes, for every LLM call, the prompts it sends and the raw reply it gets back. Useful for auditing scores, debugging unexpected results, and producing evidence for compliance reviews.
+
+Each run writes into a `run-*` subdirectory of its own, logged when the run starts, so runs that share a `--debug-dir`, even in parallel, never overwrite each other:
 
 ```bash
 vens generate \
@@ -135,13 +137,18 @@ vens generate \
   --config-file c.yaml \
   --sbom-serial-number "$SBOM_UUID" \
   report.json out.json
-ls vens-debug/
-# system.prompt  human.prompt
+# ... level=INFO msg="Writing debug files" dir=./vens-debug/run-3787846641
+ls vens-debug/run-3787846641/
+# batch-00001.human.prompt  batch-00001.response  batch-00001.system.prompt
+# batch-00002.human.prompt  batch-00002.response  batch-00002.system.prompt
+# ...
 ```
 
-**What you get:**
+Each run adds a new `run-*` directory, and nothing deletes the old ones. Remove them when you are done, for example with `rm -rf vens-debug/run-*`.
 
-- `system.prompt` — the full system prompt sent to the LLM, including your `config.yaml` context formatted as text, the OWASP scoring instructions, and the JSON schema the LLM must return. Shape (truncated):
+**What you get**, for each LLM call, numbered from `00001` in call order:
+
+- `batch-NNNNN.system.prompt` — the full system prompt sent to the LLM, including your `config.yaml` context formatted as text, the OWASP scoring instructions, and the JSON schema the LLM must return. Shape (truncated):
 
     ```
     You are a talented security expert scoring vulnerabilities using OWASP Risk Rating Methodology.
@@ -163,23 +170,35 @@ ls vens-debug/
     {...}
     ```
 
-- `human.prompt` — the JSON array of CVEs sent to the LLM in the last batch (vuln id, pkg, title, description, severity).
+- `batch-NNNNN.human.prompt` — the JSON array of CVEs sent in that call (vuln id, pkg, title, description, severity).
+- `batch-NNNNN.response` — the model's raw reply to that call, with its scores and reasoning for each CVE. It is written before Vens parses it, so a reply that fails to parse is on disk too. A call that failed, such as a batch the provider truncated, has no `.response`.
 
-!!! warning "Only the last batch is saved"
-    Each batch **overwrites** the previous `system.prompt` and `human.prompt` files. If your scan has 200 CVEs at batch size 10, you get 20 LLM calls but only the last batch's prompts on disk. To capture every batch, run with `--llm-batch-size` equal to the total CVE count (one big call), or use `--llm-batch-size 1` and copy the files between runs. This is a known limitation — per-batch file naming is planned for a future release.
+Numbers count LLM calls, not `--llm-batch-size` batches: a batch the provider truncates is retried in two halves, and a CVE the model leaves out is asked about again on its own, each in a call with its own number.
 
-Per-CVE component scores and the LLM's reasoning are logged to stderr at `INFO`/`DEBUG` level (run with `DEBUG=1` to see them).
+!!! note "Matching the files to the `--attest` evidence"
+    Match a call's files to its `evidence-batch-N` entry by `prompt_hash`, not by number: the attestation records only the calls that succeeded, so after a truncated batch, `batch-00002` can be `evidence-batch-1`. `prompt_hash` is the SHA-256 of the system prompt, two newlines, then the human prompt:
+
+    ```bash
+    cd vens-debug/run-3787846641
+    { cat batch-00002.system.prompt; printf '\n\n'; cat batch-00002.human.prompt; } | sha256sum
+    jq -r '.declarations.evidence[] | .["bom-ref"] + " " + (.data[] | select(.name == "prompt_hash") | .contents.attachment.content)' ../../out.attestation.cdx.json
+    ```
+
+    An ask-again for a lone CVE repeats its prompt word for word, so two entries can share a hash. They come in the same order as the files, and each entry's `raw_response` is its call's `.response`, base64-encoded.
+
+Per-CVE component scores and the LLM's reasoning are also logged to stderr at `INFO`/`DEBUG` level (run with `DEBUG=1` to see them).
 
 !!! warning "Treat `--debug-dir` output as sensitive"
-    These files contain the **full text** of what was sent to the LLM provider:
+    These files contain the **full text** of what was sent to the LLM provider and of what it sent back:
 
     - Your `config.yaml` context, including the `notes` field verbatim.
     - Every CVE identifier from the scanned image, plus titles and descriptions.
+    - The model's reasoning about each CVE in your context.
 
-    Do **not** commit them to a public repository. In CI, either delete the directory after inspection or upload it to an access-controlled artifact store.
+    On Linux and macOS, Vens creates each run directory and its files readable by your user only (`0700` and `0600`). Do **not** commit them to a public repository. In CI, either delete the directory after inspection or upload it to an access-controlled artifact store.
 
 !!! note "Retention for compliance workloads"
-    If you need the debug output as audit evidence (HIPAA-style 6-year retention, SOC 2 change log, PCI-DSS risk decisions), store it in the same encrypted, access-controlled system you use for other security audit logs. Treat each `--debug-dir` directory as one entry in your vulnerability-triage evidence chain, indexed by scan date and by the Git SHA of the `config.yaml` that produced it. Reasoning can only be reconstructed later if **both** the `config.yaml` version and the debug files are preserved — a copy of the VEX alone is not enough.
+    If you need the debug output as audit evidence (HIPAA-style 6-year retention, SOC 2 change log, PCI-DSS risk decisions), store it in the same encrypted, access-controlled system you use for other security audit logs. Treat each `run-*` directory as one entry in your vulnerability-triage evidence chain, indexed by scan date and by the Git SHA of the `config.yaml` that produced it. Reasoning can only be reconstructed later if **both** the `config.yaml` version and the debug files are preserved — a copy of the VEX alone is not enough.
 
 ### `--attest`
 

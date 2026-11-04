@@ -101,7 +101,9 @@ type Opts struct {
 
 	SleepOnRateLimit time.Duration
 	RetryOnRateLimit int
-	DebugDir         string
+	// DebugDir gets one run-* directory per Generator, holding the prompts
+	// and the raw response of every LLM call.
+	DebugDir string
 
 	// Config carries user-provided context hints loaded from config.yaml.
 	Config *riskconfig.Config
@@ -111,6 +113,12 @@ type Opts struct {
 type Generator struct {
 	o        Opts
 	attestor *attestation.Builder
+	// debugRunDir is this run's own directory under Opts.DebugDir, empty
+	// when debug files are off.
+	debugRunDir string
+	// debugBatches numbers the LLM calls written to debugRunDir. A split
+	// batch and an ask-again are calls of their own (#359).
+	debugBatches int
 }
 
 // New creates a new Generator with the given options.
@@ -132,12 +140,36 @@ func New(o Opts) (*Generator, error) {
 		g.o.RetryOnRateLimit = DefaultRetryOnRateLimit
 	}
 	if g.o.DebugDir != "" {
-		if err := os.MkdirAll(g.o.DebugDir, 0755); err != nil {
-			slog.Error("failed to create the debug dir", "error", err)
-			g.o.DebugDir = ""
-		}
+		g.debugRunDir = newDebugRunDir(g.o.DebugDir)
 	}
 	return g, nil
+}
+
+// newDebugRunDir creates this run's directory under parent, private to the
+// user: runs sharing a --debug-dir, even in parallel, never overwrite each
+// other's files. It returns "" when it can't, which turns debug files off.
+func newDebugRunDir(parent string) string {
+	if err := os.MkdirAll(parent, 0755); err != nil {
+		slog.Error("failed to create the debug dir", "dir", parent, "error", err)
+		return ""
+	}
+	dir, err := os.MkdirTemp(parent, "run-*")
+	if err != nil {
+		slog.Error("failed to create the debug dir", "dir", parent, "error", err)
+		return ""
+	}
+	slog.Info("Writing debug files", "dir", dir)
+	return dir
+}
+
+// writeDebugFile writes one file of the run's debug directory, readable by the
+// user only since it holds the deployment context and the CVE inventory. A
+// failure is logged and the run goes on.
+func (g *Generator) writeDebugFile(ctx context.Context, name, content string) {
+	path := filepath.Join(g.debugRunDir, name)
+	if err := os.WriteFile(path, []byte(content), 0600); err != nil {
+		slog.ErrorContext(ctx, "failed to write a debug file", "file", path, "error", err)
+	}
 }
 
 // SetAttestor attaches an attestation Builder after construction. Pass nil to disable.
@@ -573,13 +605,14 @@ func (g *Generator) evaluateOWASPScores(ctx context.Context, vulns []LLMVulnerab
 	}
 	humanPrompt := string(vulnsJSON)
 
-	if g.o.DebugDir != "" {
-		if err := os.WriteFile(filepath.Join(g.o.DebugDir, "system.prompt"), []byte(systemPrompt), 0644); err != nil {
-			slog.ErrorContext(ctx, "failed to write system.prompt", "error", err)
-		}
-		if err := os.WriteFile(filepath.Join(g.o.DebugDir, "human.prompt"), []byte(humanPrompt), 0644); err != nil {
-			slog.ErrorContext(ctx, "failed to write human.prompt", "error", err)
-		}
+	// One numbered file set per LLM call: fixed names would let every call
+	// overwrite the previous one, hiding what the model was asked (#359).
+	var debugName string
+	if g.debugRunDir != "" {
+		g.debugBatches++
+		debugName = fmt.Sprintf("batch-%05d", g.debugBatches)
+		g.writeDebugFile(ctx, debugName+".system.prompt", systemPrompt)
+		g.writeDebugFile(ctx, debugName+".human.prompt", humanPrompt)
 	}
 
 	req := llm.Request{
@@ -597,6 +630,12 @@ func (g *Generator) evaluateOWASPScores(ctx context.Context, vulns []LLMVulnerab
 		return e
 	}); err != nil {
 		return nil, "", err
+	}
+
+	// Written before parsing, so a reply that fails to parse is on disk too. A
+	// failed call, such as a truncated one, has no reply: its prompts stay alone.
+	if debugName != "" {
+		g.writeDebugFile(ctx, debugName+".response", raw)
 	}
 
 	var evidenceRef string
