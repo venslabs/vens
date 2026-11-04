@@ -1417,3 +1417,161 @@ func TestDebugDir_WriteFailureLogsTheFile(t *testing.T) {
 		filepath.Join(dirs[0], "batch-00001.response"),
 	}, failed)
 }
+
+// runSummary returns the run's one INFO summary.
+func runSummary(t *testing.T, logs *captureHandler) capturedRecord {
+	t.Helper()
+	var found []capturedRecord
+	for _, r := range logs.records {
+		if r.level == slog.LevelInfo && r.msg == "Scoring run finished" {
+			found = append(found, r)
+		}
+	}
+	require.Len(t, found, 1, "one summary per run")
+	return found[0]
+}
+
+// Every batch logs its composition at debug level, and the run closes with an
+// INFO summary of rows, distinct CVEs, LLM calls, asks-again and splits.
+func TestGenerator_LogsBatchCompositionAndRunSummary(t *testing.T) {
+	m := &scriptedLLM{answer: func(_ int, _ string) llmOutputEntry { return scoredEntry() }}
+	g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 2})
+	require.NoError(t, err)
+
+	logs := withCapturedLogs(t)
+	require.NoError(t, g.GenerateRiskScore(context.Background(), testVulns(4), nil))
+
+	var batches []capturedRecord
+	for _, r := range logs.records {
+		if r.level == slog.LevelDebug && r.msg == "scoring batch" {
+			batches = append(batches, r)
+		}
+	}
+	require.Len(t, batches, 2, "one debug line per batch")
+	require.Equal(t, int64(2), batches[0].attrs["rows"])
+	require.Equal(t, "CVE-2024-0000,CVE-2024-0001", batches[0].attrs["vulns"])
+	require.Equal(t, int64(2), batches[1].attrs["rows"])
+	require.Equal(t, "CVE-2024-0002,CVE-2024-0003", batches[1].attrs["vulns"])
+
+	summary := runSummary(t, logs)
+	require.Equal(t, int64(4), summary.attrs["rows"])
+	require.Equal(t, int64(4), summary.attrs["cves"])
+	require.Equal(t, int64(2), summary.attrs["llm_calls"])
+	require.Equal(t, int64(0), summary.attrs["asked_again"])
+	require.Equal(t, int64(0), summary.attrs["splits"])
+	require.Equal(t, false, summary.attrs["failed"])
+}
+
+// A failed run still logs its summary, marked failed: it is the run one
+// usually debugs.
+func TestGenerator_LogsRunSummaryWhenTheRunFails(t *testing.T) {
+	m := newDroppingLLM(true, "CVE-2024-0000")
+	g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 2})
+	require.NoError(t, err)
+
+	logs := withCapturedLogs(t)
+	require.Error(t, g.GenerateRiskScore(context.Background(), testVulns(4), nil))
+
+	summary := runSummary(t, logs)
+	require.Equal(t, true, summary.attrs["failed"])
+	require.Equal(t, int64(4), summary.attrs["rows"])
+	require.Equal(t, int64(4), summary.attrs["cves"])
+	require.Equal(t, int64(2), summary.attrs["llm_calls"], "batch 1 and its ask-again; the run stops before batch 2")
+	require.Equal(t, int64(1), summary.attrs["asked_again"])
+	require.Equal(t, int64(0), summary.attrs["splits"])
+}
+
+// A row without a vulnerability ID is a row, not a CVE.
+func TestGenerator_RunSummaryCVECountSkipsRowsWithoutID(t *testing.T) {
+	m := &scriptedLLM{answer: func(_ int, _ string) llmOutputEntry { return scoredEntry() }}
+	g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 10})
+	require.NoError(t, err)
+
+	logs := withCapturedLogs(t)
+	vulns := []Vulnerability{
+		{VulnID: "CVE-2024-0000", PkgName: "pkg-a", Title: "t", BOMRef: "a"},
+		{PkgName: "pkg-b", Title: "t", BOMRef: "b"},
+		{VulnID: "CVE-2024-0001", PkgName: "pkg-c", Title: "t", BOMRef: "c"},
+	}
+	require.NoError(t, g.GenerateRiskScore(context.Background(), vulns, nil))
+
+	summary := runSummary(t, logs)
+	require.Equal(t, int64(3), summary.attrs["rows"])
+	require.Equal(t, int64(2), summary.attrs["cves"])
+}
+
+// Leaving a scored CVE out of the prompt and reusing its first score is one
+// decision: one debug line per CVE, naming the bundle the reused score cites.
+func TestGenerator_LogsScoreReuseFromEarlierBatch(t *testing.T) {
+	m := &scriptedLLM{answer: func(_ int, _ string) llmOutputEntry { return scoredEntry() }}
+	g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 1})
+	require.NoError(t, err)
+	g.SetAttestor(attestation.NewBuilder(attestation.Opts{Provider: "mock", Model: "mock"}))
+
+	logs := withCapturedLogs(t)
+	vulns := []Vulnerability{
+		{VulnID: "CVE-2024-0000", PkgName: "pkg-a", Title: "t", BOMRef: "a"},
+		{VulnID: "CVE-2024-0000", PkgName: "pkg-b", Title: "t", BOMRef: "b"},
+	}
+	require.NoError(t, g.GenerateRiskScore(context.Background(), vulns, nil))
+
+	// The debug lines of the second batch, after its composition line.
+	var second []capturedRecord
+	batches := 0
+	for _, r := range logs.records {
+		if r.level != slog.LevelDebug {
+			continue
+		}
+		if r.msg == "scoring batch" {
+			batches++
+			continue
+		}
+		if batches == 2 {
+			second = append(second, r)
+		}
+	}
+	require.Len(t, second, 1, "one decision, one line")
+	require.Equal(t, "reusing an earlier batch's first score", second[0].msg)
+	require.Equal(t, "CVE-2024-0000", second[0].attrs["vuln"])
+	require.Equal(t, "evidence-batch-1", second[0].attrs["evidence_ref"])
+}
+
+// A split names both halves at debug level; a CVE the model skips in both the
+// ask and the ask-again waits for a later row instead of failing. The fake is
+// deterministic, so the summary's counts are exact: 8 LLM calls, 3 of them
+// truncated (rows 0-9, 0-4 and 5-9), 1 ask-again (rows 0-2) and 3 splits.
+func TestGenerator_LogsSplitHoldBackAndSummaryCounts(t *testing.T) {
+	m := &truncatingLLM{maxPerCall: 3, skip: map[string]int{"CVE-2024-0100": 2}}
+	g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 10})
+	require.NoError(t, err)
+
+	logs := withCapturedLogs(t)
+	vulns := testVulns(10)
+	vulns[1].VulnID, vulns[1].BOMRef = "CVE-2024-0100", "x1"
+	vulns[7].VulnID, vulns[7].BOMRef = "CVE-2024-0100", "x2"
+	require.NoError(t, g.GenerateRiskScore(context.Background(), vulns, nil))
+
+	var splits, holdBacks int
+	for _, r := range logs.records {
+		switch {
+		case r.level == slog.LevelDebug && r.msg == "splitting truncated batch":
+			splits++
+			require.NotEmpty(t, r.attrs["first_half"], "the split must name the rows each half keeps")
+			require.NotEmpty(t, r.attrs["second_half"], "the split must name the rows each half keeps")
+		case r.level == slog.LevelDebug && r.msg == "holding back rows until a later batch scores the CVE":
+			if r.attrs["vuln"] == "CVE-2024-0100" {
+				holdBacks++
+			}
+		}
+	}
+	require.Equal(t, 3, splits, "rows 0-9, then rows 0-4 and 5-9")
+	require.Equal(t, 1, holdBacks, "CVE-2024-0100 waits for its later row once")
+
+	summary := runSummary(t, logs)
+	require.Equal(t, int64(10), summary.attrs["rows"])
+	require.Equal(t, int64(9), summary.attrs["cves"])
+	require.Equal(t, int64(8), summary.attrs["llm_calls"])
+	require.Equal(t, int64(1), summary.attrs["asked_again"])
+	require.Equal(t, int64(3), summary.attrs["splits"])
+	require.Equal(t, false, summary.attrs["failed"])
+}
