@@ -17,10 +17,17 @@ package generator
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"log/slog"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -1152,4 +1159,261 @@ func TestGenerator_ScoreMatchesVectorRecomputation(t *testing.T) {
 	require.NotNil(t, got[0].Rating.Score)
 	require.Equal(t, 67.5, *got[0].Rating.Score, "score is computed from the rounded aggregates")
 	require.Contains(t, got[0].Rating.Vector, "ED:8", "vector carries the rounded vulnerability aggregate")
+}
+
+// runDirs lists the run-* directories under a --debug-dir.
+func runDirs(t *testing.T, parent string) []string {
+	t.Helper()
+	dirs, err := filepath.Glob(filepath.Join(parent, "run-*"))
+	require.NoError(t, err)
+	return dirs
+}
+
+func fileNames(t *testing.T, dir string) []string {
+	t.Helper()
+	entries, err := os.ReadDir(dir)
+	require.NoError(t, err)
+	names := make([]string, len(entries))
+	for i, e := range entries {
+		names[i] = e.Name()
+	}
+	return names
+}
+
+func debugFile(t *testing.T, dir string, call int, ext string) string {
+	t.Helper()
+	b, err := os.ReadFile(filepath.Join(dir, fmt.Sprintf("batch-%05d.%s", call, ext)))
+	require.NoError(t, err)
+	return string(b)
+}
+
+// Runs sharing a --debug-dir, here two in parallel, each write into their own
+// run-* directory and log it once, so neither overwrites the other's
+// batch-00001 files (#359).
+func TestDebugDir_OneDirectoryPerRun(t *testing.T) {
+	logs := withCapturedLogs(t)
+	parent := t.TempDir()
+
+	ids := []string{"CVE-2024-1111", "CVE-2024-2222"}
+	gens := make([]*Generator, len(ids))
+	for i := range ids {
+		g, err := New(Opts{LLM: testutil.NewMockLLM(), Config: &riskconfig.Config{}, DebugDir: parent})
+		require.NoError(t, err)
+		gens[i] = g
+	}
+	errs := make([]error, len(gens))
+	var wg sync.WaitGroup
+	for i, g := range gens {
+		wg.Go(func() {
+			errs[i] = g.GenerateRiskScore(context.Background(), []Vulnerability{{VulnID: ids[i], PkgName: "pkg", Title: "t"}}, nil)
+		})
+	}
+	wg.Wait()
+	require.NoError(t, errors.Join(errs...))
+
+	dirs := runDirs(t, parent)
+	require.Len(t, dirs, 2, "one directory per run")
+
+	var logged []string
+	for _, r := range logs.records {
+		if r.msg == "Writing debug files" {
+			require.Equal(t, slog.LevelInfo, r.level)
+			logged = append(logged, fmt.Sprint(r.attrs["dir"]))
+		}
+	}
+	require.ElementsMatch(t, dirs, logged, "each run logs its directory once")
+
+	got := map[string]bool{}
+	for _, dir := range dirs {
+		require.Equal(t, []string{"batch-00001.human.prompt", "batch-00001.response", "batch-00001.system.prompt"}, fileNames(t, dir))
+		var asked []LLMVulnerability
+		require.NoError(t, json.Unmarshal([]byte(debugFile(t, dir, 1, "human.prompt")), &asked))
+		require.Len(t, asked, 1)
+		require.Contains(t, debugFile(t, dir, 1, "response"), asked[0].VulnID, "the response sits beside its own prompt")
+		got[asked[0].VulnID] = true
+	}
+	require.Equal(t, map[string]bool{"CVE-2024-1111": true, "CVE-2024-2222": true}, got, "each run kept its own prompt")
+}
+
+type attestedCall struct {
+	promptHash  string
+	rawResponse string
+}
+
+// attestedCalls returns the prompt_hash and the decoded raw_response of every
+// evidence entry, in order.
+func attestedCalls(t *testing.T, at *attestation.Builder) []attestedCall {
+	t.Helper()
+	var buf bytes.Buffer
+	require.NoError(t, at.Write(&buf))
+	var doc struct {
+		Declarations struct {
+			Evidence []struct {
+				Data []struct {
+					Name     string `json:"name"`
+					Contents struct {
+						Attachment struct {
+							Content string `json:"content"`
+						} `json:"attachment"`
+					} `json:"contents"`
+				} `json:"data"`
+			} `json:"evidence"`
+		} `json:"declarations"`
+	}
+	require.NoError(t, json.Unmarshal(buf.Bytes(), &doc))
+
+	calls := make([]attestedCall, 0, len(doc.Declarations.Evidence))
+	for _, e := range doc.Declarations.Evidence {
+		var c attestedCall
+		for _, d := range e.Data {
+			switch d.Name {
+			case "prompt_hash":
+				c.promptHash = d.Contents.Attachment.Content
+			case "raw_response":
+				raw, err := base64.StdEncoding.DecodeString(d.Contents.Attachment.Content)
+				require.NoError(t, err)
+				c.rawResponse = string(raw)
+			}
+		}
+		calls = append(calls, c)
+	}
+	return calls
+}
+
+// Files are numbered per LLM call, not per batch: the two-CVE batch truncates
+// and keeps its prompts without a response, then the model skips CVE-2024-0001
+// in its half, so the ask-again is a call of its own. The attestation records
+// only the calls that returned, so batch-00002 is evidence-batch-1 and a file
+// set is found there by prompt_hash.
+func TestDebugDir_WritesOneFileSetPerCall(t *testing.T) {
+	parent := t.TempDir()
+	m := &truncatingLLM{maxPerCall: 1, skip: map[string]int{"CVE-2024-0001": 1}}
+	g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 2, DebugDir: parent})
+	require.NoError(t, err)
+	at := attestation.NewBuilder(attestation.Opts{Provider: "mock", Model: "mock"})
+	g.SetAttestor(at)
+
+	require.NoError(t, g.GenerateRiskScore(context.Background(), testVulns(2), nil))
+
+	dirs := runDirs(t, parent)
+	require.Len(t, dirs, 1)
+	dir := dirs[0]
+	require.Equal(t, []string{
+		"batch-00001.human.prompt", "batch-00001.system.prompt",
+		"batch-00002.human.prompt", "batch-00002.response", "batch-00002.system.prompt",
+		"batch-00003.human.prompt", "batch-00003.response", "batch-00003.system.prompt",
+		"batch-00004.human.prompt", "batch-00004.response", "batch-00004.system.prompt",
+	}, fileNames(t, dir), "the truncated call returned nothing, so it has no response")
+
+	asked := func(call int) []string {
+		var in []LLMVulnerability
+		require.NoError(t, json.Unmarshal([]byte(debugFile(t, dir, call, "human.prompt")), &in))
+		return vulnIDs(in)
+	}
+	answered := func(call int) []string {
+		var out llmOutput
+		require.NoError(t, json.Unmarshal([]byte(debugFile(t, dir, call, "response")), &out))
+		ids := []string{}
+		for _, e := range out.Results {
+			ids = append(ids, e.VulnID)
+		}
+		return ids
+	}
+	require.Equal(t, []string{"CVE-2024-0000", "CVE-2024-0001"}, asked(1), "the batch the provider truncated")
+	require.Equal(t, []string{"CVE-2024-0000"}, asked(2))
+	require.Equal(t, []string{"CVE-2024-0000"}, answered(2))
+	require.Equal(t, []string{"CVE-2024-0001"}, asked(3))
+	require.Empty(t, answered(3), "the model skipped it")
+	require.Equal(t, []string{"CVE-2024-0001"}, asked(4), "asked again on its own")
+	require.Equal(t, []string{"CVE-2024-0001"}, answered(4))
+
+	promptHash := func(call int) string {
+		sum := sha256.Sum256([]byte(debugFile(t, dir, call, "system.prompt") + "\n\n" + debugFile(t, dir, call, "human.prompt")))
+		return hex.EncodeToString(sum[:])
+	}
+	require.Equal(t, promptHash(3), promptHash(4), "the ask-again repeats its prompt word for word")
+	calls := attestedCalls(t, at)
+	require.Len(t, calls, 3, "the truncated call is not attested")
+	for i, call := range []int{2, 3, 4} {
+		require.Equalf(t, promptHash(call), calls[i].promptHash, "batch-%05d is evidence-batch-%d", call, i+1)
+		require.Equalf(t, debugFile(t, dir, call, "response"), calls[i].rawResponse, "batch-%05d.response is the raw reply", call)
+	}
+}
+
+type unparsableLLM struct{}
+
+func (unparsableLLM) Generate(context.Context, llm.Request) (string, error) {
+	return "not json", nil
+}
+
+// The response is written before it is parsed, so the reply behind an
+// "unable to parse LLM output" error is on disk.
+func TestDebugDir_KeepsAReplyThatFailsToParse(t *testing.T) {
+	parent := t.TempDir()
+	g, err := New(Opts{LLM: unparsableLLM{}, Config: &riskconfig.Config{}, DebugDir: parent})
+	require.NoError(t, err)
+
+	require.ErrorContains(t, g.GenerateRiskScore(context.Background(), testVulns(1), nil), "unable to parse LLM output")
+	dirs := runDirs(t, parent)
+	require.Len(t, dirs, 1)
+	require.Equal(t, "not json", debugFile(t, dirs[0], 1, "response"))
+}
+
+// The files hold the deployment context and the CVE inventory, so the run
+// directory and every file in it are for the user only.
+func TestDebugDir_FilesArePrivate(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix permission bits")
+	}
+	parent := t.TempDir()
+	g, err := New(Opts{LLM: testutil.NewMockLLM(), Config: &riskconfig.Config{}, DebugDir: parent})
+	require.NoError(t, err)
+	require.NoError(t, g.GenerateRiskScore(context.Background(), testVulns(1), nil))
+
+	dirs := runDirs(t, parent)
+	require.Len(t, dirs, 1)
+	info, err := os.Stat(dirs[0])
+	require.NoError(t, err)
+	require.Equal(t, fs.FileMode(0o700), info.Mode().Perm(), "run directory")
+
+	entries, err := os.ReadDir(dirs[0])
+	require.NoError(t, err)
+	require.Len(t, entries, 3)
+	for _, e := range entries {
+		info, err := e.Info()
+		require.NoError(t, err)
+		require.Equalf(t, fs.FileMode(0o600), info.Mode().Perm(), "%s", e.Name())
+	}
+}
+
+// A debug file that can't be written is logged under one constant message
+// naming the file, and the run goes on.
+func TestDebugDir_WriteFailureLogsTheFile(t *testing.T) {
+	logs := withCapturedLogs(t)
+	parent := t.TempDir()
+	g, err := New(Opts{LLM: testutil.NewMockLLM(), Config: &riskconfig.Config{}, DebugDir: parent})
+	require.NoError(t, err)
+	dirs := runDirs(t, parent)
+	require.Len(t, dirs, 1)
+	require.NoError(t, os.RemoveAll(dirs[0]))
+
+	var emitted []outputhandler.VulnRating
+	require.NoError(t, g.GenerateRiskScore(context.Background(), testVulns(1), func(group []outputhandler.VulnRating) error {
+		emitted = append(emitted, group...)
+		return nil
+	}))
+	require.Len(t, emitted, 1, "a debug file is no reason to fail the run")
+
+	var failed []string
+	for _, r := range logs.records {
+		if r.msg == "failed to write a debug file" {
+			require.Equal(t, slog.LevelError, r.level)
+			failed = append(failed, fmt.Sprint(r.attrs["file"]))
+		}
+	}
+	require.Equal(t, []string{
+		filepath.Join(dirs[0], "batch-00001.system.prompt"),
+		filepath.Join(dirs[0], "batch-00001.human.prompt"),
+		filepath.Join(dirs[0], "batch-00001.response"),
+	}, failed)
 }
