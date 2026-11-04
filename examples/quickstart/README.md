@@ -82,7 +82,7 @@ Prioritized List → Fix what matters for YOU
         "score": 45.5,
         "severity": "high",
         "method": "OWASP",
-        "vector": "SL:7/M:7/O:7/S:7/ED:6/EE:6/A:6/ID:3/LC:7/LI:7/LAV:7/LAC:7/FD:7/RD:7/NC:7/PV:7"
+        "vector": "SL:7/M:7/O:7/S:7/ED:6/EE:6/A:6/ID:6/LC:7/LI:7/LAV:7/LAC:7/FD:7/RD:7/NC:7/PV:7"
       }]
     },
     {
@@ -91,7 +91,7 @@ Prioritized List → Fix what matters for YOU
         "score": 10.0,
         "severity": "low",
         "method": "OWASP",
-        "vector": "SL:3/M:3/O:3/S:3/ED:2/EE:2/A:2/ID:7/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
+        "vector": "SL:3/M:3/O:3/S:3/ED:2/EE:2/A:2/ID:2/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
       }]
     }
   ]

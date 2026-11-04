@@ -33,7 +33,7 @@ OWASP scoring (`Risk = Likelihood × Impact`, 0-81) reflects your system's expos
 ```yaml
 - uses: venslabs/vens-action@v0.2.0   # check the marketplace for the latest tag; pin by SHA in production
   with:
-    version: v0.4.0                   # vens binary version
+    version: v0.6.0                   # vens binary version
     config-file: .vens/config.yaml    # see docs/guides/configuration.md to author this file
     input-report: report.json
     sbom-serial-number: ${{ vars.SBOM_SERIAL }}
@@ -86,9 +86,9 @@ Output is a [CycloneDX VEX](https://cyclonedx.org/capabilities/vex/) document; e
     "source": { "name": "NVD", "url": "https://nvd.nist.gov/vuln/detail/CVE-XXXX-YYYY" },
     "ratings": [{
       "method": "OWASP",
-      "score": 52.0,
+      "score": 45.5,
       "severity": "high",
-      "vector": "SL:7/M:7/O:7/S:7/ED:6/EE:6/A:6/ID:3/LC:7/LI:7/LAV:7/LAC:7/FD:7/RD:7/NC:7/PV:7"
+      "vector": "SL:7/M:7/O:7/S:7/ED:6/EE:6/A:6/ID:6/LC:7/LI:7/LAV:7/LAC:7/FD:7/RD:7/NC:7/PV:7"
     }]
   }]
 }

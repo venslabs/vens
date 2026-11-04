@@ -111,15 +111,15 @@ Example output:
 [
   {
     "id": "CVE-XXXX-YYYY",
-    "score": 64,
+    "score": 67.5,
     "severity": "critical",
-    "vector": "SL:8/M:8/O:8/S:8/ED:7/EE:7/A:7/ID:3/LC:9/LI:9/LAV:9/LAC:9/FD:9/RD:9/NC:9/PV:9"
+    "vector": "SL:8/M:8/O:8/S:8/ED:7/EE:7/A:7/ID:7/LC:9/LI:9/LAV:9/LAC:9/FD:9/RD:9/NC:9/PV:9"
   },
   {
     "id": "CVE-2025-4477",
     "score": 56,
     "severity": "high",
-    "vector": "SL:7/M:7/O:7/S:7/ED:7/EE:7/A:7/ID:3/LC:8/LI:8/LAV:8/LAC:8/FD:8/RD:8/NC:8/PV:8"
+    "vector": "SL:7/M:7/O:7/S:7/ED:7/EE:7/A:7/ID:7/LC:8/LI:8/LAV:8/LAC:8/FD:8/RD:8/NC:8/PV:8"
   }
 ]
 ```
@@ -147,8 +147,8 @@ jq '.Results[]?.Vulnerabilities[]? | {VulnerabilityID, Severity, owasp_severity:
 
 `Severity` and the CVSS block stay exactly as Trivy wrote them, so read `Custom.owasp_severity` in whatever consumes the JSON next. Reach for the raw `Custom.owasp_score` only when you need the number itself — it lives on vens's internal 0–81 scale and its mapping may change.
 
-!!! note "From the next release"
-    `owasp_severity` isn't written by any release yet (v0.5.0 doesn't emit it) — it lands with the next one. The docs deploy from main, so it shows here first.
+!!! note "From v0.6.0"
+    `owasp_severity` is written from v0.6.0 on. v0.5.0 and earlier don't emit it.
 
 **Dependency-Track 5.1+.** It picks up the OWASP rating from the VEX and shows it on each finding. See [Send the scores to Dependency-Track](dependency-track.md).
 
@@ -163,7 +163,7 @@ For a turnkey Action, see [GitHub Actions integration](github-actions.md). The m
 
 ```yaml
 - name: Install Vens
-  run: go install github.com/venslabs/vens/cmd/vens@v0.4.0
+  run: go install github.com/venslabs/vens/cmd/vens@v0.6.0
 
 - name: Scan image
   run: trivy image $IMAGE --format json --output report.json

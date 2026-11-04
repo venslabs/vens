@@ -16,7 +16,7 @@ If you scan with Trivy or Grype in GitHub Actions, drop [`venslabs/vens-action`]
 - name: Prioritize with vens
   uses: venslabs/vens-action@v0.2.0   # check the marketplace for the latest tag; pin by SHA in production
   with:
-    version: v0.4.0                   # vens binary version
+    version: v0.6.0                   # vens binary version
     config-file: .vens/config.yaml    # see ../guides/configuration.md to author this file
     input-report: report.json
     sbom-serial-number: ${{ vars.SBOM_SERIAL }}
@@ -61,7 +61,7 @@ vens --version
     Make sure `$(go env GOPATH)/bin` is in your `$PATH`.
 
 !!! note
-    Pinning a specific version: `go install github.com/venslabs/vens/cmd/vens@v0.5.0`.
+    Pinning a specific version: `go install github.com/venslabs/vens/cmd/vens@v0.6.0`.
 
 ---
 
@@ -90,7 +90,7 @@ Download the latest release for your OS/architecture from the [releases page](ht
 === "Linux (amd64)"
 
     ```bash
-    # Replace VERSION with the release tag, e.g. v0.5.0
+    # Replace VERSION with the release tag, e.g. v0.6.0
     curl -L https://github.com/venslabs/vens/releases/download/VERSION/vens-VERSION-linux-amd64.tar.gz \
       | tar -xz
     sudo mv vens /usr/local/bin/
@@ -147,7 +147,7 @@ Download the latest release for your OS/architecture from the [releases page](ht
     ```
 
 !!! note
-    Assets are named `vens-<tag>-<os>-<arch>.tar.gz`, built for linux, darwin and windows on amd64 and arm64. The Windows archives hold `vens.exe` and ship from v0.5.1 onwards; for an earlier tag, install from source with `go install github.com/venslabs/vens/cmd/vens@latest`. The `$env:Path` assignment in the Windows tabs lasts for the current PowerShell session only — add the folder to your user PATH to keep it. See the [releases page](https://github.com/venslabs/vens/releases) for the current tag.
+    Assets are named `vens-<tag>-<os>-<arch>.tar.gz`, built for linux, darwin and windows on amd64 and arm64. The Windows archives hold `vens.exe` and ship from v0.6.0 onwards. The `$env:Path` assignment in the Windows tabs lasts for the current PowerShell session only — add the folder to your user PATH to keep it. See the [releases page](https://github.com/venslabs/vens/releases) for the current tag.
 
 ---
 

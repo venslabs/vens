@@ -33,7 +33,7 @@ trivy vens generate --config-file config.yaml --sbom-serial-number "$SBOM_UUID" 
       "method": "OWASP",
       "score": 10.0,
       "severity": "low",
-      "vector": "SL:3/M:3/O:3/S:3/ED:2/EE:2/A:2/ID:7/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
+      "vector": "SL:3/M:3/O:3/S:3/ED:2/EE:2/A:2/ID:2/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
     }]
   }]
 }

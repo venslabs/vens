@@ -14,7 +14,7 @@ Add this to your workflow after a container or dependency scan:
   id: vens
   uses: venslabs/vens-action@v0.2.0
   with:
-    version: v0.4.0
+    version: v0.6.0
     config-file: .vens/config.yaml
     input-report: report.json
     sbom-serial-number: ${{ vars.SBOM_SERIAL }}
@@ -53,7 +53,7 @@ For testing or cost savings, use the `mock` LLM provider — it returns fixed sc
 ```yaml
 - uses: venslabs/vens-action@v0.2.0
   with:
-    version: v0.4.0
+    version: v0.6.0
     config-file: .vens/config.yaml
     input-report: report.json
     sbom-serial-number: ${{ vars.SBOM_SERIAL }}
