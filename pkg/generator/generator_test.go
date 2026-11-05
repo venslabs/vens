@@ -31,6 +31,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -1233,6 +1234,46 @@ func TestDebugDir_OneDirectoryPerRun(t *testing.T) {
 		got[asked[0].VulnID] = true
 	}
 	require.Equal(t, map[string]bool{"CVE-2024-1111": true, "CVE-2024-2222": true}, got, "each run kept its own prompt")
+}
+
+// --debug-dir-keep prunes the oldest run-* directories once the new run's
+// directory exists, leaves anything that is not a run-* directory alone,
+// and 0 keeps everything (#397).
+func TestDebugDir_PruneKeepsLastN(t *testing.T) {
+	parent := t.TempDir()
+	now := time.Now()
+	old := []string{"run-aaa", "run-bbb", "run-ccc", "run-ddd"}
+	for i, name := range old {
+		dir := filepath.Join(parent, name)
+		require.NoError(t, os.Mkdir(dir, 0755))
+		mtime := now.Add(-time.Duration(len(old)-i) * time.Hour)
+		require.NoError(t, os.Chtimes(dir, mtime, mtime))
+	}
+	require.NoError(t, os.WriteFile(filepath.Join(parent, "notes.txt"), []byte("keep"), 0644))
+	require.NoError(t, os.Mkdir(filepath.Join(parent, "other-1"), 0755))
+
+	g, err := New(Opts{LLM: testutil.NewMockLLM(), Config: &riskconfig.Config{}, DebugDir: parent, DebugDirKeep: 2})
+	require.NoError(t, err)
+	require.NotEmpty(t, g.debugRunDir)
+
+	dirs := runDirs(t, parent)
+	require.Len(t, dirs, 2, "the new run plus the newest old run")
+	require.Contains(t, dirs, g.debugRunDir)
+	require.Contains(t, dirs, filepath.Join(parent, "run-ddd"), "the newest old run survives")
+	require.FileExists(t, filepath.Join(parent, "notes.txt"))
+	require.DirExists(t, filepath.Join(parent, "other-1"))
+}
+
+func TestDebugDir_KeepZeroKeepsAll(t *testing.T) {
+	parent := t.TempDir()
+	for _, name := range []string{"run-aaa", "run-bbb"} {
+		require.NoError(t, os.Mkdir(filepath.Join(parent, name), 0755))
+	}
+	g, err := New(Opts{LLM: testutil.NewMockLLM(), Config: &riskconfig.Config{}, DebugDir: parent})
+	require.NoError(t, err)
+	dirs := runDirs(t, parent)
+	require.Len(t, dirs, 3, "no pruning when keep is 0")
+	require.Contains(t, dirs, g.debugRunDir)
 }
 
 type attestedCall struct {
