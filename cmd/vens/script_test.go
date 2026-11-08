@@ -15,8 +15,17 @@
 package main
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/sha256"
+	"crypto/x509"
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
+	"math/big"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -24,6 +33,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gowebpki/jcs"
 	"github.com/rogpeppe/go-internal/testscript"
 )
 
@@ -91,6 +101,8 @@ func TestScript(t *testing.T) {
 			"json-contains": jsonContainsCmd,
 			"json-eq":       jsonEqCmd,
 			"envsubst":      envsubstCmd,
+			"gen-ec-key":    genECKeyCmd,
+			"jsf-verify":    jsfVerifyCmd,
 		},
 	})
 }
@@ -220,4 +232,152 @@ func truncate(s string, maxLen int) string {
 		return s
 	}
 	return s[:maxLen] + "\n... (truncated)"
+}
+
+// genECKeyCmd writes a fresh P-256 key as an unencrypted PKCS#8 PEM private key
+// and a PKIX PEM public key, so no private key has to live in the repo.
+func genECKeyCmd(ts *testscript.TestScript, neg bool, args []string) {
+	if neg || len(args) != 2 {
+		ts.Fatalf("usage: gen-ec-key private.pem public.pem")
+	}
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		ts.Fatalf("generating key: %v", err)
+	}
+	priv, err := x509.MarshalPKCS8PrivateKey(key)
+	if err != nil {
+		ts.Fatalf("marshal private key: %v", err)
+	}
+	pub, err := x509.MarshalPKIXPublicKey(&key.PublicKey)
+	if err != nil {
+		ts.Fatalf("marshal public key: %v", err)
+	}
+	write := func(name, blockType string, der []byte, mode os.FileMode) {
+		data := pem.EncodeToMemory(&pem.Block{Type: blockType, Bytes: der})
+		if err := os.WriteFile(ts.MkAbs(name), data, mode); err != nil {
+			ts.Fatalf("writing %s: %v", name, err)
+		}
+	}
+	write(args[0], "PRIVATE KEY", priv, 0o600)
+	write(args[1], "PUBLIC KEY", pub, 0o644)
+}
+
+// jsfVerifyCmd verifies the first JSF signer of a document against a PEM public
+// key (the pinned key, not the one embedded in the file) with an
+// implementation independent of pkg/attestation. It also checks that the
+// embedded publicKey is that same key and that the default keyId is the
+// SHA-256 of the public key's SPKI DER.
+//
+//	jsf-verify file pub.pem [keyid|default]
+func jsfVerifyCmd(ts *testscript.TestScript, neg bool, args []string) {
+	err := jsfVerify(ts, args)
+	if neg {
+		if err == nil {
+			ts.Fatalf("jsf-verify succeeded but should have failed")
+		}
+		return
+	}
+	if err != nil {
+		ts.Fatalf("jsf-verify: %v", err)
+	}
+}
+
+func jsfVerify(ts *testscript.TestScript, args []string) error {
+	if len(args) < 2 || len(args) > 3 {
+		return fmt.Errorf("usage: jsf-verify file pub.pem [keyid|default]")
+	}
+	data, err := os.ReadFile(ts.MkAbs(args[0]))
+	if err != nil {
+		return err
+	}
+	block, _ := pem.Decode(mustRead(ts, args[1]))
+	if block == nil {
+		return fmt.Errorf("%s: no PEM block", args[1])
+	}
+	parsed, err := x509.ParsePKIXPublicKey(block.Bytes)
+	if err != nil {
+		return err
+	}
+	pub, ok := parsed.(*ecdsa.PublicKey)
+	if !ok {
+		return fmt.Errorf("%s: not an ECDSA public key", args[1])
+	}
+
+	var doc map[string]any
+	if err := json.Unmarshal(data, &doc); err != nil {
+		return err
+	}
+	sigObj, _ := doc["signature"].(map[string]any)
+	signers, _ := sigObj["signers"].([]any)
+	if len(signers) == 0 {
+		return fmt.Errorf("no signature.signers")
+	}
+	signer, _ := signers[0].(map[string]any)
+	if signer["algorithm"] != "ES256" {
+		return fmt.Errorf("algorithm = %v, want ES256", signer["algorithm"])
+	}
+	value, _ := signer["value"].(string)
+	raw, err := base64.RawURLEncoding.DecodeString(value)
+	if err != nil || len(raw) != 64 {
+		return fmt.Errorf("signature value is not 64 bytes of base64url")
+	}
+
+	// Embedded publicKey must be the pinned key.
+	jwk, _ := signer["publicKey"].(map[string]any)
+	x, _ := jwk["x"].(string)
+	y, _ := jwk["y"].(string)
+	xb, errX := base64.RawURLEncoding.DecodeString(x)
+	yb, errY := base64.RawURLEncoding.DecodeString(y)
+	if errX != nil || errY != nil {
+		return fmt.Errorf("embedded publicKey x/y are not base64url")
+	}
+	pinnedRaw, err := pub.Bytes()
+	if err != nil {
+		return err
+	}
+	if jwk["kty"] != "EC" || jwk["crv"] != "P-256" ||
+		string(xb) != string(pinnedRaw[1:33]) || string(yb) != string(pinnedRaw[33:65]) {
+		return fmt.Errorf("embedded publicKey is not the pinned public key")
+	}
+
+	if len(args) == 3 {
+		want := args[2]
+		if want == "default" {
+			sum := sha256.Sum256(block.Bytes)
+			want = hex.EncodeToString(sum[:])
+		}
+		if signer["keyId"] != want {
+			return fmt.Errorf("keyId = %v, want %s", signer["keyId"], want)
+		}
+	}
+
+	// JSF section 8: keep only this signer, drop its value, JCS, SHA-256.
+	view := map[string]any{}
+	for k, v := range signer {
+		if k != "value" {
+			view[k] = v
+		}
+	}
+	sigObj["signers"] = []any{view}
+	reencoded, err := json.Marshal(doc)
+	if err != nil {
+		return err
+	}
+	canon, err := jcs.Transform(reencoded)
+	if err != nil {
+		return err
+	}
+	digest := sha256.Sum256(canon)
+	if !ecdsa.Verify(pub, digest[:], new(big.Int).SetBytes(raw[:32]), new(big.Int).SetBytes(raw[32:])) {
+		return fmt.Errorf("signature did not verify against %s", args[1])
+	}
+	return nil
+}
+
+func mustRead(ts *testscript.TestScript, name string) []byte {
+	b, err := os.ReadFile(ts.MkAbs(name))
+	if err != nil {
+		ts.Fatalf("reading %s: %v", name, err)
+	}
+	return b
 }

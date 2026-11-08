@@ -225,7 +225,7 @@ vens generate --attest \
     - `input_hash` — SHA-256 of the scanner report bytes
     - `config_hash` — SHA-256 of the `config.yaml` used
     - `raw_response` — base64-encoded raw LLM JSON reply (flagged `sensitiveData`)
-- `assessors[]` + `attestations[]` — tie the claims to vens as the producer; a human reviewer can later add their own assessor/attestation over the same claims without touching the LLM evidence
+- `assessors[]` + `attestations[]` — tie the claims to vens as the producer; a human reviewer can add their own assessor/attestation over the same claims without touching the LLM evidence, but not by editing a [signed](#-attest-signing-key-path) sidecar (see the note there)
 
 The producing `vens` version is recorded in `metadata.tools`. The attestation is a `file` component that links to the VEX it describes through a `bom` external reference (`urn:cdx:<vex-serial>/<version>`).
 
@@ -234,6 +234,58 @@ The producing `vens` version is recorded in `metadata.tools`. The attestation is
 
 !!! warning "The attestation is sensitive — store it like audit evidence"
     The claims spell out, in clear text, which CVEs you scored, their scores and the model's reasoning, and `raw_response` holds the full model reply **base64-encoded, not encrypted** (anyone with the file can decode it). The prompt, scanner report and config are kept only as SHA-256 hashes, so the raw vulnerability list is not embedded, but the assessment itself is fully readable. In CI, write the attestation to the same access-controlled store as your other security evidence, not to a public build artifact.
+
+### `--attest-signing-key <path>`
+
+Opt-in. Requires `--attest`. Signs the CDXA sidecar with a BOM-level [JSF](https://cyberphone.github.io/doc/security/jsf.html) signature (`signature.signers[]`, algorithm `ES256`). The value is a **path to a file**, not the key itself: an unencrypted **PKCS#8 PEM** ECDSA **P-256** (`prime256v1`) private key. Passphrase-protected keys are rejected; `openssl pkey -in enc.key -out attest.key` decrypts one.
+
+One-time setup: generate the key once, keep `attest.key` in your CI secret store, and publish `attest.pub.pem` somewhere your verifiers already trust (for example, in the repo).
+
+```bash
+umask 077
+openssl ecparam -name prime256v1 -genkey -noout \
+  | openssl pkcs8 -topk8 -nocrypt -out attest.key
+openssl ec -in attest.key -pubout -out attest.pub.pem
+```
+
+Per run, write the key from your secret store to a `0600` file (`umask 077` / `chmod 600`) before running vens:
+
+```bash
+vens generate --attest --attest-signing-key attest.key \
+  --config-file c.yaml \
+  --sbom-serial-number "$SBOM_UUID" \
+  report.json out.cdx.json
+# out.attestation.cdx.json carries signature.signers[0] {algorithm,keyId,publicKey,value}
+```
+
+Optional `--attest-signing-key-id <id>` (requires `--attest-signing-key`) sets the JSF `keyId` label (default: hex SHA-256 fingerprint of the public key's SPKI). It is only a label: it does not identify who signed.
+
+Fail-closed: `--attest-signing-key` without `--attest`, an empty `--attest-signing-key=`, `--attest-signing-key-id` without a key path, or an unreadable, encrypted or non-P-256 key is a hard error before any output is written. A SEC1 `EC PRIVATE KEY` is rejected too; `openssl pkcs8 -topk8 -nocrypt` converts it.
+
+!!! note "What the signature proves"
+    It proves the sidecar has not changed since someone holding the private key signed it, **if you check it against your own public key**. It does not sign the VEX (the sidecar names the VEX by serial number and version only, with no hash), it does not prove when it was signed, and `keyId` is only a label. The `publicKey` embedded in the file is self-asserted: checking against it only catches accidental damage, because anyone who edits a claim can re-sign the file with their own key.
+
+    Editing a signed sidecar, for example to add a reviewer's assessor or attestation, breaks the signature. Keep the vens-signed file as is and record the review in a separate CDXA file, or add a second signer to `signature.signers[]`.
+
+**Verify** (CycloneDX JSON JSF; `cyclonedx-cli` cannot verify JSON signatures today). Check against the public key from the setup step, and check that the sidecar belongs to the VEX next to it:
+
+```bash
+npm install @cyclonedx/sign@0.5.2
+node --input-type=module -e '
+  import { verify } from "@cyclonedx/sign/jsf";
+  import { readFileSync } from "node:fs";
+  const doc = JSON.parse(readFileSync("out.attestation.cdx.json", "utf8"));
+  const r = await verify(doc, { allowedAlgorithms: ["ES256"], publicKey: readFileSync("attest.pub.pem", "utf8") });
+  const vex = JSON.parse(readFileSync("out.cdx.json", "utf8"));
+  const link = doc.metadata?.component?.externalReferences?.find(e => e.type === "bom")?.url;
+  const want = `urn:cdx:${vex.serialNumber.replace(/^urn:uuid:/, "")}/${vex.version}`;
+  console.log("valid:", r.valid, "bom link matches VEX:", link === want);
+  process.exit(r.valid && link === want ? 0 : 1);'
+```
+
+Without the `bom` link check, a signed sidecar left over from an earlier run still verifies next to a new VEX.
+
+Digest rule (for a custom verifier): keep only the signer you are checking in `signature.signers`, drop its `value`, then take the SHA-256 of the [JCS](https://www.rfc-editor.org/rfc/rfc8785) form of the whole document (JSF section 8). For the single signer vens writes that is `{"signature":{"signers":[<signer without value>]}}`, and it stays correct after a countersignature. Do not strip the whole `signature` member.
 
 ### `--sbom-version <int>`
 
