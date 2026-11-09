@@ -48,8 +48,19 @@
 }
 
 /* The landing renders full-bleed sections in the tabs block; the page's own
-   (empty) content area is dropped so there is no gap before the footer. */
-.vens-hero ~ .md-main { display: none; }
+   (empty) content area is dropped so there is no gap before the footer.
+   On wide screens the whole .md-main can go. Below 76.25em, Material turns the
+   primary sidebar (inside .md-main) into the hamburger drawer, so we keep
+   .md-main there and only hide the empty content, otherwise the drawer is empty. */
+@media screen and (min-width: 76.25em) {
+  .vens-hero ~ .md-main { display: none; }
+}
+@media screen and (max-width: 76.234375em) {
+  .vens-hero ~ .md-main { flex-grow: 0; }
+  .vens-hero ~ .md-main .md-main__inner { margin-top: 0; }
+  .vens-hero ~ .md-main .md-content,
+  .vens-hero ~ .md-main .md-sidebar--secondary { display: none; }
+}
 
 /* the header logo is the vens wordmark, so hide the redundant site-name text
    (the per-page title in the second topic still shows on scroll) */
