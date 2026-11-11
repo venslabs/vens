@@ -361,6 +361,85 @@ func TestPromptAuditRequirementConditional(t *testing.T) {
 	})
 }
 
+// TestPromptConfigLookups checks that the prompt spells out, for the run's
+// config, the values the TECHNICAL_IMPACT and BUSINESS_IMPACT lookups admit
+// (#310 step 0B, arm (b)).
+func TestPromptConfigLookups(t *testing.T) {
+	level := func(s string) *string { return &s }
+	cases := []struct {
+		name     string
+		ctx      riskconfig.ContextHints
+		want     []string
+		dontWant []string
+	}{
+		{
+			name: "vens-demo internet-facing",
+			ctx: riskconfig.ContextHints{
+				Exposure: "internet", DataSensitivity: "critical", BusinessCriticality: "critical",
+				AvailabilityRequirement: level("critical"), AuditRequirement: level("high"),
+				ComplianceRequirements: []string{"PCI-DSS", "GDPR"},
+			},
+			want: []string{
+				"technical_impact must be one of: 7, 8, 9 (",
+				"business_impact must be one of: 9 (",
+				"THIS vuln still decides which impact axes it hits (confidentiality or integrity, availability, accountability) and whether it triggers a compliance violation; the lookups only give the values",
+			},
+		},
+		{
+			name: "vens-demo internal",
+			ctx: riskconfig.ContextHints{
+				Exposure: "internal", DataSensitivity: "low", BusinessCriticality: "low",
+				AvailabilityRequirement: level("low"), AuditRequirement: level("low"),
+			},
+			want: []string{
+				"technical_impact must be one of: 1, 2, 3 (",
+				"business_impact must be one of: 1, 2, 3 (",
+				"THIS vuln still decides which impact axes it hits (confidentiality or integrity, availability, accountability); the lookups only give the values",
+			},
+			dontWant: []string{"compliance violation"},
+		},
+		{
+			name: "no availability_requirement nor audit_requirement, compliance on a medium system",
+			ctx: riskconfig.ContextHints{
+				Exposure: "internal", DataSensitivity: "high", BusinessCriticality: "medium",
+				ComplianceRequirements: []string{"GDPR"},
+			},
+			want: []string{
+				"technical_impact must be one of: 4, 5, 6, 7, 8 (C/I breach: data_sensitivity high = 7-8; availability loss: business_criticality medium = 4-6;",
+				"business_impact must be one of: 4, 5, 6, 7, 8 (business_criticality medium = 4-6, +2 if THIS vuln triggers a compliance violation (data breach/audit failure), capped at 9)",
+				"which impact axes it hits (confidentiality or integrity, availability) and whether",
+			},
+			dontWant: []string{"accountability loss"},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := &riskconfig.Config{Project: riskconfig.ProjectConfig{Name: "p"}, Context: tc.ctx}
+			prompt := newTestGenerator(t, cfg).buildSystemPrompt()
+			want := append([]string{
+				"CONFIG LOOKUPS for THIS system",
+				"The Output Example below is a fictitious format illustration from another system: its impact values are not this system's, and these lookups take precedence over it",
+				"Do not adjust either one for how likely THIS vuln is to be exploited: the lookups set the impact, likelihood belongs in THREAT_AGENT and VULNERABILITY",
+			}, tc.want...)
+			for _, w := range want {
+				if !strings.Contains(prompt, w) {
+					t.Errorf("prompt missing %q", w)
+				}
+			}
+			for _, w := range append([]string{"how much it exposes"}, tc.dontWant...) {
+				if strings.Contains(prompt, w) {
+					t.Errorf("prompt should not contain %q", w)
+				}
+			}
+		})
+	}
+
+	g := &Generator{o: Opts{LLM: testutil.NewMockLLM(), BatchSize: 10}}
+	if strings.Contains(g.buildSystemPrompt(), "CONFIG LOOKUPS") {
+		t.Error("a nil config should give no lookups")
+	}
+}
+
 // schemaDoc mirrors the JSON Schema produced by buildOutputSchema, enough to
 // assert on its shape in tests.
 type schemaDoc struct {

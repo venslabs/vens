@@ -792,9 +792,87 @@ TASK: For EACH vulnerability, analyze its specific characteristics and score 4 f
    - Cap at 9
 
 SCORING SCALE: low:1-3, medium:4-6, high:7-8, critical:9
-OUTPUT: 4 scores (0-9) + brief reasoning for THIS specific vulnerability in THIS context.
+`
+	if g.o.Config != nil {
+		prompt += configLookups(g.o.Config.Context)
+	}
+	prompt += `OUTPUT: 4 scores (0-9) + brief reasoning for THIS specific vulnerability in THIS context.
 `
 	return prompt
+}
+
+// scaleValues lists the values the SCORING SCALE line admits for each context level.
+var scaleValues = map[string][]int{
+	"low":      {1, 2, 3},
+	"medium":   {4, 5, 6},
+	"high":     {7, 8},
+	"critical": {9},
+}
+
+// configLookups spells out the values the TECHNICAL_IMPACT and BUSINESS_IMPACT
+// lookups admit for this config, so the model looks them up instead of
+// estimating them (#310 step 0B, arm (b)). It restates the rules above; it adds
+// none.
+func configLookups(c riskconfig.ContextHints) string {
+	avail, availName := c.BusinessCriticality, "business_criticality"
+	if c.AvailabilityRequirement != nil {
+		avail, availName = *c.AvailabilityRequirement, "availability_requirement"
+	}
+	axes := []string{
+		fmt.Sprintf("C/I breach: data_sensitivity %s = %s", c.DataSensitivity, scaleText(c.DataSensitivity)),
+		fmt.Sprintf("availability loss: %s %s = %s", availName, avail, scaleText(avail)),
+	}
+	axisNames := "confidentiality or integrity, availability"
+	tech := append(append([]int{}, scaleValues[c.DataSensitivity]...), scaleValues[avail]...)
+	if c.AuditRequirement != nil {
+		axes = append(axes, fmt.Sprintf("accountability loss: audit_requirement %s = %s", *c.AuditRequirement, scaleText(*c.AuditRequirement)))
+		tech = append(tech, scaleValues[*c.AuditRequirement]...)
+		axisNames += ", accountability"
+	}
+	bus := append([]int{}, scaleValues[c.BusinessCriticality]...)
+	busWhy := fmt.Sprintf("business_criticality %s = %s", c.BusinessCriticality, scaleText(c.BusinessCriticality))
+	decides := "which impact axes it hits (" + axisNames + ")"
+	if len(c.ComplianceRequirements) > 0 {
+		for _, v := range scaleValues[c.BusinessCriticality] {
+			bus = append(bus, min(v+2, 9))
+		}
+		busWhy += ", +2 if THIS vuln triggers a compliance violation (data breach/audit failure), capped at 9"
+		decides += " and whether it triggers a compliance violation"
+	}
+	return fmt.Sprintf(`CONFIG LOOKUPS for THIS system (SYSTEM CONTEXT read through the SCORING SCALE; look these up, do not estimate them):
+   - technical_impact must be one of: %s (%s; the highest that applies to THIS vuln)
+   - business_impact must be one of: %s (%s)
+   - THIS vuln still decides %s; the lookups only give the values
+   - Do not adjust either one for how likely THIS vuln is to be exploited: the lookups set the impact, likelihood belongs in THREAT_AGENT and VULNERABILITY
+   - The Output Example below is a fictitious format illustration from another system: its impact values are not this system's, and these lookups take precedence over it
+`, joinValues(tech), strings.Join(axes, "; "), joinValues(bus), busWhy, decides)
+}
+
+// scaleText renders a level's admitted values as the SCORING SCALE line does: 9, or 7-8.
+func scaleText(level string) string {
+	v := scaleValues[level]
+	if len(v) == 0 {
+		return "?"
+	}
+	if len(v) == 1 {
+		return fmt.Sprint(v[0])
+	}
+	return fmt.Sprintf("%d-%d", v[0], v[len(v)-1])
+}
+
+// joinValues sorts and de-duplicates vs and joins them with ", ".
+func joinValues(vs []int) string {
+	seen := make(map[int]bool, len(vs))
+	var out []string
+	sorted := append([]int{}, vs...)
+	sort.Ints(sorted)
+	for _, v := range sorted {
+		if !seen[v] {
+			seen[v] = true
+			out = append(out, fmt.Sprint(v))
+		}
+	}
+	return strings.Join(out, ", ")
 }
 
 // buildOutputSchema returns the JSON Schema the LLM output must satisfy.
