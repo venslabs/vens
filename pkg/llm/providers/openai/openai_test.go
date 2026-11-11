@@ -30,28 +30,38 @@ import (
 	"github.com/venslabs/vens/pkg/llm"
 )
 
-func TestIsReasoningModel(t *testing.T) {
-	cases := map[string]bool{
-		// reasoning models reject an explicit temperature
-		"o1":         true,
-		"o1-mini":    true,
-		"o3":         true,
-		"o3-mini":    true,
-		"o4-mini":    true,
-		"gpt-5":      true,
-		"gpt-5-mini": true,
-		// chat models take temperature=0 for deterministic scoring
-		"gpt-4o":        false,
-		"gpt-4o-mini":   false,
-		"gpt-4.1":       false,
-		"gpt-4-turbo":   false,
-		"gpt-3.5-turbo": false,
-		"":              false,
+// A reasoning model with an explicit temperature fails clearly instead of
+// silently dropping the flag; no request is sent.
+func TestGenerate_ReasoningModelRefusesExplicitTemperature(t *testing.T) {
+	url, captured := fakeServer(t, http.StatusOK, successBody)
+	c := newTestClient(t, "o3-mini", url)
+	_, err := c.Generate(context.Background(), llm.Request{
+		Schema:      json.RawMessage(testSchema),
+		Temperature: fptr(0.7),
+	})
+	if err == nil || !strings.Contains(err.Error(), "refuses an explicit temperature") {
+		t.Fatalf("Generate err = %v, want a refuses-temperature error", err)
 	}
-	for model, want := range cases {
-		if got := isReasoningModel(model); got != want {
-			t.Errorf("isReasoningModel(%q) = %v, want %v", model, got, want)
-		}
+	if len(*captured) != 0 {
+		t.Error("no request must be sent when the model refuses the temperature")
+	}
+}
+
+// Without an explicit temperature, no temperature key is sent — for chat
+// models and reasoning models alike. The flag's zero default is never
+// forwarded on its own, so a plain run keeps working on both.
+func TestGenerate_OmitsTemperatureWhenFlagNotPassed(t *testing.T) {
+	for _, model := range []string{"gpt-4o", "gpt-5.4-mini"} {
+		t.Run(model, func(t *testing.T) {
+			url, captured := fakeServer(t, http.StatusOK, successBody)
+			c := newTestClient(t, model, url)
+			if _, err := c.Generate(context.Background(), llm.Request{Schema: json.RawMessage(testSchema)}); err != nil {
+				t.Fatalf("Generate: %v", err)
+			}
+			if _, ok := (*captured)["temperature"]; ok {
+				t.Error("temperature must be omitted when the flag is not passed")
+			}
+		})
 	}
 }
 
@@ -158,23 +168,8 @@ func TestGenerate_RequestShape(t *testing.T) {
 	}
 }
 
-// Reasoning models must not receive an explicit temperature, and seed is omitted
-// when zero.
-func TestGenerate_OmitsTemperatureAndSeed(t *testing.T) {
-	t.Run("reasoning model omits temperature", func(t *testing.T) {
-		url, captured := fakeServer(t, http.StatusOK, successBody)
-		c := newTestClient(t, "o3-mini", url)
-		if _, err := c.Generate(context.Background(), llm.Request{
-			Schema:      json.RawMessage(testSchema),
-			Temperature: fptr(0.7),
-		}); err != nil {
-			t.Fatalf("Generate: %v", err)
-		}
-		if _, ok := (*captured)["temperature"]; ok {
-			t.Error("reasoning model must omit temperature")
-		}
-	})
-
+// A zero seed is omitted from the request.
+func TestGenerate_OmitsSeed(t *testing.T) {
 	t.Run("zero seed omitted", func(t *testing.T) {
 		url, captured := fakeServer(t, http.StatusOK, successBody)
 		c := newTestClient(t, "gpt-4o", url)
@@ -183,17 +178,6 @@ func TestGenerate_OmitsTemperatureAndSeed(t *testing.T) {
 		}
 		if _, ok := (*captured)["seed"]; ok {
 			t.Error("seed must be omitted when 0")
-		}
-	})
-
-	t.Run("temperature omitted when flag not passed", func(t *testing.T) {
-		url, captured := fakeServer(t, http.StatusOK, successBody)
-		c := newTestClient(t, "gpt-4o", url)
-		if _, err := c.Generate(context.Background(), llm.Request{Schema: json.RawMessage(testSchema)}); err != nil {
-			t.Fatalf("Generate: %v", err)
-		}
-		if _, ok := (*captured)["temperature"]; ok {
-			t.Error("temperature must be omitted when --llm-temperature wasn't passed")
 		}
 	})
 }
@@ -364,5 +348,23 @@ func TestGenerate_OtherBadRequestIsNotStructuredOutput(t *testing.T) {
 	}
 	if errors.Is(err, llm.ErrUnsupportedStructuredOutput) {
 		t.Errorf("err = %v, want it classified as a plain provider error", err)
+	}
+}
+
+// An unknown model id (an Azure deployment name or a future id) is not in
+// the refuse-list; when the API answers the explicit temperature with a 400
+// naming the parameter, fail with the same clear message.
+func TestGenerate_TemperatureRefusedByAPI(t *testing.T) {
+	const body = `{"error":{"message":"Unsupported parameter: 'temperature' is not supported with this model.",` +
+		`"type":"invalid_request_error","param":"temperature","code":null}}`
+	url, _ := fakeServer(t, http.StatusBadRequest, body)
+	c := newTestClient(t, "future-reasoning-9", url)
+
+	_, err := c.Generate(context.Background(), llm.Request{
+		Schema:      json.RawMessage(testSchema),
+		Temperature: fptr(0.7),
+	})
+	if err == nil || !strings.Contains(err.Error(), "refused the explicit --llm-temperature") {
+		t.Fatalf("Generate err = %v, want a refused-temperature error", err)
 	}
 }
