@@ -743,11 +743,21 @@ TASK: For EACH vulnerability, analyze its specific characteristics and score 4 f
    - Consider: Does system exposure match vuln attack vector?
    - Internet-exposed remote vuln: 7-9 | Private network local vuln: 3-5 | Mismatch: lower
    - Adjust for attacker motivation based on business value
+   - Anchors: the average of OWASP's four threat agent factors, for the worst-case attacker group
+     * Skill level: no technical skills 1, some technical skills 3, advanced computer user 5, network and programming skills 6, security penetration skills 9
+     * Motive: low or no reward 1, possible reward 4, high reward 9
+     * Opportunity: full access or expensive resources required 0, special access or resources required 4, some access or resources required 7, no access or resources required 9
+     * Size: developers or system administrators 2, intranet users 4, partners 5, authenticated users 6, anonymous Internet users 9
 
 2. VULNERABILITY (How exploitable is THIS specific vuln?)
    CRITICAL: Score the ACTUAL vulnerability, not the system
    - Analyze: CVE/description reveals public exploits? Known PoC? Automated scanners detect it?
-   - Easy discovery + exploit available: 7-9 | Requires expertise: 4-6 | Theoretical/complex: 1-3`
+   - Easy discovery + exploit available: 7-9 | Requires expertise: 4-6 | Theoretical/complex: 1-3
+   - Anchors: the average of OWASP's four vulnerability factors, for that attacker group
+     * Ease of discovery: practically impossible 1, difficult 3, easy 7, automated tools available 9
+     * Ease of exploit: theoretical 1, difficult 3, easy 5, automated tools available 9
+     * Awareness: unknown 1, hidden 4, obvious 6, public knowledge 9
+     * Intrusion detection: active detection in application 1, logged and reviewed 3, logged without review 8, not logged 9`
 
 	if g.o.Config != nil {
 		controls := g.o.Config.Context.Controls
@@ -829,25 +839,29 @@ const outputSchema = `{
   "required": ["results"]
 }`
 
-// buildOutputExample returns an example output for the LLM.
+// buildOutputExample returns an example output for the LLM. It is neutral: each
+// score field averages 4.5 across the two exemplars and spans both ends of the
+// scale, and each exemplar averages 4.5 over its four scores, so it shows the
+// format, with the four scores not moving together, without pulling scores to
+// one side (#310 step 0B, arm (a)).
 func (g *Generator) buildOutputExample() string {
 	return `{
   "results": [
     {
       "vulnId": "CVE-2024-1234",
-      "threat_agent_score": 8,
+      "threat_agent_score": 2,
       "vulnerability_score": 7,
-      "technical_impact": 8,
-      "business_impact": 9,
-      "reasoning": "RCE in OpenSSL: ThreatAgent=8 (internet-exposed, attracts skilled attackers), Vulnerability=7 (known exploit exists), TechImpact=8 (full system compromise), BusinessImpact=9 (critical system + compliance risk)"
+      "technical_impact": 7,
+      "business_impact": 2,
+      "reasoning": "Path traversal reachable by local administrators only: ThreatAgent=2 (skill 3, motive 1, opportunity 0, size 2), Vulnerability=7 (discovery 7, exploit 5, awareness 9, detection 8), TechImpact=7 (C/I breach, data_sensitivity high), BusinessImpact=2 (business_criticality low)"
     },
     {
       "vulnId": "CVE-2024-5678",
-      "threat_agent_score": 3,
-      "vulnerability_score": 4,
-      "technical_impact": 4,
-      "business_impact": 5,
-      "reasoning": "DoS in logging lib: ThreatAgent=3 (internal only), Vulnerability=4 (requires config), TechImpact=4 (availability impact medium), BusinessImpact=5 (medium criticality system)"
+      "threat_agent_score": 7,
+      "vulnerability_score": 2,
+      "technical_impact": 2,
+      "business_impact": 7,
+      "reasoning": "Crash behind a rare build option on a public endpoint: ThreatAgent=7 (skill 9, motive 4, opportunity 7, size 9), Vulnerability=2 (discovery 1, exploit 1, awareness 4, detection 3), TechImpact=2 (availability loss, availability_requirement low), BusinessImpact=7 (business_criticality high)"
     }
   ]
 }`

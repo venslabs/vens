@@ -16,6 +16,7 @@ package generator
 
 import (
 	"encoding/json"
+	"math"
 	"strings"
 	"testing"
 
@@ -511,23 +512,18 @@ func TestExampleSchemaConsistency(t *testing.T) {
 		}
 	}
 
-	scorePatterns := []string{
-		`"threat_agent_score": 8`,
-		`"vulnerability_score": 7`,
-		`"technical_impact": 8`,
-		`"business_impact": 9`,
+	var parsed struct {
+		Results []map[string]any `json:"results"`
 	}
-
-	foundNumericScore := false
-	for _, pattern := range scorePatterns {
-		if strings.Contains(example, pattern) {
-			foundNumericScore = true
-			break
+	if err := json.Unmarshal([]byte(example), &parsed); err != nil {
+		t.Fatalf("Example is not valid JSON: %v", err)
+	}
+	for _, r := range parsed.Results {
+		for _, field := range scoreFieldNames {
+			if _, ok := r[field].(float64); !ok {
+				t.Errorf("Example should give %s as a number (not a quoted string), got %v", field, r[field])
+			}
 		}
-	}
-
-	if !foundNumericScore {
-		t.Error("Example should contain numeric scores (not quoted strings)")
 	}
 }
 
@@ -616,43 +612,78 @@ func TestOutputExampleValidJSON(t *testing.T) {
 	}
 }
 
+// scoreFieldNames are the four aggregates the model returns per vulnerability.
+var scoreFieldNames = []string{"threat_agent_score", "vulnerability_score", "technical_impact", "business_impact"}
+
+// TestOutputExampleFewShotDiversity checks that the example is neutral (#310 step
+// 0B, arm (a), decided 14/10/2026: the test changes, not the arm). Across the
+// exemplars every score field averages the scale's midpoint and shows both a low
+// and a high value, and no exemplar sits on one side of the scale over its four
+// scores, so the example cannot pull every score up or down.
 func TestOutputExampleFewShotDiversity(t *testing.T) {
 	g := newTestGenerator(t, minimalConfig())
 	example := g.buildOutputExample()
 
-	var parsed map[string]interface{}
+	var parsed struct {
+		Results []map[string]any `json:"results"`
+	}
 	if err := json.Unmarshal([]byte(example), &parsed); err != nil {
 		t.Fatalf("Example is not valid JSON: %v", err)
 	}
-
-	results, ok := parsed["results"].([]interface{})
-	if !ok {
-		t.Fatal("Parsed example missing 'results' array")
+	if len(parsed.Results) < 2 {
+		t.Fatal("Example should contain at least 2 results for few-shot diversity")
 	}
 
-	if len(results) < 2 {
-		t.Error("Example should contain at least 2 results for few-shot diversity")
-	}
-
-	var hasHighScore, hasLowScore bool
-	for _, r := range results {
-		result, ok := r.(map[string]interface{})
-		if !ok {
-			continue
+	for _, field := range scoreFieldNames {
+		var sum float64
+		var hasLow, hasHigh bool
+		for _, r := range parsed.Results {
+			v, ok := r[field].(float64)
+			if !ok {
+				t.Fatalf("%s is not a number in %v", field, r["vulnId"])
+			}
+			sum += v
+			hasLow = hasLow || v <= 3
+			hasHigh = hasHigh || v >= 6
 		}
-
-		if score, ok := result["threat_agent_score"].(float64); ok {
-			if score >= 7 {
-				hasHighScore = true
-			}
-			if score <= 4 {
-				hasLowScore = true
-			}
+		if mean := sum / float64(len(parsed.Results)); math.Abs(mean-4.5) > 0.5 {
+			t.Errorf("%s averages %.2f across the exemplars, want 4.5 +/- 0.5", field, mean)
+		}
+		if !hasLow || !hasHigh {
+			t.Errorf("%s should show a value <= 3 and a value >= 6 across the exemplars", field)
 		}
 	}
+	for _, r := range parsed.Results {
+		var sum float64
+		for _, field := range scoreFieldNames {
+			sum += r[field].(float64)
+		}
+		if mean := sum / float64(len(scoreFieldNames)); math.Abs(mean-4.5) > 0.5 {
+			t.Errorf("exemplar %v averages %.2f over its four scores, want 4.5 +/- 0.5", r["vulnId"], mean)
+		}
+	}
+}
 
-	if !hasHighScore || !hasLowScore {
-		t.Error("Example should show both high-score and low-score cases for calibration")
+// TestPromptPerFactorAnchors checks that THREAT_AGENT and VULNERABILITY carry
+// OWASP's level anchors for each of their four factors (#310 step 0B, arm (a)).
+func TestPromptPerFactorAnchors(t *testing.T) {
+	g := newTestGenerator(t, minimalConfig())
+	prompt := g.buildSystemPrompt()
+
+	anchors := []string{
+		"Skill level: no technical skills 1, some technical skills 3, advanced computer user 5, network and programming skills 6, security penetration skills 9",
+		"Motive: low or no reward 1, possible reward 4, high reward 9",
+		"Opportunity: full access or expensive resources required 0, special access or resources required 4, some access or resources required 7, no access or resources required 9",
+		"Size: developers or system administrators 2, intranet users 4, partners 5, authenticated users 6, anonymous Internet users 9",
+		"Ease of discovery: practically impossible 1, difficult 3, easy 7, automated tools available 9",
+		"Ease of exploit: theoretical 1, difficult 3, easy 5, automated tools available 9",
+		"Awareness: unknown 1, hidden 4, obvious 6, public knowledge 9",
+		"Intrusion detection: active detection in application 1, logged and reviewed 3, logged without review 8, not logged 9",
+	}
+	for _, a := range anchors {
+		if !strings.Contains(prompt, a) {
+			t.Errorf("Prompt missing per-factor anchor: %q", a)
+		}
 	}
 }
 
