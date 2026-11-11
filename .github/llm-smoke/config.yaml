@@ -1,0 +1,10 @@
+# Minimal project context for the nightly real-provider LLM smoke test
+# (.github/workflows/nightly-llm-smoke.yml). Kept tiny on purpose: two
+# vulnerabilities are enough to prove a provider still speaks our protocol.
+project:
+  name: "llm-smoke"
+  description: "Nightly real-provider smoke test fixture"
+context:
+  exposure: "private"
+  data_sensitivity: "medium"
+  business_criticality: "high"
