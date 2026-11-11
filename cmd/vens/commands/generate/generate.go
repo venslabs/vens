@@ -69,6 +69,7 @@ The LLM calculates the OWASP risk score (0-81) for each vulnerability using:
 	flags.String("output-format", "auto", "Output format ([auto cyclonedxvex])")
 	flags.String("cyclonedx-spec-version", outputhandler.DefaultSpecVersion, fmt.Sprintf("CycloneDX spec version for VEX output (%s)", strings.Join(outputhandler.SupportedSpecVersions, " ")))
 	flags.String("debug-dir", "", "Directory to save debug files (prompts, responses)")
+	flags.Int("debug-dir-keep", 0, "Keep at most N run directories under --debug-dir, deleting the oldest first (0 keeps all)")
 	flags.String("sbom-serial-number", "", "SBOM serial number for BOM-Link (format: urn:uuid:...)")
 	flags.Int("sbom-version", 1, "SBOM version for BOM-Link (default: 1)")
 	flags.Bool("attest", false, "Emit a CycloneDX Attestations (CDXA) sibling file with prompt hash, input hash, model, seed, raw LLM response")
@@ -164,6 +165,10 @@ func action(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	o.DebugDir, err = flags.GetString("debug-dir")
+	if err != nil {
+		return err
+	}
+	o.DebugDirKeep, err = flags.GetInt("debug-dir-keep")
 	if err != nil {
 		return err
 	}
