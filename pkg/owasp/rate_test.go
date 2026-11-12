@@ -122,7 +122,7 @@ func TestRate_TakesTheLargerImpact(t *testing.T) {
 }
 
 // OWASP's bands, 0 to under 3 LOW, 3 to under 6 MEDIUM, 6 and up HIGH, each
-// edge beside the reachable value under it.
+// edge beside the next value under it on the /8 or /4 grid.
 func TestRate_BandEdges(t *testing.T) {
 	runRateCases(t, []rateCase{
 		{"impact 2.75 is LOW", 4.25, 2.75, 1.75, "low", 11.6875},
@@ -204,11 +204,11 @@ func sumCounts(sets [][]int) map[int]int {
 	return counts
 }
 
-// Over the product of calculatorLevelSets, a superset of the vectors vens can
+// Over the product of reachableLevelSets, a superset of the vectors vens can
 // emit: no vector rates Note, the ranges are those of #310 step 3, and the
-// severities count what the calculator's JAR gave through its own bands,
-// max(T, B) and OWASP's matrix.
-func TestRate_CalculatorLevelSetsProduct(t *testing.T) {
+// severities count what #310 step 3's run got by crossing the JAR's own bands
+// of the likelihood and of max(T, B) in OWASP's matrix.
+func TestRate_ReachableLevelSetsProduct(t *testing.T) {
 	sets := levelSets(t)
 	likelihood, technical, business := sumCounts(sets[0:8]), sumCounts(sets[8:12]), sumCounts(sets[12:16])
 

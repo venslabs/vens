@@ -129,8 +129,8 @@ func mirrorParse(vector string) ([16]int, bool) {
 	if !mirrorPattern.MatchString(vector) {
 		return levels, false
 	}
-	for i, token := range strings.Split(vector, "/") {
-		level, err := strconv.Atoi(strings.Split(token, ":")[1])
+	for i, part := range strings.Split(vector, "/") {
+		level, err := strconv.Atoi(strings.Split(part, ":")[1])
 		if err != nil || !mirrorAccepts(i, level) {
 			return levels, false
 		}
@@ -297,29 +297,66 @@ func TestLevelConstantsAreTheCalculatorsEnums(t *testing.T) {
 }
 
 // Check compares values, so a constant sharing its level with another (Size 2,
-// LC 6, LAV 5) could drop out of its table unseen: each table lists its type's
-// constants, each once.
+// LC 6, LAV 5) could drop out of its table unseen: the table Check passes for
+// each factor lists that factor's constants, each once.
 func TestLevelTablesListEachConstantOnce(t *testing.T) {
 	consts, tables := goLevelDecls(t)
 	for _, f := range mirrorEnums {
+		table := tables[f.abbr]
 		want := slices.Sorted(maps.Keys(consts[f.enum]))
-		got := slices.Sorted(slices.Values(tables[f.enum]))
-		if !slices.Equal(got, want) {
-			t.Errorf("the table of %s lists %v, its constants are %v", f.enum, got, want)
+		got := slices.Sorted(slices.Values(table.levels))
+		if table.typ != f.enum || !slices.Equal(got, want) {
+			t.Errorf("Check reads %s in a []%s listing %v, want the %s constants %v", f.abbr, table.typ, got, f.enum, want)
 		}
 	}
 }
 
+type levelTable struct {
+	typ    string
+	levels []string
+}
+
 // goLevelDecls reads the package's typed integer constants, keyed by type then
-// name, and what each []Type literal lists, keyed by type.
-func goLevelDecls(t *testing.T) (consts map[string]map[string]int, tables map[string][]string) {
+// name, and the table Check passes for each factor, keyed by its abbreviation.
+func goLevelDecls(t *testing.T) (consts map[string]map[string]int, tables map[string]levelTable) {
+	t.Helper()
+	fset := token.NewFileSet()
+	consts, vars := map[string]map[string]int{}, map[string]levelTable{}
+	var check *ast.FuncDecl
+	for _, decl := range packageDecls(t, fset) {
+		switch d := decl.(type) {
+		case *ast.FuncDecl:
+			if d.Recv != nil && d.Name.Name == "Check" {
+				check = d
+			}
+		case *ast.GenDecl:
+			addGenDecl(t, fset, d, consts, vars)
+		}
+	}
+	if check == nil {
+		t.Fatal("the package declares no Check method")
+	}
+	tables = map[string]levelTable{}
+	ast.Inspect(check.Body, func(n ast.Node) bool {
+		call, ok := n.(*ast.CallExpr)
+		if !ok || types.ExprString(call.Fun) != "offLevel" || len(call.Args) != 3 {
+			return true
+		}
+		if abbr, err := strconv.Unquote(types.ExprString(call.Args[0])); err == nil {
+			tables[abbr] = vars[types.ExprString(call.Args[2])]
+		}
+		return true
+	})
+	return consts, tables
+}
+
+func packageDecls(t *testing.T, fset *token.FileSet) []ast.Decl {
 	t.Helper()
 	files, err := filepath.Glob("*.go")
 	if err != nil {
 		t.Fatal(err)
 	}
-	consts, tables = map[string]map[string]int{}, map[string][]string{}
-	fset := token.NewFileSet()
+	var decls []ast.Decl
 	for _, name := range files {
 		if strings.HasSuffix(name, "_test.go") {
 			continue
@@ -328,21 +365,22 @@ func goLevelDecls(t *testing.T) (consts map[string]map[string]int, tables map[st
 		if err != nil {
 			t.Fatal(err)
 		}
-		for _, decl := range file.Decls {
-			gen, ok := decl.(*ast.GenDecl)
-			if !ok || (gen.Tok != token.CONST && gen.Tok != token.VAR) {
-				continue
-			}
-			for _, spec := range gen.Specs {
-				if gen.Tok == token.CONST {
-					addConst(t, fset, consts, spec.(*ast.ValueSpec))
-				} else {
-					addTable(tables, spec.(*ast.ValueSpec))
-				}
-			}
+		decls = append(decls, file.Decls...)
+	}
+	return decls
+}
+
+func addGenDecl(t *testing.T, fset *token.FileSet, d *ast.GenDecl, consts map[string]map[string]int, vars map[string]levelTable) {
+	t.Helper()
+	for _, spec := range d.Specs {
+		vs, ok := spec.(*ast.ValueSpec)
+		switch {
+		case ok && d.Tok == token.CONST:
+			addConst(t, fset, consts, vs)
+		case ok && d.Tok == token.VAR:
+			addVar(vars, vs)
 		}
 	}
-	return consts, tables
 }
 
 func addConst(t *testing.T, fset *token.FileSet, consts map[string]map[string]int, vs *ast.ValueSpec) {
@@ -365,21 +403,22 @@ func addConst(t *testing.T, fset *token.FileSet, consts map[string]map[string]in
 	consts[typ.Name][vs.Names[0].Name] = level
 }
 
-func addTable(tables map[string][]string, vs *ast.ValueSpec) {
-	for _, value := range vs.Values {
+// addVar records each slice literal a var declares, by the variable's name.
+func addVar(vars map[string]levelTable, vs *ast.ValueSpec) {
+	for i, value := range vs.Values {
 		lit, ok := value.(*ast.CompositeLit)
-		if !ok {
+		if !ok || i >= len(vs.Names) {
 			continue
 		}
 		slice, ok := lit.Type.(*ast.ArrayType)
 		if !ok || slice.Len != nil {
 			continue
 		}
-		if typ, ok := slice.Elt.(*ast.Ident); ok {
-			for _, elt := range lit.Elts {
-				tables[typ.Name] = append(tables[typ.Name], types.ExprString(elt))
-			}
+		table := levelTable{typ: types.ExprString(slice.Elt)}
+		for _, elt := range lit.Elts {
+			table.levels = append(table.levels, types.ExprString(elt))
 		}
+		vars[vs.Names[i].Name] = table
 	}
 }
 
@@ -391,17 +430,17 @@ func camelCase(screaming string) string {
 	return b.String()
 }
 
-// The levels #310 step 3's rules can give each factor, in vector order. The
-// calculator's 1.0.1 release JAR parsed and scored every vector of their
-// product, 26,542,080, and refused none.
-const calculatorLevelSets = "9 1,4,9 0,4,7,9 4,6,9 9 1,3,5,9 9 1,3,8,9 2,6,7,9 1,3,5,7,9 1,5,7,9 1,7,9 1,3,7,9 1,4,5,9 2,5,7 3,5,7,9"
+// The levels #310 step 3's rules can give each factor, in vector order, tied to
+// the mappings when they land. The calculator's 1.0.1 release JAR parsed and
+// scored every vector of their product, 26,542,080, and refused none.
+const reachableLevelSets = "9 1,4,9 0,4,7,9 4,6,9 9 1,3,5,9 9 1,3,8,9 2,6,7,9 1,3,5,7,9 1,5,7,9 1,7,9 1,3,7,9 1,4,5,9 2,5,7 3,5,7,9"
 
 func levelSets(t *testing.T) [16][]int {
 	t.Helper()
 	var sets [16][]int
-	fields := strings.Fields(calculatorLevelSets)
+	fields := strings.Fields(reachableLevelSets)
 	if len(fields) != len(sets) {
-		t.Fatalf("calculatorLevelSets holds %d sets, want %d", len(fields), len(sets))
+		t.Fatalf("reachableLevelSets holds %d sets, want %d", len(fields), len(sets))
 	}
 	for i, field := range fields {
 		for _, digit := range strings.Split(field, ",") {
@@ -415,7 +454,7 @@ func levelSets(t *testing.T) [16][]int {
 	return sets
 }
 
-func TestCalculatorLevelSetsAreLegal(t *testing.T) {
+func TestReachableLevelSetsAreLegal(t *testing.T) {
 	product := 1
 	for i, set := range levelSets(t) {
 		product *= len(set)
