@@ -19,54 +19,6 @@ import (
 	"testing"
 )
 
-func TestOwaspRRVector_String(t *testing.T) {
-	tests := []struct {
-		name     string
-		vector   *OwaspRRVector
-		expected string
-	}{
-		{
-			name: "all_zeros",
-			vector: &OwaspRRVector{
-				SkillLevel: 0, Motive: 0, Opportunity: 0, Size: 0,
-				EaseOfDiscovery: 0, EaseOfExploit: 0, Awareness: 0, IntrusionDetection: 0,
-				LossOfConfidentiality: 0, LossOfIntegrity: 0, LossOfAvailability: 0, LossOfAccountability: 0,
-				FinancialDamage: 0, ReputationDamage: 0, NonCompliance: 0, PrivacyViolation: 0,
-			},
-			expected: "SL:0/M:0/O:0/S:0/ED:0/EE:0/A:0/ID:0/LC:0/LI:0/LAV:0/LAC:0/FD:0/RD:0/NC:0/PV:0",
-		},
-		{
-			name: "all_nines",
-			vector: &OwaspRRVector{
-				SkillLevel: 9, Motive: 9, Opportunity: 9, Size: 9,
-				EaseOfDiscovery: 9, EaseOfExploit: 9, Awareness: 9, IntrusionDetection: 9,
-				LossOfConfidentiality: 9, LossOfIntegrity: 9, LossOfAvailability: 9, LossOfAccountability: 9,
-				FinancialDamage: 9, ReputationDamage: 9, NonCompliance: 9, PrivacyViolation: 9,
-			},
-			expected: "SL:9/M:9/O:9/S:9/ED:9/EE:9/A:9/ID:9/LC:9/LI:9/LAV:9/LAC:9/FD:9/RD:9/NC:9/PV:9",
-		},
-		{
-			name: "mixed_values",
-			vector: &OwaspRRVector{
-				SkillLevel: 5, Motive: 2, Opportunity: 7, Size: 1,
-				EaseOfDiscovery: 3, EaseOfExploit: 6, Awareness: 9, IntrusionDetection: 2,
-				LossOfConfidentiality: 9, LossOfIntegrity: 7, LossOfAvailability: 5, LossOfAccountability: 8,
-				FinancialDamage: 1, ReputationDamage: 2, NonCompliance: 1, PrivacyViolation: 5,
-			},
-			expected: "SL:5/M:2/O:7/S:1/ED:3/EE:6/A:9/ID:2/LC:9/LI:7/LAV:5/LAC:8/FD:1/RD:2/NC:1/PV:5",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := tt.vector.String()
-			if got != tt.expected {
-				t.Errorf("OwaspRRVector.String() = %v, want %v", got, tt.expected)
-			}
-		})
-	}
-}
-
 func TestFromAggregatedScores(t *testing.T) {
 	tests := []struct {
 		name            string

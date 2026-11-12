@@ -42,6 +42,19 @@ type Vector struct {
 	PV  PrivacyViolation
 }
 
+// Rating is a checked vector as vens publishes it.
+type Rating struct {
+	// Vector is the 16 levels in the calculator's pattern,
+	// SL:9/M:4/O:7/S:9/ED:9/EE:5/A:9/ID:9/LC:6/LI:5/LAV:7/LAC:7/FD:3/RD:4/NC:5/PV:7.
+	Vector string
+	// Severity is OWASP's overall risk severity in lower case, its Note
+	// written as CycloneDX's info.
+	Severity string
+	// Score is likelihood × impact, a vens extension: OWASP's method stops at
+	// the severity.
+	Score float64
+}
+
 // Check returns an error naming every level of v that is not one of its
 // factor's levels. The calculator refuses a vector holding one.
 func (v Vector) Check() error {
@@ -74,4 +87,23 @@ func offLevel[L ~int](abbr string, level L, levels []L) []string {
 		return nil
 	}
 	return []string{fmt.Sprintf("%s:%d", abbr, level)}
+}
+
+// Rate checks v and, once every level has passed, writes the vector and rates
+// it: likelihood, technical and business impact are the calculator's averages
+// of their levels. A vector that fails the check gets no rating.
+func (v Vector) Rate() (Rating, error) {
+	if err := v.Check(); err != nil {
+		return Rating{}, err
+	}
+	likelihood := int(v.SL) + int(v.M) + int(v.O) + int(v.S) + int(v.ED) + int(v.EE) + int(v.A) + int(v.ID)
+	technical := int(v.LC) + int(v.LI) + int(v.LAV) + int(v.LAC)
+	business := int(v.FD) + int(v.RD) + int(v.NC) + int(v.PV)
+	severity, score := rate(float64(likelihood)/8, float64(technical)/4, float64(business)/4)
+	return Rating{
+		Vector: fmt.Sprintf("SL:%d/M:%d/O:%d/S:%d/ED:%d/EE:%d/A:%d/ID:%d/LC:%d/LI:%d/LAV:%d/LAC:%d/FD:%d/RD:%d/NC:%d/PV:%d",
+			v.SL, v.M, v.O, v.S, v.ED, v.EE, v.A, v.ID, v.LC, v.LI, v.LAV, v.LAC, v.FD, v.RD, v.NC, v.PV),
+		Severity: severity,
+		Score:    score,
+	}, nil
 }

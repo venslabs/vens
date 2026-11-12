@@ -138,6 +138,55 @@ func mirrorParse(vector string) ([16]int, bool) {
 	return levels, true
 }
 
+// calculateScore(): the sums of the likelihood, technical and business levels
+// /8, /4 and /4 (OwaspRiskRating.java:69-75).
+func mirrorScores(levels [16]int) (likelihood, technical, business float64) {
+	for i, level := range levels {
+		switch {
+		case i < 8:
+			likelihood += float64(level)
+		case i < 12:
+			technical += float64(level)
+		default:
+			business += float64(level)
+		}
+	}
+	return likelihood / 8, technical / 4, business / 4
+}
+
+// Score.rank() (Score.java:63-71).
+func mirrorBand(x float64) int {
+	if x < 3 {
+		return 0
+	} else if x < 6 {
+		return 1
+	}
+	return 2
+}
+
+// OWASP's Step 4, likelihood band by impact band, as the calculator's run for
+// #310 step 3 (Check3.java) crossed it with max(T, B).
+var owaspMatrix = [3][3]string{
+	{"Note", "Low", "Medium"},
+	{"Low", "Medium", "High"},
+	{"Medium", "High", "Critical"},
+}
+
+// The published severity and score recomputed from a written vector alone.
+func mirrorRate(vector string) (severity string, score float64, ok bool) {
+	levels, ok := mirrorParse(vector)
+	if !ok {
+		return "", 0, false
+	}
+	likelihood, technical, business := mirrorScores(levels)
+	impact := max(technical, business)
+	severity = strings.ToLower(owaspMatrix[mirrorBand(likelihood)][mirrorBand(impact)])
+	if severity == "note" {
+		severity = "info"
+	}
+	return severity, likelihood * impact, true
+}
+
 func mirrorVector(levels [16]int) string {
 	parts := make([]string, len(levels))
 	for i, level := range levels {
