@@ -95,9 +95,9 @@ func TestTrivyScanner_Parse_EvidenceEdges(t *testing.T) {
 		trivytypes.DetectedVulnerability{
 			VulnerabilityID: "CVE-2024-0003", PkgID: "c@1", PkgName: "c",
 			Vulnerability: dbtypes.Vulnerability{
-				// A severity past CRITICAL and a v3 vector without its CVSS:
+				// Severities off Trivy's scale and a v3 vector without its CVSS:
 				// prefix are kept as they are; the vector then does not parse.
-				VendorSeverity: dbtypes.VendorSeverity{"nvd": 7},
+				VendorSeverity: dbtypes.VendorSeverity{"nvd": 7, "ghsa": -1},
 				CVSS:           dbtypes.VendorCVSS{"nvd": {V3Vector: "AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N"}},
 			},
 		},
@@ -110,7 +110,7 @@ func TestTrivyScanner_Parse_EvidenceEdges(t *testing.T) {
 	if !reflect.DeepEqual(rows[1].CVSS, wantCVSS) {
 		t.Errorf("CVSS = %+v, want %+v", rows[1].CVSS, wantCVSS)
 	}
-	wantSeverities := []generator.VendorSeverity{{Source: "nvd", Severity: "7"}}
+	wantSeverities := []generator.VendorSeverity{{Source: "ghsa", Severity: "-1"}, {Source: "nvd", Severity: "7"}}
 	if !reflect.DeepEqual(rows[1].VendorSeverities, wantSeverities) {
 		t.Errorf("VendorSeverities = %+v, want %+v", rows[1].VendorSeverities, wantSeverities)
 	}
@@ -123,14 +123,15 @@ const grypeEvidenceReport = `{"matches": [{
       "vector": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:L/VI:N/VA:N/SC:N/SI:N/SA:N"}]
   },
   "relatedVulnerabilities": [
-    {"id": "GHSA-aaaa-bbbb-cccc", "namespace": "github:language:python", "severity": "Medium",
-     "cvss": [{"source": "cna@python.org", "type": "Secondary", "version": "4.0",
-       "vector": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:L/VI:N/VA:N/SC:N/SI:N/SA:N"}]},
     {"id": "CVE-2024-0001", "namespace": "nvd:cpe", "severity": "High",
      "cvss": [
        {"source": "nvd@nist.gov", "type": "Primary", "version": "3.1", "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N"},
        {"source": "nvd@nist.gov", "type": "Primary", "version": "2.0", "vector": "AV:N/AC:L/Au:N/C:P/I:N/A:N"}
-     ]}
+     ]},
+    {"id": "GHSA-aaaa-bbbb-cccc", "namespace": "github:language:python", "severity": "Medium",
+     "cvss": [{"source": "cna@python.org", "type": "Secondary", "version": "4.0",
+       "vector": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:L/VI:N/VA:N/SC:N/SI:N/SA:N"}]},
+    {"id": "CVE-2024-0001", "namespace": "nvd:cpe", "severity": "High", "cvss": []}
   ],
   "artifact": {"id": "p1", "name": "a", "version": "1"}
 }, {

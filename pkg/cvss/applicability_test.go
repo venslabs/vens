@@ -155,6 +155,7 @@ func TestMissing_String(t *testing.T) {
 		{Missing{Cause: Unparsable, Vector: v, Err: parseErr}, []string{"redhat", "CVSS 4.0", "CVSS:4.0/AV:N", "does not parse", parseErr.Error()}},
 		{Missing{Cause: MetricAbsent, Vector: v, Metric: "SC"}, []string{"redhat", "CVSS 4.0", "lacks SC"}},
 		{Missing{Cause: OffScale, Vector: v, Metric: "SA", Value: "S"}, []string{"redhat", "CVSS 4.0", "SA:S", "off"}},
+		{Missing{}, []string{"cause 0"}},
 	}
 	for _, tt := range tests {
 		got := tt.m.String()
