@@ -69,6 +69,8 @@ type Vulnerability struct {
 	// VendorSeverities is each source's own severity: Trivy's VendorSeverity,
 	// the related records' on Grype.
 	VendorSeverities []VendorSeverity
+	// Flags are the row's flags, which the scanner parser sets.
+	Flags Flags
 }
 
 // LLMVulnerability contains only the fields needed for LLM analysis.

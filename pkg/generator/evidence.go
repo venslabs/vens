@@ -23,6 +23,38 @@ type VendorSeverity struct {
 	Severity string
 }
 
+// Flags are the two flags that send a CVE to the adjustment call of #310
+// step 3, and whether the second could be checked at all.
+type Flags struct {
+	// MaintainerDisputed: the description says the CVE is disputed, or not a
+	// security issue.
+	MaintainerDisputed bool
+	// SeverityContested: the severity is low and not NVD's, while NVD rates
+	// the CVE high or critical with a vector of the newest CVSS version the
+	// row carries.
+	SeverityContested bool
+	// SeverityContestedUnavailable: the report has no NVD record to check the
+	// severity against, so SeverityContested could not fire.
+	SeverityContestedUnavailable bool
+}
+
+// Flagged reports whether either flag fired.
+func (f Flags) Flagged() bool {
+	return f.MaintainerDisputed || f.SeverityContested
+}
+
+// CVEFlags reads one CVE's flags from its rows: a flag fires when it fires on
+// any row, and the second is unavailable only when it is on every row.
+func CVEFlags(rows []Vulnerability) Flags {
+	f := Flags{SeverityContestedUnavailable: len(rows) > 0}
+	for _, r := range rows {
+		f.MaintainerDisputed = f.MaintainerDisputed || r.Flags.MaintainerDisputed
+		f.SeverityContested = f.SeverityContested || r.Flags.SeverityContested
+		f.SeverityContestedUnavailable = f.SeverityContestedUnavailable && r.Flags.SeverityContestedUnavailable
+	}
+	return f
+}
+
 // CVEApplicability reads Applicability over every vector of one CVE's rows.
 func CVEApplicability(rows []Vulnerability) cvss.Applicability {
 	var vectors []cvss.Vector

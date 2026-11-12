@@ -63,6 +63,12 @@ func (s *GrypeScanner) Parse(data []byte) ([]generator.Vulnerability, error) {
 			SeveritySource:   vuln.Namespace,
 			VendorSeverities: grypeVendorSeverities(match.RelatedVulnerabilities),
 		}
+		contested, unavailable := grypeSeverityContested(match, v.CVSS)
+		v.Flags = generator.Flags{
+			MaintainerDisputed:           maintainerDisputed(v.Description),
+			SeverityContested:            contested,
+			SeverityContestedUnavailable: unavailable,
+		}
 		vulns = append(vulns, v)
 	}
 

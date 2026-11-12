@@ -48,6 +48,38 @@ func TestCVEApplicability_NoVectorOnAnyRow(t *testing.T) {
 	}
 }
 
+func TestCVEFlags(t *testing.T) {
+	disputed := Flags{MaintainerDisputed: true}
+	contested := Flags{SeverityContested: true}
+	unavailable := Flags{SeverityContestedUnavailable: true}
+	tests := []struct {
+		name    string
+		rows    []Flags
+		want    Flags
+		flagged bool
+	}{
+		{"no flag", []Flags{{}, {}}, Flags{}, false},
+		{"disputed on one row", []Flags{{}, disputed}, disputed, true},
+		{"contested on one row", []Flags{contested, {}}, contested, true},
+		{"each flag from its own row", []Flags{disputed, contested}, Flags{MaintainerDisputed: true, SeverityContested: true}, true},
+		{"unavailable on every row", []Flags{unavailable, unavailable}, unavailable, false},
+		{"unavailable on one row only", []Flags{unavailable, {}}, Flags{}, false},
+		{"disputed where the check is unavailable", []Flags{{MaintainerDisputed: true, SeverityContestedUnavailable: true}},
+			Flags{MaintainerDisputed: true, SeverityContestedUnavailable: true}, true},
+		{"no row", nil, Flags{}, false},
+	}
+	for _, tt := range tests {
+		rows := make([]Vulnerability, len(tt.rows))
+		for i, f := range tt.rows {
+			rows[i] = Vulnerability{VulnID: "CVE-2024-0001", Flags: f}
+		}
+		got := CVEFlags(rows)
+		if got != tt.want || got.Flagged() != tt.flagged {
+			t.Errorf("%s: CVEFlags = %+v (flagged %v), want %+v (flagged %v)", tt.name, got, got.Flagged(), tt.want, tt.flagged)
+		}
+	}
+}
+
 // A row without a vector does not stop another row's vectors from flooring:
 // Applicability reads the CVE's vectors, whichever rows carry them.
 func TestCVEApplicability_RowWithoutVector(t *testing.T) {
