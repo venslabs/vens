@@ -19,6 +19,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"go/types"
 	"maps"
 	"path/filepath"
 	"regexp"
@@ -164,8 +165,7 @@ func mirrorBand(x float64) int {
 	return 2
 }
 
-// OWASP's Step 4, likelihood band by impact band, as the calculator's run for
-// #310 step 3 (Check3.java) crossed it with max(T, B).
+// OWASP's Step 4 overall risk severity, likelihood band by impact band.
 var owaspMatrix = [3][3]string{
 	{"Note", "Low", "Medium"},
 	{"Low", "Medium", "High"},
@@ -212,9 +212,9 @@ func vectorOf(l [16]int) Vector {
 	}
 }
 
-// java/java3.out (#310 step 3): the digits the calculator's 1.0.1 JAR accepts,
-// factor by factor, the other factors at their lowest level.
-var javaAcceptedDigits = [16]string{
+// The digits the calculator's 1.0.1 release JAR accepted, factor by factor,
+// the other factors at their lowest level, when run for #310 step 3.
+var jarAcceptedDigits = [16]string{
 	"13569", "149", "0479", "24569", "1379", "1359", "1469", "1389",
 	"2679", "13579", "1579", "179", "1379", "1459", "257", "3579",
 }
@@ -235,8 +235,8 @@ func TestMirrorAcceptsExactlyTheEnumeratedDigits(t *testing.T) {
 		if accepted.String() != enumerated.String() {
 			t.Errorf("%s: the mirror accepts %q, its enum holds %q", f.abbr, accepted.String(), enumerated.String())
 		}
-		if enumerated.String() != javaAcceptedDigits[i] {
-			t.Errorf("%s: the copied enum holds %q, the calculator's JAR accepted %q", f.abbr, enumerated.String(), javaAcceptedDigits[i])
+		if enumerated.String() != jarAcceptedDigits[i] {
+			t.Errorf("%s: the copied enum holds %q, the calculator's JAR accepted %q", f.abbr, enumerated.String(), jarAcceptedDigits[i])
 		}
 	}
 }
@@ -280,7 +280,7 @@ func TestCheckAcceptsExactlyTheCalculatorsLevels(t *testing.T) {
 // One type per factor, its constants the enum's, name for name: the constant
 // SkillLevelNoTechnicalSkills for SkillLevel.NO_TECHNICAL_SKILLS(1).
 func TestLevelConstantsAreTheCalculatorsEnums(t *testing.T) {
-	got := goLevelConstants(t)
+	got, _ := goLevelDecls(t)
 	for _, f := range mirrorEnums {
 		want := map[string]int{}
 		for _, l := range f.levels {
@@ -296,15 +296,29 @@ func TestLevelConstantsAreTheCalculatorsEnums(t *testing.T) {
 	}
 }
 
-// goLevelConstants reads every typed integer constant the package declares,
-// keyed by type name, then constant name.
-func goLevelConstants(t *testing.T) map[string]map[string]int {
+// Check compares values, so a constant sharing its level with another (Size 2,
+// LC 6, LAV 5) could drop out of its table unseen: each table lists its type's
+// constants, each once.
+func TestLevelTablesListEachConstantOnce(t *testing.T) {
+	consts, tables := goLevelDecls(t)
+	for _, f := range mirrorEnums {
+		want := slices.Sorted(maps.Keys(consts[f.enum]))
+		got := slices.Sorted(slices.Values(tables[f.enum]))
+		if !slices.Equal(got, want) {
+			t.Errorf("the table of %s lists %v, its constants are %v", f.enum, got, want)
+		}
+	}
+}
+
+// goLevelDecls reads the package's typed integer constants, keyed by type then
+// name, and what each []Type literal lists, keyed by type.
+func goLevelDecls(t *testing.T) (consts map[string]map[string]int, tables map[string][]string) {
 	t.Helper()
 	files, err := filepath.Glob("*.go")
 	if err != nil {
 		t.Fatal(err)
 	}
-	consts := map[string]map[string]int{}
+	consts, tables = map[string]map[string]int{}, map[string][]string{}
 	fset := token.NewFileSet()
 	for _, name := range files {
 		if strings.HasSuffix(name, "_test.go") {
@@ -316,31 +330,57 @@ func goLevelConstants(t *testing.T) map[string]map[string]int {
 		}
 		for _, decl := range file.Decls {
 			gen, ok := decl.(*ast.GenDecl)
-			if !ok || gen.Tok != token.CONST {
+			if !ok || (gen.Tok != token.CONST && gen.Tok != token.VAR) {
 				continue
 			}
 			for _, spec := range gen.Specs {
-				vs := spec.(*ast.ValueSpec)
-				typ, ok := vs.Type.(*ast.Ident)
-				if !ok || len(vs.Names) != 1 || len(vs.Values) != 1 {
-					t.Fatalf("%s: declare each level as `Name Type = digit`", fset.Position(vs.Pos()))
+				if gen.Tok == token.CONST {
+					addConst(t, fset, consts, spec.(*ast.ValueSpec))
+				} else {
+					addTable(tables, spec.(*ast.ValueSpec))
 				}
-				lit, ok := vs.Values[0].(*ast.BasicLit)
-				if !ok || lit.Kind != token.INT {
-					t.Fatalf("%s: a level is an integer literal", fset.Position(vs.Pos()))
-				}
-				level, err := strconv.Atoi(lit.Value)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if consts[typ.Name] == nil {
-					consts[typ.Name] = map[string]int{}
-				}
-				consts[typ.Name][vs.Names[0].Name] = level
 			}
 		}
 	}
-	return consts
+	return consts, tables
+}
+
+func addConst(t *testing.T, fset *token.FileSet, consts map[string]map[string]int, vs *ast.ValueSpec) {
+	t.Helper()
+	typ, ok := vs.Type.(*ast.Ident)
+	if !ok || len(vs.Names) != 1 || len(vs.Values) != 1 {
+		t.Fatalf("%s: declare each level as `Name Type = digit`", fset.Position(vs.Pos()))
+	}
+	lit, ok := vs.Values[0].(*ast.BasicLit)
+	if !ok || lit.Kind != token.INT {
+		t.Fatalf("%s: a level is an integer literal", fset.Position(vs.Pos()))
+	}
+	level, err := strconv.Atoi(lit.Value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if consts[typ.Name] == nil {
+		consts[typ.Name] = map[string]int{}
+	}
+	consts[typ.Name][vs.Names[0].Name] = level
+}
+
+func addTable(tables map[string][]string, vs *ast.ValueSpec) {
+	for _, value := range vs.Values {
+		lit, ok := value.(*ast.CompositeLit)
+		if !ok {
+			continue
+		}
+		slice, ok := lit.Type.(*ast.ArrayType)
+		if !ok || slice.Len != nil {
+			continue
+		}
+		if typ, ok := slice.Elt.(*ast.Ident); ok {
+			for _, elt := range lit.Elts {
+				tables[typ.Name] = append(tables[typ.Name], types.ExprString(elt))
+			}
+		}
+	}
 }
 
 func camelCase(screaming string) string {
@@ -351,17 +391,17 @@ func camelCase(screaming string) string {
 	return b.String()
 }
 
-// step3.out's JAVA_ARGS line (#310 step 3): the level sets, in vector order,
-// that the calculator's 1.0.1 JAR parsed and scored in java/java3.out, all
-// 26,542,080 vectors of their product, none refused.
-const javaArgs = "9 1,4,9 0,4,7,9 4,6,9 9 1,3,5,9 9 1,3,8,9 2,6,7,9 1,3,5,7,9 1,5,7,9 1,7,9 1,3,7,9 1,4,5,9 2,5,7 3,5,7,9"
+// The levels #310 step 3's rules can give each factor, in vector order. The
+// calculator's 1.0.1 release JAR parsed and scored every vector of their
+// product, 26,542,080, and refused none.
+const calculatorLevelSets = "9 1,4,9 0,4,7,9 4,6,9 9 1,3,5,9 9 1,3,8,9 2,6,7,9 1,3,5,7,9 1,5,7,9 1,7,9 1,3,7,9 1,4,5,9 2,5,7 3,5,7,9"
 
-func javaArgsSets(t *testing.T) [16][]int {
+func levelSets(t *testing.T) [16][]int {
 	t.Helper()
 	var sets [16][]int
-	fields := strings.Fields(javaArgs)
+	fields := strings.Fields(calculatorLevelSets)
 	if len(fields) != len(sets) {
-		t.Fatalf("JAVA_ARGS holds %d sets, want %d", len(fields), len(sets))
+		t.Fatalf("calculatorLevelSets holds %d sets, want %d", len(fields), len(sets))
 	}
 	for i, field := range fields {
 		for _, digit := range strings.Split(field, ",") {
@@ -375,22 +415,22 @@ func javaArgsSets(t *testing.T) [16][]int {
 	return sets
 }
 
-func TestJavaArgsAreCalculatorLevels(t *testing.T) {
+func TestCalculatorLevelSetsAreLegal(t *testing.T) {
 	product := 1
-	for i, set := range javaArgsSets(t) {
+	for i, set := range levelSets(t) {
 		product *= len(set)
 		for _, level := range set {
 			if !mirrorAccepts(i, level) {
-				t.Errorf("JAVA_ARGS %s:%d is off the calculator's enum", mirrorEnums[i].abbr, level)
+				t.Errorf("level set %s:%d is off the calculator's enum", mirrorEnums[i].abbr, level)
 			}
 			levels := lowestLevels()
 			levels[i] = level
 			if err := vectorOf(levels).Check(); err != nil {
-				t.Errorf("JAVA_ARGS %s:%d: %v", mirrorEnums[i].abbr, level, err)
+				t.Errorf("level set %s:%d: %v", mirrorEnums[i].abbr, level, err)
 			}
 		}
 	}
 	if product != 26_542_080 {
-		t.Errorf("JAVA_ARGS' product holds %d vectors, java3.out ran 26,542,080", product)
+		t.Errorf("the level sets' product holds %d vectors, the JAR scored 26,542,080", product)
 	}
 }

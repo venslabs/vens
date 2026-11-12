@@ -151,9 +151,9 @@ func randomLevels(rng *rand.Rand) [16]int {
 	return levels
 }
 
-// #340's test (ii): the written vector, read and averaged as the calculator
-// does, then max(T, B) and OWASP's matrix, gives the published severity and
-// score back.
+// A consumer can derive the rating from the vector alone: the written vector,
+// read and averaged as the calculator does, then max(T, B) (#340) and OWASP's
+// matrix, gives the published severity and score back.
 func TestVector_RateRecomputesFromTheWrittenVector(t *testing.T) {
 	rng := rand.New(rand.NewPCG(310, 340))
 	for range 20_000 {
@@ -173,7 +173,7 @@ func TestVector_RateRecomputesFromTheWrittenVector(t *testing.T) {
 	}
 }
 
-// #340's test (i), through the vector: raising any one level never lowers the
+// Monotone through the vector: raising any one level never lowers the
 // severity or the score.
 func TestVector_RaisingALevelNeverLowersTheRating(t *testing.T) {
 	rng := rand.New(rand.NewPCG(340, 1))

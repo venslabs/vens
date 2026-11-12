@@ -56,8 +56,8 @@ func TestRate_OWASPMatrix(t *testing.T) {
 	})
 }
 
-// #340's test (iii). OWASP rates its worked example Low on the business
-// impact; vens takes the larger impact and says High, the declared divergence.
+// OWASP's worked example. OWASP rates it Low on the business impact; vens takes
+// the larger impact and says High, the divergence from OWASP that #340 declares.
 func TestRate_OWASPWorkedExample(t *testing.T) {
 	likelihood, technical, business := mirrorScores([16]int{5, 2, 7, 1, 3, 6, 9, 2, 9, 7, 5, 8, 1, 2, 1, 5})
 	if likelihood != 4.375 || technical != 7.25 || business != 2.25 {
@@ -66,9 +66,10 @@ func TestRate_OWASPWorkedExample(t *testing.T) {
 	runRateCases(t, []rateCase{{"worked example", 4.375, 7.25, 2.25, "high", 31.71875}})
 }
 
-// #340's test (iv): a verified exclusion floors the impact factors, technical
-// (2+1+1+1)/4 = 1.25 and business (1+1+2+3)/4 = 1.75, a LOW impact: Low at a
-// MEDIUM likelihood, Medium at a HIGH one.
+// A finding verified as not exploitable here keeps its likelihood and floors its
+// impact factors (#310), technical (2+1+1+1)/4 = 1.25 and business
+// (1+1+2+3)/4 = 1.75: a LOW impact, Low at a MEDIUM likelihood, Medium at a
+// HIGH one.
 func TestVector_VerifiedExclusionIsALowImpact(t *testing.T) {
 	excluded := Vector{
 		LC: LossOfConfidentialityMinimalNonSensitiveDataDisclosed, LI: LossOfIntegrityMinimalSlightlyCorruptData,
@@ -109,8 +110,9 @@ func TestVector_VerifiedExclusionIsALowImpact(t *testing.T) {
 	}
 }
 
-// #340's test (v). Business above technical rules out always-technical,
-// technical above business always-business, and both rule out the mean.
+// The impact is the larger of technical and business (#340). Business above
+// technical rules out always-technical, technical above business
+// always-business, and both rule out the mean.
 func TestRate_TakesTheLargerImpact(t *testing.T) {
 	runRateCases(t, []rateCase{
 		{"business above technical", 4.25, 1.25, 8.5, "high", 36.125},
@@ -119,8 +121,8 @@ func TestRate_TakesTheLargerImpact(t *testing.T) {
 	})
 }
 
-// #340's test (vi): OWASP's bands, 0 to under 3 LOW, 3 to under 6 MEDIUM,
-// 6 and up HIGH, each edge beside the reachable value under it.
+// OWASP's bands, 0 to under 3 LOW, 3 to under 6 MEDIUM, 6 and up HIGH, each
+// edge beside the reachable value under it.
 func TestRate_BandEdges(t *testing.T) {
 	runRateCases(t, []rateCase{
 		{"impact 2.75 is LOW", 4.25, 2.75, 1.75, "low", 11.6875},
@@ -152,8 +154,9 @@ func rateSums(sl, st, sb int) (string, float64) {
 	return rate(float64(sl)/8, float64(st)/4, float64(sb)/4)
 }
 
-// #340's test (i) on the sums: raising the likelihood, technical or business
-// sum by one never lowers the severity or the score.
+// Monotone on the sums: raising the likelihood, technical or business sum by
+// one never lowers the severity or the score, so no level rising can lower a
+// rating.
 func TestRate_MonotoneInEverySum(t *testing.T) {
 	forEverySum(func(sl, st, sb int) {
 		severity, score := rateSums(sl, st, sb)
@@ -176,7 +179,7 @@ func TestRate_MonotoneInEverySum(t *testing.T) {
 
 // With integer levels the score is the likelihood sum times the larger impact
 // sum over 32, exact in float64, so a published score recomputes bit for bit
-// from its vector (#358).
+// from its own vector, which #358 found it did not.
 func TestRate_ScoreIsExact(t *testing.T) {
 	forEverySum(func(sl, st, sb int) {
 		if _, score := rateSums(sl, st, sb); score*32 != float64(sl*max(st, sb)) {
@@ -201,11 +204,12 @@ func sumCounts(sets [][]int) map[int]int {
 	return counts
 }
 
-// step3.out B1 and java/java3.out (#310 step 3), over the product of the
-// JAVA_ARGS sets, a superset of the vectors vens can emit: no vector rates
-// Note, and the severities count what the calculator's own bands counted.
-func TestRate_JavaArgsProduct(t *testing.T) {
-	sets := javaArgsSets(t)
+// Over the product of calculatorLevelSets, a superset of the vectors vens can
+// emit: no vector rates Note, the ranges are those of #310 step 3, and the
+// severities count what the calculator's JAR gave through its own bands,
+// max(T, B) and OWASP's matrix.
+func TestRate_CalculatorLevelSetsProduct(t *testing.T) {
+	sets := levelSets(t)
 	likelihood, technical, business := sumCounts(sets[0:8]), sumCounts(sets[8:12]), sumCounts(sets[12:16])
 
 	counts := map[string]int{}

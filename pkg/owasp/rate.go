@@ -41,7 +41,8 @@ func band(x float64) int {
 // takes the worse of OWASP's two choices.
 //
 // From integer levels the averages are k/8 and j/4 and the score k*j/32, all
-// exact in float64, so nothing here is rounded (#358).
+// exact in float64, so nothing here is rounded and a published score always
+// recomputes from its own vector (#358).
 func rate(likelihood, technical, business float64) (severity string, score float64) {
 	impact := max(technical, business)
 	return severities[band(likelihood)][band(impact)], likelihood * impact
