@@ -14,6 +14,9 @@
 
 package owasp
 
+// The four-aggregate vector pkg/generator still writes until #310 step 3 wires
+// in Vector.Rate. Its levels can be off the calculator's enumerations.
+
 import (
 	"fmt"
 	"math"
