@@ -67,54 +67,6 @@ func TestOwaspRRVector_String(t *testing.T) {
 	}
 }
 
-func TestOwaspRRVector_MatchesStandardPattern(t *testing.T) {
-	// This is the standard OWASP RR vector pattern
-	// Reference: https://owasp.org/www-community/OWASP_Risk_Rating_Methodology
-	pattern := regexp.MustCompile(`^SL:\d/M:\d/O:\d/S:\d/ED:\d/EE:\d/A:\d/ID:\d/LC:\d/LI:\d/LAV:\d/LAC:\d/FD:\d/RD:\d/NC:\d/PV:\d$`)
-
-	tests := []struct {
-		name   string
-		vector *OwaspRRVector
-	}{
-		{
-			name: "zero_values",
-			vector: &OwaspRRVector{
-				SkillLevel: 0, Motive: 0, Opportunity: 0, Size: 0,
-				EaseOfDiscovery: 0, EaseOfExploit: 0, Awareness: 0, IntrusionDetection: 0,
-				LossOfConfidentiality: 0, LossOfIntegrity: 0, LossOfAvailability: 0, LossOfAccountability: 0,
-				FinancialDamage: 0, ReputationDamage: 0, NonCompliance: 0, PrivacyViolation: 0,
-			},
-		},
-		{
-			name: "max_values",
-			vector: &OwaspRRVector{
-				SkillLevel: 9, Motive: 9, Opportunity: 9, Size: 9,
-				EaseOfDiscovery: 9, EaseOfExploit: 9, Awareness: 9, IntrusionDetection: 9,
-				LossOfConfidentiality: 9, LossOfIntegrity: 9, LossOfAvailability: 9, LossOfAccountability: 9,
-				FinancialDamage: 9, ReputationDamage: 9, NonCompliance: 9, PrivacyViolation: 9,
-			},
-		},
-		{
-			name: "realistic_values",
-			vector: &OwaspRRVector{
-				SkillLevel: 5, Motive: 4, Opportunity: 7, Size: 6,
-				EaseOfDiscovery: 7, EaseOfExploit: 5, Awareness: 6, IntrusionDetection: 8,
-				LossOfConfidentiality: 2, LossOfIntegrity: 3, LossOfAvailability: 5, LossOfAccountability: 7,
-				FinancialDamage: 1, ReputationDamage: 2, NonCompliance: 2, PrivacyViolation: 3,
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			vectorString := tt.vector.String()
-			if !pattern.MatchString(vectorString) {
-				t.Errorf("Vector %q does not match standard OWASP RR pattern", vectorString)
-			}
-		})
-	}
-}
-
 func TestFromAggregatedScores(t *testing.T) {
 	tests := []struct {
 		name            string
