@@ -18,7 +18,6 @@
 package cvss
 
 import (
-	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -103,13 +102,10 @@ func (v Vector) Parse() (Metrics, error) {
 		}
 		body = metrics
 	}
-	if body == "" {
-		return Metrics{}, errors.New("no metric")
-	}
 	values := make(map[string]string)
 	for part := range strings.SplitSeq(body, "/") {
-		metric, value, ok := strings.Cut(part, ":")
-		if !ok || metric == "" || value == "" {
+		metric, value, _ := strings.Cut(part, ":")
+		if metric == "" || value == "" {
 			return Metrics{}, fmt.Errorf("%q is not a metric:value pair", part)
 		}
 		if _, seen := values[metric]; seen {
@@ -124,8 +120,8 @@ func (v Vector) Parse() (Metrics, error) {
 // scale; ok is false for a metric absent, off the scale, or not one vens reads
 // at this version.
 func (m Metrics) Get(metric string) (value string, ok bool) {
-	value, ok = m.values[metric]
-	if !ok || !slices.Contains(scales[m.tier][metric], value) {
+	value = m.values[metric]
+	if !slices.Contains(scales[m.tier][metric], value) {
 		return "", false
 	}
 	return value, true
