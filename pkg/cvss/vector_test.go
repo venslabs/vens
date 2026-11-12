@@ -122,6 +122,8 @@ func TestVector_ParseRefuses(t *testing.T) {
 		{"a part with no colon", Vector{Version: "3.1", Vector: "CVSS:3.1/AVN/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:N"}},
 		{"a metric with no value", Vector{Version: "3.1", Vector: "CVSS:3.1/AV:/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:N"}},
 		{"a value with no metric", Vector{Version: "3.1", Vector: "CVSS:3.1/:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:N"}},
+		{"a part with two colons", Vector{Version: "3.1", Vector: "CVSS:3.1/AV:N:bad/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:N"}},
+		{"a v2 part with two colons", Vector{Version: "2.0", Vector: "AV:N/AC:L/Au:N:x/C:N/I:N/A:N"}},
 		{"a metric given twice", Vector{Version: "3.1", Vector: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:N/C:H"}},
 	}
 	for _, tt := range tests {

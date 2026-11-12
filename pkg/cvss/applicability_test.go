@@ -88,6 +88,7 @@ func TestApplicabilityOf_Missing(t *testing.T) {
 	v2Low := v2("AV:N/AC:L/Au:N/C:L/I:N/A:N")
 	unknown := Vector{Source: "ghsa", Version: "5.0", Vector: "AV:N/C:N/I:N/A:N"}
 	noS := v40("AV:N/AC:L/AT:N/PR:N/UI:N/VC:N/VI:N/VA:N")
+	twoColons := v31("AV:N:bad/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:N")
 
 	tests := []struct {
 		name    string
@@ -98,6 +99,8 @@ func TestApplicabilityOf_Missing(t *testing.T) {
 		{"no vector", nil, floored(false, false, false), []Missing{{Cause: NoVector}}},
 		{"a vector that does not parse leaves every axis", []Vector{v31(v3NNN), unparsable},
 			floored(false, false, false), []Missing{{Cause: Unparsable, Vector: unparsable}}},
+		{"a part with two colons leaves every axis, its impact metrics all N", []Vector{twoColons},
+			floored(false, false, false), []Missing{{Cause: Unparsable, Vector: twoColons}}},
 		{"a version vens does not read", []Vector{unknown}, floored(false, false, false),
 			[]Missing{{Cause: Unparsable, Vector: unknown}}},
 		{"v4 lacking SC leaves C", []Vector{noSC}, floored(false, true, true),

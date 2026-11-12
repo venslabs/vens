@@ -105,7 +105,7 @@ func (v Vector) Parse() (Metrics, error) {
 	values := make(map[string]string)
 	for part := range strings.SplitSeq(body, "/") {
 		metric, value, _ := strings.Cut(part, ":")
-		if metric == "" || value == "" {
+		if metric == "" || value == "" || strings.Contains(value, ":") {
 			return Metrics{}, fmt.Errorf("%q is not a metric:value pair", part)
 		}
 		if _, seen := values[metric]; seen {

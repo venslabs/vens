@@ -101,6 +101,12 @@ func TestTrivyScanner_Parse_EvidenceEdges(t *testing.T) {
 				CVSS:           dbtypes.VendorCVSS{"nvd": {V3Vector: "AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N"}},
 			},
 		},
+		trivytypes.DetectedVulnerability{
+			VulnerabilityID: "CVE-2024-0004", PkgID: "d@1", PkgName: "d",
+			Vulnerability: dbtypes.Vulnerability{
+				CVSS: dbtypes.VendorCVSS{"redhat": {V3Vector: " CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:N\n"}},
+			},
+		},
 	)
 	if rows[0].CVSS != nil || rows[0].VendorSeverities != nil || rows[0].SeveritySource != "" {
 		t.Errorf("a row with no evidence: CVSS %v, VendorSeverities %v, SeveritySource %q; want none",
@@ -113,6 +119,15 @@ func TestTrivyScanner_Parse_EvidenceEdges(t *testing.T) {
 	wantSeverities := []generator.VendorSeverity{{Source: "ghsa", Severity: "-1"}, {Source: "nvd", Severity: "7"}}
 	if !reflect.DeepEqual(rows[1].VendorSeverities, wantSeverities) {
 		t.Errorf("VendorSeverities = %+v, want %+v", rows[1].VendorSeverities, wantSeverities)
+	}
+	// Space around a vector is kept, and read past both for its version and
+	// by Parse.
+	spaced := rows[2].CVSS
+	if len(spaced) != 1 || spaced[0].Version != "3.1" || spaced[0].Vector != " CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:N\n" {
+		t.Fatalf("CVSS = %+v, want the vector as given, version 3.1", spaced)
+	}
+	if _, err := spaced[0].Parse(); err != nil {
+		t.Errorf("Parse: %v", err)
 	}
 }
 
