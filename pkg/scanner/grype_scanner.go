@@ -17,10 +17,12 @@ package scanner
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 
 	grypemodels "github.com/anchore/grype/grype/presenter/models"
 	"github.com/package-url/packageurl-go"
+	"github.com/venslabs/vens/pkg/cvss"
 	"github.com/venslabs/vens/pkg/generator"
 )
 
@@ -57,6 +59,9 @@ func (s *GrypeScanner) Parse(data []byte) ([]generator.Vulnerability, error) {
 			Severity:         vuln.Severity,
 			SourceName:       grypeNamespaceToSourceName(vuln.Namespace, vuln.ID),
 			SourceURL:        vuln.DataSource,
+			CVSS:             grypeVectors(match),
+			SeveritySource:   vuln.Namespace,
+			VendorSeverities: grypeVendorSeverities(match.RelatedVulnerabilities),
 		}
 		vulns = append(vulns, v)
 	}
@@ -67,6 +72,41 @@ func (s *GrypeScanner) Parse(data []byte) ([]generator.Vulnerability, error) {
 // Name returns the scanner identifier
 func (s *GrypeScanner) Name() string {
 	return string(ScannerGrype)
+}
+
+// grypeVectors lists the matched record's vectors, then each related
+// record's, each distinct vector once.
+func grypeVectors(match grypemodels.Match) []cvss.Vector {
+	var vectors []cvss.Vector
+	add := func(scores []grypemodels.Cvss) {
+		for _, c := range scores {
+			v := cvss.Vector{Source: c.Source, Version: c.Version, Vector: c.Vector}
+			if !slices.Contains(vectors, v) {
+				vectors = append(vectors, v)
+			}
+		}
+	}
+	add(match.Vulnerability.Cvss)
+	for _, related := range match.RelatedVulnerabilities {
+		add(related.Cvss)
+	}
+	return vectors
+}
+
+// grypeVendorSeverities lists each related record's namespace and severity,
+// in namespace order, each distinct pair once.
+func grypeVendorSeverities(related []grypemodels.VulnerabilityMetadata) []generator.VendorSeverity {
+	var severities []generator.VendorSeverity
+	for _, r := range related {
+		s := generator.VendorSeverity{Source: r.Namespace, Severity: r.Severity}
+		if !slices.Contains(severities, s) {
+			severities = append(severities, s)
+		}
+	}
+	slices.SortStableFunc(severities, func(a, b generator.VendorSeverity) int {
+		return strings.Compare(a.Source, b.Source)
+	})
+	return severities
 }
 
 // calculateBOMRef calculates the BOM-Ref for Grype artifacts.
