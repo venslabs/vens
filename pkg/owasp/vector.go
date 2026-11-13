@@ -12,111 +12,98 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package owasp writes and rates OWASP Risk Rating vectors on the levels of the
+// reference calculator, stevespringett/owasp-risk-rating-calculator.
 package owasp
 
 import (
 	"fmt"
-	"math"
+	"slices"
+	"strings"
 )
 
-// OwaspRRVector represents an OWASP Risk Rating vector in standard format.
-// Format: SL:5/M:4/O:7/S:6/ED:7/EE:5/A:6/ID:8/LC:2/LI:3/LAV:5/LAC:7/FD:1/RD:2/NC:2/PV:3
-//
-// Vector components (all 0-9):
-//   - Threat Agent Factors (4): SL (SkillLevel), M (Motive), O (Opportunity), S (Size)
-//   - Vulnerability Factors (4): ED (EaseOfDiscovery), EE (EaseOfExploit), A (Awareness), ID (IntrusionDetection)
-//   - Technical Impact Factors (4): LC (LossOfConfidentiality), LI (LossOfIntegrity), LAV (LossOfAvailability), LAC (LossOfAccountability)
-//   - Business Impact Factors (4): FD (FinancialDamage), RD (ReputationDamage), NC (NonCompliance), PV (PrivacyViolation)
-//
-// Reference: https://owasp.org/www-community/OWASP_Risk_Rating_Methodology
-type OwaspRRVector struct {
-	// Threat Agent Factors
-	SkillLevel  int // SL: 0-9
-	Motive      int // M: 0-9
-	Opportunity int // O: 0-9
-	Size        int // S: 0-9
-
-	// Vulnerability Factors
-	EaseOfDiscovery    int // ED: 0-9
-	EaseOfExploit      int // EE: 0-9
-	Awareness          int // A: 0-9
-	IntrusionDetection int // ID: 0-9
-
-	// Technical Impact Factors
-	LossOfConfidentiality int // LC: 0-9
-	LossOfIntegrity       int // LI: 0-9
-	LossOfAvailability    int // LAV: 0-9
-	LossOfAccountability  int // LAC: 0-9
-
-	// Business Impact Factors
-	FinancialDamage  int // FD: 0-9
-	ReputationDamage int // RD: 0-9
-	NonCompliance    int // NC: 0-9
-	PrivacyViolation int // PV: 0-9
+// Vector holds one level per factor, in the order the vector writes them.
+type Vector struct {
+	SL  SkillLevel
+	M   Motive
+	O   Opportunity
+	S   Size
+	ED  EaseOfDiscovery
+	EE  EaseOfExploit
+	A   Awareness
+	ID  IntrusionDetection
+	LC  LossOfConfidentiality
+	LI  LossOfIntegrity
+	LAV LossOfAvailability
+	LAC LossOfAccountability
+	FD  FinancialDamage
+	RD  ReputationDamage
+	NC  NonCompliance
+	PV  PrivacyViolation
 }
 
-// String returns the vector in standard OWASP RR format.
-func (v *OwaspRRVector) String() string {
-	return fmt.Sprintf("SL:%d/M:%d/O:%d/S:%d/ED:%d/EE:%d/A:%d/ID:%d/LC:%d/LI:%d/LAV:%d/LAC:%d/FD:%d/RD:%d/NC:%d/PV:%d",
-		v.SkillLevel, v.Motive, v.Opportunity, v.Size,
-		v.EaseOfDiscovery, v.EaseOfExploit, v.Awareness, v.IntrusionDetection,
-		v.LossOfConfidentiality, v.LossOfIntegrity, v.LossOfAvailability, v.LossOfAccountability,
-		v.FinancialDamage, v.ReputationDamage, v.NonCompliance, v.PrivacyViolation)
+// Rating is a checked vector as vens publishes it.
+type Rating struct {
+	// Vector is the 16 levels in the calculator's pattern,
+	// SL:9/M:4/O:7/S:9/ED:9/EE:5/A:9/ID:9/LC:6/LI:5/LAV:7/LAC:7/FD:3/RD:4/NC:5/PV:7.
+	Vector string
+	// Severity is OWASP's overall risk severity in lower case, its Note
+	// written as CycloneDX's info.
+	Severity string
+	// Score is likelihood × impact, a vens extension: OWASP's method stops at
+	// the severity.
+	Score float64
 }
 
-// FromAggregatedScores creates an OWASP RR vector from aggregated scores.
-// This is a pragmatic approach when detailed 16-factor scoring is not available.
-//
-// The function distributes the aggregated scores across the individual factors
-// to maintain mathematical consistency with the OWASP Risk Rating methodology:
-//   - ThreatAgent score (0-9) is distributed across SL, M, O, S
-//   - Vulnerability score (0-9) is distributed across ED, EE, A, ID
-//   - TechnicalImpact score (0-9) is distributed across LC, LI, LAV, LAC
-//   - BusinessImpact score (0-9) is distributed across FD, RD, NC, PV
-//
-// Note: This produces a valid OWASP RR vector that can be parsed by
-// compliant platforms, though it doesn't capture the full granularity of individual factors.
-func FromAggregatedScores(threatAgent, vulnerability, technicalImpact, businessImpact float64) *OwaspRRVector {
-	// Clamp all scores to 0-9 range
-	ta := clamp09(int(math.Round(threatAgent)))
-	vul := clamp09(int(math.Round(vulnerability)))
-	tech := clamp09(int(math.Round(technicalImpact)))
-	bus := clamp09(int(math.Round(businessImpact)))
-
-	return &OwaspRRVector{
-		// Threat Agent: distribute evenly across 4 factors
-		SkillLevel:  ta,
-		Motive:      ta,
-		Opportunity: ta,
-		Size:        ta,
-
-		// Vulnerability: distribute evenly across 4 factors
-		EaseOfDiscovery:    vul,
-		EaseOfExploit:      vul,
-		Awareness:          vul,
-		IntrusionDetection: vul,
-
-		// Technical Impact: distribute evenly across 4 factors
-		LossOfConfidentiality: tech,
-		LossOfIntegrity:       tech,
-		LossOfAvailability:    tech,
-		LossOfAccountability:  tech,
-
-		// Business Impact: distribute evenly across 4 factors
-		FinancialDamage:  bus,
-		ReputationDamage: bus,
-		NonCompliance:    bus,
-		PrivacyViolation: bus,
+// Check returns an error naming every level of v that is not one of its
+// factor's levels. The calculator refuses a vector holding one.
+func (v Vector) Check() error {
+	off := slices.Concat(
+		offLevel("SL", v.SL, skillLevels),
+		offLevel("M", v.M, motives),
+		offLevel("O", v.O, opportunities),
+		offLevel("S", v.S, sizes),
+		offLevel("ED", v.ED, easesOfDiscovery),
+		offLevel("EE", v.EE, easesOfExploit),
+		offLevel("A", v.A, awarenesses),
+		offLevel("ID", v.ID, intrusionDetections),
+		offLevel("LC", v.LC, lossesOfConfidentiality),
+		offLevel("LI", v.LI, lossesOfIntegrity),
+		offLevel("LAV", v.LAV, lossesOfAvailability),
+		offLevel("LAC", v.LAC, lossesOfAccountability),
+		offLevel("FD", v.FD, financialDamages),
+		offLevel("RD", v.RD, reputationDamages),
+		offLevel("NC", v.NC, nonCompliances),
+		offLevel("PV", v.PV, privacyViolations),
+	)
+	if len(off) > 0 {
+		return fmt.Errorf("owasp: levels off the calculator's enumerations: %s", strings.Join(off, ", "))
 	}
+	return nil
 }
 
-// clamp09 ensures a value is within 0-9 range
-func clamp09(val int) int {
-	if val < 0 {
-		return 0
+func offLevel[L ~int](abbr string, level L, levels []L) []string {
+	if slices.Contains(levels, level) {
+		return nil
 	}
-	if val > 9 {
-		return 9
+	return []string{fmt.Sprintf("%s:%d", abbr, level)}
+}
+
+// Rate checks v and, once every level has passed, writes the vector and rates
+// it: likelihood, technical and business impact are the calculator's averages
+// of their levels. A vector that fails the check gets no rating.
+func (v Vector) Rate() (Rating, error) {
+	if err := v.Check(); err != nil {
+		return Rating{}, err
 	}
-	return val
+	likelihood := int(v.SL) + int(v.M) + int(v.O) + int(v.S) + int(v.ED) + int(v.EE) + int(v.A) + int(v.ID)
+	technical := int(v.LC) + int(v.LI) + int(v.LAV) + int(v.LAC)
+	business := int(v.FD) + int(v.RD) + int(v.NC) + int(v.PV)
+	severity, score := rate(float64(likelihood)/8, float64(technical)/4, float64(business)/4)
+	return Rating{
+		Vector: fmt.Sprintf("SL:%d/M:%d/O:%d/S:%d/ED:%d/EE:%d/A:%d/ID:%d/LC:%d/LI:%d/LAV:%d/LAC:%d/FD:%d/RD:%d/NC:%d/PV:%d",
+			v.SL, v.M, v.O, v.S, v.ED, v.EE, v.A, v.ID, v.LC, v.LI, v.LAV, v.LAC, v.FD, v.RD, v.NC, v.PV),
+		Severity: severity,
+		Score:    score,
+	}, nil
 }
