@@ -139,7 +139,8 @@ func readReport(t *testing.T, path string) []byte {
 		t.Fatalf("read %s: %v", path, err)
 	}
 	if !strings.HasSuffix(path, ".gz") {
-		return data
+		// A Windows checkout turns the reports' LF into CRLF; the pinned hashes are of the LF bytes.
+		return bytes.ReplaceAll(data, []byte("\r\n"), []byte("\n"))
 	}
 	zr, err := gzip.NewReader(bytes.NewReader(data))
 	if err != nil {
