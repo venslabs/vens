@@ -102,16 +102,13 @@ func trivyVectors(bySource dbtypes.VendorCVSS) []cvss.Vector {
 	return vectors
 }
 
-// trivyVersion is the version a vector's CVSS: prefix states, read past
-// surrounding space as Parse reads it; Trivy names none for v2 vectors, which
-// carry no prefix.
+// trivyVersion is the version a vector's CVSS: prefix states, read as Parse
+// reads it; Trivy names none for v2 vectors, which carry no prefix.
 func trivyVersion(vector, unprefixed string) string {
-	rest, ok := strings.CutPrefix(strings.TrimSpace(vector), "CVSS:")
-	if !ok {
-		return unprefixed
+	if version, ok := cvss.PrefixVersion(vector); ok {
+		return version
 	}
-	version, _, _ := strings.Cut(rest, "/")
-	return version
+	return unprefixed
 }
 
 // trivyVendorSeverities lists each source's severity by name, sources in name

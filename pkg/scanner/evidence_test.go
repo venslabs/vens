@@ -107,6 +107,12 @@ func TestTrivyScanner_Parse_EvidenceEdges(t *testing.T) {
 				CVSS: dbtypes.VendorCVSS{"redhat": {V3Vector: " CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:N\n"}},
 			},
 		},
+		trivytypes.DetectedVulnerability{
+			VulnerabilityID: "CVE-2024-0005", PkgID: "e@1", PkgName: "e",
+			Vulnerability: dbtypes.Vulnerability{
+				CVSS: dbtypes.VendorCVSS{"nvd": {V40Vector: "cvss:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:N/VI:N/VA:N/SC:N/SI:N/SA:N"}},
+			},
+		},
 	)
 	if rows[0].CVSS != nil || rows[0].VendorSeverities != nil || rows[0].SeveritySource != "" {
 		t.Errorf("a row with no evidence: CVSS %v, VendorSeverities %v, SeveritySource %q; want none",
@@ -127,6 +133,14 @@ func TestTrivyScanner_Parse_EvidenceEdges(t *testing.T) {
 		t.Fatalf("CVSS = %+v, want the vector as given, version 3.1", spaced)
 	}
 	if _, err := spaced[0].Parse(); err != nil {
+		t.Errorf("Parse: %v", err)
+	}
+	// So is a prefix in lower case.
+	lower := rows[3].CVSS
+	if len(lower) != 1 || lower[0].Version != "4.0" {
+		t.Fatalf("CVSS = %+v, want version 4.0", lower)
+	}
+	if _, err := lower[0].Parse(); err != nil {
 		t.Errorf("Parse: %v", err)
 	}
 }

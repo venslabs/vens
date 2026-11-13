@@ -89,6 +89,7 @@ func TestApplicabilityOf_Missing(t *testing.T) {
 	unknown := Vector{Source: "ghsa", Version: "5.0", Vector: "AV:N/C:N/I:N/A:N"}
 	noS := v40("AV:N/AC:L/AT:N/PR:N/UI:N/VC:N/VI:N/VA:N")
 	twoColons := v31("AV:N:bad/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:N")
+	lowerPrefix := Vector{Source: "nvd", Version: "2.0", Vector: "cvss:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:N"}
 
 	tests := []struct {
 		name    string
@@ -101,6 +102,8 @@ func TestApplicabilityOf_Missing(t *testing.T) {
 			floored(false, false, false), []Missing{{Cause: Unparsable, Vector: unparsable}}},
 		{"a part with two colons leaves every axis, its impact metrics all N", []Vector{twoColons},
 			floored(false, false, false), []Missing{{Cause: Unparsable, Vector: twoColons}}},
+		{"a lower-case v3 prefix on a 2.0 record leaves every axis", []Vector{lowerPrefix},
+			floored(false, false, false), []Missing{{Cause: Unparsable, Vector: lowerPrefix}}},
 		{"a version vens does not read", []Vector{unknown}, floored(false, false, false),
 			[]Missing{{Cause: Unparsable, Vector: unknown}}},
 		{"v4 lacking SC leaves C", []Vector{noSC}, floored(false, true, true),
@@ -158,6 +161,8 @@ func TestMissing_String(t *testing.T) {
 		{Missing{Cause: Unparsable, Vector: v, Err: parseErr}, []string{"redhat", "CVSS 4.0", "CVSS:4.0/AV:N", "does not parse", parseErr.Error()}},
 		{Missing{Cause: MetricAbsent, Vector: v, Metric: "SC"}, []string{"redhat", "CVSS 4.0", "lacks SC"}},
 		{Missing{Cause: OffScale, Vector: v, Metric: "SA", Value: "S"}, []string{"redhat", "CVSS 4.0", "SA:S", "off"}},
+		{Missing{Cause: MetricAbsent, Vector: Vector{Source: "nvd", Vector: "AV:N/AC:L/PR:N/UI:N/S:U/I:N/A:N"}, Metric: "C"},
+			[]string{"nvd CVSS vector of unknown version lacks C"}},
 		{Missing{}, []string{"cause 0"}},
 	}
 	for _, tt := range tests {

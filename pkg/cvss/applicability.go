@@ -66,6 +66,9 @@ type Missing struct {
 
 func (m Missing) String() string {
 	at := fmt.Sprintf("%s CVSS %s vector", m.Vector.Source, m.Vector.Version)
+	if m.Vector.Version == "" {
+		at = m.Vector.Source + " CVSS vector of unknown version"
+	}
 	switch m.Cause {
 	case NoVector:
 		return "no CVSS vector in the scanner's report"

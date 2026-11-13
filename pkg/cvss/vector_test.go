@@ -85,6 +85,8 @@ func TestVector_Parse(t *testing.T) {
 				"SC": "N", "SI": "L", "SA": "H"}},
 		{"surrounding space", Vector{Version: "3.1", Vector: " CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:N\n"},
 			map[string]string{"AV": "N", "AC": "L", "PR": "N", "UI": "N", "C": "N", "I": "N", "A": "N"}},
+		{"a lower-case prefix", Vector{Version: "3.1", Vector: "cvss:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:L/A:N"},
+			map[string]string{"AV": "N", "AC": "L", "PR": "N", "UI": "N", "C": "H", "I": "L", "A": "N"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -112,6 +114,8 @@ func TestVector_ParseRefuses(t *testing.T) {
 		{"a version vens does not read", Vector{Version: "5.0", Vector: "AV:N/C:N/I:N/A:N"}},
 		{"a v4 prefix on a 3.1 record", Vector{Version: "3.1", Vector: "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:N/VI:N/VA:N/SC:N/SI:N/SA:N"}},
 		{"a v3 prefix on a 2.0 record", Vector{Version: "2.0", Vector: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:N"}},
+		{"a lower-case v3 prefix on a 2.0 record", Vector{Version: "2.0", Vector: "cvss:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:N"}},
+		{"a mixed-case v4 prefix on a 3.1 record", Vector{Version: "3.1", Vector: "Cvss:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:N/VI:N/VA:N/SC:N/SI:N/SA:N"}},
 		{"an unknown prefix", Vector{Version: "3.1", Vector: "CVSS:9.9/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:N"}},
 		{"empty", Vector{Version: "3.1"}},
 		{"blank", Vector{Version: "2.0", Vector: "  "}},
@@ -129,6 +133,27 @@ func TestVector_ParseRefuses(t *testing.T) {
 	for _, tt := range tests {
 		if _, err := tt.v.Parse(); err == nil {
 			t.Errorf("%s: Parse(%+v) succeeded, want an error", tt.name, tt.v)
+		}
+	}
+}
+
+func TestPrefixVersion(t *testing.T) {
+	tests := []struct {
+		vector, version string
+		ok              bool
+	}{
+		{"CVSS:3.1/AV:N/AC:L", "3.1", true},
+		{"cvss:4.0/AV:N/AC:L", "4.0", true},
+		{" CvSs:3.0/AV:N\n", "3.0", true},
+		{"CVSS:3.1", "3.1", true},
+		{"AV:N/AC:L/Au:N/C:P/I:N/A:N", "", false},
+		{"CVSS", "", false},
+		{"", "", false},
+	}
+	for _, tt := range tests {
+		version, ok := PrefixVersion(tt.vector)
+		if version != tt.version || ok != tt.ok {
+			t.Errorf("PrefixVersion(%q) = %q, %v; want %q, %v", tt.vector, version, ok, tt.version, tt.ok)
 		}
 	}
 }

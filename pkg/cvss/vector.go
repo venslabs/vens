@@ -28,7 +28,9 @@ type Vector struct {
 	// Source is who published it, as the report names it: "nvd" or "redhat"
 	// on Trivy, "nvd@nist.gov" on Grype.
 	Source string
-	// Version is the CVSS version, "2.0", "3.0", "3.1" or "4.0".
+	// Version is the CVSS version as the report states it: "2.0", "3.0", "3.1"
+	// or "4.0", also "2" on Grype; empty when it states none, as for a Trivy v3
+	// or v4 vector without its CVSS: prefix. Tier reads any other value as 0.
 	Version string
 	Vector  string
 }
@@ -85,18 +87,36 @@ type Metrics struct {
 	values map[string]string
 }
 
+// PrefixVersion returns the version a vector's CVSS: prefix states, read as
+// Parse reads it: past surrounding space, the prefix in any case. ok is false
+// when the vector has no such prefix.
+func PrefixVersion(vector string) (version string, ok bool) {
+	version, _, ok = cutPrefix(strings.TrimSpace(vector))
+	return version, ok
+}
+
+// cutPrefix splits a CVSS:x.y/ prefix, in any case, off a trimmed vector into
+// the version it states and the metrics after it.
+func cutPrefix(vector string) (version, metrics string, ok bool) {
+	const prefix = "CVSS:"
+	if len(vector) < len(prefix) || !strings.EqualFold(vector[:len(prefix)], prefix) {
+		return "", vector, false
+	}
+	version, metrics, _ = strings.Cut(vector[len(prefix):], "/")
+	return version, metrics, true
+}
+
 // Parse splits the vector into its metrics. It refuses a version vens does
-// not read, a CVSS: prefix of another tier, and a part that is not one
-// metric:value pair or repeats a metric. A parsed vector can still lack a
-// metric vens reads or give it off its version's scale.
+// not read, a CVSS: prefix (in any case) of another tier, and a part that is
+// not one metric:value pair or repeats a metric. A parsed vector can still
+// lack a metric vens reads or give it off its version's scale.
 func (v Vector) Parse() (Metrics, error) {
 	tier := v.Tier()
 	if tier == 0 {
 		return Metrics{}, fmt.Errorf("CVSS version %q is not one vens reads", v.Version)
 	}
 	body := strings.TrimSpace(v.Vector)
-	if rest, ok := strings.CutPrefix(body, "CVSS:"); ok {
-		version, metrics, _ := strings.Cut(rest, "/")
+	if version, metrics, ok := cutPrefix(body); ok {
 		if tierOf(version) != tier {
 			return Metrics{}, fmt.Errorf("prefix CVSS:%s on a CVSS %s vector", version, v.Version)
 		}
