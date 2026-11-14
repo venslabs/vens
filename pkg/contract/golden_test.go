@@ -274,7 +274,7 @@ func TestGoldenFrames(t *testing.T) {
 	}
 }
 
-// The parts the design's frames elide, written out: a batch's entries, its
+// The parts the reference frames elide, written out: a batch's entries, its
 // first CVE's rows disagreeing, with the CVSS lines of each version, and the
 // adjustment's entry of that CVE.
 func TestGoldenEntries(t *testing.T) {
@@ -291,11 +291,11 @@ func TestGoldenEntries(t *testing.T) {
 	})
 }
 
-// testdata/SHA256SUMS holds the sha256 of the frames #310 step 3's design
-// rendered for these four deployments, with the same two CVEs and elisions.
-// -update leaves it alone: a golden file that departs from the design's
-// frame fails here until the design changes too.
-func TestGoldenFramesAreTheDesignsFrames(t *testing.T) {
+// testdata/SHA256SUMS pins the sha256 of each golden frame of the four
+// deployments, as the reference frames reviewed before this code gave them.
+// -update leaves the sums alone, so a prompt change updates them on purpose,
+// in the same review as the frames.
+func TestGoldenFramesMatchPinnedSums(t *testing.T) {
 	sums := map[string]string{}
 	scanner := bufio.NewScanner(strings.NewReader(readLF(t, filepath.Join("testdata", "SHA256SUMS"))))
 	for scanner.Scan() {
@@ -315,7 +315,7 @@ func TestGoldenFramesAreTheDesignsFrames(t *testing.T) {
 			path := c.name + "/" + f.Name()
 			sum := sha256.Sum256([]byte(readLF(t, filepath.Join("testdata", c.name, f.Name()))))
 			if got := hex.EncodeToString(sum[:]); got != sums[path] {
-				t.Errorf("%s: sha256 %s, the design's frame %q", path, got, sums[path])
+				t.Errorf("%s: sha256 %s, pinned %q", path, got, sums[path])
 			}
 			seen++
 		}
