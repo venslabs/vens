@@ -157,7 +157,9 @@ func lowerable() []string {
 
 // newAdjustmentEntry writes a flagged CVE's entry, its evidence and the
 // answers its ordinary calls gave, which are the baselines the adjustment may
-// lower.
+// lower. A CVE no row describes shows cannot_tell as Opportunity's: Go reads
+// whatever was answered as that, and a baseline the reply keeps must be the
+// one Go keeps.
 func newAdjustmentEntry(c CVE, floored [3]bool, flags []Flag, given Answers) (adjustmentEntry, error) {
 	if err := checkCVE(c); err != nil {
 		return adjustmentEntry{}, err
@@ -174,6 +176,9 @@ func newAdjustmentEntry(c CVE, floored [3]bool, flags []Flag, given Answers) (ad
 		CVSS:           []sourcedVector{},
 		Flags:          flags,
 		Answers:        givenAnswers{Opportunity: given.O},
+	}
+	if !c.described() {
+		e.Answers.Opportunity = cannotTell
 	}
 	for _, v := range c.vectors() {
 		sv := sourcedVector{Source: v.Source, Version: v.Version, Vector: v.Vector}

@@ -580,3 +580,37 @@ func TestAdjustmentRefusesWhatItCannotShow(t *testing.T) {
 		}
 	}
 }
+
+// A flagged CVE no row describes shows cannot_tell as Opportunity's baseline,
+// the one Go keeps: whatever the ordinary call answered, keep leaves 9 and a
+// lower answer lowers it, as for any cannot_tell baseline. A described CVE
+// shows its answer, which keep keeps.
+func TestAdjustmentShowsTheBaselineGoKeeps(t *testing.T) {
+	flags := []Flag{{SeverityContested, "LOW from debian, NVD says HIGH", "liba"}}
+	given := Answers{O: "special_access_or_resources_required", LC: "minimal", LI: "minimal_slightly_corrupt", LAV: "minimal_secondary_interrupted"}
+	for _, c := range []struct {
+		name     string
+		rows     []Row
+		baseline string
+		kept     int
+	}{
+		{"no description", []Row{{PkgName: "liba", Severity: "LOW"}}, cannotTell, 9},
+		{"a description", []Row{{PkgName: "liba", Severity: "LOW", Description: "Described."}}, "special_access_or_resources_required", 4},
+	} {
+		cve := CVE{ID: "CVE-N", Rows: c.rows}
+		request := text(t)(AdjustmentRequest(base(), cve, [3]bool{}, flags, given))
+		if !strings.Contains(request, `"answers":{"opportunity":"`+c.baseline+`",`) {
+			t.Errorf("%s: the request does not show %s as Opportunity's baseline:\n%s", c.name, c.baseline, request)
+		}
+		shown, _ := opportunity.read(c.baseline)
+		if l := computeFor(t, base(), cve, [3]bool{}, given, nil); int(l.Vector.O) != int(shown) || int(shown) != c.kept {
+			t.Errorf("%s: Go's baseline %d, the request's %d, want %d", c.name, l.Vector.O, shown, c.kept)
+		}
+		if l := computeFor(t, base(), cve, [3]bool{}, given, &Adjusted{Opportunity: keep}); int(l.Vector.O) != c.kept {
+			t.Errorf("%s: kept, O = %d, want %d", c.name, l.Vector.O, c.kept)
+		}
+		if l := computeFor(t, base(), cve, [3]bool{}, given, &Adjusted{Opportunity: "full_access_or_expensive_resources_required"}); l.Vector.O != 0 {
+			t.Errorf("%s: lowered to 0, O = %d", c.name, l.Vector.O)
+		}
+	}
+}
