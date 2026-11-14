@@ -82,6 +82,21 @@ var (
 	adjustGiven = Answers{O: "no_access_or_resources_required", LC: "all", LI: "extensive_seriously_corrupt", LAV: "minimal_primary_interrupted"}
 )
 
+// baselines returns given without the answers of the floored axes, whose
+// questions were not asked.
+func baselines(given Answers, floored [3]bool) Answers {
+	if floored[cvss.Confidentiality] {
+		given.LC = ""
+	}
+	if floored[cvss.Integrity] {
+		given.LI = ""
+	}
+	if floored[cvss.Availability] {
+		given.LAV = ""
+	}
+	return given
+}
+
 func TestCVSSLines(t *testing.T) {
 	want := map[Factor][]string{
 		O: {
@@ -349,8 +364,12 @@ func TestEntryFromConflictingRows(t *testing.T) {
 // and source, the flags, and the answers of the axes not floored.
 func TestAdjustmentEntryListsEveryRowsEvidence(t *testing.T) {
 	flags := []Flag{{MaintainerDisputed, "the maintainer disputes it", "libfoo-dev"}}
-	given := Answers{O: "some_access_or_resources_required", LC: "extensive", LI: "minimal_slightly_corrupt", LAV: "extensive_primary_interrupted"}
-	got := data(t)(json.Marshal(newAdjustmentEntry(conflicting, [3]bool{cvss.Availability: true}, flags, given)))
+	given := Answers{O: "some_access_or_resources_required", LC: "extensive", LI: "minimal_slightly_corrupt"}
+	e, err := newAdjustmentEntry(conflicting, [3]bool{cvss.Availability: true}, flags, given)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := data(t)(json.Marshal(e))
 	for _, part := range []string{
 		`"vendorSeverity":[{"source":"nvd","severity":"HIGH","packages":["libfoo","libfoo-dev"]},{"source":"redhat","severity":"MEDIUM","packages":["libfoo"]},{"source":"redhat","severity":"LOW","packages":["libfoo-dev"]}]`,
 		`"cvss":[{"source":"nvd","version":"3.1","vector":"CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N"},{"source":"redhat","version":"3.1","vector":"CVSS:3.1/AV:L/AC:L/PR:L/UI:N/S:U/C:H/I:N/A:N"},{"source":"nvd","version":"3.1","vector":"CVSS:3.1/AV:N/AC:H/PR:N/UI:R/S:U/C:H/I:N/A:N"},{"source":"nvd","version":"2.0","vector":"AV:N/AC:L/Au:N/C:P/I:N/A:N"}]`,
@@ -374,7 +393,7 @@ func TestAdjustmentAsksTheAxesNotFloored(t *testing.T) {
 				want = append(want, name)
 			}
 		}
-		request := text(t)(AdjustmentRequest(base(), conflicting, floored, adjustFlags, adjustGiven))
+		request := text(t)(AdjustmentRequest(base(), conflicting, floored, adjustFlags, baselines(adjustGiven, floored)))
 		questions := strings.Split(strings.Split(request, "\nQUESTIONS\n")[1], "\n\n")[0]
 		var asked []string
 		for _, line := range strings.Split(questions, "\n") {
@@ -445,3 +464,80 @@ func TestRenderRefusesWhatItCannotSend(t *testing.T) {
 }
 
 func second[T any](_ T, err error) error { return err }
+
+// The severity's source is the adjustment's evidence and no ordinary
+// question's: two rows giving LOW from two sources keep both, each in its
+// package, and one source on every row is written once.
+func TestSeveritySourceShownToTheAdjustmentOnly(t *testing.T) {
+	rows := func(first, second string) CVE {
+		return CVE{ID: "CVE-L", Rows: []Row{
+			{PkgName: "liba", Severity: "LOW", SeveritySource: first},
+			{PkgName: "libb", Severity: "LOW", SeveritySource: second},
+		}}
+	}
+	flags := []Flag{{SeverityContested, "LOW from debian, NVD says HIGH", "liba"}}
+	given := Answers{O: cannotTell, LC: cannotTell, LI: cannotTell, LAV: cannotTell}
+	for _, c := range []struct {
+		cve        CVE
+		adjustment string
+	}{
+		{rows("debian", "ubuntu"), `{"vulnId":"CVE-L","severity":"LOW","packages":[{"name":"liba","severitySource":"debian"},{"name":"libb","severitySource":"ubuntu"}],`},
+		{rows("debian", "debian"), `{"vulnId":"CVE-L","severity":"LOW","severitySource":"debian","packages":[{"name":"liba"},{"name":"libb"}],`},
+	} {
+		if got := text(t)(entriesJSON([]CVE{c.cve})); got != `[{"vulnId":"CVE-L","severity":"LOW","packages":[{"name":"liba"},{"name":"libb"}]}]` {
+			t.Errorf("the ordinary entry shows the severity's source: %s", got)
+		}
+		e, err := newAdjustmentEntry(c.cve, [3]bool{}, flags, given)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := data(t)(json.Marshal(e)); !strings.HasPrefix(got, c.adjustment) {
+			t.Errorf("the adjustment's entry:\n got %s\nwant %s…", got, c.adjustment)
+		}
+	}
+}
+
+// The adjustment shows the baselines it may lower and the flags it rests on,
+// so it refuses an answer no question lists, an answer for an axis not asked,
+// a flag quoting nothing and a flag on a package the CVE does not have.
+// cannot_tell is a baseline like any other answer.
+func TestAdjustmentRefusesWhatItCannotShow(t *testing.T) {
+	cFloored := [3]bool{cvss.Confidentiality: true}
+	with := func(change func(*Answers)) Answers {
+		a := adjustGiven
+		change(&a)
+		return a
+	}
+	for name, c := range map[string]struct {
+		floored [3]bool
+		flags   []Flag
+		given   Answers
+	}{
+		"no Opportunity answer":          {given: with(func(a *Answers) { a.O = "" })},
+		"keep as Opportunity's answer":   {given: with(func(a *Answers) { a.O = keep })},
+		"an answer for a floored axis":   {floored: cFloored, given: adjustGiven},
+		"cannot_tell for a floored axis": {floored: cFloored, given: with(func(a *Answers) { a.LC = cannotTell })},
+		"no answer for an axis asked":    {given: with(func(a *Answers) { a.LI = "" })},
+		"another factor's answer":        {given: with(func(a *Answers) { a.LAV = "all" })},
+		"a flag quoting nothing":         {flags: []Flag{{MaintainerDisputed, "  ", "libfoo"}}, given: adjustGiven},
+		"a flag naming no package":       {flags: []Flag{{MaintainerDisputed, "disputed", ""}}, given: adjustGiven},
+		"a flag on another package":      {flags: []Flag{{MaintainerDisputed, "disputed", "libother"}}, given: adjustGiven},
+	} {
+		flags := c.flags
+		if flags == nil {
+			flags = adjustFlags
+		}
+		if _, err := AdjustmentRequest(base(), conflicting, c.floored, flags, c.given); err == nil {
+			t.Errorf("%s: no error", name)
+		}
+		if _, err := newAdjustmentEntry(conflicting, c.floored, flags, c.given); err == nil {
+			t.Errorf("%s: the entry took it", name)
+		}
+	}
+	abstained := Answers{O: cannotTell, LC: cannotTell, LI: cannotTell, LAV: cannotTell}
+	for _, floored := range [][3]bool{{}, cFloored, {true, true, true}} {
+		if _, err := AdjustmentRequest(base(), conflicting, floored, adjustFlags, baselines(abstained, floored)); err != nil {
+			t.Errorf("cannot_tell baselines, floored %v: %v", floored, err)
+		}
+	}
+}

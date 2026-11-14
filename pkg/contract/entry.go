@@ -41,6 +41,10 @@ type Row struct {
 	Title            string
 	Description      string
 	Severity         string
+	// SeveritySource is the source the scanner took Severity from: Trivy's
+	// SeveritySource, the matched record's namespace on Grype. Only the
+	// adjustment shows it.
+	SeveritySource string
 	// CVSS is every vector the row's advisory publishes, each with its
 	// source and version.
 	CVSS []cvss.Vector
@@ -74,11 +78,12 @@ func (c CVE) vectors() []cvss.Vector {
 // each package instead, so no row's value is dropped. Empty fields are left
 // out.
 type entry struct {
-	VulnID      string         `json:"vulnId"`
-	Title       string         `json:"title,omitempty"`
-	Description string         `json:"description,omitempty"`
-	Severity    string         `json:"severity,omitempty"`
-	Packages    []entryPackage `json:"packages"`
+	VulnID         string         `json:"vulnId"`
+	Title          string         `json:"title,omitempty"`
+	Description    string         `json:"description,omitempty"`
+	Severity       string         `json:"severity,omitempty"`
+	SeveritySource string         `json:"severitySource,omitempty"`
+	Packages       []entryPackage `json:"packages"`
 }
 
 type entryPackage struct {
@@ -89,13 +94,21 @@ type entryPackage struct {
 	Title            string `json:"title,omitempty"`
 	Description      string `json:"description,omitempty"`
 	Severity         string `json:"severity,omitempty"`
+	SeveritySource   string `json:"severitySource,omitempty"`
 }
 
-func newEntry(c CVE) entry {
+// newEntry writes the CVE's entry. The ordinary questions are shown the
+// scanner's fields without the severity's source; the adjustment, whose flag
+// can rest on it, is shown it too.
+func newEntry(c CVE, withSource bool) entry {
 	e := entry{VulnID: c.ID, Packages: []entryPackage{}}
 	title, sharedTitle := alike(c.Rows, func(r Row) string { return r.Title })
 	description, sharedDescription := alike(c.Rows, func(r Row) string { return r.Description })
 	severity, sharedSeverity := alike(c.Rows, func(r Row) string { return r.Severity })
+	source, sharedSource := alike(c.Rows, func(r Row) string { return r.SeveritySource })
+	if !withSource {
+		source, sharedSource = "", true
+	}
 	if sharedTitle {
 		e.Title = title
 	}
@@ -104,6 +117,9 @@ func newEntry(c CVE) entry {
 	}
 	if sharedSeverity {
 		e.Severity = severity
+	}
+	if sharedSource {
+		e.SeveritySource = source
 	}
 	for _, r := range c.Rows {
 		p := entryPackage{PkgID: r.PkgID, Name: r.PkgName, InstalledVersion: r.InstalledVersion, FixedVersion: r.FixedVersion}
@@ -115,6 +131,9 @@ func newEntry(c CVE) entry {
 		}
 		if !sharedSeverity {
 			p.Severity = r.Severity
+		}
+		if !sharedSource {
+			p.SeveritySource = r.SeveritySource
 		}
 		if !slices.Contains(e.Packages, p) {
 			e.Packages = append(e.Packages, p)
@@ -142,7 +161,7 @@ func entriesJSON(batch []CVE) (string, error) {
 	}
 	entries := make([]entry, len(batch))
 	for i, c := range batch {
-		entries[i] = newEntry(c)
+		entries[i] = newEntry(c, false)
 	}
 	b, err := json.Marshal(entries)
 	return string(b), err

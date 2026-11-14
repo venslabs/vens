@@ -182,8 +182,13 @@ func frames(t *testing.T, d Deployment, adjustFloored [3]bool) map[string]string
 		out[name+".request.txt"] = elide(t, text(Request(f, d, frameBatch)), entries, "[entries]")
 		out[name+".schema.json"] = data(Schema(f, []string{"CVE-A", "CVE-B"}))
 	}
-	request := text(AdjustmentRequest(d, frameFlagged, adjustFloored, frameFlags, frameGiven))
-	entry := data(json.Marshal(newAdjustmentEntry(frameFlagged, adjustFloored, frameFlags, frameGiven)))
+	given := baselines(frameGiven, adjustFloored)
+	request := text(AdjustmentRequest(d, frameFlagged, adjustFloored, frameFlags, given))
+	e, err := newAdjustmentEntry(frameFlagged, adjustFloored, frameFlags, given)
+	if err != nil {
+		t.Fatal(err)
+	}
+	entry := data(json.Marshal(e))
 	out["13-adjustment.request.txt"] = elide(t, request, entry, "[entry]")
 	out["13-adjustment.schema.json"] = data(AdjustmentSchema(adjustFloored))
 	return out
@@ -282,7 +287,7 @@ func TestGoldenEntries(t *testing.T) {
 	flags := []Flag{{Name: MaintainerDisputed, Evidence: "the maintainer disputes it", Package: "libfoo-dev"}}
 	checkGoldenDir(t, filepath.Join("testdata", "conflicting-rows"), map[string]string{
 		"02-O.request.txt":          text(t)(Request(O, d, cvssBatch)),
-		"13-adjustment.request.txt": text(t)(AdjustmentRequest(d, conflicting, [3]bool{cvss.Availability: true}, flags, frameGiven)),
+		"13-adjustment.request.txt": text(t)(AdjustmentRequest(d, conflicting, [3]bool{cvss.Availability: true}, flags, baselines(frameGiven, [3]bool{cvss.Availability: true}))),
 	})
 }
 

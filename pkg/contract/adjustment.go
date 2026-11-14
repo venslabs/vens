@@ -59,7 +59,7 @@ var axisNames = [3]string{
 }
 
 // Flag is one flag a row of a flagged CVE raised: its name, the evidence the
-// adjustment quotes for it, and that row's package.
+// adjustment quotes for it, and the name of that row's package.
 type Flag struct {
 	Name     string `json:"flag"`
 	Evidence string `json:"evidence"`
@@ -108,13 +108,11 @@ func AdjustmentRequest(d Deployment, c CVE, floored [3]bool, flags []Flag, given
 	if err := d.Check(); err != nil {
 		return "", err
 	}
-	if err := checkCVE(c); err != nil {
+	entry, err := newAdjustmentEntry(c, floored, flags, given)
+	if err != nil {
 		return "", err
 	}
-	if err := checkFlags(flags); err != nil {
-		return "", err
-	}
-	e, err := json.Marshal(newAdjustmentEntry(c, floored, flags, given))
+	e, err := json.Marshal(entry)
 	if err != nil {
 		return "", err
 	}
@@ -157,30 +155,25 @@ func lowerable() []string {
 	return slices.Clone(ids[:len(ids)-1])
 }
 
-func newAdjustmentEntry(c CVE, floored [3]bool, flags []Flag, given Answers) adjustmentEntry {
+// newAdjustmentEntry writes a flagged CVE's entry, its evidence and the
+// answers its ordinary calls gave, which are the baselines the adjustment may
+// lower.
+func newAdjustmentEntry(c CVE, floored [3]bool, flags []Flag, given Answers) (adjustmentEntry, error) {
+	if err := checkCVE(c); err != nil {
+		return adjustmentEntry{}, err
+	}
+	if err := checkFlags(flags, c); err != nil {
+		return adjustmentEntry{}, err
+	}
+	if err := checkGiven(given, floored); err != nil {
+		return adjustmentEntry{}, err
+	}
 	e := adjustmentEntry{
-		entry:          newEntry(c),
-		VendorSeverity: []sourcedSeverity{},
+		entry:          newEntry(c, true),
+		VendorSeverity: vendorSeverities(c),
 		CVSS:           []sourcedVector{},
 		Flags:          flags,
 		Answers:        givenAnswers{Opportunity: given.O},
-	}
-	for _, r := range c.Rows {
-		for _, s := range r.VendorSeverities {
-			i := slices.IndexFunc(e.VendorSeverity, func(x sourcedSeverity) bool {
-				return x.Source == s.Source && x.Severity == s.Severity
-			})
-			if i < 0 {
-				e.VendorSeverity = append(e.VendorSeverity, sourcedSeverity{Source: s.Source, Severity: s.Severity, Packages: []string{}})
-				i = len(e.VendorSeverity) - 1
-			}
-			if r.PkgName != "" && !slices.Contains(e.VendorSeverity[i].Packages, r.PkgName) {
-				e.VendorSeverity[i].Packages = append(e.VendorSeverity[i].Packages, r.PkgName)
-			}
-		}
-	}
-	for _, s := range e.VendorSeverity {
-		slices.Sort(s.Packages)
 	}
 	for _, v := range c.vectors() {
 		sv := sourcedVector{Source: v.Source, Version: v.Version, Vector: v.Vector}
@@ -197,16 +190,66 @@ func newAdjustmentEntry(c CVE, floored [3]bool, flags []Flag, given Answers) adj
 	if !floored[cvss.Availability] {
 		e.Answers.Availability = &given.LAV
 	}
-	return e
+	return e, nil
 }
 
-func checkFlags(flags []Flag) error {
+// vendorSeverities lists each source's severity once, with the names of the
+// packages whose rows give it, sorted.
+func vendorSeverities(c CVE) []sourcedSeverity {
+	out := []sourcedSeverity{}
+	for _, r := range c.Rows {
+		for _, s := range r.VendorSeverities {
+			i := slices.IndexFunc(out, func(x sourcedSeverity) bool { return x.Source == s.Source && x.Severity == s.Severity })
+			if i < 0 {
+				out = append(out, sourcedSeverity{Source: s.Source, Severity: s.Severity, Packages: []string{}})
+				i = len(out) - 1
+			}
+			if r.PkgName != "" && !slices.Contains(out[i].Packages, r.PkgName) {
+				out[i].Packages = append(out[i].Packages, r.PkgName)
+			}
+		}
+	}
+	for _, s := range out {
+		slices.Sort(s.Packages)
+	}
+	return out
+}
+
+// checkFlags checks a flagged CVE's flags: each names one of the two flags,
+// quotes its evidence and names the package of a row of the CVE.
+func checkFlags(flags []Flag, c CVE) error {
 	if len(flags) == 0 {
 		return errors.New("a CVE with no flag gets no adjustment")
 	}
 	for _, f := range flags {
-		if f.Name != MaintainerDisputed && f.Name != SeverityContested {
+		switch {
+		case f.Name != MaintainerDisputed && f.Name != SeverityContested:
 			return fmt.Errorf("%q is not a flag", f.Name)
+		case strings.TrimSpace(f.Evidence) == "":
+			return fmt.Errorf("%s on %s quotes no evidence", f.Name, c.ID)
+		case f.Package == "" || !slices.ContainsFunc(c.Rows, func(r Row) bool { return r.PkgName == f.Package }):
+			return fmt.Errorf("%s names the package %q, not one of %s's", f.Name, f.Package, c.ID)
+		}
+	}
+	return nil
+}
+
+// checkGiven checks the baselines the adjustment shows: Opportunity's answer
+// and, for each axis Applicability did not floor, its factor's, each one its
+// question lists, cannot_tell included. An axis floored was not asked and
+// has no answer.
+func checkGiven(given Answers, floored [3]bool) error {
+	if !slices.Contains(table[O].ids, given.O) {
+		return fmt.Errorf("%s's answer %q is not one its question lists", O, given.O)
+	}
+	factors := [3]Factor{cvss.Confidentiality: LC, cvss.Integrity: LI, cvss.Availability: LAV}
+	answers := [3]string{cvss.Confidentiality: given.LC, cvss.Integrity: given.LI, cvss.Availability: given.LAV}
+	for axis, f := range factors {
+		switch {
+		case floored[axis] && answers[axis] != "":
+			return fmt.Errorf("%s was not asked, its axis floored, yet has the answer %q", f, answers[axis])
+		case !floored[axis] && !slices.Contains(table[f].ids, answers[axis]):
+			return fmt.Errorf("%s's answer %q is not one its question lists", f, answers[axis])
 		}
 	}
 	return nil
