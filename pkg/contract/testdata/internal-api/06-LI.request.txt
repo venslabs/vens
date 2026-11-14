@@ -1,0 +1,19 @@
+VULNERABILITIES
+[entries]
+
+QUESTION
+If intranet users exploited this vulnerability in this deployment, how much of the data this service handles could they corrupt, and how badly?
+
+FOR THIS QUESTION
+Data sensitivity: medium (Internal data, limited confidentiality)
+
+ANSWERS
+- minimal_slightly_corrupt: Minimal, slightly corrupt: a little of the data, changed in ways that are easy to notice or undo.
+- minimal_seriously_corrupt: Minimal, seriously corrupt: a little of the data, changed in ways that matter, such as altered records, credentials or settings.
+- extensive_slightly_corrupt: Extensive, slightly corrupt: much of the data, changed in ways that are easy to notice or undo.
+- extensive_seriously_corrupt: Extensive, seriously corrupt: much of the data, changed in ways that matter.
+- all_data_totally_corrupt: All data totally corrupt: everything this service holds can be overwritten or destroyed.
+- cannot_tell: The facts given do not say.
+
+Answer every vulnerability listed above once, by its vulnId, with one answer id from ANSWERS.
+Reply with {"answers": [{"vulnId": "...", "reasoning": "...", "answer": "..."}]}.

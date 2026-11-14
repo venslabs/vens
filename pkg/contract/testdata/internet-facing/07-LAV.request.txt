@@ -1,0 +1,19 @@
+VULNERABILITIES
+[entries]
+
+QUESTION
+If anonymous Internet users exploited this vulnerability in this deployment, how much of this service could they interrupt, and how vital is what they would interrupt?
+
+FOR THIS QUESTION
+Availability requirement: critical (Zero downtime tolerance)
+
+ANSWERS
+- minimal_secondary_interrupted: Minimal, secondary: a brief or partial interruption of something the service can do without for a while.
+- minimal_primary_interrupted: Minimal, primary: a brief or partial interruption of what the service exists to do.
+- extensive_secondary_interrupted: Extensive, secondary: a lasting or broad interruption of things the service can do without for a while.
+- extensive_primary_interrupted: Extensive, primary: a lasting or broad interruption of what the service exists to do.
+- all_services_completely_lost: All services completely lost: the service and what runs with it, completely.
+- cannot_tell: The facts given do not say.
+
+Answer every vulnerability listed above once, by its vulnId, with one answer id from ANSWERS.
+Reply with {"answers": [{"vulnId": "...", "reasoning": "...", "answer": "..."}]}.

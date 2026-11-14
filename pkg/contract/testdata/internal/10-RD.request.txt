@@ -1,0 +1,18 @@
+VULNERABILITIES
+[entries]
+
+QUESTION
+If intranet users exploited this vulnerability in this service and it became known, how much would it harm the business's reputation?
+
+FOR THIS QUESTION
+Business criticality: low (Dev / test / sandbox)
+
+ANSWERS
+- minimal_damage: Minimal damage: few would notice or care.
+- loss_of_major_accounts: Loss of major accounts: important customers or partners would leave or reconsider.
+- loss_of_goodwill: Loss of goodwill: customers or the public would trust the business less.
+- brand_damage: Brand damage: lasting, public harm to the brand.
+- cannot_tell: The facts given do not say.
+
+Answer every vulnerability listed above once, by its vulnId, with one answer id from ANSWERS.
+Reply with {"answers": [{"vulnId": "...", "reasoning": "...", "answer": "..."}]}.

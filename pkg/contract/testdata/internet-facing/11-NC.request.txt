@@ -1,0 +1,14 @@
+VULNERABILITIES
+[entries]
+
+QUESTION
+This service must comply with PCI-DSS, GDPR. If anonymous Internet users exploited this vulnerability here, how serious a violation of those frameworks would it cause?
+
+ANSWERS
+- minor_violation: Minor violation: at most a minor or technical breach of a requirement.
+- clear_violation: Clear violation: a clear breach of a requirement, such as exposure or alteration of the data or controls a framework protects.
+- high_profile_violation: High profile violation: a breach that would have to be reported or would draw a regulator's attention.
+- cannot_tell: The facts given do not say.
+
+Answer every vulnerability listed above once, by its vulnId, with one answer id from ANSWERS.
+Reply with {"answers": [{"vulnId": "...", "reasoning": "...", "answer": "..."}]}.

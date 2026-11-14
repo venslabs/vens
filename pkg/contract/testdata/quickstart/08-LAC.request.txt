@@ -1,0 +1,14 @@
+VULNERABILITIES
+[entries]
+
+QUESTION
+To exploit this vulnerability in this deployment, must anonymous Internet users authenticate to this service, and could the exploit let them act as someone else or erase, forge or bypass the records of who did what?
+
+ANSWERS
+- identified: Identified: they must authenticate to this service, and the exploit does not let them act as someone else or tamper with the records of who did what.
+- unidentified: Unidentified: they need not authenticate to this service, and the exploit does not let them act as someone else or tamper with those records.
+- defeats_attribution: Defeats attribution: whether or not they authenticate, the exploit lets them act as someone else, or erase, forge or bypass the records of who did what.
+- cannot_tell: The facts given do not say.
+
+Answer every vulnerability listed above once, by its vulnId, with one answer id from ANSWERS.
+Reply with {"answers": [{"vulnId": "...", "reasoning": "...", "answer": "..."}]}.
