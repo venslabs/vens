@@ -45,7 +45,7 @@ type Deployment struct {
 	// shows the business criticality.
 	AvailabilityRequirement *Setting
 	// Controls are the controls set to true among waf, ddos_protection,
-	// antivirus, segmentation and zero_trust, which Ease of exploit shows in
+	// segmentation, zero_trust and antivirus, which Ease of exploit shows in
 	// that order.
 	Controls []Control
 	// Frameworks are the compliance frameworks declared, in their order.
@@ -106,7 +106,7 @@ func listenerShown(value string) bool {
 
 // controlKeys are the controls Ease of exploit can show, in the order it
 // shows them.
-var controlKeys = [...]string{"waf", "ddos_protection", "antivirus", "segmentation", "zero_trust"}
+var controlKeys = [...]string{"waf", "ddos_protection", "segmentation", "zero_trust", "antivirus"}
 
 // Check returns an error naming every value of d that the texts or the rules
 // cannot read. Each function of this package that takes a Deployment checks

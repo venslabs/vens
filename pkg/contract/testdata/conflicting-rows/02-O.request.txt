@@ -11,6 +11,7 @@ CVSS metrics AV, AT, PR, UI of the newest CVSS version published for each vulner
 - CVE-C: CVSS 3.1, nvd: AV:N PR:N UI:R
 - CVE-D: CVSS 4.0, ghsa: AV:N AT:P PR:N UI:A
 - CVE-G: CVSS 2.0, nvd: AV:N
+- CVE-H: CVSS 3.1, nvd: AV:L PR:N UI:N
 
 ANSWERS
 - no_access_or_resources_required: No access or resources required: from where they already are, they can reach and trigger the vulnerable code in this deployment.

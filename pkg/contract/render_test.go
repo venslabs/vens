@@ -90,6 +90,7 @@ func TestCVSSLines(t *testing.T) {
 			"- CVE-C: CVSS 3.1, nvd: AV:N PR:N UI:R",
 			"- CVE-D: CVSS 4.0, ghsa: AV:N AT:P PR:N UI:A",
 			"- CVE-G: CVSS 2.0, nvd: AV:N",
+			"- CVE-H: CVSS 3.1, nvd: AV:L PR:N UI:N",
 		},
 		EE: {
 			"- CVE-C: CVSS 3.1, nvd: AC:L PR:N UI:N",
@@ -97,6 +98,7 @@ func TestCVSSLines(t *testing.T) {
 			"- CVE-C: CVSS 3.1, nvd: AC:H PR:N UI:R",
 			"- CVE-D: CVSS 4.0, ghsa: AC:L AT:P PR:N UI:A",
 			"- CVE-G: CVSS 2.0, nvd: AC:M",
+			"- CVE-H: CVSS 3.1, nvd: AC:L PR:N UI:N",
 		},
 	}
 	for f, metrics := range cvssShown {
@@ -108,6 +110,62 @@ func TestCVSSLines(t *testing.T) {
 	twice := CVE{ID: "CVE-T", Rows: []Row{{CVSS: conflicting.Rows[0].CVSS[:1]}, {CVSS: conflicting.Rows[0].CVSS[:1]}}}
 	if got := cvssLines(cvssShown[O], []CVE{twice}); len(got) != 1 {
 		t.Errorf("one vector on two rows: %q", got)
+	}
+}
+
+// A vector published at the newest version always gets its line, showing
+// its metrics as written: a CVE with no line has no published vector.
+func TestCVSSLinesShowWhatWasPublished(t *testing.T) {
+	for _, c := range []struct {
+		name   string
+		vector cvss.Vector
+		parses bool
+		want   []string
+	}{
+		{"a value off its version's scale", v31("nvd", "AV:Z/AC:L/PR:N/UI:N"), true, []string{"- CVE-X: CVSS 3.1, nvd: AV:Z PR:N UI:N"}},
+		{"a metric written twice, its last value", v31("nvd", "AV:N/PR:N/UI:N/AV:A"), false, []string{"- CVE-X: CVSS 3.1, nvd: AV:A PR:N UI:N"}},
+		{"a vector that does not parse", v31("nvd", "AV:N//PR:L:x/UI"), false, []string{"- CVE-X: CVSS 3.1, nvd: AV:N PR:L:x"}},
+		{"none of the metrics shown", v31("nvd", "S:U/C:H/I:H/A:H"), true, []string{"- CVE-X: CVSS 3.1, nvd:"}},
+		{"a version vens does not read", cvss.Vector{Source: "nvd", Version: "5.0", Vector: "CVSS:5.0/AV:N"}, false, nil},
+	} {
+		if _, err := c.vector.Parse(); (err == nil) != c.parses {
+			t.Fatalf("%s: Parse() = %v", c.name, err)
+		}
+		got := cvssLines(cvssShown[O], []CVE{{ID: "CVE-X", Rows: []Row{{CVSS: []cvss.Vector{c.vector}}}}})
+		if !slices.Equal(got, c.want) {
+			t.Errorf("%s: %q, want %q", c.name, got, c.want)
+		}
+	}
+	// The newest version is the one the scanner reports, whatever the text.
+	older := cvss.Vector{Source: "nvd", Version: "2.0", Vector: "AV:N/AC:L/Au:N/C:P/I:P/A:P"}
+	newer := v31("ghsa", "garbled")
+	if got := cvssLines(cvssShown[O], []CVE{{ID: "CVE-X", Rows: []Row{{CVSS: []cvss.Vector{older, newer}}}}}); !slices.Equal(got, []string{"- CVE-X: CVSS 3.1, ghsa:"}) {
+		t.Errorf("a garbled v3.1 beside a v2: %q", got)
+	}
+}
+
+// Ease of exploit shows the controls in one order, whatever order the config
+// gives them in.
+func TestControlsShownInOneOrder(t *testing.T) {
+	control := func(key string) Control {
+		return Control{Key: key, Description: key + " description", Scope: key + " scope"}
+	}
+	var all []Control
+	for _, key := range []string{"antivirus", "zero_trust", "segmentation", "ddos_protection", "waf"} {
+		all = append(all, control(key))
+	}
+	want := "Controls in front of this deployment: waf (waf description; scope: waf scope); " +
+		"ddos_protection (ddos_protection description; scope: ddos_protection scope); " +
+		"segmentation (segmentation description; scope: segmentation scope); " +
+		"zero_trust (zero_trust description; scope: zero_trust scope); " +
+		"antivirus (antivirus description; scope: antivirus scope)"
+	if got := controlsLine(all); got != want {
+		t.Errorf("all five:\n got %s\nwant %s", got, want)
+	}
+	want = "Controls in front of this deployment: segmentation (segmentation description; scope: segmentation scope); " +
+		"antivirus (antivirus description; scope: antivirus scope)"
+	if got := controlsLine([]Control{control("antivirus"), control("segmentation")}); got != want {
+		t.Errorf("antivirus with segmentation:\n got %s\nwant %s", got, want)
 	}
 }
 

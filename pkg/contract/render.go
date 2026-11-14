@@ -190,10 +190,12 @@ func controlsLine(controls []Control) string {
 	return "Controls in front of this deployment: " + strings.Join(shown, "; ")
 }
 
-// cvssLines returns, per CVE in batch order, one line per distinct vector of
-// the newest CVSS version among its rows' vectors, with the metrics given on
-// that version's scale. A CVE with no vector vens reads gets no line, and so
-// does a vector that does not parse.
+// cvssLines returns, per CVE in batch order, one line per distinct vector
+// published at the newest CVSS version the scanner reports among its rows'
+// vectors, so that a CVE with no line has no published vector. A line shows
+// the metrics as published: the model reads the vector as text, and a value
+// off its version's scale or a vector that does not parse still says what
+// its source wrote.
 func cvssLines(metrics []string, batch []CVE) []string {
 	var lines []string
 	for _, c := range batch {
@@ -203,21 +205,30 @@ func cvssLines(metrics []string, batch []CVE) []string {
 			if newest == 0 || v.Tier() != newest {
 				continue
 			}
-			m, err := v.Parse()
-			if err != nil {
-				continue
-			}
-			var given []string
+			values := published(v.Vector)
+			line := fmt.Sprintf("- %s: CVSS %s, %s:", c.ID, v.Version, v.Source)
 			for _, metric := range metrics {
-				if value, ok := m.Get(metric); ok {
-					given = append(given, metric+":"+value)
+				if value, ok := values[metric]; ok {
+					line += " " + metric + ":" + value
 				}
 			}
-			line := fmt.Sprintf("- %s: CVSS %s, %s: %s", c.ID, v.Version, v.Source, strings.Join(given, " "))
 			if !slices.Contains(lines, line) {
 				lines = append(lines, line)
 			}
 		}
 	}
 	return lines
+}
+
+// published returns a vector's metrics as its source wrote them: each part
+// between slashes split at its first colon, a part with none skipped, and a
+// metric written twice taking its last value.
+func published(vector string) map[string]string {
+	values := map[string]string{}
+	for part := range strings.SplitSeq(strings.TrimSpace(vector), "/") {
+		if metric, value, ok := strings.Cut(part, ":"); ok {
+			values[metric] = value
+		}
+	}
+	return values
 }
