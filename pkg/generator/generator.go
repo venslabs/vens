@@ -31,6 +31,7 @@ import (
 
 	"github.com/CycloneDX/cyclonedx-go"
 	"github.com/venslabs/vens/pkg/attestation"
+	"github.com/venslabs/vens/pkg/cvss"
 	"github.com/venslabs/vens/pkg/llm"
 	"github.com/venslabs/vens/pkg/outputhandler"
 	"github.com/venslabs/vens/pkg/owasp"
@@ -58,6 +59,18 @@ type Vulnerability struct {
 	Severity         string // NVD/vendor severity
 	SourceName       string
 	SourceURL        string
+
+	// CVSS is every vector the row's advisory publishes, each with its source
+	// and version.
+	CVSS []cvss.Vector
+	// SeveritySource is where Severity comes from: Trivy's SeveritySource,
+	// the matched record's namespace on Grype.
+	SeveritySource string
+	// VendorSeverities is each source's own severity: Trivy's VendorSeverity,
+	// the related records' on Grype.
+	VendorSeverities []VendorSeverity
+	// Flags are the row's flags, which the scanner parser sets.
+	Flags Flags
 }
 
 // LLMVulnerability contains only the fields needed for LLM analysis.

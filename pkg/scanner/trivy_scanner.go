@@ -17,9 +17,14 @@ package scanner
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
+	"slices"
+	"strconv"
 	"strings"
 
+	dbtypes "github.com/aquasecurity/trivy-db/pkg/types"
 	trivytypes "github.com/aquasecurity/trivy/pkg/types"
+	"github.com/venslabs/vens/pkg/cvss"
 	"github.com/venslabs/vens/pkg/generator"
 )
 
@@ -55,11 +60,18 @@ func (s *TrivyScanner) Parse(data []byte) ([]generator.Vulnerability, error) {
 				// half the entries, and the resolved severity is frequently absent from
 				// VendorSeverity because Trivy falls back to CVSS. Its resolution logic is
 				// unexported, so keep the resolved value until Trivy DB v3 drops it.
-				Severity: v.Severity, //nolint:staticcheck // SA1019, see above
+				Severity:         v.Severity, //nolint:staticcheck // SA1019, see above
+				CVSS:             trivyVectors(v.CVSS),
+				SeveritySource:   string(v.SeveritySource),
+				VendorSeverities: trivyVendorSeverities(v.VendorSeverity),
 			}
 			if v.DataSource != nil {
 				vuln.SourceName = trivyDataSourceToSourceName(string(v.DataSource.ID), v.VulnerabilityID)
 				vuln.SourceURL = v.DataSource.URL
+			}
+			vuln.Flags = generator.Flags{
+				MaintainerDisputed: maintainerDisputed(vuln.Description),
+				SeverityContested:  trivySeverityContested(vuln),
 			}
 			vulns = append(vulns, vuln)
 		}
@@ -71,6 +83,47 @@ func (s *TrivyScanner) Parse(data []byte) ([]generator.Vulnerability, error) {
 // Name returns the scanner identifier
 func (s *TrivyScanner) Name() string {
 	return string(ScannerTrivy)
+}
+
+// trivyVectors lists every vector of every source, sources in name order and
+// each source's v2, v3 and v4 in that order.
+func trivyVectors(bySource dbtypes.VendorCVSS) []cvss.Vector {
+	var vectors []cvss.Vector
+	for _, source := range slices.Sorted(maps.Keys(bySource)) {
+		c := bySource[source]
+		for _, f := range []struct{ vector, unprefixed string }{{c.V2Vector, "2.0"}, {c.V3Vector, ""}, {c.V40Vector, ""}} {
+			if f.vector != "" {
+				vectors = append(vectors, cvss.Vector{
+					Source: string(source), Version: trivyVersion(f.vector, f.unprefixed), Vector: f.vector,
+				})
+			}
+		}
+	}
+	return vectors
+}
+
+// trivyVersion is the version a vector's CVSS: prefix states, read as Parse
+// reads it; Trivy names none for v2 vectors, which carry no prefix.
+func trivyVersion(vector, unprefixed string) string {
+	if version, ok := cvss.PrefixVersion(vector); ok {
+		return version
+	}
+	return unprefixed
+}
+
+// trivyVendorSeverities lists each source's severity by name, sources in name
+// order.
+func trivyVendorSeverities(bySource dbtypes.VendorSeverity) []generator.VendorSeverity {
+	var severities []generator.VendorSeverity
+	for _, source := range slices.Sorted(maps.Keys(bySource)) {
+		s := bySource[source]
+		name := strconv.Itoa(int(s))
+		if s >= 0 && int(s) < len(dbtypes.SeverityNames) {
+			name = dbtypes.SeverityNames[s]
+		}
+		severities = append(severities, generator.VendorSeverity{Source: string(source), Severity: name})
+	}
+	return severities
 }
 
 // countComponentsPerPURL counts distinct components behind each PURL. A report
