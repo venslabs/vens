@@ -51,9 +51,18 @@ func levels(v owasp.Vector) map[string]int {
 	}
 }
 
+// describedCVE is a CVE a row describes, the case every rule but the
+// likelihood fallback reads.
+var describedCVE = CVE{ID: "CVE-T", Rows: []Row{{PkgName: "libexample", Description: "A described vulnerability."}}}
+
 func compute(t *testing.T, d Deployment, floored [3]bool, a Answers, adjusted *Adjusted) Levels {
 	t.Helper()
-	l, err := Compute(d, floored, a, adjusted)
+	return computeFor(t, d, describedCVE, floored, a, adjusted)
+}
+
+func computeFor(t *testing.T, d Deployment, c CVE, floored [3]bool, a Answers, adjusted *Adjusted) Levels {
+	t.Helper()
+	l, err := Compute(d, c, floored, a, adjusted)
 	if err != nil {
 		t.Fatalf("Compute: %v", err)
 	}

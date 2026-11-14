@@ -310,8 +310,13 @@ func TestAdjustmentNeverRaises(t *testing.T) {
 func TestComputeRefusesAnInvalidDeployment(t *testing.T) {
 	d := base()
 	d.Exposure.Value = "public"
-	if _, err := Compute(d, [3]bool{}, Answers{}, nil); err == nil {
+	if _, err := Compute(d, describedCVE, [3]bool{}, Answers{}, nil); err == nil {
 		t.Error("Compute took an exposure off its list")
+	}
+	for _, c := range []CVE{{ID: "CVE-X"}, {Rows: []Row{{}}}} {
+		if _, err := Compute(base(), c, [3]bool{}, Answers{}, nil); err == nil {
+			t.Errorf("Compute took %+v", c)
+		}
 	}
 	if _, err := Questions(d, [3]bool{}); err == nil {
 		t.Error("Questions took an exposure off its list")
@@ -326,5 +331,88 @@ func TestReadingsHoldEveryQuestionAsked(t *testing.T) {
 				t.Errorf("readings for %v, questions %v", got, want)
 			}
 		}
+	}
+}
+
+// With no description on any row, Motive, Opportunity and Ease of exploit
+// read whatever they were answered as cannot_tell: 9, each counted once. The
+// questions are still asked, and the rest reads as usual.
+func TestNoDescriptionReadsTheLikelihoodAnswersAsCannotTell(t *testing.T) {
+	answers := Answers{M: "low_or_no_reward", O: "full_access_or_expensive_resources_required", EE: cannotTell,
+		LC: "minimal", LAC: "identified", FD: "bankruptcy", RD: "minimal_damage"}
+	for _, rows := range [][]Row{
+		{{PkgName: "liba"}},
+		{{PkgName: "liba", Description: " \n"}, {PkgName: "libb"}},
+	} {
+		l := computeFor(t, base(), CVE{ID: "CVE-N", Rows: rows}, [3]bool{}, answers, nil)
+		got := levels(l.Vector)
+		for _, f := range []Factor{M, O, EE} {
+			if got[string(f)] != 9 || l.Readings[f] != NoDescription || l.Sources[f] != SourceAnswer {
+				t.Errorf("%s: level %d read %v from %v, want 9 read as no description", f, got[string(f)], l.Readings[f], l.Sources[f])
+			}
+		}
+		for _, counter := range []string{"motive_cannot_tell", "opportunity_cannot_tell", "ease_of_exploit_cannot_tell"} {
+			if n := len(slices.DeleteFunc(slices.Clone(l.Counters), func(c string) bool { return c != counter })); n != 1 {
+				t.Errorf("%s counted %d times: %v", counter, n, l.Counters)
+			}
+		}
+		if got["LC"] != 2 || l.Readings[LC] != Answered {
+			t.Errorf("LC = %d read %v, want its answer's 2", got["LC"], l.Readings[LC])
+		}
+	}
+	// One row with a description is enough to read the answers.
+	c := CVE{ID: "CVE-N", Rows: []Row{{PkgName: "liba"}, {PkgName: "libb", Description: "Described."}}}
+	if got := levels(computeFor(t, base(), c, [3]bool{}, answers, nil).Vector); got["M"] != 1 || got["O"] != 0 {
+		t.Errorf("one row described: M %d, O %d, want 1 and 0", got["M"], got["O"])
+	}
+	// The adjustment can still lower Opportunity from there.
+	l := computeFor(t, base(), CVE{ID: "CVE-N", Rows: []Row{{PkgName: "liba"}}}, [3]bool{}, answers,
+		&Adjusted{Opportunity: "special_access_or_resources_required"})
+	if l.Vector.O != 4 || l.Sources[O] != SourceAdjustment {
+		t.Errorf("adjusted with no description: O %d from %v, want 4 from the adjustment", l.Vector.O, l.Sources[O])
+	}
+}
+
+// An adjustment lowers Opportunity below a cannot_tell baseline of 9, which
+// still counts.
+func TestAdjustmentLowersACannotTellBaseline(t *testing.T) {
+	l := compute(t, base(), [3]bool{}, Answers{O: cannotTell}, &Adjusted{Opportunity: "special_access_or_resources_required"})
+	if l.Vector.O != 4 || l.Readings[O] != CannotTell || l.Sources[O] != SourceAdjustment || !slices.Contains(l.Counters, "opportunity_cannot_tell") {
+		t.Errorf("O %d read %v from %v, counters %v", l.Vector.O, l.Readings[O], l.Sources[O], l.Counters)
+	}
+}
+
+// A question skipped because no answer could move its level ignores a junk
+// answer and the adjustment alike: ID keeps the one declared level and PV the
+// floor data_subjects sets, neither read nor counted, while the factors
+// asked take the adjustment.
+func TestSkippedQuestionsIgnoreJunkAndTheAdjustment(t *testing.T) {
+	d := declared()
+	d.Detection = &Detection{Network: "logged_and_reviewed", Host: "logged_and_reviewed", Application: "logged_and_reviewed"}
+	d.DataSubjects = ptr("none")
+	a := Answers{M: "high_reward", O: "no_access_or_resources_required", EE: "easy", ID: []string{"bogus"},
+		LC: "all", LI: "all_data_totally_corrupt", LAV: "all_services_completely_lost", LAC: "unidentified",
+		FD: "bankruptcy", RD: "brand_damage", NC: "high_profile_violation", PV: "bogus"}
+	adjusted := &Adjusted{Opportunity: "special_access_or_resources_required", Confidentiality: notAffected,
+		Integrity: notAffected, Availability: notAffected}
+	l := compute(t, d, [3]bool{}, a, adjusted)
+	got := levels(l.Vector)
+	for f, w := range map[string]int{"ID": 3, "PV": 3, "O": 4, "LC": 2, "LI": 1, "LAV": 1} {
+		if got[f] != w {
+			t.Errorf("%s = %d, want %d", f, got[f], w)
+		}
+	}
+	for f, w := range map[Factor]Source{ID: SourceConfig, PV: SourceConfig, O: SourceAdjustment, LC: SourceAdjustment, LI: SourceAdjustment, LAV: SourceAdjustment} {
+		if l.Sources[f] != w {
+			t.Errorf("%s from %v, want %v", f, l.Sources[f], w)
+		}
+	}
+	for _, f := range []Factor{ID, PV} {
+		if _, read := l.Readings[f]; read {
+			t.Errorf("%s not asked, yet read", f)
+		}
+	}
+	if len(l.Counters) != 0 {
+		t.Errorf("counters %v", l.Counters)
 	}
 }

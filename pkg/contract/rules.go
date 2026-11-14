@@ -167,6 +167,8 @@ type Adjusted struct {
 // Levels is a CVE's 16 levels and what Go read to reach them.
 type Levels struct {
 	Vector owasp.Vector
+	// Sources says where each of the 16 levels came from.
+	Sources map[Factor]Source
 	// Readings holds how the answer to each question the CVE was asked was
 	// read.
 	Readings map[Factor]Reading
@@ -176,30 +178,37 @@ type Levels struct {
 	Counters []string
 }
 
-// Compute applies the 16 rules to one CVE: the deployment, the axes
-// Applicability floored (indexed as cvss's axes), the answers, and for a
-// flagged CVE its adjustment, nil otherwise. The adjustment never raises a
-// level, and leaves Loss of accountability and the business factors as
-// computed.
-func Compute(d Deployment, floored [3]bool, a Answers, adjusted *Adjusted) (Levels, error) {
+// Compute applies the 16 rules to one CVE: the deployment, the CVE's rows,
+// the axes Applicability floored over its vectors (indexed as cvss's axes),
+// its answers, and for a flagged CVE its adjustment, nil otherwise. The
+// adjustment never raises a level, and leaves Loss of accountability and the
+// business factors as computed.
+func Compute(d Deployment, c CVE, floored [3]bool, a Answers, adjusted *Adjusted) (Levels, error) {
 	if err := d.Check(); err != nil {
+		return Levels{}, err
+	}
+	if err := checkCVE(c); err != nil {
 		return Levels{}, err
 	}
 	if adjusted == nil {
 		adjusted = &Adjusted{}
 	}
-	s := &scorer{d: d, floored: floored, levels: Levels{Readings: map[Factor]Reading{}}}
-	v := owasp.Vector{
-		// Every finding is a published CVE a scanner matched: OWASP's worst
-		// case holds for the skill of the group, its discovery and awareness.
-		SL: owasp.SkillLevelSecurityPenetrationSkills,
-		S:  exposures[d.Exposure.Value].size,
-		ED: owasp.EaseOfDiscoveryAutomatedToolsAvailable,
-		A:  owasp.AwarenessPublicKnowledge,
+	s := &scorer{d: d, floored: floored, described: c.described(), levels: Levels{
+		Sources: map[Factor]Source{}, Readings: map[Factor]Reading{},
+	}}
+	var v owasp.Vector
+	// Every finding is a published CVE a scanner matched: OWASP's worst case
+	// holds for the skill of the group, its discovery and awareness.
+	v.SL = from(s, SL, SourceConstant, owasp.SkillLevelSecurityPenetrationSkills)
+	v.M = likelihood(s, motive, a.M)
+	v.O = likelihood(s, opportunity, a.O)
+	if level, r := opportunity.read(adjusted.Opportunity); r == Answered {
+		v.O = lowered(s, O, v.O, level)
 	}
-	v.M = answered(s, motive, a.M)
-	v.O = lowerOpportunity(answered(s, opportunity, a.O), adjusted.Opportunity)
-	v.EE = answered(s, easeOfExploit, a.EE)
+	v.S = from(s, S, SourceConfig, exposures[d.Exposure.Value].size)
+	v.ED = from(s, ED, SourceConstant, owasp.EaseOfDiscoveryAutomatedToolsAvailable)
+	v.EE = likelihood(s, easeOfExploit, a.EE)
+	v.A = from(s, A, SourceConstant, owasp.AwarenessPublicKnowledge)
 	v.ID = s.intrusionDetection(a.ID)
 	v.LC = s.confidentiality(a.LC, adjusted.Confidentiality)
 	v.LI = axis(s, integrity, a.LI, adjusted.Integrity, integrityFloor)
@@ -214,9 +223,10 @@ func Compute(d Deployment, floored [3]bool, a Answers, adjusted *Adjusted) (Leve
 }
 
 type scorer struct {
-	d       Deployment
-	floored [3]bool
-	levels  Levels
+	d         Deployment
+	floored   [3]bool
+	described bool
+	levels    Levels
 }
 
 func (s *scorer) count(counter string) {
@@ -230,21 +240,38 @@ func (s *scorer) note(f Factor, r Reading) {
 	}
 }
 
+// from records where a level came from.
+func from[L any](s *scorer, f Factor, source Source, level L) L {
+	s.levels.Sources[f] = source
+	return level
+}
+
 // answered reads an asked factor's answer through its contract.
 func answered[V any](s *scorer, c contract[V], id string) V {
 	value, r := c.read(id)
 	s.note(c.factor, r)
-	return value
+	return from(s, c.factor, SourceAnswer, value)
 }
 
-// lowerOpportunity is the lower of the baseline and the adjusted answer's
-// level, the lowest answer, 0, included.
-func lowerOpportunity(baseline owasp.Opportunity, adjusted string) owasp.Opportunity {
-	level, r := opportunity.read(adjusted)
-	if r != Answered {
-		return baseline
+// likelihood reads Motive's, Opportunity's or Ease of exploit's answer. A CVE
+// with no description gives the model nothing to judge it by: whatever the
+// answer, it reads as cannot_tell.
+func likelihood[L ~int](s *scorer, c contract[L], id string) L {
+	if s.described {
+		return answered(s, c, id)
 	}
-	return min(baseline, level)
+	level, _ := c.read(cannotTell)
+	s.note(c.factor, NoDescription)
+	return from(s, c.factor, SourceAnswer, level)
+}
+
+// lowered is the adjusted level where it is below the baseline: the
+// adjustment never raises one.
+func lowered[L ~int](s *scorer, f Factor, baseline, adjusted L) L {
+	if adjusted < baseline {
+		return from(s, f, SourceAdjustment, adjusted)
+	}
+	return baseline
 }
 
 // axis is Loss of integrity's or of availability's level: the floor when
@@ -252,11 +279,11 @@ func lowerOpportunity(baseline owasp.Opportunity, adjusted string) owasp.Opportu
 // adjustment answered not_affected; the answer's level otherwise.
 func axis[L owasp.LossOfIntegrity | owasp.LossOfAvailability](s *scorer, c contract[L], id, adjusted string, floor L) L {
 	if !asked(c.factor, s.d, s.floored) {
-		return floor
+		return from(s, c.factor, SourceFloor, floor)
 	}
 	level := answered(s, c, id)
 	if adjusted == notAffected {
-		return floor
+		return lowered(s, c.factor, level, floor)
 	}
 	return level
 }
@@ -264,15 +291,15 @@ func axis[L owasp.LossOfIntegrity | owasp.LossOfAvailability](s *scorer, c contr
 func (s *scorer) intrusionDetection(chosen []string) owasp.IntrusionDetection {
 	if s.d.Detection == nil {
 		s.count("detection_undeclared")
-		return owasp.IntrusionDetectionNotLogged
+		return from(s, ID, SourceConfig, owasp.IntrusionDetectionNotLogged)
 	}
 	levels := s.d.Detection.levels()
 	if !asked(ID, s.d, s.floored) {
-		return levels[0]
+		return from(s, ID, SourceConfig, levels[0])
 	}
 	level, r := readChannels(chosen, levels)
 	s.note(ID, r)
-	return level
+	return from(s, ID, SourceAnswer, level)
 }
 
 // readChannels returns the lowest level among the channels chosen, each
@@ -304,17 +331,18 @@ func readChannels(chosen []string, levels [3]owasp.IntrusionDetection) (owasp.In
 
 func (s *scorer) confidentiality(id, adjusted string) owasp.LossOfConfidentiality {
 	if !asked(LC, s.d, s.floored) {
-		return confidentialityFloor
+		return from(s, LC, SourceFloor, confidentialityFloor)
 	}
 	e := answered(s, confidentiality, id)
-	if adjusted == notAffected {
-		return confidentialityFloor
-	}
 	column := 0
 	if critical[s.d.DataSensitivity.Value] {
 		column = 1
 	}
-	return confidentialityLevels[e][column]
+	level := confidentialityLevels[e][column]
+	if adjusted == notAffected {
+		return lowered(s, LC, level, confidentialityFloor)
+	}
+	return level
 }
 
 func (s *scorer) accountability(id string) owasp.LossOfAccountability {
@@ -332,7 +360,7 @@ func (s *scorer) accountability(id string) owasp.LossOfAccountability {
 // nonCompliance is OWASP's lowest level, a floor, when no framework applies.
 func (s *scorer) nonCompliance(id string) owasp.NonCompliance {
 	if !asked(NC, s.d, s.floored) {
-		return owasp.NonComplianceMinorViolation
+		return from(s, NC, SourceConfig, owasp.NonComplianceMinorViolation)
 	}
 	return answered(s, nonCompliance, id)
 }
@@ -340,17 +368,21 @@ func (s *scorer) nonCompliance(id string) owasp.NonCompliance {
 // privacy is the lower of the answer's band and the declared population's;
 // undeclared, the population caps nothing.
 func (s *scorer) privacy(id, adjustedConfidentiality string) owasp.PrivacyViolation {
-	if !asked(PV, s.d, s.floored) {
-		return privacyFloor
+	switch {
+	case s.floored[cvss.Confidentiality]:
+		return from(s, PV, SourceFloor, privacyFloor)
+	case !asked(PV, s.d, s.floored):
+		// data_subjects declares none or one individual: the cap is the floor.
+		return from(s, PV, SourceConfig, privacyFloor)
 	}
 	level := answered(s, privacyViolation, id)
 	if s.d.DataSubjects == nil {
 		s.count("data_subjects_missing")
-	} else {
-		level = min(level, band(*s.d.DataSubjects))
+	} else if limit := band(*s.d.DataSubjects); limit < level {
+		level = from(s, PV, SourceConfig, limit)
 	}
 	if adjustedConfidentiality == notAffected {
-		return privacyFloor
+		return lowered(s, PV, level, privacyFloor)
 	}
 	return level
 }

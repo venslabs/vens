@@ -25,15 +25,19 @@ package contract
 
 import "slices"
 
-// Factor is a model-answered factor, named by the abbreviation the vector
-// writes. Skill level, Size, Ease of discovery and Awareness are Go's alone
-// and have no question.
+// Factor is one of the 16 factors, named by the abbreviation the vector
+// writes. Twelve are model-answered, each through a question of its own;
+// Skill level, Size, Ease of discovery and Awareness are Go's alone.
 type Factor string
 
 const (
+	SL  Factor = "SL"
 	M   Factor = "M"
 	O   Factor = "O"
+	S   Factor = "S"
+	ED  Factor = "ED"
 	EE  Factor = "EE"
+	A   Factor = "A"
 	ID  Factor = "ID"
 	LC  Factor = "LC"
 	LI  Factor = "LI"
@@ -67,7 +71,46 @@ const (
 	// Invalid: an answer off the list, which only a provider ignoring the
 	// schema can give. It is read as cannot_tell and counted with it.
 	Invalid
+	// NoDescription: no row of the CVE has a description, which leaves
+	// Motive, Opportunity and Ease of exploit nothing to judge it by. Their
+	// answers, whatever they are, are read as cannot_tell and counted.
+	NoDescription
 )
+
+// Source is where a level came from.
+type Source int
+
+const (
+	// SourceAnswer: the model's answer as Go read it, cannot_tell included,
+	// crossed with the config for a factor Go crosses it with.
+	SourceAnswer Source = iota + 1
+	// SourceConstant: the same level for every finding.
+	SourceConstant
+	// SourceConfig: the config alone, the question not asked or its answer
+	// capped.
+	SourceConfig
+	// SourceFloor: an axis every CVSS vector gives N, the question not asked.
+	SourceFloor
+	// SourceAdjustment: a flagged CVE's adjustment, which lowered the level.
+	SourceAdjustment
+)
+
+var sourceNames = [...]string{
+	SourceAnswer: "answer", SourceConstant: "constant", SourceConfig: "config",
+	SourceFloor: "floor", SourceAdjustment: "adjustment",
+}
+
+func (s Source) String() string {
+	if s > 0 && int(s) < len(sourceNames) {
+		return sourceNames[s]
+	}
+	return "unknown"
+}
+
+// MarshalText writes the source by name.
+func (s Source) MarshalText() ([]byte, error) {
+	return []byte(s.String()), nil
+}
 
 const cannotTell = "cannot_tell"
 

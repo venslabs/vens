@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/venslabs/vens/pkg/cvss"
 )
@@ -52,6 +53,11 @@ type Row struct {
 type VendorSeverity struct {
 	Source   string
 	Severity string
+}
+
+// described reports whether a row of the CVE has a description.
+func (c CVE) described() bool {
+	return slices.ContainsFunc(c.Rows, func(r Row) bool { return strings.TrimSpace(r.Description) != "" })
 }
 
 // vectors returns every vector of every row, in row order.
