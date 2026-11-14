@@ -51,16 +51,16 @@ func data(t *testing.T) func([]byte, error) string {
 }
 
 // conflicting is a CVE whose two rows disagree on the description, the
-// severity, the vendor severities and the vectors, two of them distinct
-// with the same source and version, so that evidence keyed by source or by
-// version alone would lose one.
+// severity and its source, the vendor severities and the vectors, two of
+// them distinct with the same source and version, so that evidence keyed by
+// source or by version alone would lose one.
 var conflicting = CVE{ID: "CVE-C", Rows: []Row{
 	{PkgID: "libfoo@1.0", PkgName: "libfoo", InstalledVersion: "1.0", FixedVersion: "1.1",
-		Title: "Overflow in libfoo", Description: "A crafted header overflows a buffer.", Severity: "HIGH",
+		Title: "Overflow in libfoo", Description: "A crafted header overflows a buffer.", Severity: "HIGH", SeveritySource: "nvd",
 		CVSS:             []cvss.Vector{v31("nvd", "AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N"), v31("redhat", "AV:L/AC:L/PR:L/UI:N/S:U/C:H/I:N/A:N")},
 		VendorSeverities: []VendorSeverity{{"nvd", "HIGH"}, {"redhat", "MEDIUM"}}},
 	{PkgID: "libfoo-dev@1.0", PkgName: "libfoo-dev", InstalledVersion: "1.0", FixedVersion: "1.1",
-		Title: "Overflow in libfoo", Description: "A crafted header overflows a buffer; the maintainer disputes it.", Severity: "MEDIUM",
+		Title: "Overflow in libfoo", Description: "A crafted header overflows a buffer; the maintainer disputes it.", Severity: "MEDIUM", SeveritySource: "redhat",
 		CVSS:             []cvss.Vector{v31("nvd", "AV:N/AC:H/PR:N/UI:R/S:U/C:H/I:N/A:N"), {Source: "nvd", Version: "2.0", Vector: "AV:N/AC:L/Au:N/C:P/I:N/A:N"}},
 		VendorSeverities: []VendorSeverity{{"nvd", "HIGH"}, {"redhat", "LOW"}}},
 }}
@@ -412,6 +412,8 @@ func TestAdjustmentEntryListsEveryRowsEvidence(t *testing.T) {
 	for _, part := range []string{
 		`"vendorSeverity":[{"source":"nvd","severity":"HIGH","packages":["libfoo","libfoo-dev"]},{"source":"redhat","severity":"MEDIUM","packages":["libfoo"]},{"source":"redhat","severity":"LOW","packages":["libfoo-dev"]}]`,
 		`"cvss":[{"source":"nvd","version":"3.1","vector":"CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N"},{"source":"redhat","version":"3.1","vector":"CVSS:3.1/AV:L/AC:L/PR:L/UI:N/S:U/C:H/I:N/A:N"},{"source":"nvd","version":"3.1","vector":"CVSS:3.1/AV:N/AC:H/PR:N/UI:R/S:U/C:H/I:N/A:N"},{"source":"nvd","version":"2.0","vector":"AV:N/AC:L/Au:N/C:P/I:N/A:N"}]`,
+		`"description":"A crafted header overflows a buffer.","severity":"HIGH","severitySource":"nvd"}`,
+		`"description":"A crafted header overflows a buffer; the maintainer disputes it.","severity":"MEDIUM","severitySource":"redhat"}`,
 		`"flags":[{"flag":"maintainer_disputed","evidence":"the maintainer disputes it","package":"libfoo-dev"}]`,
 		`"answers":{"opportunity":"some_access_or_resources_required","confidentiality":"extensive","integrity":"minimal_slightly_corrupt"}}`,
 	} {
