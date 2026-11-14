@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"unicode"
 
 	"github.com/venslabs/vens/pkg/cvss"
 )
@@ -192,26 +193,28 @@ func controlsLine(controls []Control) string {
 
 // cvssLines returns, per CVE in batch order, one line per distinct vector
 // published at the newest CVSS version the scanner reports among its rows'
-// vectors, so that a CVE with no line has no published vector. A line shows
-// the metrics as published: the model reads the vector as text, and a value
-// off its version's scale or a vector that does not parse still says what
-// its source wrote.
+// vectors, or every vector when none reports a version vens reads, so that a
+// CVE with no line has no published vector. A line shows the metrics as
+// published: the model reads the vector as text, and a value off its
+// version's scale or a vector that does not parse still says what its
+// source wrote.
 func cvssLines(metrics []string, batch []CVE) []string {
 	var lines []string
 	for _, c := range batch {
 		vectors := c.vectors()
 		newest := cvss.Newest(vectors)
 		for _, v := range vectors {
-			if newest == 0 || v.Tier() != newest {
+			if v.Tier() != newest {
 				continue
 			}
 			values := published(v.Vector)
-			line := fmt.Sprintf("- %s: CVSS %s, %s:", c.ID, v.Version, v.Source)
+			var shown []string
 			for _, metric := range metrics {
 				if value, ok := values[metric]; ok {
-					line += " " + metric + ":" + value
+					shown = append(shown, metric+":"+value)
 				}
 			}
+			line := fmt.Sprintf("- %s: CVSS %s, %s: %s", oneLine(c.ID), oneLine(v.Version), oneLine(v.Source), strings.Join(shown, " "))
 			if !slices.Contains(lines, line) {
 				lines = append(lines, line)
 			}
@@ -220,15 +223,32 @@ func cvssLines(metrics []string, batch []CVE) []string {
 	return lines
 }
 
-// published returns a vector's metrics as its source wrote them: each part
-// between slashes split at its first colon, a part with none skipped, and a
-// metric written twice taking its last value.
+// published returns a vector's metrics as its source wrote them, the parts
+// between slashes, spaces and control characters each split at their first
+// colon: a part with none is skipped and a metric written twice takes its
+// last value. Splitting there keeps a value from carrying another metric, or
+// a line break that would forge a line of the request.
 func published(vector string) map[string]string {
 	values := map[string]string{}
-	for part := range strings.SplitSeq(strings.TrimSpace(vector), "/") {
+	parts := strings.FieldsFunc(vector, func(r rune) bool {
+		return r == '/' || unicode.IsSpace(r) || unicode.IsControl(r)
+	})
+	for _, part := range parts {
 		if metric, value, ok := strings.Cut(part, ":"); ok {
 			values[metric] = value
 		}
 	}
 	return values
+}
+
+// oneLine replaces each control character, and each space other than a plain
+// one, with a plain space: a scanner's field written into a line of the
+// request cannot break it.
+func oneLine(s string) string {
+	return strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) || (unicode.IsSpace(r) && r != ' ') {
+			return ' '
+		}
+		return r
+	}, s)
 }
