@@ -21,6 +21,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/venslabs/vens/cmd/vens/commands/enrich"
 	"github.com/venslabs/vens/cmd/vens/commands/generate"
+	"github.com/venslabs/vens/cmd/vens/commands/notify"
 	"github.com/venslabs/vens/cmd/vens/version"
 	"github.com/venslabs/vens/pkg/envutil"
 )
@@ -61,6 +62,7 @@ func newRootCommand() *cobra.Command {
 	cmd.AddCommand(
 		generate.New(),
 		enrich.New(),
+		notify.New(),
 	)
 
 	return cmd
