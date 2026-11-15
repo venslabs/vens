@@ -1,6 +1,10 @@
 // Copyright 2025 venslabs
 //
-// Licensed under the Apache License, Version 2.0
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -102,4 +106,37 @@ func TestInitRefusesToOverwriteWithoutForce(t *testing.T) {
 	if _, err := riskconfig.Parse(raw); err != nil {
 		t.Errorf("forced overwrite produced an invalid config: %v", err)
 	}
+}
+
+func TestInitFailsFastOnUnwritableTarget(t *testing.T) {
+	dir := t.TempDir()
+
+	runExpectError := func(t *testing.T, args []string, want string) {
+		t.Helper()
+		cmd := initcmd.New()
+		cmd.SetIn(strings.NewReader("x\n"))
+		cmd.SetOut(io.Discard)
+		cmd.SetArgs(args)
+		err := cmd.Execute()
+		if err == nil {
+			t.Fatalf("args %v: expected an error, got nil", args)
+		}
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("args %v: error %q, want it to contain %q", args, err, want)
+		}
+	}
+
+	// A directory as target: the error must not suggest --force, which
+	// would fail with "is a directory" anyway.
+	sub := filepath.Join(dir, "subdir")
+	if err := os.Mkdir(sub, 0755); err != nil {
+		t.Fatal(err)
+	}
+	runExpectError(t, []string{"--output", sub}, "is a directory")
+
+	// A missing parent directory: found out before any question is asked.
+	runExpectError(t, []string{"--output", filepath.Join(dir, "no-such-dir", "config.yaml")}, "output directory")
+
+	// An empty output path.
+	runExpectError(t, []string{"--output", ""}, "must not be empty")
 }
