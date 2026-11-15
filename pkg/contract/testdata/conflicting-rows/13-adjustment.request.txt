@@ -1,0 +1,12 @@
+FLAGGED VULNERABILITY
+{"vulnId":"CVE-C","title":"Overflow in libfoo","packages":[{"pkgId":"libfoo@1.0","name":"libfoo","installedVersion":"1.0","fixedVersion":"1.1","description":"A crafted header overflows a buffer.","severity":"HIGH","severitySource":"nvd"},{"pkgId":"libfoo-dev@1.0","name":"libfoo-dev","installedVersion":"1.0","fixedVersion":"1.1","description":"A crafted header overflows a buffer; the maintainer disputes it.","severity":"MEDIUM","severitySource":"redhat"}],"vendorSeverity":[{"source":"nvd","severity":"HIGH","packages":["libfoo","libfoo-dev"]},{"source":"redhat","severity":"MEDIUM","packages":["libfoo"]},{"source":"redhat","severity":"LOW","packages":["libfoo-dev"]}],"cvss":[{"source":"nvd","version":"3.1","vector":"CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N"},{"source":"redhat","version":"3.1","vector":"CVSS:3.1/AV:L/AC:L/PR:L/UI:N/S:U/C:H/I:N/A:N"},{"source":"nvd","version":"3.1","vector":"CVSS:3.1/AV:N/AC:H/PR:N/UI:R/S:U/C:H/I:N/A:N"},{"source":"nvd","version":"2.0","vector":"AV:N/AC:L/Au:N/C:P/I:N/A:N"}],"flags":[{"flag":"maintainer_disputed","evidence":"the maintainer disputes it","package":"libfoo-dev"}],"answers":{"opportunity":"some_access_or_resources_required","confidentiality":"extensive","integrity":"minimal_slightly_corrupt"}}
+
+This vulnerability is flagged: its maintainers dispute it, or its severity sources disagree. Its entry carries the evidence: every CVSS vector published for it with its source, every vendor severity, the flag's quoted evidence, and the answers it was given without that evidence. Reconsider it from that evidence.
+
+QUESTIONS
+opportunity: Given this evidence, what access or resources do anonymous Internet users really need to exploit it here? Answer with one of: no_access_or_resources_required, some_access_or_resources_required, special_access_or_resources_required, full_access_or_expensive_resources_required; keep, if the answer it was given stands; or cannot_tell.
+confidentiality: Given this evidence, can exploiting it here affect confidentiality at all? Answer with affected, not_affected or cannot_tell.
+integrity: Given this evidence, can exploiting it here affect integrity at all? Answer with affected, not_affected or cannot_tell.
+
+Choose cannot_tell only when the evidence does not decide.
+Reply with {"reasoning": "...", "opportunity": "...", "confidentiality": "...", "integrity": "..."}.

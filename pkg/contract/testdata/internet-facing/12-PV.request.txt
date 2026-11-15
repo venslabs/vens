@@ -1,0 +1,19 @@
+VULNERABILITIES
+[entries]
+
+QUESTION
+If anonymous Internet users exploited this vulnerability in this deployment, how many distinct people's personal data could be disclosed, at most? Choose the band that holds that count.
+
+FOR THIS QUESTION
+Data sensitivity: critical (Secrets, PHI, payment card data)
+
+ANSWERS
+- none: None: no personal data could be disclosed (0 people).
+- one_individual: One individual: 1 person.
+- hundreds: Hundreds: 2 to 999 people; a count under 100 belongs here.
+- thousands: Thousands: 1,000 to 999,999 people.
+- millions: Millions: 1,000,000 people or more.
+- cannot_tell: The facts given do not say.
+
+Answer every vulnerability listed above once, by its vulnId, with one answer id from ANSWERS.
+Reply with {"answers": [{"vulnId": "...", "reasoning": "...", "answer": "..."}]}.

@@ -1,0 +1,18 @@
+VULNERABILITIES
+[entries]
+
+QUESTION
+How motivated are anonymous Internet users to find and exploit this vulnerability in this service? Judge by the reward that exploiting it here would bring them: what a successful exploit gives an attacker, and what this service is and holds.
+
+FOR THIS QUESTION
+Business criticality: high (Customer-facing, important operations)
+Data sensitivity: high (PII, financial data, customer info)
+
+ANSWERS
+- low_or_no_reward: Low or no reward: exploiting it here brings them nothing they could use, sell or leverage.
+- possible_reward: Possible reward: it brings them something of some value here.
+- high_reward: High reward: it brings them something of high value here, such as control of the service, its data or its users.
+- cannot_tell: The facts given do not say.
+
+Answer every vulnerability listed above once, by its vulnId, with one answer id from ANSWERS.
+Reply with {"answers": [{"vulnId": "...", "reasoning": "...", "answer": "..."}]}.

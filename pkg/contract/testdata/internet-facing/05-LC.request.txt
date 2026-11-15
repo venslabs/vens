@@ -1,0 +1,14 @@
+VULNERABILITIES
+[entries]
+
+QUESTION
+If anonymous Internet users exploited this vulnerability in this deployment, how much of the data this service handles could they read?
+
+ANSWERS
+- minimal: Minimal: a small, bounded amount, such as a few values, one record, or a fragment of memory or metadata.
+- extensive: Extensive: a large amount, such as many records, whole files or tables, or the data of many users.
+- all: All: all the data this service can read.
+- cannot_tell: The facts given do not say.
+
+Answer every vulnerability listed above once, by its vulnId, with one answer id from ANSWERS.
+Reply with {"answers": [{"vulnId": "...", "reasoning": "...", "answer": "..."}]}.

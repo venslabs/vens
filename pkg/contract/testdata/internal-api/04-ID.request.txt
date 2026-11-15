@@ -1,0 +1,14 @@
+VULNERABILITIES
+[entries]
+
+QUESTION
+Where would an attempt to exploit this vulnerability in this deployment show? Choose every place that applies.
+
+ANSWERS
+- network: Network: the attempt crosses the network to or from this deployment.
+- host: Host: the attempt runs code, starts processes, or changes files or privileges on the host.
+- application: Application: the attempt passes through this service's own request handling or logic, where the application itself could log or detect it.
+- cannot_tell: The facts given do not say. Chosen alone.
+
+Answer every vulnerability listed above once, by its vulnId, with one or more answer ids from ANSWERS.
+Reply with {"answers": [{"vulnId": "...", "reasoning": "...", "answer": ["...", ...]}]}.
