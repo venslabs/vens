@@ -88,8 +88,12 @@ func Example() string {
   # Scan an image and generate a vulnerability report
   trivy image nginx:1.25 --format=json --severity HIGH,CRITICAL > report.json
 
+  # The serialNumber of the CycloneDX SBOM paired with this scan
+  # (jq -r .serialNumber sbom.cdx.json), or an ad-hoc one:
+  SBOM_UUID="urn:uuid:$(uuidgen | tr '[:upper:]' '[:lower:]')"
+
   # Generate OWASP risk scores using LLM
-  %s generate --config-file config.yaml report.json output.cdx.json
+  %s generate --config-file config.yaml --sbom-serial-number "$SBOM_UUID" report.json output.cdx.json
 
   # Example config.yaml:
   # project:
