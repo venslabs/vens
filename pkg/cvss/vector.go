@@ -29,8 +29,9 @@ type Vector struct {
 	// on Trivy, "nvd@nist.gov" on Grype.
 	Source string
 	// Version is the CVSS version as the report states it: "2.0", "3.0", "3.1"
-	// or "4.0", also "2" on Grype; empty when it states none, as for a Trivy v3
-	// or v4 vector without its CVSS: prefix. Tier reads any other value as 0.
+	// or "4.0", also "2" on Grype, and "3" for a Trivy v3 vector without its
+	// CVSS: prefix, whose field gives the major version only. Tier reads any
+	// other value as 0.
 	Version string
 	Vector  string
 }
@@ -45,7 +46,7 @@ func tierOf(version string) int {
 	switch version {
 	case "2.0", "2":
 		return 2
-	case "3.0", "3.1":
+	case "3.0", "3.1", "3":
 		return 3
 	case "4.0":
 		return 4

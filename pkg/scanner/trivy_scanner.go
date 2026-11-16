@@ -91,7 +91,7 @@ func trivyVectors(bySource dbtypes.VendorCVSS) []cvss.Vector {
 	var vectors []cvss.Vector
 	for _, source := range slices.Sorted(maps.Keys(bySource)) {
 		c := bySource[source]
-		for _, f := range []struct{ vector, unprefixed string }{{c.V2Vector, "2.0"}, {c.V3Vector, ""}, {c.V40Vector, ""}} {
+		for _, f := range []struct{ vector, unprefixed string }{{c.V2Vector, "2.0"}, {c.V3Vector, "3"}, {c.V40Vector, "4.0"}} {
 			if f.vector != "" {
 				vectors = append(vectors, cvss.Vector{
 					Source: string(source), Version: trivyVersion(f.vector, f.unprefixed), Vector: f.vector,
@@ -103,7 +103,9 @@ func trivyVectors(bySource dbtypes.VendorCVSS) []cvss.Vector {
 }
 
 // trivyVersion is the version a vector's CVSS: prefix states, read as Parse
-// reads it; Trivy names none for v2 vectors, which carry no prefix.
+// reads it. Without one it is the version of Trivy's field: v2 vectors never
+// carry a prefix, V40Vector holds 4.0 alone, and V3Vector holds 3.0 and 3.1
+// alike, so its major version is all that is known.
 func trivyVersion(vector, unprefixed string) string {
 	if version, ok := cvss.PrefixVersion(vector); ok {
 		return version
