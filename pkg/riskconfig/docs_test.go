@@ -71,6 +71,17 @@ func repoRoot(t *testing.T) string {
 	}
 }
 
+// readText reads a committed file with LF line ends: a Windows checkout can
+// turn them into CRLF, which would hide the blank lines between paragraphs.
+func readText(t *testing.T, path string) string {
+	t.Helper()
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return strings.ReplaceAll(string(raw), "\r\n", "\n")
+}
+
 func isConfig(text string) bool {
 	return projectKey.MatchString(text) && contextKey.MatchString(text)
 }
@@ -160,23 +171,20 @@ func docsConfigBlocks(t *testing.T, root string) []block {
 	t.Helper()
 	var blocks []block
 	add := func(path string) {
-		raw, err := os.ReadFile(path)
-		if err != nil {
-			t.Fatal(err)
-		}
+		src := readText(t, path)
 		name, _ := filepath.Rel(root, path)
 		var found []block
 		switch filepath.Ext(path) {
 		case ".md":
-			for _, b := range fencedBlocks(name, string(raw)) {
+			for _, b := range fencedBlocks(name, src) {
 				if isYAMLFence(b.lang) {
 					found = append(found, b)
 				}
 			}
 		case ".yaml", ".yml":
-			found = []block{{source: name + ":1", text: string(raw)}}
+			found = []block{{source: name + ":1", text: src}}
 		case ".html":
-			found = preBlocks(name, string(raw))
+			found = preBlocks(name, src)
 		}
 		for _, b := range found {
 			if isConfig(b.text) {
@@ -306,13 +314,9 @@ var (
 // whose comment lines would read as headings.
 func readReference(t *testing.T) []section {
 	t.Helper()
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), reference))
-	if err != nil {
-		t.Fatal(err)
-	}
 	sections := []section{{}}
 	inFence, inTable := false, false
-	for _, line := range strings.Split(string(raw), "\n") {
+	for _, line := range strings.Split(readText(t, filepath.Join(repoRoot(t), reference)), "\n") {
 		cur := &sections[len(sections)-1]
 		isRow := !inFence && strings.HasPrefix(line, "|")
 		switch {
