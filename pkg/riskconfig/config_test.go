@@ -288,18 +288,63 @@ func TestSchemaVersion(t *testing.T) {
 		"Read https://venslabs.github.io/vens/reference/config-schema/#migrating, then add `schema_version: 2` at the top of the file.")
 	parseFails(t, "schema_version: 1\n"+body, 2, "schema_version 1 is not supported: this vens reads schema 2 only. "+
 		"Read https://venslabs.github.io/vens/reference/config-schema/#migrating, then set `schema_version: 2`.")
-	for _, v := range []string{"3", "10"} {
+	// 99999999999999999999 does not fit an int, so yaml.v3 resolves it as a
+	// float: it is still a plain decimal integer above 2.
+	for _, v := range []string{"3", "10", "99999999999999999999"} {
 		parseFails(t, "schema_version: "+v+"\n"+body, 2,
 			"schema_version "+v+" is not supported: this vens reads schema 2; the file needs a newer vens.")
 	}
 	for written, shown := range map[string]string{
 		"2.0": "2.0", "2.5": "2.5", `"2"`: `"2"`, "'2'": "'2'", "0x2": "0x2", "+2": "+2", "0x3": "0x3", "+3": "+3",
 		"0": "0", "-2": "-2", "02": "02", "": "no value", "null": "null", "!!str 2": "!!str 2", "[2]": "a sequence",
+		"!!int 2": "!!int 2", `!!int "2"`: `!!int "2"`, "!!int 3": "!!int 3", "|\n  2": `a block scalar "2\n"`, ">-\n  2": `a block scalar "2"`,
 	} {
 		parseFails(t, "schema_version: "+written+"\n"+body, 2, "schema_version must be the integer 2, got "+shown)
 	}
 	mustParse(t, "schema_version: 2 # the format\n"+body)
 	mustParse(t, body+"schema_version: 2\n")
+}
+
+// A merge key that brings a mapping into its own value fails with an error
+// instead of recursing until the stack overflows.
+func TestMergeIntoItself(t *testing.T) {
+	for _, tc := range []struct{ name, src, want string }{
+		{"context", strings.Replace(withContext("<<: *c"), "context:\n", "context: &c\n", 1),
+			"config.yaml line 8: anchor 'c' is merged into its own value"},
+		{"controls", withContext("controls: &d {waf: true, <<: [*d]}"),
+			"config.yaml line 8: anchor 'd' is merged into its own value"},
+		{"root", "&r\n" + minimal + "<<: *r\n",
+			"config.yaml line 9: anchor 'r' is merged into its own value"},
+		{"project", strings.Replace(minimal, "project:\n  name: svc\n", "project: &p {name: svc, <<: *p}\n", 1),
+			"config.yaml line 2: anchor 'p' is merged into its own value"},
+	} {
+		_, err := Parse([]byte(tc.src))
+		if err == nil || err.Error() != tc.want {
+			t.Errorf("%s:\n%s\nerror %v\nwant  %q", tc.name, tc.src, err, tc.want)
+		}
+	}
+	// Merging the same mapping twice, or two mappings that both merge a third,
+	// is no cycle.
+	mustParse(t, withContext("controls: {<<: [&base {waf: true}, *base]}"))
+	mustParse(t, strings.Replace(minimal, "context:\n", "context:\n  <<: [&a {notes: x}, &b {<<: *a}, {<<: [*a, *b]}]\n", 1))
+}
+
+func TestOneDocumentOnly(t *testing.T) {
+	for _, tc := range []struct{ name, src, want string }{
+		{"a second document holding a key", minimal + "---\ncontext:\n  tracability: none\n",
+			"config.yaml line 8: a second YAML document starts here; config.yaml must hold a single document"},
+		{"an empty second document", minimal + "---\n",
+			"config.yaml line 8: a second YAML document starts here; config.yaml must hold a single document"},
+		{"an empty first document", "---\n---\n" + minimal,
+			"config.yaml line 2: a second YAML document starts here; config.yaml must hold a single document"},
+	} {
+		_, err := Parse([]byte(tc.src))
+		if err == nil || err.Error() != tc.want {
+			t.Errorf("%s: error %v, want %q", tc.name, err, tc.want)
+		}
+	}
+	mustParse(t, "---\n"+minimal)
+	mustParse(t, minimal+"...\n")
 }
 
 func TestUnknownKeys(t *testing.T) {
