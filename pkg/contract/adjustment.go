@@ -164,7 +164,7 @@ func newAdjustmentEntry(c CVE, floored [3]bool, flags []Flag, given Answers) (ad
 	if err := checkCVE(c); err != nil {
 		return adjustmentEntry{}, err
 	}
-	if err := checkFlags(flags, c); err != nil {
+	if err := CheckFlags(flags, c); err != nil {
 		return adjustmentEntry{}, err
 	}
 	if err := checkGiven(given, floored); err != nil {
@@ -220,9 +220,10 @@ func vendorSeverities(c CVE) []sourcedSeverity {
 	return out
 }
 
-// checkFlags checks a flagged CVE's flags: each names one of the two flags,
-// quotes its evidence and names a row of the CVE by its package.
-func checkFlags(flags []Flag, c CVE) error {
+// CheckFlags checks a flagged CVE's flags as its adjustment request does:
+// each names one of the two flags, quotes its evidence and names a row of the
+// CVE by its package.
+func CheckFlags(flags []Flag, c CVE) error {
 	if len(flags) == 0 {
 		return errors.New("a CVE with no flag gets no adjustment")
 	}

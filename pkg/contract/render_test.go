@@ -540,8 +540,9 @@ func TestSeveritySourceShownToTheAdjustmentOnly(t *testing.T) {
 
 // The adjustment shows the baselines it may lower and the flags it rests on,
 // so it refuses an answer no question lists, an answer for an axis not asked,
-// a flag quoting nothing and a flag on a package the CVE does not have.
-// cannot_tell is a baseline like any other answer.
+// a flag quoting nothing and a flag on a package the CVE does not have;
+// CheckFlags refuses such a flag with the same error. cannot_tell is a
+// baseline like any other answer.
 func TestAdjustmentRefusesWhatItCannotShow(t *testing.T) {
 	cFloored := [3]bool{cvss.Confidentiality: true}
 	with := func(change func(*Answers)) Answers {
@@ -568,11 +569,17 @@ func TestAdjustmentRefusesWhatItCannotShow(t *testing.T) {
 		if flags == nil {
 			flags = adjustFlags
 		}
-		if _, err := AdjustmentRequest(base(), conflicting, c.floored, flags, c.given); err == nil {
+		_, err := AdjustmentRequest(base(), conflicting, c.floored, flags, c.given)
+		if err == nil {
 			t.Errorf("%s: no error", name)
 		}
 		if _, err := newAdjustmentEntry(conflicting, c.floored, flags, c.given); err == nil {
 			t.Errorf("%s: the entry took it", name)
+		}
+		if c.flags != nil {
+			if checked := CheckFlags(flags, conflicting); checked == nil || err == nil || checked.Error() != err.Error() {
+				t.Errorf("%s: CheckFlags says %v, the request %v", name, checked, err)
+			}
 		}
 	}
 	abstained := Answers{O: cannotTell, LC: cannotTell, LI: cannotTell, LAV: cannotTell}

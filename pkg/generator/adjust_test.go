@@ -329,6 +329,19 @@ func TestGenerator_FlaggedRowWithoutAPackageName(t *testing.T) {
 	}
 }
 
+// A flag the adjustment would refuse, here a row flagged disputed whose
+// description does not say so, stops the run before any call, with the
+// adjustment's error: no batch's calls are paid for nothing.
+func TestGenerator_FlagWithoutEvidenceStopsTheRunBeforeAnyCall(t *testing.T) {
+	m := &fakeLLM{}
+	g := newGen(t, Opts{LLM: m})
+	vulns := testVulns(2)
+	vulns[1].Flags = Flags{MaintainerDisputed: true}
+	require.EqualError(t, g.GenerateRiskScore(context.Background(), vulns, nil),
+		"maintainer_disputed on CVE-2024-0001 quotes no evidence")
+	assert.Empty(t, m.log())
+}
+
 // Each flag the adjustment shows quotes what fired it and names its row's
 // package.
 func TestRowFlags(t *testing.T) {

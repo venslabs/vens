@@ -59,7 +59,8 @@ func (c *cve) counters(l contract.Levels) []string {
 
 // plan groups the rows by CVE and reads, for each CVE, Applicability over
 // every vector of every row, the flags of every row, and the questions it
-// gets.
+// gets. A flag the adjustment would refuse, such as one whose evidence its
+// row cannot quote, stops the run here, before any call is paid.
 func (g *Generator) plan(ctx context.Context, vulns []Vulnerability) ([]*cve, error) {
 	groups := groupVulnsByCVE(vulns)
 	cves := make([]*cve, 0, len(groups))
@@ -70,6 +71,11 @@ func (g *Generator) plan(ctx context.Context, vulns []Vulnerability) ([]*cve, er
 			applicability:    CVEApplicability(rows),
 			flags:            rowFlags(rows),
 			contestUnchecked: CVEFlags(rows).SeverityContestedUnavailable,
+		}
+		if len(c.flags) > 0 {
+			if err := contract.CheckFlags(c.flags, c.in); err != nil {
+				return nil, err
+			}
 		}
 		questions, err := contract.Questions(g.deployment, c.applicability.Floored)
 		if err != nil {
