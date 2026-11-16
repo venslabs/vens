@@ -111,9 +111,10 @@ type fieldDoc struct {
 	choices []Choice
 }
 
-// fieldDocs lists each field's values in their documented order. For the
-// schema-2 fields that order is the direction step 1's tests read: a larger
-// population, a better detection level, more traceability.
+// fieldDocs lists each field's values in their documented order: from the
+// smallest population to the largest for data_subjects, from nothing
+// recorded to active detection for detection, from no record to records per
+// individual for traceability.
 var fieldDocs = map[Field]fieldDoc{
 	Exposure: {choices: []Choice{
 		{"internal", "Corporate network only, no external access"},

@@ -28,8 +28,8 @@ import (
 	"testing"
 )
 
-// The docs checks D1 to D3: the config blocks the docs show load, and the
-// reference documents the keys and the wording this package holds.
+// The docs checks: every config block the docs show loads under schema 2,
+// and the reference documents every key, and the wording, this package holds.
 
 const reference = "docs/reference/config-schema.md"
 
@@ -247,7 +247,7 @@ func checkBlock(b block) error {
 	return nil
 }
 
-// D1.
+// TestDocsConfigBlocksLoad loads every config block the docs show.
 func TestDocsConfigBlocksLoad(t *testing.T) {
 	blocks := docsConfigBlocks(t, repoRoot(t))
 	from := map[string]bool{}
@@ -515,7 +515,8 @@ func checkControlScopes(t *testing.T, rows [][]string) {
 	}
 }
 
-// D3.
+// TestReferenceDocumentsEveryKey checks that the reference documents every
+// YAML key of the structs, found by reflection over their tags, and no other.
 func TestReferenceDocumentsEveryKey(t *testing.T) {
 	documented := map[string]bool{}
 	for _, s := range readReference(t) {

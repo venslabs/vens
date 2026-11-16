@@ -27,12 +27,14 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
-// migrating is the reference's migration section, which E1 and E2 point to.
+// migrating is the address the schema-version errors give for the migration
+// notes.
 const migrating = "https://venslabs.github.io/vens/reference/config-schema/#migrating"
 
-// loadError is a load error the reference documents by number: E1 no
-// schema_version, E2 another version, E3 an unknown key, E4 a listener,
-// data_subjects or traceability that cannot load, E5 a detection that cannot.
+// loadError is a load error with its number, the one a docs block's
+// `<!-- docs-check: E<n> -->` marker names: 1 no schema_version, 2 another
+// version, 3 an unknown key, 4 a listener, data_subjects or traceability that
+// cannot load, 5 a detection that cannot.
 type loadError struct {
 	code int
 	msg  string
