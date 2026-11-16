@@ -204,9 +204,10 @@ func TestGenerator_Attestor_ClaimsCiteTheCallsThatAnswered(t *testing.T) {
 	assert.Equal(t, append([]string{"evidence-batch-1"}, others...), cited["b"], "answered on the first ask")
 }
 
-// An answer for a CVE the call did not ask about is ignored: the CVE keeps
-// the answer to its own question when its batch comes.
+// An answer for a CVE the call did not ask about is ignored, logged: the CVE
+// keeps the answer to its own question when its batch comes.
 func TestGenerator_IgnoresAnswersForCVEsNotInThePrompt(t *testing.T) {
+	logs := withCapturedLogs(t)
 	m := &fakeLLM{
 		answer: func(c fakeCall, _ string) any {
 			if c.factor == contract.M {
@@ -228,6 +229,12 @@ func TestGenerator_IgnoresAnswersForCVEsNotInThePrompt(t *testing.T) {
 	require.Len(t, m.of(contract.M), 2, "the volunteered CVE is still asked in its own batch")
 	require.Equal(t, 9, vectorLevel(t, byID(emitted)["CVE-2024-0001"].Rating.Vector, "M"),
 		"CVE-2024-0001 carries the answer to its own question, not the volunteered one")
+
+	warned := logs.find(slog.LevelWarn, "Model answered a CVE the call did not ask about; ignoring the answer")
+	require.Len(t, warned, 1)
+	assert.Equal(t, "CVE-2024-0001", warned[0].attrs["vuln"])
+	assert.Equal(t, "M", warned[0].attrs["question"])
+	assert.Contains(t, warned[0].attrs["entry"], `"stale"`)
 }
 
 // The ask-again drops answers for CVEs it did not ask about too.
@@ -255,8 +262,9 @@ func TestGenerator_IgnoresAnswersForCVEsNotAskedOnRetry(t *testing.T) {
 		"CVE-2024-0001 carries the answer to its own question, not the one volunteered on the ask-again")
 }
 
-// A reply answering a CVE twice keeps the first answer.
+// A reply answering a CVE twice keeps the first answer, the second logged.
 func TestGenerator_AnswerGivenTwiceKeepsTheFirst(t *testing.T) {
+	logs := withCapturedLogs(t)
 	m := &fakeLLM{
 		answer: func(c fakeCall, _ string) any {
 			if c.factor == contract.M {
@@ -276,6 +284,12 @@ func TestGenerator_AnswerGivenTwiceKeepsTheFirst(t *testing.T) {
 	var emitted []outputhandler.VulnRating
 	require.NoError(t, g.GenerateRiskScore(context.Background(), testVulns(1), collect(&emitted)))
 	require.Equal(t, 1, vectorLevel(t, emitted[0].Rating.Vector, "M"))
+
+	warned := logs.find(slog.LevelWarn, "Model answered a CVE twice; keeping its first answer")
+	require.Len(t, warned, 1)
+	assert.Equal(t, "CVE-2024-0000", warned[0].attrs["vuln"])
+	assert.Equal(t, "M", warned[0].attrs["question"])
+	assert.Contains(t, warned[0].attrs["entry"], `"high_reward"`)
 }
 
 // --llm-temperature must reach every request exactly as passed, and stay

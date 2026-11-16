@@ -140,9 +140,9 @@ func (g *Generator) askOnce(ctx context.Context, run *scoringRun, f contract.Fac
 
 // readReplies reads a call's reply by key, one answer per CVE. An answer for
 // a CVE the call did not ask about is ignored, and a CVE answered twice keeps
-// its first answer. An answer off its list, or one a key written twice
-// leaves in doubt, is kept as given and logged: Go reads it as cannot_tell.
-// Each of these counts as a defect of the run's.
+// its first answer, each logged. An answer off its list, or one a key written
+// twice leaves in doubt, is kept as given and logged: Go reads it as
+// cannot_tell. Each of these counts as a defect of the run's.
 func readReplies(ctx context.Context, run *scoringRun, f contract.Factor, raw, evidenceRef string, cves []*cve) (map[string]reply, error) {
 	entries, err := readEntries(ctx, f, raw)
 	if err != nil {
@@ -159,12 +159,14 @@ func readReplies(ctx context.Context, run *scoringRun, f contract.Factor, raw, e
 			// A provider honouring the schema cannot write one: the call's
 			// ids are an enum.
 			run.defect(defectCVENotAsked)
-			slog.DebugContext(ctx, "ignoring an answer for a CVE the call did not ask about",
-				"vuln", id, "question", string(f))
+			slog.WarnContext(ctx, "Model answered a CVE the call did not ask about; ignoring the answer",
+				"vuln", id, "question", string(f), "entry", string(e.text))
 			continue
 		}
 		if _, ok := got[id]; ok {
 			run.defect(defectCVERepeated)
+			slog.WarnContext(ctx, "Model answered a CVE twice; keeping its first answer",
+				"vuln", id, "question", string(f), "entry", string(e.text))
 			continue
 		}
 		got[id] = readEntry(ctx, run, f, id, e, evidenceRef)
