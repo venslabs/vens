@@ -481,3 +481,28 @@ func TestGenerator_ClaimReasoningJoinsEachAnswer(t *testing.T) {
 	assert.Equal(t, fmt.Sprintf("CVE-2024-0000 on pkg  assessed at OWASP risk %.2f (%s)", score, emitted[0].Rating.Severity), got[0].Predicate)
 	assert.Len(t, got[0].Evidence, len(m.calls), "every call answered for the one CVE")
 }
+
+// A reasoning written over several lines, or with runs of spaces, takes one
+// line of the claim's reasoning, the adjustment's too.
+func TestGenerator_ClaimReasoningKeepsOneLinePerAnswer(t *testing.T) {
+	at := attestation.NewBuilder(attestation.Opts{Provider: "mock", Model: "mock"})
+	m := &fakeLLM{
+		edit: func(c fakeCall, entry map[string]any) {
+			if c.factor == contract.M {
+				entry["reasoning"] = "It holds the keys.\nAn attacker wants them.\u2028\t Enough."
+			}
+		},
+		adjust: func(fakeCall) map[string]any {
+			return map[string]any{"reasoning": "\nThe dispute\r\nstands.  ", "opportunity": "keep",
+				"confidentiality": "affected", "integrity": "affected", "availability": "affected"}
+		},
+	}
+	g := newGen(t, Opts{LLM: m})
+	g.SetAttestor(at)
+	require.NoError(t, g.GenerateRiskScore(context.Background(), []Vulnerability{disputedRow(testVulns(1)[0])}, nil))
+
+	lines := strings.Split(claims(t, at)[0].Reasoning, "\n")
+	require.Len(t, lines, len(questionsUndeclared)+1)
+	assert.Equal(t, "M (low_or_no_reward): It holds the keys. An attacker wants them. Enough.", lines[0])
+	assert.Equal(t, "adjustment (opportunity: keep, confidentiality: affected, integrity: affected, availability: affected): The dispute stands.", lines[len(lines)-1])
+}

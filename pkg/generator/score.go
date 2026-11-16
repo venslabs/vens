@@ -47,7 +47,13 @@ func (a *assessment) answer(f contract.Factor, r reply) {
 	} else {
 		*answerField(&a.answers, f) = r.answer[0]
 	}
-	a.note(fmt.Sprintf("%s (%s): %s", f, strings.Join(r.answer, ", "), r.reasoning), r.evidenceRef)
+	a.note(fmt.Sprintf("%s (%s): %s", f, strings.Join(r.answer, ", "), oneLine(r.reasoning)), r.evidenceRef)
+}
+
+// oneLine collapses each run of whitespace, line breaks included, to one
+// space: a claim's reasoning holds one line per answer.
+func oneLine(s string) string {
+	return strings.Join(strings.Fields(s), " ")
 }
 
 func (a *assessment) note(reason, evidenceRef string) {

@@ -106,13 +106,15 @@ func readSchema(schema []byte) fakeCall {
 
 // fakeLLM records every call and answers through its functions. By default
 // each CVE gets the question's first answer and the adjustment keeps every
-// baseline. answer overrides a CVE's answer when it returns non-nil; skip
-// leaves a CVE out; extra appends entries to a reply; adjust replaces the
-// adjustment's reply; reply replaces a call's raw reply; fail fails a call.
+// baseline. answer overrides a CVE's answer when it returns non-nil; edit
+// changes a CVE's entry before it is written; skip leaves a CVE out; extra
+// appends entries to a reply; adjust replaces the adjustment's reply; reply
+// replaces a call's raw reply; fail fails a call.
 type fakeLLM struct {
 	mu     sync.Mutex
 	calls  []fakeCall
 	answer func(c fakeCall, id string) any
+	edit   func(c fakeCall, entry map[string]any)
 	skip   func(c fakeCall, id string) bool
 	extra  func(c fakeCall) []map[string]any
 	adjust func(c fakeCall) map[string]any
@@ -144,7 +146,11 @@ func (m *fakeLLM) Generate(_ context.Context, req llm.Request) (string, error) {
 		if m.skip != nil && m.skip(c, id) {
 			continue
 		}
-		answers = append(answers, map[string]any{"vulnId": id, "reasoning": "because of " + id, "answer": m.answerFor(c, id)})
+		entry := map[string]any{"vulnId": id, "reasoning": "because of " + id, "answer": m.answerFor(c, id)}
+		if m.edit != nil {
+			m.edit(c, entry)
+		}
+		answers = append(answers, entry)
 	}
 	if m.extra != nil {
 		answers = append(answers, m.extra(c)...)

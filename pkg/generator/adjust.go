@@ -56,7 +56,7 @@ func (g *Generator) adjust(ctx context.Context, run *scoringRun, c *cve, a *asse
 	}
 	adjusted, answered, reasoning := readAdjustment(ctx, c.id(), raw, lists)
 	a.adjusted = &adjusted
-	a.note(fmt.Sprintf("%s (%s): %s", adjustmentCall, answered, reasoning), ref)
+	a.note(fmt.Sprintf("%s (%s): %s", adjustmentCall, answered, oneLine(reasoning)), ref)
 	return nil
 }
 
