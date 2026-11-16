@@ -16,6 +16,7 @@ json-contains output.cdx.json 'GHSA-1234-5678-abcd'
 json-contains output.cdx.json '"name": "GITHUB"'
 
 -- config.yaml --
+schema_version: 2
 project:
   name: "test-project"
   description: "Test project for integration tests"

@@ -1,17 +1,27 @@
-# `vens init` writes a config that `vens generate` accepts: the required
-# questions are answered, optional ones are skipped with empty lines, and a
-# second run without --force refuses to overwrite the file it just wrote.
+# `vens init` writes a config that `vens generate` accepts: every question is
+# answered, schema 2's included, the controls left unanswered read as no, and
+# a second run without --force refuses to overwrite the file it just wrote.
 
 stdin answers.txt
 exec vens init --output config.yaml
 stdout 'Wrote config.yaml'
+grep '^schema_version: 2$' config.yaml
 grep 'name: my-api' config.yaml
 grep 'exposure: internet' config.yaml
 grep 'data_sensitivity: high' config.yaml
 grep 'business_criticality: critical' config.yaml
 grep 'availability_requirement: high' config.yaml
-grep 'audit_requirement: medium' config.yaml
 grep 'GDPR' config.yaml
+grep 'traceability: per_request' config.yaml
+grep 'listener: present' config.yaml
+grep 'data_subjects: thousands' config.yaml
+grep 'network: logged$' config.yaml
+grep 'host: not_logged' config.yaml
+grep 'application: logged_and_reviewed' config.yaml
+grep 'waf: true' config.yaml
+grep 'notes: Handles customer data' config.yaml
+! grep 'audit_requirement' config.yaml
+! grep 'ddos_protection' config.yaml
 grep 'vens generate --config-file' config.yaml
 
 # The generated file is accepted by vens generate.
@@ -34,7 +44,18 @@ high
 critical
 high
 gdpr
-medium
+per_request
+present
+thousands
+y
+logged
+not_logged
+logged_and_reviewed
+y
+n
+
+
+
 Handles customer data
 
 -- report.json --

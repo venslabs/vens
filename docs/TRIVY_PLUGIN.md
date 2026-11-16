@@ -58,6 +58,8 @@ trivy vens enrich --vex vex.json --output enriched-report.json report.json
 Create `config.yaml`:
 
 ```yaml
+schema_version: 2
+
 project:
   name: "my-api"
   description: "Production web application"

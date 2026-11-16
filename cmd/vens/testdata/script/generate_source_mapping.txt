@@ -15,6 +15,7 @@ json-contains output2.cdx.json 'GHSA-abcd-1234-efgh'
 json-contains output2.cdx.json '"name": "GITHUB"'
 
 -- config.yaml --
+schema_version: 2
 project:
   name: "source-mapping-test"
 context:

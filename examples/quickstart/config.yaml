@@ -6,6 +6,8 @@
 # within YOUR system context.
 # Reference: https://owasp.org/www-community/OWASP_Risk_Rating_Methodology
 
+schema_version: 2
+
 project:
   name: "python-backend-api"
   description: "Python 3.11 backend API service handling customer data"

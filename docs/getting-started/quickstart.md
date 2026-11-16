@@ -44,6 +44,8 @@ You now have a `report.json` with ~30–80 CVEs.
 Create `config.yaml`:
 
 ```yaml
+schema_version: 2
+
 project:
   name: "my-python-api"
   description: "Customer-facing Python API handling user data"

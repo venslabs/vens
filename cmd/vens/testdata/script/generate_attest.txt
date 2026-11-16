@@ -56,6 +56,7 @@ exists output2.attestation.cdx.json
 ! json-contains output2.attestation.cdx.json '"name": "temperature"'
 
 -- config.yaml --
+schema_version: 2
 project:
   name: "attest-test"
   description: "Test project for attestation integration"

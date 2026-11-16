@@ -101,6 +101,8 @@ The per-CVE reasoning from the LLM is logged to stderr as the command runs, and 
 Create `config.yaml`:
 
 ```yaml
+schema_version: 2
+
 project:
   name: "my-api"
   description: "Customer-facing REST API"

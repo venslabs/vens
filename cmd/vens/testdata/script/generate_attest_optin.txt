@@ -5,6 +5,7 @@ exists output.cdx.json
 ! exists output.attestation.cdx.json
 
 -- config.yaml --
+schema_version: 2
 project:
   name: "attest-optin-test"
   description: "Test project for attestation opt-in default"

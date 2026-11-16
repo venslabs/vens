@@ -29,6 +29,7 @@ json-contains split.attestation.cdx.json '"target": "pkg:deb/debian/openssl@3.0.
 json-contains split.attestation.cdx.json '"target": "pkg:deb/debian/libssl3@3.0.11"'
 
 -- config.yaml --
+schema_version: 2
 project:
   name: "dup-cve-test"
   description: "Same CVE across two components"

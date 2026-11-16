@@ -31,6 +31,7 @@ Trivy and Grype hand you a list of CVEs. CVSS is a score in a vacuum: it doesn't
 The bare minimum:
 
 ```yaml
+schema_version: 2
 project:
   name: "checkout-api"
 context:

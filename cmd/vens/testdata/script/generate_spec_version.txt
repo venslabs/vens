@@ -34,6 +34,7 @@ stderr 'failed to parse vulnerabilities'
 cmp v16.cdx.json existing2.cdx.json
 
 -- config.yaml --
+schema_version: 2
 project:
   name: "test-project"
   description: "Test project for integration tests"

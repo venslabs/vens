@@ -25,6 +25,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -41,8 +42,9 @@ func New() *cobra.Command {
 		Long: `Ask a short series of questions about the system being scored and
 write the answers as a config.yaml that vens generate accepts. Only the
 project name and the three required context fields are mandatory; every
-other question can be skipped with Enter. An existing file is left alone
-unless --force is passed.`,
+other question can be skipped with Enter, except the three detection
+channels once you choose to declare detection. An existing file is left
+alone unless --force is passed.`,
 		Example: `  vens init
   vens init --output my-config.yaml
   vens init --force`,
@@ -67,66 +69,12 @@ func action(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	// Fail fast, before asking any questions, if the target cannot be
-	// written: an empty path, a directory, a missing parent directory, or
-	// an existing file without --force.
-	if output == "" {
-		return fmt.Errorf("output path must not be empty")
-	}
-	if info, err := os.Stat(output); err == nil {
-		if info.IsDir() {
-			return fmt.Errorf("config file %q is a directory", output)
-		}
-		if !force {
-			return fmt.Errorf("config file %q already exists (use --force to overwrite)", output)
-		}
-	} else if !os.IsNotExist(err) {
-		return fmt.Errorf("checking output file %q: %w", output, err)
-	} else if dir := filepath.Dir(output); dir != "." && dir != "" {
-		if _, err := os.Stat(dir); err != nil {
-			return fmt.Errorf("output directory %q: %w", dir, err)
-		}
+	if err := checkOutput(output, force); err != nil {
+		return err
 	}
 
 	p := &prompter{in: bufio.NewReader(cmd.InOrStdin()), out: cmd.OutOrStdout()}
-
-	cfg := riskconfig.Config{}
-	cfg.Project.Name, err = p.askRequired("Project name")
-	if err != nil {
-		return err
-	}
-	cfg.Project.Description, err = p.askOptional("Project description")
-	if err != nil {
-		return err
-	}
-	cfg.Context.Exposure, err = p.askChoice("Exposure", []string{"internal", "private", "internet"})
-	if err != nil {
-		return err
-	}
-	cfg.Context.DataSensitivity, err = p.askChoice("Data sensitivity", []string{"low", "medium", "high", "critical"})
-	if err != nil {
-		return err
-	}
-	cfg.Context.BusinessCriticality, err = p.askChoice("Business criticality", []string{"low", "medium", "high", "critical"})
-	if err != nil {
-		return err
-	}
-	if v, err := p.askOptionalChoice("Availability requirement", []string{"low", "medium", "high", "critical"}); err != nil {
-		return err
-	} else if v != "" {
-		cfg.Context.AvailabilityRequirement = &v
-	}
-	if v, err := p.askCompliance(); err != nil {
-		return err
-	} else {
-		cfg.Context.ComplianceRequirements = v
-	}
-	if v, err := p.askOptionalChoice("Audit requirement", []string{"low", "medium", "high"}); err != nil {
-		return err
-	} else if v != "" {
-		cfg.Context.AuditRequirement = &v
-	}
-	cfg.Context.Notes, err = p.askOptional("Notes")
+	cfg, err := p.askConfig()
 	if err != nil {
 		return err
 	}
@@ -144,6 +92,40 @@ func action(cmd *cobra.Command, args []string) error {
 	if _, err := riskconfig.Parse([]byte(out)); err != nil {
 		return fmt.Errorf("generated config failed validation: %w", err)
 	}
+	if err := writeConfig(output, force, out); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(cmd.OutOrStdout(), "Wrote %s\n", output); err != nil {
+		return fmt.Errorf("writing output: %w", err)
+	}
+	return nil
+}
+
+// checkOutput fails before any question for a target it can tell cannot be
+// written: an empty path, a directory, a missing parent directory, or an
+// existing file without --force. Other write errors surface at the end.
+func checkOutput(output string, force bool) error {
+	if output == "" {
+		return fmt.Errorf("output path must not be empty")
+	}
+	if info, err := os.Stat(output); err == nil {
+		if info.IsDir() {
+			return fmt.Errorf("config file %q is a directory", output)
+		}
+		if !force {
+			return fmt.Errorf("config file %q already exists (use --force to overwrite)", output)
+		}
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("checking output file %q: %w", output, err)
+	} else if dir := filepath.Dir(output); dir != "." && dir != "" {
+		if _, err := os.Stat(dir); err != nil {
+			return fmt.Errorf("output directory %q: %w", dir, err)
+		}
+	}
+	return nil
+}
+
+func writeConfig(output string, force bool, content string) error {
 	// Open with O_EXCL when --force is not set: a file created while the
 	// user was answering (another terminal, an editor save) must not be
 	// silently replaced. O_EXCL also refuses a dangling symlink.
@@ -158,17 +140,164 @@ func action(cmd *cobra.Command, args []string) error {
 		}
 		return fmt.Errorf("writing config file %q: %w", output, err)
 	}
-	if _, err := f.Write([]byte(out)); err != nil {
+	if _, err := f.Write([]byte(content)); err != nil {
 		_ = f.Close()
 		return fmt.Errorf("writing config file %q: %w", output, err)
 	}
 	if err := f.Close(); err != nil {
 		return fmt.Errorf("writing config file %q: %w", output, err)
 	}
-	if _, err := fmt.Fprintf(cmd.OutOrStdout(), "Wrote %s\n", output); err != nil {
-		return fmt.Errorf("writing output: %w", err)
-	}
 	return nil
+}
+
+// askConfig asks the required questions first, then the optional ones; each
+// value list and meaning comes from riskconfig, so the wizard offers what
+// validation accepts, in the reference's words.
+func (p *prompter) askConfig() (riskconfig.Config, error) {
+	cfg := riskconfig.Config{SchemaVersion: riskconfig.SchemaVersion}
+	var err error
+	if cfg.Project.Name, err = p.askRequired("Project name"); err != nil {
+		return cfg, err
+	}
+	if cfg.Project.Description, err = p.askOptional("Project description"); err != nil {
+		return cfg, err
+	}
+	if cfg.Context, err = p.askContext(); err != nil {
+		return cfg, err
+	}
+	if cfg.Context.Controls, err = p.askControls(); err != nil {
+		return cfg, err
+	}
+	if cfg.Context.Notes, err = p.askOptional("Notes"); err != nil {
+		return cfg, err
+	}
+	return cfg, nil
+}
+
+func (p *prompter) askContext() (riskconfig.ContextHints, error) {
+	var h riskconfig.ContextHints
+	var err error
+	if h.Exposure, err = p.askChoice("Exposure", riskconfig.Exposure.Values()); err != nil {
+		return h, err
+	}
+	if h.DataSensitivity, err = p.askChoice("Data sensitivity", riskconfig.DataSensitivity.Values()); err != nil {
+		return h, err
+	}
+	if h.BusinessCriticality, err = p.askChoice("Business criticality", riskconfig.BusinessCriticality.Values()); err != nil {
+		return h, err
+	}
+	if h.AvailabilityRequirement, err = p.askOptionalField("Availability requirement", riskconfig.AvailabilityRequirement, false); err != nil {
+		return h, err
+	}
+	if h.ComplianceRequirements, err = p.askCompliance(); err != nil {
+		return h, err
+	}
+	// audit_requirement moves no score, so traceability, what is recorded,
+	// is asked in its place.
+	if h.Traceability, err = p.askOptionalField("Traceability", riskconfig.Traceability, true); err != nil {
+		return h, err
+	}
+	listener, err := p.askOptionalField("Listener", riskconfig.Listener, true)
+	if err != nil {
+		return h, err
+	}
+	if listener != nil {
+		h.Listener = *listener
+	}
+	if h.DataSubjects, err = p.askOptionalField("Data subjects", riskconfig.DataSubjects, true); err != nil {
+		return h, err
+	}
+	if h.Detection, err = p.askDetection(); err != nil {
+		return h, err
+	}
+	return h, nil
+}
+
+// askOptionalField asks an optional field, showing what the field and each
+// value mean first when explain is set. It returns nil when skipped.
+func (p *prompter) askOptionalField(question string, f riskconfig.Field, explain bool) (*string, error) {
+	if explain {
+		if err := p.explain(question, f.About(), f.Choices()); err != nil {
+			return nil, err
+		}
+	}
+	v, err := p.askOptionalChoice(question, f.Values())
+	if err != nil || v == "" {
+		return nil, err
+	}
+	return &v, nil
+}
+
+// askDetection asks whether to declare detection, then all three channels:
+// once written, detection needs each of them.
+func (p *prompter) askDetection() (*riskconfig.DetectionCoverage, error) {
+	if err := p.explain("Detection", riskconfig.Detection.About(), nil); err != nil {
+		return nil, err
+	}
+	declare, err := p.askYesNo("Declare detection")
+	if err != nil || !declare {
+		return nil, err
+	}
+	if err := p.explain("Channels", "", []riskconfig.Choice{
+		{Value: "network", Meaning: riskconfig.DetectionNetwork.About()},
+		{Value: "host", Meaning: riskconfig.DetectionHost.About()},
+		{Value: "application", Meaning: riskconfig.DetectionApplication.About()},
+	}); err != nil {
+		return nil, err
+	}
+	if err := p.explain("Levels", "", detectionLevels()); err != nil {
+		return nil, err
+	}
+	var d riskconfig.DetectionCoverage
+	for _, c := range []struct {
+		question string
+		field    riskconfig.Field
+		value    *string
+	}{
+		{"Detection, network", riskconfig.DetectionNetwork, &d.Network},
+		{"Detection, host", riskconfig.DetectionHost, &d.Host},
+		{"Detection, application", riskconfig.DetectionApplication, &d.Application},
+	} {
+		if *c.value, err = p.askChoice(c.question, c.field.Values()); err != nil {
+			return nil, err
+		}
+	}
+	return &d, nil
+}
+
+// detectionLevels returns the levels a channel can be declared at, marking
+// those the network and host channels do not accept.
+func detectionLevels() []riskconfig.Choice {
+	levels := riskconfig.Detection.Choices()
+	for i, l := range levels {
+		if !slices.Contains(riskconfig.DetectionNetwork.Values(), l.Value) {
+			levels[i].Value += " (application only)"
+		}
+	}
+	return levels
+}
+
+// askControls asks the controls a question shows, each with its scope; ids,
+// siem and edr move no score and are not asked.
+func (p *prompter) askControls() (riskconfig.SecurityControls, error) {
+	var controls riskconfig.SecurityControls
+	if err := p.explain("Security controls in operation for this deployment", "", nil); err != nil {
+		return controls, err
+	}
+	for _, c := range riskconfig.ControlScopes() {
+		on, err := p.askYesNo(fmt.Sprintf("%s: %s. Scope: %s", c.Key, c.Description, c.Scope))
+		if err != nil {
+			return controls, err
+		}
+		if !on {
+			continue
+		}
+		var ok bool
+		if controls, ok = controls.Enable(c.Key); !ok {
+			return controls, fmt.Errorf("no control has the key %q", c.Key)
+		}
+	}
+	return controls, nil
 }
 
 // prompter asks one question per line on stdin and returns the answers;
@@ -187,6 +316,24 @@ func (p *prompter) readLine() (string, error) {
 		return "", io.EOF
 	}
 	return strings.TrimSpace(line), nil
+}
+
+// explain prints, after a blank line, a label with what it means, then each
+// value's meaning, one per line.
+func (p *prompter) explain(label, about string, choices []riskconfig.Choice) error {
+	header := "\n" + label + ":"
+	if about != "" {
+		header += " " + about
+	}
+	if _, err := fmt.Fprintln(p.out, header); err != nil {
+		return fmt.Errorf("writing prompt: %w", err)
+	}
+	for _, c := range choices {
+		if _, err := fmt.Fprintf(p.out, "  %s: %s\n", c.Value, c.Meaning); err != nil {
+			return fmt.Errorf("writing prompt: %w", err)
+		}
+	}
+	return nil
 }
 
 func (p *prompter) askRequired(question string) (string, error) {
@@ -261,8 +408,30 @@ func (p *prompter) askOptionalChoice(question string, valid []string) (string, e
 	}
 }
 
+// askYesNo reads yes or no, y or n in any case; Enter is no.
+func (p *prompter) askYesNo(question string) (bool, error) {
+	for {
+		if _, err := fmt.Fprintf(p.out, "%s [y/N]: ", question); err != nil {
+			return false, fmt.Errorf("writing prompt: %w", err)
+		}
+		answer, err := p.readLine()
+		if err != nil {
+			return false, fmt.Errorf("reading %q: %w", question, err)
+		}
+		switch strings.ToLower(answer) {
+		case "y", "yes":
+			return true, nil
+		case "", "n", "no":
+			return false, nil
+		}
+		if _, err := fmt.Fprintln(p.out, "Answer y or n."); err != nil {
+			return false, fmt.Errorf("writing prompt: %w", err)
+		}
+	}
+}
+
 func (p *prompter) askCompliance() ([]string, error) {
-	valid := []string{"PCI-DSS", "HIPAA", "GDPR", "SOX", "ISO27001", "FedRAMP", "NIST", "CCPA", "SOC2", "FISMA", "ITAR", "CMMC"}
+	valid := riskconfig.ComplianceFrameworks()
 	for {
 		if _, err := fmt.Fprintf(p.out, "Compliance requirements, comma-separated (optional) [%s]: ", strings.Join(valid, ", ")); err != nil {
 			return nil, fmt.Errorf("writing prompt: %w", err)

@@ -15,209 +15,312 @@
 package riskconfig
 
 import (
+	"bytes"
 	"fmt"
+	"reflect"
+	"slices"
 	"strings"
 
 	"go.yaml.in/yaml/v3"
 )
 
-// Config represents the structure of config.yaml provided by users.
-// The schema uses textual context hints that help the LLM calculate
-// accurate OWASP risk scores for each vulnerability.
+// SchemaVersion is the version of the config.yaml format this vens reads.
+const SchemaVersion = 2
+
+// Config is config.yaml: the deployment every finding is scored in. Go reads
+// some fields itself to set an OWASP factor's level and never sends them;
+// others are shown to the model with their documented meaning; a few move no
+// score and are kept as information.
 //
 // Example YAML:
 //
+//	schema_version: 2
 //	project:
 //	  name: "nginx-production"
 //	  description: "Production NGINX web server"
-//
 //	context:
-//	  exposure: "internet"           # internal | private | internet
-//	  data_sensitivity: "high"       # low | medium | high | critical
-//	  business_criticality: "critical" # low | medium | high | critical
+//	  exposure: "internet"
+//	  data_sensitivity: "high"
+//	  business_criticality: "critical"
 //	  notes: "Handles customer PII, PCI-DSS compliance required"
-//
-// The LLM uses these context hints to evaluate the OWASP risk score
-// for each vulnerability according to the OWASP Risk Rating Methodology.
 type Config struct {
-	Project ProjectConfig `yaml:"project"`
-	Context ContextHints  `yaml:"context"`
+	// SchemaVersion must be 2. A file without it was written for vens v0.6
+	// or earlier, schema 1, and is refused.
+	SchemaVersion int           `yaml:"schema_version"`
+	Project       ProjectConfig `yaml:"project"`
+	Context       ContextHints  `yaml:"context"`
 }
 
-// ProjectConfig holds project metadata for context in LLM analysis.
+// ProjectConfig names the deployment in every question's deployment block.
 type ProjectConfig struct {
 	Name        string `yaml:"name"`
 	Description string `yaml:"description,omitempty"`
 }
 
-// ContextHints holds textual hints that describe the project's risk context.
-// These hints help the LLM calculate accurate OWASP risk scores.
-// Reference: https://owasp.org/www-community/OWASP_Risk_Rating_Methodology
+// ContextHints describes the deployment. Each field says which OWASP factor
+// reads it and how.
 type ContextHints struct {
-	// Exposure describes how the system is exposed to potential attackers.
-	// Values: "internal" (corporate network only), "private" (VPN/authenticated),
-	//         "internet" (publicly accessible)
-	// Maps to: OWASP Threat Agent Factors (Opportunity, Size)
+	// Exposure is internal, private or internet: Size's level in Go and the
+	// attacker group every likelihood question names, shown in the
+	// deployment block with its meaning.
 	Exposure string `yaml:"exposure"`
 
-	// DataSensitivity describes the sensitivity of data handled by the system.
-	// Values: "low" (public data), "medium" (internal data),
-	//         "high" (PII, financial), "critical" (secrets, credentials, PHI)
-	// Maps to: OWASP Technical Impact (Loss of Confidentiality, Loss of Integrity)
+	// DataSensitivity is low, medium, high or critical: Loss of
+	// confidentiality's column in Go (low and medium non-sensitive, high and
+	// critical critical), hidden from that question; background to Motive,
+	// Loss of integrity and Privacy violation.
 	DataSensitivity string `yaml:"data_sensitivity"`
 
-	// BusinessCriticality describes how critical the system is for business operations.
-	// Values: "low" (dev/test), "medium" (internal tools),
-	//         "high" (customer-facing), "critical" (revenue-critical, compliance)
-	// Maps to: OWASP Business Impact (Financial Damage, Reputation Damage)
+	// BusinessCriticality is low, medium, high or critical: background to
+	// Motive, Financial damage and Reputation damage, and to Loss of
+	// availability when AvailabilityRequirement is unset.
 	BusinessCriticality string `yaml:"business_criticality"`
 
-	// AvailabilityRequirement describes how critical system availability is.
-	// Values: "low" (best-effort), "medium" (business hours SLA),
-	//         "high" (24/7 required), "critical" (zero downtime, lives at risk)
-	// Maps to: OWASP Technical Impact (Loss of Availability)
-	// Default: nil (inherits from business_criticality if not specified)
-	// Optional: Only needed if availability criticality differs from business criticality
+	// AvailabilityRequirement is low, medium, high or critical: background
+	// to Loss of availability. nil: BusinessCriticality stands in.
 	AvailabilityRequirement *string `yaml:"availability_requirement,omitempty"`
 
-	// ComplianceRequirements lists regulatory/compliance frameworks that apply.
-	// Values: "PCI-DSS", "HIPAA", "GDPR", "SOX", "ISO27001", "FedRAMP", etc.
-	// Maps to: OWASP Business Impact (Non-Compliance)
-	// Default: nil (no compliance requirements)
-	// Optional: Specify if system must comply with regulations
+	// ComplianceRequirements are the frameworks Non-compliance asks about.
+	// Empty: Non-compliance is 2 and not asked.
 	ComplianceRequirements []string `yaml:"compliance_requirements,omitempty"`
 
-	// AuditRequirement describes the importance of audit logging and traceability.
-	// Values: "low" (basic logging), "medium" (audit trail required),
-	//         "high" (forensic-grade logging, immutable audit)
-	// Maps to: OWASP Technical Impact (Loss of Accountability)
-	// Default: nil (no special audit requirements)
-	// Optional: Only needed for systems with strong audit requirements
+	// AuditRequirement is low, medium or high. It states a requirement, not
+	// what is recorded, so it moves no score and is sent nowhere; kept as
+	// information. Traceability states what is recorded.
 	AuditRequirement *string `yaml:"audit_requirement,omitempty"`
 
-	// Controls describes the security controls in place to defend the system.
-	// These controls affect the Vulnerability Factor score (ease of exploit).
-	// All controls are optional and default to false (no control in place).
+	// Listener is present, absent or unknown: whether the deployment accepts
+	// connections others open. Shown in the deployment block when present or
+	// absent. Omitted, it reads unknown.
+	Listener string `yaml:"listener,omitempty"`
+
+	// DataSubjects is the band of people whose personal data the service can
+	// read: Privacy violation's cap, in Go, never sent. nil: no cap.
+	DataSubjects *string `yaml:"data_subjects,omitempty"`
+
+	// Detection is what records an attempt on each channel: Intrusion
+	// detection, in Go, never sent. nil: every channel not logged, 9.
+	Detection *DetectionCoverage `yaml:"detection,omitempty"`
+
+	// Traceability is none, per_request or per_individual: Loss of
+	// accountability's column, in Go, never sent. nil: the none column.
+	Traceability *string `yaml:"traceability,omitempty"`
+
+	// Controls are the security controls in operation.
 	Controls SecurityControls `yaml:"controls,omitempty"`
 
-	// Notes provides additional context in free-form text (optional).
-	// Examples: "Handles authentication tokens", "Connected to production database"
+	// Notes is free text shown in every question's deployment block.
 	Notes string `yaml:"notes,omitempty"`
 }
 
-// SecurityControls describes the security defenses in place.
-// These controls affect the OWASP Vulnerability Factor score by making
-// vulnerabilities harder to discover and exploit.
-type SecurityControls struct {
-	// Perimeter controls
-	WAF            bool `yaml:"waf,omitempty"`             // Web Application Firewall
-	DDoSProtection bool `yaml:"ddos_protection,omitempty"` // DDoS mitigation service
-
-	// Detection controls
-	IDS  bool `yaml:"ids,omitempty"`  // Intrusion Detection System
-	SIEM bool `yaml:"siem,omitempty"` // Security Information & Event Management
-
-	// Endpoint controls
-	EDR       bool `yaml:"edr,omitempty"`       // Endpoint Detection & Response
-	Antivirus bool `yaml:"antivirus,omitempty"` // Antivirus/Anti-malware
-
-	// Network controls
-	Segmentation bool `yaml:"segmentation,omitempty"` // Network micro-segmentation
-	ZeroTrust    bool `yaml:"zero_trust,omitempty"`   // Zero-trust architecture
+// DetectionCoverage declares, per channel, what records an attempt across
+// the whole service. Once detection is written, all three are required.
+type DetectionCoverage struct {
+	Network     string `yaml:"network"`
+	Host        string `yaml:"host"`
+	Application string `yaml:"application"`
 }
 
-// Valid values for context hints
-var (
-	validExposure                = []string{"internal", "private", "internet"}
-	validDataSensitivity         = []string{"low", "medium", "high", "critical"}
-	validBusinessCriticality     = []string{"low", "medium", "high", "critical"}
-	validAvailabilityRequirement = []string{"low", "medium", "high", "critical"}
-	validAuditRequirement        = []string{"low", "medium", "high"}
-	validComplianceFrameworks    = []string{
-		"PCI-DSS", "HIPAA", "GDPR", "SOX", "ISO27001", "FedRAMP",
-		"NIST", "CCPA", "SOC2", "FISMA", "ITAR", "CMMC",
-	}
-)
+// SecurityControls are booleans, default false. WAF, DDoSProtection,
+// Segmentation, ZeroTrust and Antivirus are shown, when true and with their
+// documented scope, to the Ease of exploit question only. IDS, SIEM and EDR
+// say a tool exists, not that this service's attempts are recorded: they
+// move no score and are sent nowhere. Detection states coverage.
+type SecurityControls struct {
+	WAF            bool `yaml:"waf,omitempty"`
+	DDoSProtection bool `yaml:"ddos_protection,omitempty"`
+	IDS            bool `yaml:"ids,omitempty"`
+	SIEM           bool `yaml:"siem,omitempty"`
+	EDR            bool `yaml:"edr,omitempty"`
+	Antivirus      bool `yaml:"antivirus,omitempty"`
+	Segmentation   bool `yaml:"segmentation,omitempty"`
+	ZeroTrust      bool `yaml:"zero_trust,omitempty"`
+}
 
-// Parse unmarshals raw YAML bytes into a Config, then validates it.
+// Enable returns s with the control named by its YAML key set to true, and
+// false when no control has that key.
+func (s SecurityControls) Enable(key string) (SecurityControls, bool) {
+	on := map[string]*bool{
+		"waf": &s.WAF, "ddos_protection": &s.DDoSProtection, "ids": &s.IDS, "siem": &s.SIEM,
+		"edr": &s.EDR, "antivirus": &s.Antivirus, "segmentation": &s.Segmentation, "zero_trust": &s.ZeroTrust,
+	}[key]
+	if on == nil {
+		return s, false
+	}
+	*on = true
+	return s, true
+}
+
+// Parse loads config.yaml from its bytes. It reads the YAML tree first, so
+// that the marker, the shape of the schema-2 keys and unknown keys fail with
+// errors naming the YAML path, then decodes strictly and validates.
 func Parse(b []byte) (*Config, error) {
-	var cfg Config
-	if err := yaml.Unmarshal(b, &cfg); err != nil {
+	root, err := rootMapping(b)
+	if err != nil {
 		return nil, err
 	}
-
-	// Validate context hints
-	if err := cfg.validate(); err != nil {
+	if err := checkSchemaVersion(root, b); err != nil {
 		return nil, err
 	}
-
+	if err := checkSchema2Keys(root); err != nil {
+		return nil, err
+	}
+	if err := checkKnownKeys(root, reflect.TypeFor[Config](), ""); err != nil {
+		return nil, err
+	}
+	var decoded Config
+	dec := yaml.NewDecoder(bytes.NewReader(b))
+	dec.KnownFields(true)
+	if err := dec.Decode(&decoded); err != nil {
+		return nil, err
+	}
+	cfg, err := decoded.validated()
+	if err != nil {
+		return nil, err
+	}
 	return &cfg, nil
 }
 
-// validate checks that all context hints have valid values and applies defaults.
-func (c *Config) validate() error {
+// validated returns c with its values normalized, or the first value that
+// keeps it from loading. An empty listener reads unknown: Parse has already
+// refused one written empty, so only an omitted key or a struct literal
+// reaches here with it.
+func (c Config) validated() (Config, error) {
 	if c.Project.Name == "" {
-		return fmt.Errorf("project.name is required")
+		return Config{}, fmt.Errorf("project.name is required")
 	}
-
-	// Validate required fields
-	if c.Context.Exposure == "" {
-		return fmt.Errorf("context.exposure is required (valid values: %v)", validExposure)
-	}
-	if c.Context.DataSensitivity == "" {
-		return fmt.Errorf("context.data_sensitivity is required (valid values: %v)", validDataSensitivity)
-	}
-	if c.Context.BusinessCriticality == "" {
-		return fmt.Errorf("context.business_criticality is required (valid values: %v)", validBusinessCriticality)
-	}
-
-	// Normalize required values to lowercase
-	c.Context.Exposure = strings.ToLower(strings.TrimSpace(c.Context.Exposure))
-	c.Context.DataSensitivity = strings.ToLower(strings.TrimSpace(c.Context.DataSensitivity))
-	c.Context.BusinessCriticality = strings.ToLower(strings.TrimSpace(c.Context.BusinessCriticality))
-
-	// Normalize optional pointer values
-	if c.Context.AvailabilityRequirement != nil {
-		normalized := strings.ToLower(strings.TrimSpace(*c.Context.AvailabilityRequirement))
-		c.Context.AvailabilityRequirement = &normalized
-	}
-	if c.Context.AuditRequirement != nil {
-		normalized := strings.ToLower(strings.TrimSpace(*c.Context.AuditRequirement))
-		c.Context.AuditRequirement = &normalized
-	}
-
-	// Validate normalized values against valid options
-	if !contains(validExposure, c.Context.Exposure) {
-		return fmt.Errorf("context.exposure must be one of %v, got %q", validExposure, c.Context.Exposure)
-	}
-	if !contains(validDataSensitivity, c.Context.DataSensitivity) {
-		return fmt.Errorf("context.data_sensitivity must be one of %v, got %q", validDataSensitivity, c.Context.DataSensitivity)
-	}
-	if !contains(validBusinessCriticality, c.Context.BusinessCriticality) {
-		return fmt.Errorf("context.business_criticality must be one of %v, got %q", validBusinessCriticality, c.Context.BusinessCriticality)
-	}
-
-	// Validate optional fields if provided (no defaults applied)
-	if c.Context.AvailabilityRequirement != nil {
-		if !contains(validAvailabilityRequirement, *c.Context.AvailabilityRequirement) {
-			return fmt.Errorf("context.availability_requirement must be one of %v, got %q", validAvailabilityRequirement, *c.Context.AvailabilityRequirement)
+	for _, f := range []struct {
+		field Field
+		value string
+	}{
+		{Exposure, c.Context.Exposure},
+		{DataSensitivity, c.Context.DataSensitivity},
+		{BusinessCriticality, c.Context.BusinessCriticality},
+	} {
+		if f.value == "" {
+			return Config{}, fmt.Errorf("%s is required (valid values: %v)", f.field.Path(), f.field.Values())
 		}
 	}
+	n := c
+	n.Context = c.Context.normalized()
+	if err := n.Context.checkSchema1Values(); err != nil {
+		return Config{}, err
+	}
+	if err := n.Context.checkSchema2Values(); err != nil {
+		return Config{}, err
+	}
+	return n, nil
+}
 
-	if c.Context.AuditRequirement != nil {
-		if !contains(validAuditRequirement, *c.Context.AuditRequirement) {
-			return fmt.Errorf("context.audit_requirement must be one of %v, got %q", validAuditRequirement, *c.Context.AuditRequirement)
+func (h ContextHints) normalized() ContextHints {
+	n := h
+	n.Exposure = normalize(h.Exposure)
+	n.DataSensitivity = normalize(h.DataSensitivity)
+	n.BusinessCriticality = normalize(h.BusinessCriticality)
+	n.AvailabilityRequirement = normalizePtr(h.AvailabilityRequirement)
+	n.AuditRequirement = normalizePtr(h.AuditRequirement)
+	n.Listener = normalize(h.Listener)
+	if n.Listener == "" {
+		n.Listener = listenerUnknown
+	}
+	n.DataSubjects = normalizePtr(h.DataSubjects)
+	n.Traceability = normalizePtr(h.Traceability)
+	if h.Detection != nil {
+		n.Detection = &DetectionCoverage{
+			Network:     normalize(h.Detection.Network),
+			Host:        normalize(h.Detection.Host),
+			Application: normalize(h.Detection.Application),
 		}
 	}
+	return n
+}
 
-	// Validate compliance requirements
-	for _, framework := range c.Context.ComplianceRequirements {
-		if !containsCaseInsensitive(validComplianceFrameworks, framework) {
-			return fmt.Errorf("context.compliance_requirements contains unknown framework %q (valid: %v)", framework, validComplianceFrameworks)
+func (h ContextHints) checkSchema1Values() error {
+	for _, f := range []struct {
+		field Field
+		value *string
+	}{
+		{Exposure, &h.Exposure},
+		{DataSensitivity, &h.DataSensitivity},
+		{BusinessCriticality, &h.BusinessCriticality},
+		{AvailabilityRequirement, h.AvailabilityRequirement},
+		{AuditRequirement, h.AuditRequirement},
+	} {
+		if f.value != nil && !f.field.accepts(*f.value) {
+			return fmt.Errorf("%s must be one of %v, got %q", f.field.Path(), f.field.Values(), *f.value)
 		}
 	}
-
+	for _, framework := range h.ComplianceRequirements {
+		// Lowercased equality, as schema 1 matched: EqualFold would also take
+		// Unicode case folds such as ſOX for SOX.
+		lower := strings.ToLower(framework)
+		if !slices.ContainsFunc(complianceFrameworks, func(v string) bool { return strings.ToLower(v) == lower }) {
+			return fmt.Errorf("context.compliance_requirements contains unknown framework %q (valid: %v)", framework, complianceFrameworks)
+		}
+	}
 	return nil
+}
+
+func (h ContextHints) checkSchema2Values() error {
+	for _, f := range []struct {
+		field Field
+		value *string
+	}{
+		{Listener, &h.Listener},
+		{DataSubjects, h.DataSubjects},
+		{Traceability, h.Traceability},
+	} {
+		if f.value != nil && !f.field.accepts(*f.value) {
+			return &loadError{4, fmt.Sprintf("%s must be one of %v, got %q", f.field.Path(), f.field.Values(), *f.value)}
+		}
+	}
+	if h.Detection != nil {
+		return h.Detection.check()
+	}
+	return nil
+}
+
+// check applies the rule that once detection is written, it declares all
+// three channels, and that active_in_application is the application's alone.
+func (d DetectionCoverage) check() error {
+	channels := []struct {
+		field Field
+		value string
+	}{
+		{DetectionNetwork, d.Network},
+		{DetectionHost, d.Host},
+		{DetectionApplication, d.Application},
+	}
+	var missing []string
+	for _, c := range channels {
+		if c.value == "" {
+			missing = append(missing, fmt.Sprintf("%s is required once context.detection is present (values: %v)", c.field.Path(), c.field.Values()))
+		}
+	}
+	if len(missing) > 0 {
+		return &loadError{5, strings.Join(missing, "; ")}
+	}
+	for _, c := range channels {
+		switch {
+		case c.value == activeInApplication && c.field != DetectionApplication:
+			return &loadError{5, fmt.Sprintf("%s: active_in_application applies to application only", c.field.Path())}
+		case !c.field.accepts(c.value):
+			return &loadError{5, fmt.Sprintf("%s must be one of %v, got %q", c.field.Path(), c.field.Values(), c.value)}
+		}
+	}
+	return nil
+}
+
+func normalize(s string) string {
+	return strings.ToLower(strings.TrimSpace(s))
+}
+
+func normalizePtr(s *string) *string {
+	if s == nil {
+		return nil
+	}
+	n := normalize(*s)
+	return &n
 }
 
 // FormatForLLM returns a formatted string representation of the context
@@ -302,23 +405,4 @@ func RiskSeverity(score float64) string {
 	default:
 		return "info"
 	}
-}
-
-func contains(slice []string, item string) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
-		}
-	}
-	return false
-}
-
-func containsCaseInsensitive(slice []string, item string) bool {
-	itemLower := strings.ToLower(item)
-	for _, s := range slice {
-		if strings.ToLower(s) == itemLower {
-			return true
-		}
-	}
-	return false
 }

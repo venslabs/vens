@@ -9,6 +9,7 @@ stderr 'cannot generate VEX: 1 vulnerability with no component \(empty BOMRef\):
 ! exec sh -c 'ls .vens-*.tmp'
 
 -- config.yaml --
+schema_version: 2
 project:
   name: "empty-bomref-test"
   description: "A report entry with no component"

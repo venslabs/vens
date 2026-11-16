@@ -1,0 +1,59 @@
+# A config written for vens v0.6 or earlier has no schema_version. vens
+# refuses it while loading the config, before it reads the report: the error
+# comes even when the report does not exist.
+
+! exec vens generate --llm=mock --config-file=old.yaml --sbom-serial-number=urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79 missing-report.json out.cdx.json
+stderr 'config.yaml has no schema_version: it was written for vens v0.6 or earlier \(schema 1\)'
+stderr 'Read https://venslabs.github.io/vens/reference/config-schema/#migrating, then add `schema_version: 2` at the top of the file.'
+! stderr 'missing-report'
+! exists out.cdx.json
+
+# schema_version 1 gets the same pointer.
+! exec vens generate --llm=mock --config-file=v1.yaml --sbom-serial-number=urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79 report.json out.cdx.json
+stderr 'schema_version 1 is not supported: this vens reads schema 2 only. Read https://venslabs.github.io/vens/reference/config-schema/#migrating, then set `schema_version: 2`.'
+! exists out.cdx.json
+
+# The old config with the marker added and the four new fields declared loads.
+exec vens generate --llm=mock --config-file=migrated.yaml --sbom-serial-number=urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79 report.json out.cdx.json
+exists out.cdx.json
+
+-- old.yaml --
+project:
+  name: "old-config"
+context:
+  exposure: "internet"
+  data_sensitivity: "high"
+  business_criticality: "critical"
+  audit_requirement: "high"
+  controls:
+    waf: true
+    ids: true
+-- v1.yaml --
+schema_version: 1
+project:
+  name: "old-config"
+context:
+  exposure: "internet"
+  data_sensitivity: "high"
+  business_criticality: "critical"
+-- migrated.yaml --
+schema_version: 2
+project:
+  name: "old-config"
+context:
+  exposure: "internet"
+  data_sensitivity: "high"
+  business_criticality: "critical"
+  audit_requirement: "high"
+  listener: present
+  data_subjects: thousands
+  detection:
+    network: logged
+    host: not_logged
+    application: logged_and_reviewed
+  traceability: per_request
+  controls:
+    waf: true
+    ids: true
+-- report.json --
+{"SchemaVersion": 2, "Results": []}

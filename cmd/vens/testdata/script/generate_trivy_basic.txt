@@ -17,6 +17,7 @@ json-contains output.cdx.json 'CVE-2024-1234'
 json-contains output.cdx.json '"name": "NVD"'
 
 -- config.yaml --
+schema_version: 2
 project:
   name: "test-project"
   description: "Test project for integration tests"

@@ -9,6 +9,7 @@ stderr 'model returned no score for CVE-2024-5678 after asking again; stopping t
 ! exec sh -c 'ls .vens-*.tmp'
 
 -- config.yaml --
+schema_version: 2
 project:
   name: "unscored-cve-test"
   description: "A CVE the model never scores"

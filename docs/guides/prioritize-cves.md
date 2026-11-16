@@ -50,6 +50,8 @@ trivy image my-registry/my-app:v1.2.3 \
 Create `config.yaml` with the real characteristics of the workload:
 
 ```yaml
+schema_version: 2
+
 project:
   name: "checkout-api"
   description: "Public-facing checkout service, handles payment card data"
