@@ -32,6 +32,27 @@ const (
 	adjustmentCall = "adjustment"
 )
 
+// adjustmentReading is how Go read a CVE's adjustment reply.
+type adjustmentReading string
+
+const (
+	// adjustmentNotAsked: no reply was read, the CVE having no flag or its
+	// run stopping first.
+	adjustmentNotAsked   adjustmentReading = "not_asked"
+	adjustmentAnswered   adjustmentReading = "answered"
+	adjustmentUnreadable adjustmentReading = "unreadable"
+	adjustmentKeyTwice   adjustmentReading = "key_written_twice"
+)
+
+// adjustmentReply is an adjustment reply as Go read it: the fields kept, how
+// it read, the fields as the claim shows them, and the reasoning.
+type adjustmentReply struct {
+	adjusted  contract.Adjusted
+	reading   adjustmentReading
+	shown     string
+	reasoning string
+}
+
 // adjust makes a flagged CVE's adjustment call, after its ordinary
 // questions: it shows every row's evidence, the flags and the answers given,
 // and may lower Opportunity and each axis Applicability did not floor, never
@@ -54,9 +75,9 @@ func (g *Generator) adjust(ctx context.Context, run *scoringRun, c *cve, a *asse
 	if err != nil {
 		return fmt.Errorf("LLM evaluation failed on the adjustment of %s: %w", c.id(), err)
 	}
-	adjusted, answered, reasoning := readAdjustment(ctx, c.id(), raw, lists)
-	a.adjusted = &adjusted
-	a.note("", answered, reasoning, ref)
+	got := readAdjustment(ctx, c.id(), raw, lists)
+	a.adjusted, a.adjustment = &got.adjusted, got.reading
+	a.note("", got.shown, got.reasoning, ref)
 	return nil
 }
 
@@ -90,18 +111,18 @@ func shownAs(f contract.Factor, answer string) string {
 // sent leaves the baseline, and a reply that is no JSON object, or that
 // writes a key twice at any depth, leaves them all, logged at WARN. A reply
 // without reasoning, or with one that is no JSON string, keeps its fields,
-// logged at WARN. It also returns the fields as answered, and the reasoning.
-func readAdjustment(ctx context.Context, id, raw string, lists map[string][]string) (adjusted contract.Adjusted, answered, reasoning string) {
+// logged at WARN.
+func readAdjustment(ctx context.Context, id, raw string, lists map[string][]string) adjustmentReply {
 	var fields map[string]json.RawMessage
-	if err := json.Unmarshal([]byte(raw), &fields); err != nil {
+	if err := json.Unmarshal([]byte(raw), &fields); err != nil || fields == nil {
 		slog.WarnContext(ctx, "Unreadable adjustment reply; the baselines stand", "vuln", id, "reply", raw)
-		return contract.Adjusted{}, "unreadable", ""
+		return adjustmentReply{reading: adjustmentUnreadable, shown: "unreadable"}
 	}
 	if repeatedKeys([]byte(raw)) > 0 {
 		// encoding/json kept the last value of the key, which may lower a
 		// level the model meant to keep.
 		slog.WarnContext(ctx, "Adjustment reply writes a key twice; the baselines stand", "vuln", id, "reply", raw)
-		return contract.Adjusted{}, "a key written twice", reasoningOf(fields["reasoning"])
+		return adjustmentReply{reading: adjustmentKeyTwice, shown: "a key written twice", reasoning: reasoningOf(fields["reasoning"])}
 	}
 	var parts []string
 	read := func(name string) string {
@@ -119,17 +140,21 @@ func readAdjustment(ctx context.Context, id, raw string, lists map[string][]stri
 		parts = append(parts, name+": "+shown)
 		return value
 	}
-	adjusted = contract.Adjusted{
-		Opportunity:     read("opportunity"),
-		Confidentiality: read("confidentiality"),
-		Integrity:       read("integrity"),
-		Availability:    read("availability"),
+	got := adjustmentReply{
+		adjusted: contract.Adjusted{
+			Opportunity:     read("opportunity"),
+			Confidentiality: read("confidentiality"),
+			Integrity:       read("integrity"),
+			Availability:    read("availability"),
+		},
+		reading:   adjustmentAnswered,
+		shown:     strings.Join(parts, ", "),
+		reasoning: reasoningOf(fields["reasoning"]),
 	}
-	reasoning = reasoningOf(fields["reasoning"])
-	if oneLine(reasoning) == "" {
+	if oneLine(got.reasoning) == "" {
 		slog.WarnContext(ctx, "Adjustment reply gives no reasoning; keeping its answers", "vuln", id)
 	}
-	return adjusted, strings.Join(parts, ", "), reasoning
+	return got
 }
 
 // propertyEnums reads the closed list of each property of an object schema.

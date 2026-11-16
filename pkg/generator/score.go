@@ -35,9 +35,12 @@ type assessment struct {
 	answers contract.Answers
 	// read lists the factors answered, in call order, and raw their answers
 	// as the replies wrote them.
-	read     []contract.Factor
-	raw      map[contract.Factor]json.RawMessage
-	adjusted *contract.Adjusted
+	read []contract.Factor
+	raw  map[contract.Factor]json.RawMessage
+	// adjusted holds the adjustment's fields as read, and adjustment how its
+	// reply read, both unset until a reply is read.
+	adjusted   *contract.Adjusted
+	adjustment adjustmentReading
 	// reasons holds each answer's line of the claim in call order, the
 	// adjustment's last.
 	reasons []reason

@@ -29,6 +29,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 
@@ -288,9 +289,10 @@ func TestDebugDir_WriteFailureLogsTheFile(t *testing.T) {
 
 type answersJSON struct {
 	Vulnerabilities []struct {
-		VulnID  string `json:"vulnId"`
-		Unrated bool   `json:"unrated"`
-		Factors []struct {
+		VulnID     string `json:"vulnId"`
+		Unrated    bool   `json:"unrated"`
+		Adjustment string `json:"adjustment"`
+		Factors    []struct {
 			Factor   string `json:"factor"`
 			Answer   any    `json:"answer"`
 			Reading  string `json:"reading"`
@@ -428,6 +430,91 @@ func TestDebugDir_AnswersJSONOnAFailedRun(t *testing.T) {
 	assert.Equal(t, 2, got.Counters["detection_undeclared"], "the rated CVEs'")
 	assert.Equal(t, 1, got.Counters["motive_cannot_tell"])
 	assert.Equal(t, int64(1), runSummary(t, logs).attrs["counters.motive_cannot_tell"])
+}
+
+// adjustedCVE is the CVE an adjustment call is about.
+func adjustedCVE(t *testing.T, c fakeCall) string {
+	t.Helper()
+	var entry struct {
+		VulnID string `json:"vulnId"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(strings.Split(c.req.Human, "\n")[1]), &entry))
+	return entry.VulnID
+}
+
+// answers.json says how each CVE's adjustment reply read: not_asked for a CVE
+// with no flag, else answered, unreadable, null included, or
+// key_written_twice. A failed batch keeps, unrated, the adjustment a CVE was
+// given before the run stopped, without levels.
+func TestDebugDir_AnswersJSONSaysHowTheAdjustmentRead(t *testing.T) {
+	const axes = `"confidentiality":"affected","integrity":"affected","availability":"not_affected"`
+	replies := map[string]string{
+		"CVE-2024-0001": `{"reasoning":"r","opportunity":"special_access_or_resources_required",` + axes + `}`,
+		"CVE-2024-0002": `not json`,
+		"CVE-2024-0003": `{"reasoning":"r","opportunity":"keep","opportunity":"keep",` + axes + `}`,
+		"CVE-2024-0004": `null`,
+	}
+	t.Run("rated", func(t *testing.T) {
+		parent := t.TempDir()
+		vulns := testVulns(5)
+		for i := 1; i < len(vulns); i++ {
+			vulns[i] = disputedRow(vulns[i])
+		}
+		m := &fakeLLM{reply: func(c fakeCall) (string, bool) {
+			if !c.adjustment() {
+				return "", false
+			}
+			return replies[adjustedCVE(t, c)], true
+		}}
+		g := newGen(t, Opts{LLM: m, DebugDir: parent})
+		require.NoError(t, g.GenerateRiskScore(context.Background(), vulns, nil))
+
+		got, _ := readAnswers(t, parent)
+		readings := map[string]string{}
+		for _, v := range got.Vulnerabilities {
+			readings[v.VulnID] = v.Adjustment
+		}
+		assert.Equal(t, map[string]string{
+			"CVE-2024-0000": "not_asked", "CVE-2024-0001": "answered",
+			"CVE-2024-0002": "unreadable", "CVE-2024-0003": "key_written_twice", "CVE-2024-0004": "unreadable",
+		}, readings)
+	})
+	t.Run("unrated", func(t *testing.T) {
+		parent := t.TempDir()
+		vulns := []Vulnerability{disputedRow(testVulns(2)[0]), disputedRow(testVulns(2)[1])}
+		m := &fakeLLM{
+			reply: func(c fakeCall) (string, bool) { return replies["CVE-2024-0001"], c.adjustment() },
+			fail: func(c fakeCall) error {
+				if c.adjustment() && adjustedCVE(t, c) == "CVE-2024-0001" {
+					return errors.New("mock: the provider is down")
+				}
+				return nil
+			},
+		}
+		g := newGen(t, Opts{LLM: m, DebugDir: parent})
+		require.Error(t, g.GenerateRiskScore(context.Background(), vulns, nil))
+
+		got, _ := readAnswers(t, parent)
+		require.Len(t, got.Vulnerabilities, 2)
+		adjusted := map[string]string{}
+		first := got.Vulnerabilities[0]
+		assert.Equal(t, []any{"CVE-2024-0000", true, "answered"}, []any{first.VulnID, first.Unrated, first.Adjustment})
+		for _, f := range first.Factors {
+			assert.Nil(t, f.Level, f.Factor)
+			assert.Empty(t, f.Source, f.Factor)
+			if f.Adjusted != "" {
+				adjusted[f.Factor] = f.Adjusted
+			}
+		}
+		assert.Equal(t, map[string]string{
+			"O": "special_access_or_resources_required", "LC": "affected", "LI": "affected", "LAV": "not_affected",
+		}, adjusted)
+		second := got.Vulnerabilities[1]
+		assert.Equal(t, []any{"CVE-2024-0001", true, "not_asked"}, []any{second.VulnID, second.Unrated, second.Adjustment})
+		for _, f := range second.Factors {
+			assert.Empty(t, f.Adjusted, f.Factor)
+		}
+	})
 }
 
 // answers.json keeps each answer as the reply wrote it, its JSON type kept: a

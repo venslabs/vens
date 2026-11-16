@@ -15,6 +15,7 @@
 package generator
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"log/slog"
@@ -36,9 +37,13 @@ type answersFile struct {
 type answersEntry struct {
 	VulnID string `json:"vulnId"`
 	// Unrated marks a CVE of the batch a run failed in: its factors are the
-	// questions it was answered, read as the replies give them, without the
-	// levels Go would have computed.
+	// questions it was answered, read as the replies give them, with the
+	// adjustment's answers if it was made, without the levels Go would have
+	// computed.
 	Unrated bool `json:"unrated,omitempty"`
+	// Adjustment is how the adjustment reply read: not_asked, answered,
+	// unreadable or key_written_twice.
+	Adjustment adjustmentReading `json:"adjustment"`
 	// Factors holds the 16 in the vector's order.
 	Factors  []factorRecord `json:"factors"`
 	Counters []string       `json:"counters,omitempty"`
@@ -68,7 +73,7 @@ func (run *scoringRun) rated(c *cve, a *assessment, l contract.Levels) {
 		run.counters[name]++
 	}
 	levels := vectorLevels(l.Vector)
-	e := answersEntry{VulnID: c.id(), Counters: counters}
+	e := answersEntry{VulnID: c.id(), Adjustment: cmp.Or(a.adjustment, adjustmentNotAsked), Counters: counters}
 	for _, f := range vectorOrder {
 		level := levels[f]
 		r := factorRecord{Factor: f, Reading: l.Readings[f], Level: &level, Source: l.Sources[f]}
@@ -85,16 +90,20 @@ func (run *scoringRun) rated(c *cve, a *assessment, l contract.Levels) {
 
 // unrated records, unrated, a CVE of a failing batch that was answered at
 // least once: each answer as its reply reads, before Go crosses it with the
-// CVE or the config, the cannot_tell each such reading counts, and
-// reasoning_missing.
+// CVE or the config, and the adjustment's if it was made; the cannot_tell
+// each such reading counts, and reasoning_missing.
 func (run *scoringRun) unrated(c *cve, a *assessment) {
 	if len(a.read) == 0 {
 		return
 	}
-	e := answersEntry{VulnID: c.id(), Unrated: true}
+	e := answersEntry{VulnID: c.id(), Unrated: true, Adjustment: cmp.Or(a.adjustment, adjustmentNotAsked)}
 	for _, f := range a.read {
 		reading, _ := contract.ReadAnswer(f, answerOf(a.answers, f)...)
-		e.Factors = append(e.Factors, factorRecord{Factor: f, Answer: rawAnswer(a, f), Reading: reading})
+		r := factorRecord{Factor: f, Answer: rawAnswer(a, f), Reading: reading}
+		if a.adjusted != nil {
+			r.Adjusted = adjustedAnswer(*a.adjusted, f)
+		}
+		e.Factors = append(e.Factors, r)
 		if reading == contract.CannotTell || reading == contract.Invalid {
 			e.Counters = append(e.Counters, f.Counter())
 		}

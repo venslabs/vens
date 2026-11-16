@@ -130,6 +130,7 @@ func TestGenerator_AdjustmentFloorsAnAxisNotAffected(t *testing.T) {
 func TestGenerator_UnreadableAdjustmentKeepsTheBaselines(t *testing.T) {
 	for name, reply := range map[string]func(fakeCall) (string, bool){
 		"not json": func(c fakeCall) (string, bool) { return "not json", c.adjustment() },
+		"null":     func(c fakeCall) (string, bool) { return "null", c.adjustment() },
 		"no field": func(c fakeCall) (string, bool) { return `{"reasoning": "r"}`, c.adjustment() },
 	} {
 		t.Run(name, func(t *testing.T) {
