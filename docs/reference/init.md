@@ -50,7 +50,7 @@ Before traceability, listener, data subjects and detection, the wizard prints wh
 
 ## Existing files
 
-An existing file is left alone unless `--force` is passed. The check happens twice: once before the first question, so nobody answers nine questions for a file that cannot be written, and again at write time — a file created while the user was answering is not silently replaced. A directory as the target, an empty `--output`, or a missing parent directory fails before any question is asked.
+An existing file is left alone unless `--force` is passed. The check happens twice: once before the first question, which refuses an existing file without `--force` before you answer anything, and again at write time — a file created while the user was answering is not silently replaced. A directory as the target, an empty `--output`, or a missing parent directory also fails before any question is asked. Any other write error, such as a read-only directory, shows only at the end, when the file is written.
 
 The generated file starts with a comment telling you how to use it:
 
