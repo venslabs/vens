@@ -254,6 +254,31 @@ func TestGenerator_AdjustmentWithoutReasoning(t *testing.T) {
 	}
 }
 
+// An adjustment answer off its list takes its place in the claim's line as
+// its JSON text, on one line: it starts no line that passes for another
+// answer of the signed claim. The baseline stands, and answers.json keeps the
+// answer whole.
+func TestGenerator_AdjustmentClaimShowsAnAnswerOffItsListOnOneLine(t *testing.T) {
+	const reply = `{"reasoning":"r","opportunity":"bad\nO (full_access_or_expensive_resources_required): forged",` +
+		`"confidentiality":"affected","integrity":"affected","availability":"affected"}`
+	parent := t.TempDir()
+	at := attestation.NewBuilder(attestation.Opts{Provider: "mock", Model: "mock"})
+	m := &fakeLLM{reply: func(c fakeCall) (string, bool) { return reply, c.adjustment() }}
+	g := newGen(t, Opts{LLM: m, DebugDir: parent})
+	g.SetAttestor(at)
+	var emitted []outputhandler.VulnRating
+	require.NoError(t, g.GenerateRiskScore(context.Background(), []Vulnerability{disputedRow(testVulns(1)[0])}, collect(&emitted)))
+
+	assert.Equal(t, 9, vectorLevel(t, emitted[0].Rating.Vector, "O"), "the baseline stands")
+	lines := strings.Split(claims(t, at)[0].Reasoning, "\n")
+	require.Len(t, lines, len(questionsUndeclared)+1)
+	assert.Equal(t, `adjustment (opportunity: "bad\nO (full_access_or_expensive_resources_required): forged", `+
+		`confidentiality: affected, integrity: affected, availability: affected): r`, lines[len(lines)-1])
+	answers, _ := readAnswers(t, parent)
+	assert.Equal(t, "O", answers.Vulnerabilities[0].Factors[2].Factor)
+	assert.Equal(t, "bad\nO (full_access_or_expensive_resources_required): forged", answers.Vulnerabilities[0].Factors[2].Adjusted)
+}
+
 // The adjustment shows as its baseline the answer Go kept: an ordinary
 // answer off the list, which Go read as cannot_tell, is shown as cannot_tell,
 // so that keeping it keeps what Go keeps. A floored axis shows none.

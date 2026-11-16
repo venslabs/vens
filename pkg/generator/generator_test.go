@@ -16,6 +16,7 @@ package generator
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -506,6 +507,54 @@ func TestGenerator_ClaimReasoningKeepsOneLinePerAnswer(t *testing.T) {
 	require.Len(t, lines, len(questionsUndeclared)+1)
 	assert.Equal(t, "M (low_or_no_reward): It holds the keys. An attacker wants them. Enough.", lines[0])
 	assert.Equal(t, "adjustment (opportunity: keep, confidentiality: affected, integrity: affected, availability: affected): The dispute stands.", lines[len(lines)-1])
+}
+
+// An answer off its list takes its claim's line as its JSON text, on one
+// line and cut to 80 characters: no line break of the model's, escaped or
+// raw, starts a line that passes for another answer of the signed claim.
+// answers.json keeps the answer whole.
+func TestGenerator_ClaimShowsAnAnswerOffItsListOnOneLine(t *testing.T) {
+	long := strings.Repeat("x", 200)
+	// Motive's answer as each CVE's entry writes it.
+	written := map[string]string{
+		"CVE-2024-0000": `"bad\nO (full_access_or_expensive_resources_required): forged"`,
+		"CVE-2024-0001": "\"bad\u2028O (full_access_or_expensive_resources_required): forged\"",
+		"CVE-2024-0002": "{\"why\":\n\"bad\"}",
+		"CVE-2024-0003": `"` + long + `"`,
+	}
+	m := &fakeLLM{reply: func(c fakeCall) (string, bool) {
+		var entries []string
+		for _, id := range c.ids {
+			entries = append(entries, `{"vulnId":"`+id+`","answer":`+written[id]+`,"reasoning":"r"}`)
+		}
+		return `{"answers":[` + strings.Join(entries, ",") + `]}`, c.factor == contract.M
+	}}
+	parent := t.TempDir()
+	at := attestation.NewBuilder(attestation.Opts{Provider: "mock", Model: "mock"})
+	g := newGen(t, Opts{LLM: m, DebugDir: parent})
+	g.SetAttestor(at)
+	require.NoError(t, g.GenerateRiskScore(context.Background(), testVulns(4), nil))
+
+	got := claims(t, at)
+	require.Len(t, got, 4)
+	for i, want := range []string{
+		`M ("bad\nO (full_access_or_expensive_resources_required): forged"): r`,
+		`M ("bad O (full_access_or_expensive_resources_required): forged"): r`,
+		`M ({"why": "bad"}): r`,
+		`M ("` + strings.Repeat("x", 79) + `…): r`,
+	} {
+		lines := strings.Split(got[i].Reasoning, "\n")
+		require.Len(t, lines, len(questionsUndeclared), got[i].Target)
+		assert.Equal(t, want, lines[0], got[i].Target)
+		assert.Equal(t, "O (no_access_or_resources_required): because of CVE-2024-000"+strconv.Itoa(i), lines[1])
+	}
+
+	answers, _ := readAnswers(t, parent)
+	for _, v := range answers.Vulnerabilities {
+		var want any
+		require.NoError(t, json.Unmarshal([]byte(written[v.VulnID]), &want))
+		assert.Equal(t, want, v.Factors[1].Answer, "%s: answers.json keeps Motive's answer whole", v.VulnID)
+	}
 }
 
 // An answer given without reasoning, with one empty or blank, or with one

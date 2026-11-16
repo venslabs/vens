@@ -110,11 +110,13 @@ func readAdjustment(ctx context.Context, id, raw string, lists map[string][]stri
 			return ""
 		}
 		value := text(fields[name])
-		parts = append(parts, name+": "+value)
+		shown := value
 		if !slices.Contains(list, value) {
+			shown = offList(fields[name])
 			slog.WarnContext(ctx, "Adjustment answer off its list; the baseline stands",
 				"vuln", id, "field", name, "answer", string(fields[name]))
 		}
+		parts = append(parts, name+": "+shown)
 		return value
 	}
 	adjusted = contract.Adjusted{

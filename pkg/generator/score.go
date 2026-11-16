@@ -67,13 +67,37 @@ func (a *assessment) answer(f contract.Factor, r reply) {
 	}
 	a.read = append(a.read, f)
 	a.raw[f] = r.raw
-	a.note(fmt.Sprintf("%s (%s)", f, strings.Join(r.answer, ", ")), r.reasoning, r.evidenceRef)
+	shown := strings.Join(r.answer, ", ")
+	if reading, _ := contract.ReadAnswer(f, r.answer...); reading == contract.Invalid {
+		shown = offList(r.raw)
+	}
+	a.note(fmt.Sprintf("%s (%s)", f, shown), r.reasoning, r.evidenceRef)
 }
 
 // oneLine collapses each run of whitespace, line breaks included, to one
 // space: a claim's reasoning holds one line per answer.
 func oneLine(s string) string {
 	return strings.Join(strings.Fields(s), " ")
+}
+
+// shownLimit is the most characters of an answer's JSON text a claim's line
+// shows.
+const shownLimit = 80
+
+// offList is an answer off its list as a claim's line shows it: its JSON
+// text as the reply wrote it, null when it wrote none, on one line and cut to
+// shownLimit characters, an ellipsis marking the cut. Text of the model's
+// that breaks the line would start one that passes for another answer of
+// the claim. answers.json keeps the answer whole.
+func offList(raw json.RawMessage) string {
+	s := oneLine(string(raw))
+	if s == "" {
+		return "null"
+	}
+	if runes := []rune(s); len(runes) > shownLimit {
+		return string(runes[:shownLimit]) + "…"
+	}
+	return s
 }
 
 // note adds a reason, "head: sentence", with the sentence on one line, and
