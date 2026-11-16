@@ -48,7 +48,7 @@ var (
 	docsCheck   = regexp.MustCompile(`^<!-- docs-check: E([1-5]) -->$`)
 	preElement  = regexp.MustCompile(`(?s)<pre[^>]*>(.*?)</pre>`)
 	htmlTag     = regexp.MustCompile(`<[^>]+>`)
-	topLevelKey = regexp.MustCompile(`^[A-Za-z_]+:(\s|$)`)
+	topLevelKey = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*:(\s|$)`)
 	projectKey  = regexp.MustCompile(`(?m)^\s*project:`)
 	contextKey  = regexp.MustCompile(`(?m)^\s*context:`)
 )
@@ -139,29 +139,54 @@ func markedError(lines []string, i int) int {
 }
 
 // preBlocks returns the configs inside an HTML page's <pre> elements, tags
-// stripped. A <pre> on the landing page is a terminal session, so each config
-// is the paragraph holding project: and context:, from its first top-level
-// key on.
+// stripped. A <pre> on the landing page is a terminal session, so a config
+// is a run of YAML lines that starts at a top-level key; blank lines between
+// its keys do not end it.
 func preBlocks(name, src string) []block {
 	var blocks []block
 	lines := strings.Split(src, "\n")
 	for _, loc := range preElement.FindAllStringSubmatchIndex(src, -1) {
 		start := strings.Count(src[:loc[0]], "\n")
 		text := html.UnescapeString(htmlTag.ReplaceAllString(src[loc[2]:loc[3]], ""))
-		for _, para := range strings.Split(text, "\n\n") {
-			if !isConfig(para) {
-				continue
-			}
-			paraLines := strings.Split(para, "\n")
-			first := slices.IndexFunc(paraLines, topLevelKey.MatchString)
+		textLines := strings.Split(text, "\n")
+		for _, run := range yamlRuns(textLines) {
 			blocks = append(blocks, block{
-				source: fmt.Sprintf("%s:%d", name, start+1),
-				text:   strings.Join(paraLines[first:], "\n") + "\n",
-				expect: markedError(lines, start),
+				source: fmt.Sprintf("%s:%d", name, start+run.first+1),
+				text:   strings.Join(textLines[run.first:run.end], "\n") + "\n",
+				expect: markedError(lines, start+run.first),
 			})
 		}
 	}
 	return blocks
+}
+
+// yamlRun is a run of YAML lines, from first up to end.
+type yamlRun struct{ first, end int }
+
+// yamlRuns returns the runs of YAML lines, in order. A run starts at a
+// top-level key and takes keys, indented lines, list items, comments and
+// blank lines, up to the first line that is none of these, such as a shell
+// command or its output.
+func yamlRuns(lines []string) []yamlRun {
+	var runs []yamlRun
+	for i := 0; i < len(lines); i++ {
+		if !topLevelKey.MatchString(lines[i]) {
+			continue
+		}
+		end := i + 1
+		for end < len(lines) && isYAMLLine(lines[end]) {
+			end++
+		}
+		runs = append(runs, yamlRun{i, end})
+		i = end - 1
+	}
+	return runs
+}
+
+func isYAMLLine(line string) bool {
+	trimmed := strings.TrimSpace(line)
+	return trimmed == "" || strings.HasPrefix(trimmed, "#") || strings.HasPrefix(line, "- ") ||
+		len(line) > len(strings.TrimLeft(line, " \t")) || topLevelKey.MatchString(line)
 }
 
 // docsConfigBlocks finds every config the docs show: fenced YAML blocks in
@@ -289,6 +314,51 @@ func TestCheckBlockHonoursDocsCheckMarkers(t *testing.T) {
 	}
 }
 
+// A config in a <pre> session may separate its top-level keys with blank
+// lines; each example is read whole, so a broken one is caught.
+func TestPreBlocksReadWholeConfigs(t *testing.T) {
+	page := strings.Join([]string{
+		`<p>Two examples.</p>`,
+		`<pre class="vens-code"><code><span class="c"># 1. a valid config</span>`,
+		`<span class="k">cat</span> config.yaml`,
+		`schema_version: 2`,
+		``,
+		`project:`,
+		`  name: my-api`,
+		``,
+		`context:`,
+		`  exposure: internet`,
+		`  data_sensitivity: high`,
+		`  business_criticality: high`,
+		``,
+		`<span class="c"># 2. a broken one</span>`,
+		`<span class="k">cat</span> broken.yaml`,
+		`schema_version: 2`,
+		``,
+		`project:`,
+		`  name: broken`,
+		``,
+		`context:`,
+		`  exposure: everywhere`,
+		`  data_sensitivity: high`,
+		`  business_criticality: high`,
+		`<span class="k">vens</span> generate --config-file config.yaml report.json out.json</code></pre>`,
+	}, "\n")
+	blocks := preBlocks("page.html", page)
+	if len(blocks) != 2 {
+		t.Fatalf("found %d configs, want 2: %+v", len(blocks), blocks)
+	}
+	if blocks[0].source != "page.html:4" || blocks[1].source != "page.html:16" {
+		t.Errorf("sources %s and %s, want page.html:4 and page.html:16", blocks[0].source, blocks[1].source)
+	}
+	if err := checkBlock(blocks[0]); err != nil {
+		t.Errorf("the valid config: %v", err)
+	}
+	if err := checkBlock(blocks[1]); err == nil || !strings.Contains(err.Error(), `got "everywhere"`) {
+		t.Errorf("the broken config: got %v, want its invalid exposure", err)
+	}
+}
+
 func indent(s, prefix string) string {
 	lines := strings.Split(strings.TrimSuffix(s, "\n"), "\n")
 	for i := range lines {
@@ -380,15 +450,19 @@ func (s section) table(first string) [][]string {
 	return nil
 }
 
-// D2.
+// TestReferenceMeaningsEqualTheTable checks the reference's value tables, and
+// what each field states, against the wording this package holds. Only
+// audit_requirement's values are checked: no question shows its meanings.
 func TestReferenceMeaningsEqualTheTable(t *testing.T) {
 	sections := readReference(t)
-	for _, f := range []Field{Exposure, DataSensitivity, BusinessCriticality, AvailabilityRequirement, Listener, DataSubjects, Detection, Traceability} {
+	for _, f := range []Field{Exposure, DataSensitivity, BusinessCriticality, AvailabilityRequirement, AuditRequirement,
+		Listener, DataSubjects, Detection, Traceability} {
 		s := sectionFor(t, sections, f.Path())
+		meanings := slices.ContainsFunc(f.Choices(), func(c Choice) bool { return c.Meaning != "" })
 		var documented []string
 		for _, row := range s.table("Value") {
 			documented = append(documented, row[0])
-			if len(row) < 2 || row[1] != f.Meaning(row[0]) {
+			if meanings && (len(row) < 2 || row[1] != f.Meaning(row[0])) {
 				t.Errorf("%s: %s %q is documented as %q, the table says %q", reference, f.Path(), row[0], row[1:], f.Meaning(row[0]))
 			}
 		}
