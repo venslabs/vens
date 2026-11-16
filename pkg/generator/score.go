@@ -38,14 +38,22 @@ type assessment struct {
 	read     []contract.Factor
 	raw      map[contract.Factor]json.RawMessage
 	adjusted *contract.Adjusted
-	// reasons holds each answer's sentence in call order, as "factor
-	// (answer): sentence", the adjustment's last.
-	reasons []string
+	// reasons holds each answer's line of the claim in call order, the
+	// adjustment's last.
+	reasons []reason
 	// unexplained marks a CVE whose reasons hold noReasoning.
 	unexplained bool
 	// evidence lists the evidence of every call whose answer Go kept, in
 	// call order, each once.
 	evidence []string
+}
+
+// reason is one line of a claim's reasoning: the question answered, empty
+// for the adjustment, the answer as the line shows it, and its sentence.
+type reason struct {
+	factor   contract.Factor
+	answer   string
+	sentence string
 }
 
 const (
@@ -71,7 +79,7 @@ func (a *assessment) answer(f contract.Factor, r reply) {
 	if reading, _ := contract.ReadAnswer(f, r.answer...); reading == contract.Invalid {
 		shown = offList(r.raw)
 	}
-	a.note(fmt.Sprintf("%s (%s)", f, shown), r.reasoning, r.evidenceRef)
+	a.note(f, shown, r.reasoning, r.evidenceRef)
 }
 
 // oneLine collapses each run of whitespace, line breaks included, to one
@@ -100,18 +108,37 @@ func offList(raw json.RawMessage) string {
 	return s
 }
 
-// note adds a reason, "head: sentence", with the sentence on one line, and
-// the evidence of its call. A reasoning left out or blank reads noReasoning.
-func (a *assessment) note(head, reasoning, evidenceRef string) {
+// note adds a reason for question f's answer, f empty for the adjustment's,
+// with its sentence on one line, and the evidence of its call. A reasoning
+// left out or blank reads noReasoning.
+func (a *assessment) note(f contract.Factor, answer, reasoning, evidenceRef string) {
 	sentence := oneLine(reasoning)
 	if sentence == "" {
 		sentence = noReasoning
 		a.unexplained = true
 	}
-	a.reasons = append(a.reasons, head+": "+sentence)
+	a.reasons = append(a.reasons, reason{factor: f, answer: answer, sentence: sentence})
 	if evidenceRef != "" && !slices.Contains(a.evidence, evidenceRef) {
 		a.evidence = append(a.evidence, evidenceRef)
 	}
+}
+
+// reasoning is a claim's reasoning, one line per reason, "factor (answer):
+// sentence". An answer Go did not read, its CVE described by no row, says
+// so: the vector holds cannot_tell's level instead.
+func (a *assessment) reasoning(readings map[contract.Factor]contract.Reading) string {
+	lines := make([]string, len(a.reasons))
+	for i, r := range a.reasons {
+		head, answer := string(r.factor), r.answer
+		if r.factor == "" {
+			head = adjustmentCall
+		}
+		if readings[r.factor] == contract.NoDescription {
+			answer += ", not used: no description"
+		}
+		lines[i] = fmt.Sprintf("%s (%s): %s", head, answer, r.sentence)
+	}
+	return strings.Join(lines, "\n")
 }
 
 // answerField is the field of a that holds factor f's answer, f one of the
@@ -197,6 +224,7 @@ func (g *Generator) rate(ctx context.Context, run *scoringRun, c *cve, a *assess
 		return nil, fmt.Errorf("%s: %w", c.id(), err)
 	}
 	run.rated(c, a, levels)
+	reasoning := a.reasoning(levels.Readings)
 	out := make([]outputhandler.VulnRating, 0, len(c.rows))
 	for _, v := range c.rows {
 		slog.InfoContext(ctx, "Scored vulnerability",
@@ -216,7 +244,7 @@ func (g *Generator) rate(ctx context.Context, run *scoringRun, c *cve, a *assess
 				PURL:        v.BOMRef,
 				Score:       rating.Score,
 				Severity:    rating.Severity,
-				Reasoning:   strings.Join(a.reasons, "\n"),
+				Reasoning:   reasoning,
 			})
 		}
 	}

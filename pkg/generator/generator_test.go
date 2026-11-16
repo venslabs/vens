@@ -509,6 +509,42 @@ func TestGenerator_ClaimReasoningKeepsOneLinePerAnswer(t *testing.T) {
 	assert.Equal(t, "adjustment (opportunity: keep, confidentiality: affected, integrity: affected, availability: affected): The dispute stands.", lines[len(lines)-1])
 }
 
+// Outside a strict run, a CVE no row describes is still asked Motive,
+// Opportunity and Ease of exploit, yet its vector holds cannot_tell's level
+// for each: their lines of the claim say so, the others and the
+// adjustment's read as ever.
+func TestGenerator_ClaimMarksTheAnswersAnUndescribedCVEDoesNotUse(t *testing.T) {
+	at := attestation.NewBuilder(attestation.Opts{Provider: "mock", Model: "mock"})
+	g := newGen(t, Opts{LLM: &fakeLLM{}})
+	g.SetAttestor(at)
+	vulns := testVulns(2)
+	vulns[0].Description = ""
+	vulns[0].Severity, vulns[0].SeveritySource = "LOW", "debian"
+	vulns[0].VendorSeverities = []VendorSeverity{{Source: "debian", Severity: "LOW"}, {Source: "nvd", Severity: "CRITICAL"}}
+	vulns[0].Flags = Flags{SeverityContested: true}
+	var emitted []outputhandler.VulnRating
+	require.NoError(t, g.GenerateRiskScore(context.Background(), vulns, collect(&emitted)))
+
+	for _, f := range []string{"M", "O", "EE"} {
+		assert.Equal(t, 9, vectorLevel(t, emitted[0].Rating.Vector, f), f)
+	}
+	got := claims(t, at)
+	require.Len(t, got, 2)
+	lines := strings.Split(got[0].Reasoning, "\n")
+	require.Len(t, lines, len(questionsUndeclared)+1)
+	assert.Equal(t, []string{
+		"M (low_or_no_reward, not used: no description): because of CVE-2024-0000",
+		"O (no_access_or_resources_required, not used: no description): because of CVE-2024-0000",
+		"EE (theoretical, not used: no description): because of CVE-2024-0000",
+		"LC (minimal): because of CVE-2024-0000",
+	}, lines[:4])
+	for _, line := range lines[4:] {
+		assert.NotContains(t, line, "not used")
+	}
+	assert.True(t, strings.HasPrefix(lines[len(lines)-1], "adjustment (opportunity: keep, "), lines[len(lines)-1])
+	assert.NotContains(t, got[1].Reasoning, "not used", "a described CVE's answers are all read")
+}
+
 // An answer off its list takes its claim's line as its JSON text, on one
 // line and cut to 80 characters: no line break of the model's, escaped or
 // raw, starts a line that passes for another answer of the signed claim.
