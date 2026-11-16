@@ -74,6 +74,16 @@ func text(raw json.RawMessage) string {
 	return string(raw)
 }
 
+// reasoningOf reads a reply's reasoning, a JSON string. A value of any other
+// type, null included, is no reasoning.
+func reasoningOf(raw json.RawMessage) string {
+	var s string
+	if json.Unmarshal(raw, &s) != nil {
+		return ""
+	}
+	return s
+}
+
 // repeatedKeys counts, at any depth of the JSON text data, the keys an
 // object writes again: encoding/json keeps the last value of such a key and
 // says nothing. data is text json.Unmarshal has accepted, which bounds its

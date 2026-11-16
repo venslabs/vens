@@ -216,12 +216,13 @@ func readEntries(ctx context.Context, f contract.Factor, raw string) ([]entry, e
 // readEntry reads the answer an entry gives for CVE id. An entry a key
 // written twice leaves in doubt keeps every answer it wrote, as a JSON array
 // no list holds: Go reads it as cannot_tell, as an answer off the list. An
-// answer without reasoning is kept, logged at WARN.
+// answer without reasoning, or with one that is no JSON string, is kept,
+// logged at WARN.
 func readEntry(ctx context.Context, f contract.Factor, id string, e entry, evidenceRef string) reply {
 	r := reply{
 		answer:      answerIDs(f, e.fields["answer"]),
 		raw:         e.fields["answer"],
-		reasoning:   text(e.fields["reasoning"]),
+		reasoning:   reasoningOf(e.fields["reasoning"]),
 		evidenceRef: evidenceRef,
 	}
 	if e.repeated {

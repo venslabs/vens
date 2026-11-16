@@ -205,10 +205,10 @@ func TestGenerator_AdjustmentKeyWrittenTwiceKeepsTheBaselines(t *testing.T) {
 	}
 }
 
-// An adjustment reply without reasoning, or with one empty or blank, keeps
-// its answers, logged at WARN; its line of the claim reads "(no reasoning
-// given)" and the CVE counts reasoning_missing. A reply Go cannot read
-// leaves the baselines, and its line reads the same.
+// An adjustment reply without reasoning, with one empty or blank, or with one
+// that is no JSON string, keeps its answers, logged at WARN; its line of the
+// claim reads "(no reasoning given)" and the CVE counts reasoning_missing. A
+// reply Go cannot read leaves the baselines, and its line reads the same.
 func TestGenerator_AdjustmentWithoutReasoning(t *testing.T) {
 	const (
 		fields   = `"opportunity":"full_access_or_expensive_resources_required","confidentiality":"affected","integrity":"affected","availability":"affected"`
@@ -222,6 +222,10 @@ func TestGenerator_AdjustmentWithoutReasoning(t *testing.T) {
 		"absent":     {`{` + fields + `}`, answered, kept, 0},
 		"empty":      {`{"reasoning":"",` + fields + `}`, answered, kept, 0},
 		"blank":      {`{"reasoning":" \n\t ",` + fields + `}`, answered, kept, 0},
+		"an object":  {`{"reasoning":{"why":"the dispute"},` + fields + `}`, answered, kept, 0},
+		"a number":   {`{"reasoning":42,` + fields + `}`, answered, kept, 0},
+		"an array":   {`{"reasoning":["the dispute"],` + fields + `}`, answered, kept, 0},
+		"null":       {`{"reasoning":null,` + fields + `}`, answered, kept, 0},
 		"unreadable": {`not json`, "adjustment (unreadable)", "Unreadable adjustment reply; the baselines stand", 7},
 	} {
 		t.Run(name, func(t *testing.T) {

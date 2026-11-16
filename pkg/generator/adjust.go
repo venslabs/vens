@@ -89,8 +89,8 @@ func shownAs(f contract.Factor, answer string) string {
 // is kept as given; one the reply leaves out or gives off the list its schema
 // sent leaves the baseline, and a reply that is no JSON object, or that
 // writes a key twice at any depth, leaves them all, logged at WARN. A reply
-// without reasoning keeps its fields, logged at WARN. It also returns the
-// fields as answered, and the reasoning.
+// without reasoning, or with one that is no JSON string, keeps its fields,
+// logged at WARN. It also returns the fields as answered, and the reasoning.
 func readAdjustment(ctx context.Context, id, raw string, lists map[string][]string) (adjusted contract.Adjusted, answered, reasoning string) {
 	var fields map[string]json.RawMessage
 	if err := json.Unmarshal([]byte(raw), &fields); err != nil {
@@ -101,7 +101,7 @@ func readAdjustment(ctx context.Context, id, raw string, lists map[string][]stri
 		// encoding/json kept the last value of the key, which may lower a
 		// level the model meant to keep.
 		slog.WarnContext(ctx, "Adjustment reply writes a key twice; the baselines stand", "vuln", id, "reply", raw)
-		return contract.Adjusted{}, "a key written twice", text(fields["reasoning"])
+		return contract.Adjusted{}, "a key written twice", reasoningOf(fields["reasoning"])
 	}
 	var parts []string
 	read := func(name string) string {
@@ -123,7 +123,7 @@ func readAdjustment(ctx context.Context, id, raw string, lists map[string][]stri
 		Integrity:       read("integrity"),
 		Availability:    read("availability"),
 	}
-	reasoning = text(fields["reasoning"])
+	reasoning = reasoningOf(fields["reasoning"])
 	if oneLine(reasoning) == "" {
 		slog.WarnContext(ctx, "Adjustment reply gives no reasoning; keeping its answers", "vuln", id)
 	}
