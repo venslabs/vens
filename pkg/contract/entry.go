@@ -51,6 +51,20 @@ type Row struct {
 	// VendorSeverities is each source's own severity, which only the
 	// adjustment shows.
 	VendorSeverities []VendorSeverity
+	// BOMRef is the component's BOM-Ref, which no request shows; a flag
+	// names a row by it when the row has neither a package name nor an id.
+	BOMRef string
+}
+
+// Package names the row's package as a flag names it: its name, else its
+// package id, else its BOM-Ref.
+func (r Row) Package() string {
+	for _, p := range []string{r.PkgName, r.PkgID, r.BOMRef} {
+		if p != "" {
+			return p
+		}
+	}
+	return ""
 }
 
 // VendorSeverity is one source's severity for a CVE.

@@ -170,6 +170,37 @@ func TestGenerator_AdjustmentShowsAnInvalidBaselineAsCannotTell(t *testing.T) {
 	}, entry.Answers)
 }
 
+// A flagged row with no package name still gets its adjustment and its
+// rating: its flag names the row by its package id, else its BOM-Ref.
+func TestGenerator_FlaggedRowWithoutAPackageName(t *testing.T) {
+	for name, row := range map[string]Vulnerability{
+		"package id": {PkgID: "libx@1", BOMRef: "pkg:generic/libx@1"},
+		"BOM-Ref":    {BOMRef: "pkg:generic/libx@1"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			row.VulnID = "CVE-2024-0000"
+			row = disputedRow(row)
+			m := &fakeLLM{}
+			g := newGen(t, Opts{LLM: m})
+			var emitted []outputhandler.VulnRating
+			require.NoError(t, g.GenerateRiskScore(context.Background(), []Vulnerability{row}, collect(&emitted)))
+			require.Len(t, emitted, 1)
+			adjustment := m.calls[len(m.calls)-1]
+			require.True(t, adjustment.adjustment())
+			var entry struct {
+				Flags []contract.Flag `json:"flags"`
+			}
+			require.NoError(t, json.Unmarshal([]byte(strings.Split(adjustment.req.Human, "\n")[1]), &entry))
+			want := row.PkgID
+			if want == "" {
+				want = row.BOMRef
+			}
+			require.Len(t, entry.Flags, 1)
+			assert.Equal(t, want, entry.Flags[0].Package)
+		})
+	}
+}
+
 // Each flag the adjustment shows quotes what fired it and names its row's
 // package.
 func TestRowFlags(t *testing.T) {

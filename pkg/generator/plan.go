@@ -113,24 +113,29 @@ func groupVulnsByCVE(vulns []Vulnerability) [][]Vulnerability {
 func contractCVE(rows []Vulnerability) contract.CVE {
 	c := contract.CVE{ID: rows[0].VulnID, Rows: make([]contract.Row, len(rows))}
 	for i, r := range rows {
-		severities := make([]contract.VendorSeverity, len(r.VendorSeverities))
-		for j, s := range r.VendorSeverities {
-			severities[j] = contract.VendorSeverity{Source: s.Source, Severity: s.Severity}
-		}
-		c.Rows[i] = contract.Row{
-			PkgID:            r.PkgID,
-			PkgName:          r.PkgName,
-			InstalledVersion: r.InstalledVersion,
-			FixedVersion:     r.FixedVersion,
-			Title:            r.Title,
-			Description:      r.Description,
-			Severity:         r.Severity,
-			SeveritySource:   r.SeveritySource,
-			CVSS:             r.CVSS,
-			VendorSeverities: severities,
-		}
+		c.Rows[i] = contractRow(r)
 	}
 	return c
+}
+
+func contractRow(r Vulnerability) contract.Row {
+	severities := make([]contract.VendorSeverity, len(r.VendorSeverities))
+	for i, s := range r.VendorSeverities {
+		severities[i] = contract.VendorSeverity{Source: s.Source, Severity: s.Severity}
+	}
+	return contract.Row{
+		PkgID:            r.PkgID,
+		PkgName:          r.PkgName,
+		InstalledVersion: r.InstalledVersion,
+		FixedVersion:     r.FixedVersion,
+		Title:            r.Title,
+		Description:      r.Description,
+		Severity:         r.Severity,
+		SeveritySource:   r.SeveritySource,
+		CVSS:             r.CVSS,
+		VendorSeverities: severities,
+		BOMRef:           r.BOMRef,
+	}
 }
 
 func cveIDs(cves []*cve) []string {

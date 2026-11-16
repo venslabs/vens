@@ -90,7 +90,8 @@ func DisputeQuote(description string) string {
 }
 
 // rowFlags lists, row by row, each flag a row raised with what the
-// adjustment quotes for it and the row's package, each distinct one once.
+// adjustment quotes for it and the row's package, each distinct one once. A
+// row with no package name is named by its package id, else its BOM-Ref.
 func rowFlags(rows []Vulnerability) []contract.Flag {
 	var flags []contract.Flag
 	add := func(f contract.Flag) {
@@ -99,11 +100,12 @@ func rowFlags(rows []Vulnerability) []contract.Flag {
 		}
 	}
 	for _, r := range rows {
+		pkg := contractRow(r).Package()
 		if r.Flags.MaintainerDisputed {
-			add(contract.Flag{Name: contract.MaintainerDisputed, Evidence: DisputeQuote(r.Description), Package: r.PkgName})
+			add(contract.Flag{Name: contract.MaintainerDisputed, Evidence: DisputeQuote(r.Description), Package: pkg})
 		}
 		if r.Flags.SeverityContested {
-			add(contract.Flag{Name: contract.SeverityContested, Evidence: contestQuote(r), Package: r.PkgName})
+			add(contract.Flag{Name: contract.SeverityContested, Evidence: contestQuote(r), Package: pkg})
 		}
 	}
 	return flags

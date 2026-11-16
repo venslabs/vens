@@ -59,7 +59,7 @@ var axisNames = [3]string{
 }
 
 // Flag is one flag a row of a flagged CVE raised: its name, the evidence the
-// adjustment quotes for it, and the name of that row's package.
+// adjustment quotes for it, and that row's package as Row.Package names it.
 type Flag struct {
 	Name     string `json:"flag"`
 	Evidence string `json:"evidence"`
@@ -221,7 +221,7 @@ func vendorSeverities(c CVE) []sourcedSeverity {
 }
 
 // checkFlags checks a flagged CVE's flags: each names one of the two flags,
-// quotes its evidence and names the package of a row of the CVE.
+// quotes its evidence and names a row of the CVE by its package.
 func checkFlags(flags []Flag, c CVE) error {
 	if len(flags) == 0 {
 		return errors.New("a CVE with no flag gets no adjustment")
@@ -232,7 +232,7 @@ func checkFlags(flags []Flag, c CVE) error {
 			return fmt.Errorf("%q is not a flag", f.Name)
 		case strings.TrimSpace(f.Evidence) == "":
 			return fmt.Errorf("%s on %s quotes no evidence", f.Name, c.ID)
-		case f.Package == "" || !slices.ContainsFunc(c.Rows, func(r Row) bool { return r.PkgName == f.Package }):
+		case !slices.ContainsFunc(c.Rows, func(r Row) bool { return r.Package() == f.Package }):
 			return fmt.Errorf("%s names the package %q, not one of %s's", f.Name, f.Package, c.ID)
 		}
 	}

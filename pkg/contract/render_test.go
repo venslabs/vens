@@ -616,3 +616,27 @@ func TestAdjustmentShowsTheBaselineGoKeeps(t *testing.T) {
 		}
 	}
 }
+
+// A flag names its row's package as Row.Package does: the name, else the
+// package id, else the BOM-Ref; any other name is refused.
+func TestFlagNamesARowByItsPackage(t *testing.T) {
+	c := CVE{ID: "CVE-P", Rows: []Row{
+		{PkgName: "liba", PkgID: "liba@1", Description: "d"},
+		{PkgID: "libb@2", Description: "d"},
+		{BOMRef: "pkg:generic/libc@3", Description: "d"},
+	}}
+	if got := []string{c.Rows[0].Package(), c.Rows[1].Package(), c.Rows[2].Package(), (Row{}).Package()}; !slices.Equal(got, []string{"liba", "libb@2", "pkg:generic/libc@3", ""}) {
+		t.Errorf("packages %q", got)
+	}
+	given := Answers{O: "some_access_or_resources_required", LC: cannotTell, LI: cannotTell, LAV: cannotTell}
+	for _, pkg := range []string{"liba", "libb@2", "pkg:generic/libc@3"} {
+		if _, err := AdjustmentRequest(base(), c, [3]bool{}, []Flag{{MaintainerDisputed, "disputed", pkg}}, given); err != nil {
+			t.Errorf("a flag on %q: %v", pkg, err)
+		}
+	}
+	for _, pkg := range []string{"liba@1", "libc", ""} {
+		if _, err := AdjustmentRequest(base(), c, [3]bool{}, []Flag{{MaintainerDisputed, "disputed", pkg}}, given); err == nil {
+			t.Errorf("a flag on %q, which names no row as a flag does, was taken", pkg)
+		}
+	}
+}
