@@ -129,12 +129,19 @@ func action(cmd *cobra.Command, args []string) error {
 	if cfg == nil {
 		return fmt.Errorf("config file %q is empty or invalid", configPath)
 	}
+	// Before anything is spent: the run's counters come only once it ends.
+	for _, w := range cfg.Warnings() {
+		slog.WarnContext(ctx, w)
+	}
 
 	slog.InfoContext(ctx, "Config loaded",
+		"schema_version", cfg.SchemaVersion,
 		"project", cfg.Project.Name,
 		"exposure", cfg.Context.Exposure,
 		"data_sensitivity", cfg.Context.DataSensitivity,
 		"business_criticality", cfg.Context.BusinessCriticality,
+		"listener", cfg.Context.Listener,
+		"undeclared", strings.Join(cfg.Undeclared(), ","),
 	)
 
 	var o generator.Opts
