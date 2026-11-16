@@ -20,9 +20,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"os"
-	"regexp"
-	"strconv"
+	"slices"
 	"strings"
 
 	"github.com/venslabs/vens/pkg/llm"
@@ -34,8 +34,16 @@ const FailEnv = "VENS_MOCK_LLM_FAIL"
 
 // SkipEnv holds comma-separated CVE ids that Generate always leaves out of its
 // answer, even when asked again, so integration tests can reach the failure
-// for a CVE the model never scores.
+// for a CVE the model never answers.
 const SkipEnv = "VENS_MOCK_LLM_SKIP"
+
+// CannotTellEnv holds comma-separated answer ids: a question whose closed
+// answers list one of them is answered cannot_tell for every vulnerability
+// it asks about, so that strict-run tests can stop a run at a chosen
+// question. cannot_tell itself names every question.
+const CannotTellEnv = "VENS_MOCK_LLM_CANNOT_TELL"
+
+const cannotTell = "cannot_tell"
 
 type MockLLM struct{}
 
@@ -43,110 +51,114 @@ func NewMockLLM() *MockLLM {
 	return &MockLLM{}
 }
 
-type llmOutputEntry struct {
-	VulnID             string  `json:"vulnId"`
-	ThreatAgentScore   float64 `json:"threat_agent_score"`
-	VulnerabilityScore float64 `json:"vulnerability_score"`
-	TechnicalImpact    float64 `json:"technical_impact"`
-	BusinessImpact     float64 `json:"business_impact"`
-	Reasoning          string  `json:"reasoning"`
+// schemaNode is the part of a JSON Schema the mock reads.
+type schemaNode struct {
+	Type       string                 `json:"type"`
+	Properties map[string]*schemaNode `json:"properties"`
+	Items      *schemaNode            `json:"items"`
+	Enum       []string               `json:"enum"`
 }
 
-type llmOutput struct {
-	Results []llmOutputEntry `json:"results"`
-}
-
-// Generate returns deterministic scores for every vulnId found in the human
-// prompt except those named in SkipEnv, so integration tests stay reproducible
-// without a real provider.
-func (m *MockLLM) Generate(ctx context.Context, req llm.Request) (string, error) {
+// Generate answers from the call's JSON Schema alone, deterministically: a
+// question's schema lists the vulnerabilities asked and the closed answers,
+// and the adjustment's lists each field's answers. It needs no knowledge of
+// the prompt's text.
+func (m *MockLLM) Generate(_ context.Context, req llm.Request) (string, error) {
 	if os.Getenv(FailEnv) != "" {
 		return "", errors.New("mockllm: forced failure (" + FailEnv + " is set)")
 	}
-
-	vulnIDs, err := extractVulnIDs(req.Human)
-	if err != nil {
-		return "", err
+	var schema schemaNode
+	if err := json.Unmarshal(req.Schema, &schema); err != nil {
+		return "", fmt.Errorf("mockllm: decode schema: %w", err)
 	}
-
-	skip := map[string]bool{}
-	for _, id := range strings.Split(os.Getenv(SkipEnv), ",") {
-		skip[strings.TrimSpace(id)] = true
+	var reply any
+	if answers := schema.Properties["answers"]; answers != nil && answers.Items != nil {
+		reply = answerQuestion(answers.Items)
+	} else {
+		reply = answerAdjustment(schema, req.Human)
 	}
+	b, err := json.Marshal(reply)
+	return string(b), err
+}
 
-	results := make([]llmOutputEntry, 0, len(vulnIDs))
-	for _, vulnID := range vulnIDs {
-		if skip[vulnID] {
+type answer struct {
+	VulnID    string `json:"vulnId"`
+	Reasoning string `json:"reasoning"`
+	Answer    any    `json:"answer"`
+}
+
+// answerQuestion gives each vulnerability the schema asks about, but those
+// SkipEnv names, an answer picked from the closed list by a hash of the
+// vulnerability and the list: one id, or one or two for a set.
+func answerQuestion(item *schemaNode) map[string][]answer {
+	answerNode := item.Properties["answer"]
+	set := answerNode.Type == "array"
+	choices := answerNode.Enum
+	if set {
+		choices = answerNode.Items.Enum
+	}
+	skip, forcedIDs := listEnv(SkipEnv), listEnv(CannotTellEnv)
+	forced := slices.ContainsFunc(choices, func(id string) bool { return slices.Contains(forcedIDs, id) })
+	options := slices.DeleteFunc(slices.Clone(choices), func(id string) bool { return id == cannotTell })
+
+	answers := []answer{}
+	for _, id := range item.Properties["vulnId"].Enum {
+		if slices.Contains(skip, id) {
 			continue
 		}
-		scores := deterministicScores(vulnID)
-		results = append(results, llmOutputEntry{
-			VulnID:             vulnID,
-			ThreatAgentScore:   scores[0],
-			VulnerabilityScore: scores[1],
-			TechnicalImpact:    scores[2],
-			BusinessImpact:     scores[3],
-			Reasoning:          "Mock LLM: deterministic scores for testing",
-		})
+		a := answer{VulnID: id, Reasoning: "Mock LLM: deterministic answer for testing"}
+		h := hash(id + "\x00" + strings.Join(choices, ","))
+		switch {
+		case forced && set:
+			a.Answer = []string{cannotTell}
+		case forced:
+			a.Answer = cannotTell
+		case set:
+			picked := []string{options[h%uint32(len(options))]}
+			if other := options[(h/7)%uint32(len(options))]; h%2 == 1 && other != picked[0] {
+				picked = append(picked, other)
+			}
+			a.Answer = picked
+		default:
+			a.Answer = options[h%uint32(len(options))]
+		}
+		answers = append(answers, a)
 	}
-
-	jsonBytes, err := json.Marshal(llmOutput{Results: results})
-	if err != nil {
-		return "", err
-	}
-	return string(jsonBytes), nil
+	return map[string][]answer{"answers": answers}
 }
 
-var numRegex = regexp.MustCompile(`\d+`)
+// answerAdjustment fills each field of the adjustment's schema with an
+// answer picked from its list by a hash of the request and the field.
+func answerAdjustment(schema schemaNode, request string) map[string]string {
+	forcedIDs := listEnv(CannotTellEnv)
+	out := map[string]string{}
+	for name, p := range schema.Properties {
+		if len(p.Enum) == 0 {
+			out[name] = "Mock LLM: deterministic adjustment for testing"
+			continue
+		}
+		if slices.ContainsFunc(p.Enum, func(id string) bool { return slices.Contains(forcedIDs, id) }) {
+			out[name] = cannotTell
+			continue
+		}
+		options := slices.DeleteFunc(slices.Clone(p.Enum), func(id string) bool { return id == cannotTell })
+		out[name] = options[hash(request+"\x00"+name)%uint32(len(options))]
+	}
+	return out
+}
 
-// extractVulnIDs reads each vulnId from the human prompt. Decoding the JSON
-// keeps the mock independent of the prompt's exact text layout.
-func extractVulnIDs(human string) ([]string, error) {
-	var vulns []struct {
-		VulnID string `json:"vulnId"`
-	}
-	if err := json.Unmarshal([]byte(human), &vulns); err != nil {
-		return nil, fmt.Errorf("mockllm: decode human prompt: %w", err)
-	}
-	ids := make([]string, 0, len(vulns))
-	for _, v := range vulns {
-		if v.VulnID != "" {
-			ids = append(ids, v.VulnID)
+func listEnv(name string) []string {
+	var out []string
+	for _, v := range strings.Split(os.Getenv(name), ",") {
+		if v = strings.TrimSpace(v); v != "" {
+			out = append(out, v)
 		}
 	}
-	return ids, nil
+	return out
 }
 
-func deterministicScores(vulnID string) [4]float64 {
-	hash := 0
-	for _, c := range vulnID {
-		hash = hash*31 + int(c)
-	}
-
-	nums := numRegex.FindAllString(vulnID, -1)
-	if len(nums) > 0 {
-		if n, err := strconv.Atoi(nums[len(nums)-1]); err == nil {
-			hash += n
-		}
-	}
-
-	// Keep base in [3,8]: a negative hash remainder could otherwise clamp every
-	// factor to 0, a zero likelihood the mock never means to give (see vens#337).
-	base := float64(((hash%6)+6)%6 + 3)
-	return [4]float64{
-		clamp(base),
-		clamp(base + 1),
-		clamp(base - 1),
-		clamp(base),
-	}
-}
-
-func clamp(v float64) float64 {
-	if v < 0 {
-		return 0
-	}
-	if v > 9 {
-		return 9
-	}
-	return v
+func hash(s string) uint32 {
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(s))
+	return h.Sum32()
 }

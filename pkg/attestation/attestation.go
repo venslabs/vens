@@ -22,6 +22,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 	"time"
 
@@ -60,12 +61,6 @@ type ClaimInput struct {
 	Score       float64
 	Severity    string
 	Reasoning   string
-	// Reused marks a claim whose cited evidence bundle's prompt did not
-	// contain this claim's (package, version) row: either the score was
-	// carried over from an earlier batch's assessment of the CVE, or the
-	// row was held back as pending and filled in by a later batch. The
-	// claim still cites that batch's evidence bundle, and says so.
-	Reused bool
 }
 
 // Builder collects per-batch evidence and per-CVE claims, then emits a
@@ -86,8 +81,8 @@ type batchEvidence struct {
 }
 
 type claimEntry struct {
-	in          ClaimInput
-	evidenceRef string
+	in           ClaimInput
+	evidenceRefs []string
 }
 
 // HashInput returns the hex-encoded SHA-256 of b.
@@ -130,12 +125,13 @@ func (b *Builder) AddBatch(systemPrompt, humanPrompt string, rawResponse []byte)
 }
 
 // AddClaim records one assessment (a scored CVE on a component) backed by the
-// given evidence. The component is added to the target list once.
-func (b *Builder) AddClaim(evidenceRef string, c ClaimInput) {
+// evidence of every call that answered for it, in call order. The component
+// is added to the target list once.
+func (b *Builder) AddClaim(evidenceRefs []string, c ClaimInput) {
 	if c.CompRef == "" {
 		return // a claim must resolve to a target component
 	}
-	b.claims = append(b.claims, claimEntry{in: c, evidenceRef: evidenceRef})
+	b.claims = append(b.claims, claimEntry{in: c, evidenceRefs: slices.Clone(evidenceRefs)})
 	if b.seenTarget[c.CompRef] {
 		return
 	}
@@ -266,18 +262,16 @@ func (b *Builder) addClaims(decl *cyclonedx.Declarations) {
 		ref := fmt.Sprintf("claim-%d", i+1)
 		predicate := fmt.Sprintf("%s on %s %s assessed at OWASP risk %.2f (%s)",
 			c.in.VulnID, c.in.CompName, c.in.CompVersion, c.in.Score, c.in.Severity)
-		if c.in.Reused {
-			// The cited batch's prompt never had this package's row: the
-			// score was either carried over from an earlier assessment of
-			// the CVE or filled in by a later batch that scored the CVE.
-			predicate += "; this package was not in the cited batch's prompt"
+		evidence := make([]cyclonedx.BOMReference, len(c.evidenceRefs))
+		for j, e := range c.evidenceRefs {
+			evidence[j] = cyclonedx.BOMReference(e)
 		}
 		claims = append(claims, cyclonedx.Claim{
 			BOMRef:    ref,
 			Target:    cyclonedx.BOMReference(c.in.CompRef),
 			Predicate: predicate,
 			Reasoning: c.in.Reasoning,
-			Evidence:  &[]cyclonedx.BOMReference{cyclonedx.BOMReference(c.evidenceRef)},
+			Evidence:  &evidence,
 		})
 		refs = append(refs, cyclonedx.BOMReference(ref))
 	}

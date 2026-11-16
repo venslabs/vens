@@ -15,7 +15,6 @@
 package scanner
 
 import (
-	"regexp"
 	"slices"
 	"strings"
 
@@ -24,12 +23,10 @@ import (
 	"github.com/venslabs/vens/pkg/generator"
 )
 
-// disputed is the wording by which a description says its CVE is disputed or
-// not a security issue, fixed in #310 step 1.
-var disputed = regexp.MustCompile(`(?i)\bdisput|non-security|not a security issue|no real threat`)
-
+// maintainerDisputed: the description says the CVE is disputed or not a
+// security issue, in the wording the adjustment quotes.
 func maintainerDisputed(description string) bool {
-	return disputed.MatchString(description)
+	return generator.DisputeQuote(description) != ""
 }
 
 // trivySeverityContested: the row's severity is LOW and not NVD's, while NVD

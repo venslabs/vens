@@ -14,7 +14,15 @@
 
 package generator
 
-import "github.com/venslabs/vens/pkg/cvss"
+import (
+	"fmt"
+	"regexp"
+	"slices"
+	"strings"
+
+	"github.com/venslabs/vens/pkg/contract"
+	"github.com/venslabs/vens/pkg/cvss"
+)
 
 // VendorSeverity is one source's severity for a vulnerability, as the
 // scanner report names both.
@@ -23,8 +31,8 @@ type VendorSeverity struct {
 	Severity string
 }
 
-// Flags are the two flags that send a CVE to the adjustment call of #310
-// step 3, and whether the second could be checked at all.
+// Flags are the two flags that send a CVE to the adjustment call, and
+// whether the second could be checked at all.
 type Flags struct {
 	// MaintainerDisputed: the description says the CVE is disputed, or not a
 	// security issue.
@@ -62,4 +70,57 @@ func CVEApplicability(rows []Vulnerability) cvss.Applicability {
 		vectors = append(vectors, r.CVSS...)
 	}
 	return cvss.ApplicabilityOf(vectors)
+}
+
+// disputed is the wording by which a description says its CVE is disputed or
+// not a security issue. None of its forms holds a sentence break.
+var disputed = regexp.MustCompile(`(?i)\bdisput|non-security|not a security issue|no real threat`)
+
+// DisputeQuote returns the sentence of a description that says its CVE is
+// disputed or not a security issue, or "" when none does.
+func DisputeQuote(description string) string {
+	for line := range strings.SplitSeq(description, "\n") {
+		for sentence := range strings.SplitAfterSeq(line, ". ") {
+			if disputed.MatchString(sentence) {
+				return strings.TrimSpace(sentence)
+			}
+		}
+	}
+	return ""
+}
+
+// rowFlags lists, row by row, each flag a row raised with what the
+// adjustment quotes for it and the row's package, each distinct one once.
+func rowFlags(rows []Vulnerability) []contract.Flag {
+	var flags []contract.Flag
+	add := func(f contract.Flag) {
+		if !slices.Contains(flags, f) {
+			flags = append(flags, f)
+		}
+	}
+	for _, r := range rows {
+		if r.Flags.MaintainerDisputed {
+			add(contract.Flag{Name: contract.MaintainerDisputed, Evidence: DisputeQuote(r.Description), Package: r.PkgName})
+		}
+		if r.Flags.SeverityContested {
+			add(contract.Flag{Name: contract.SeverityContested, Evidence: contestQuote(r), Package: r.PkgName})
+		}
+	}
+	return flags
+}
+
+// contestQuote quotes the two severities severity_contested compares: the
+// row's, with its source, and NVD's.
+func contestQuote(r Vulnerability) string {
+	source := r.SeveritySource
+	if source == "" {
+		source = "no named source"
+	}
+	quote := fmt.Sprintf("severity %s from %s", r.Severity, source)
+	for _, s := range r.VendorSeverities {
+		if strings.HasPrefix(s.Source, "nvd") && (strings.EqualFold(s.Severity, "high") || strings.EqualFold(s.Severity, "critical")) {
+			return quote + fmt.Sprintf(", while %s rates it %s", s.Source, s.Severity)
+		}
+	}
+	return quote
 }
