@@ -208,6 +208,59 @@ func TestInitRefusesToOverwriteWithoutForce(t *testing.T) {
 	parseFile(t, out)
 }
 
+// createOnFirstRead writes a file the first time the wizard reads an answer,
+// after the up-front exists check has passed, as another terminal or an
+// editor would while the user is answering.
+type createOnFirstRead struct {
+	path, content string
+	answers       io.Reader
+	created       bool
+}
+
+func (r *createOnFirstRead) Read(p []byte) (int, error) {
+	if !r.created {
+		r.created = true
+		if err := os.WriteFile(r.path, []byte(r.content), 0644); err != nil {
+			return 0, err
+		}
+	}
+	return r.answers.Read(p)
+}
+
+func TestInitDoesNotReplaceAFileCreatedWhileAsking(t *testing.T) {
+	out := filepath.Join(t.TempDir(), "config.yaml")
+	const theirs = "written by someone else\n"
+	stdin := &createOnFirstRead{path: out, content: theirs, answers: strings.NewReader(requiredThenSkip("svc"))}
+	_, err := runInit(t, stdin, out)
+	if err == nil || !strings.Contains(err.Error(), "already exists (use --force to overwrite)") {
+		t.Fatalf("got error %v, want the already-exists error", err)
+	}
+	if !stdin.created {
+		t.Fatal("the wizard never read an answer")
+	}
+	if raw, _ := os.ReadFile(out); string(raw) != theirs {
+		t.Errorf("the file created while asking was replaced: %q", raw)
+	}
+}
+
+func TestInitForceReplacesALongerFile(t *testing.T) {
+	out := filepath.Join(t.TempDir(), "config.yaml")
+	if err := os.WriteFile(out, []byte(strings.Repeat("# old\n", 200)), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runInit(t, strings.NewReader(requiredThenSkip("svc")), out, "--force"); err != nil {
+		t.Fatalf("init --force: %v", err)
+	}
+	raw, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(raw), "# old") {
+		t.Errorf("--force left the old file's lines:\n%s", raw)
+	}
+	parseFile(t, out)
+}
+
 func TestInitFailsFastOnUnwritableTarget(t *testing.T) {
 	dir := t.TempDir()
 
