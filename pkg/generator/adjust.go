@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"maps"
 	"slices"
 	"strings"
 
@@ -108,10 +109,11 @@ func shownAs(f contract.Factor, answer string) string {
 
 // readAdjustment reads an adjustment reply by key. Each field the call asked
 // is kept as given; one the reply leaves out or gives off the list its schema
-// sent leaves the baseline, and a reply that is no JSON object, or that
-// writes a key twice at any depth, leaves them all, logged at WARN. A reply
-// without reasoning, or with one that is no JSON string, keeps its fields,
-// logged at WARN. Each of these counts as a defect of the run's.
+// sent leaves the baseline, one the call did not ask is ignored, and a reply
+// that is no JSON object, or that writes a key twice at any depth, leaves
+// them all, logged at WARN. A reply without reasoning, or with one that is no
+// JSON string, keeps its fields, logged at WARN. Each of these counts as a
+// defect of the run's.
 func readAdjustment(ctx context.Context, run *scoringRun, id, raw string, lists map[string][]string) adjustmentReply {
 	var fields map[string]json.RawMessage
 	if err := json.Unmarshal([]byte(raw), &fields); err != nil || fields == nil {
@@ -153,6 +155,15 @@ func readAdjustment(ctx context.Context, run *scoringRun, id, raw string, lists 
 		reading:   adjustmentAnswered,
 		shown:     strings.Join(parts, ", "),
 		reasoning: reasoningOf(fields["reasoning"]),
+	}
+	for _, name := range slices.Sorted(maps.Keys(fields)) {
+		if _, asked := lists[name]; !asked && name != "reasoning" {
+			// A provider honouring the schema cannot write one: the object
+			// is closed, and a floored axis is not in it.
+			run.defect(defectAdjustmentNotAsked)
+			slog.WarnContext(ctx, "Adjustment reply gives a field the call did not ask; ignoring it",
+				"vuln", id, "field", name, "answer", string(fields[name]))
+		}
 	}
 	if oneLine(got.reasoning) == "" {
 		run.defect(defectAdjustmentNoReasoning)

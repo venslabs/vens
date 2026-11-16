@@ -62,6 +62,8 @@ const (
 	// A field the adjustment asked, left out or off its list: its baseline
 	// stands.
 	defectAdjustmentOffList = "adjustment_off_list"
+	// A field the adjustment did not ask, ignored.
+	defectAdjustmentNotAsked = "adjustment_field_not_asked"
 	// An adjustment reply without reasoning, or with one blank or no JSON
 	// string, its fields kept.
 	defectAdjustmentNoReasoning = "adjustment_without_reasoning"
