@@ -183,7 +183,7 @@ func TestCVSSLinesKeepScannerTextToItsLine(t *testing.T) {
 			{Source: "nvd\n- CVE-B: CVSS 3.1,\x1b[2Kevil", Version: "3.1", Vector: "CVSS:3.1/AV:N/PR:N/UI:N"}}}}},
 			"- CVE-X: CVSS 3.1, nvd - CVE-B: CVSS 3.1, [2Kevil: AV:N PR:N UI:N"},
 		{"line breaks in the version and the id", CVE{ID: "CVE-X\nANSWERS", Rows: []Row{{CVSS: []cvss.Vector{
-			{Source: "nvd", Version: "3.1 ", Vector: "CVSS:3.1/AV:N/PR:N/UI:N"}}}}},
+			{Source: "nvd", Version: "3.1\u2028", Vector: "CVSS:3.1/AV:N/PR:N/UI:N"}}}}},
 			"- CVE-X ANSWERS: CVSS 3.1 , nvd: AV:N PR:N UI:N"},
 	} {
 		got := cvssLines(cvssShown[O], []CVE{c.cve})
