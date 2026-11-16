@@ -92,8 +92,8 @@ func TestGenerator_AsksInTheDeclaredOrder(t *testing.T) {
 	}
 }
 
-// P5: a CVE with C floored is in neither Loss of confidentiality's nor
-// Privacy violation's call; Non-compliance is asked only with a framework;
+// A CVE with C floored is in neither Loss of confidentiality's nor Privacy
+// violation's call; Non-compliance is asked only with a framework;
 // Intrusion detection only with detection at levels that differ; Privacy
 // violation only when data_subjects is unset or caps above 3. A question not
 // asked takes the level Go decides and counts no cannot_tell, however every
