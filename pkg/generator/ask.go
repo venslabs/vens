@@ -99,7 +99,8 @@ func (g *Generator) askSplitting(ctx context.Context, run *scoringRun, f contrac
 	return first, nil
 }
 
-// askOnce makes one call asking f about cves and reads its reply.
+// askOnce makes one call asking f about cves and reads its reply. A strict
+// run stops right after a call that gave an answer Go reads as cannot_tell.
 func (g *Generator) askOnce(ctx context.Context, run *scoringRun, f contract.Factor, cves []*cve) (map[string]reply, error) {
 	request, err := contract.Request(f, g.deployment, contractCVEs(cves))
 	if err != nil {
@@ -113,7 +114,16 @@ func (g *Generator) askOnce(ctx context.Context, run *scoringRun, f contract.Fac
 	if err != nil {
 		return nil, fmt.Errorf("LLM evaluation failed: %w", err)
 	}
-	return readReplies(ctx, f, raw, ref, cves)
+	got, err := readReplies(ctx, f, raw, ref, cves)
+	if err != nil {
+		return nil, err
+	}
+	if g.o.Strict {
+		if err := firstCannotTell(f, cves, got); err != nil {
+			return nil, err
+		}
+	}
+	return got, nil
 }
 
 // readReplies reads a call's reply by key, one answer per CVE. An answer for

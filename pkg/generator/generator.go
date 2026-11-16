@@ -89,6 +89,12 @@ type Opts struct {
 
 	// Config is the deployment, loaded from config.yaml.
 	Config *riskconfig.Config
+	// Strict refuses a run that would fall back to a worst case: a config
+	// leaving data_subjects, detection or traceability undeclared, and a CVE
+	// whose vectors leave an axis's Applicability unknown or that no row
+	// describes, both before any call; then the first answer Go reads as
+	// cannot_tell, right after the call that gave it.
+	Strict bool
 }
 
 // Generator produces OWASP risk scores using LLM analysis.
@@ -108,7 +114,8 @@ type Generator struct {
 }
 
 // New creates a Generator. It refuses a config the questions cannot be
-// asked in, so that nothing is spent on a run that cannot finish.
+// asked in and, for a strict run, one that leaves a field Go reads
+// undeclared, so that nothing is spent on a run that cannot finish.
 func New(o Opts) (*Generator, error) {
 	if o.LLM == nil {
 		return nil, errors.New("no model")
@@ -120,6 +127,12 @@ func New(o Opts) (*Generator, error) {
 	system, err := contract.SystemPrompt(d)
 	if err != nil {
 		return nil, fmt.Errorf("config: %w", err)
+	}
+	if o.Strict {
+		if undeclared := o.Config.Undeclared(); len(undeclared) > 0 {
+			return nil, fmt.Errorf("strict: %s not declared, so each would fall back to its worst case",
+				strings.Join(undeclared, ", "))
+		}
 	}
 	if o.BatchSize == 0 {
 		o.BatchSize = DefaultBatchSize
@@ -156,6 +169,11 @@ func (g *Generator) GenerateRiskScore(ctx context.Context, vulns []Vulnerability
 		run.summarize(ctx, len(vulns), len(cves), err)
 		g.writeAnswers(ctx, run)
 	}()
+	if g.o.Strict {
+		if err := preflight(cves); err != nil {
+			return err
+		}
+	}
 	size := max(g.o.BatchSize, 1)
 	for start := 0; start < len(cves); start += size {
 		batch := cves[start:min(start+size, len(cves))]
