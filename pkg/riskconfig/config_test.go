@@ -479,8 +479,15 @@ func TestSchema1Errors(t *testing.T) {
 		{withContext("audit_requirement: forensic"), `context.audit_requirement must be one of [low medium high], got "forensic"`},
 		{withContext(`compliance_requirements: [GDPR, "PCI DSS"]`),
 			`context.compliance_requirements contains unknown framework "PCI DSS" (valid: [PCI-DSS HIPAA GDPR SOX ISO27001 FedRAMP NIST CCPA SOC2 FISMA ITAR CMMC])`},
+		// Schema 1 matched lowercased names: the long s of ſOX folds to s under
+		// Unicode case folding, not under lowercasing.
+		{withContext(`compliance_requirements: ["ſOX"]`),
+			`context.compliance_requirements contains unknown framework "ſOX" (valid: [PCI-DSS HIPAA GDPR SOX ISO27001 FedRAMP NIST CCPA SOC2 FISMA ITAR CMMC])`},
 	} {
 		parseFails(t, tc.src, 0, tc.want)
+	}
+	if cfg := mustParse(t, withContext("compliance_requirements: [sox, Pci-Dss]")); !slices.Equal(cfg.Context.ComplianceRequirements, []string{"sox", "Pci-Dss"}) {
+		t.Errorf("compliance = %q, want the names as written", cfg.Context.ComplianceRequirements)
 	}
 	// A v1 optional key written with no value still reads as unset.
 	if cfg := mustParse(t, withContext("availability_requirement:", "audit_requirement:")); cfg.Context.AvailabilityRequirement != nil || cfg.Context.AuditRequirement != nil {

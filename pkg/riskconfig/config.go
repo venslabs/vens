@@ -251,7 +251,10 @@ func (h ContextHints) checkSchema1Values() error {
 		}
 	}
 	for _, framework := range h.ComplianceRequirements {
-		if !slices.ContainsFunc(complianceFrameworks, func(v string) bool { return strings.EqualFold(v, framework) }) {
+		// Lowercased equality, as schema 1 matched: EqualFold would also take
+		// Unicode case folds such as ſOX for SOX.
+		lower := strings.ToLower(framework)
+		if !slices.ContainsFunc(complianceFrameworks, func(v string) bool { return strings.ToLower(v) == lower }) {
 			return fmt.Errorf("context.compliance_requirements contains unknown framework %q (valid: %v)", framework, complianceFrameworks)
 		}
 	}
