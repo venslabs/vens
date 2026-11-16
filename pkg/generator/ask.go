@@ -121,7 +121,7 @@ func (g *Generator) askOnce(ctx context.Context, run *scoringRun, f contract.Fac
 	if err != nil {
 		return nil, fmt.Errorf("LLM evaluation failed: %w", err)
 	}
-	got, err := readReplies(ctx, f, raw, ref, cves)
+	got, err := readReplies(ctx, run, f, raw, ref, cves)
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +142,8 @@ func (g *Generator) askOnce(ctx context.Context, run *scoringRun, f contract.Fac
 // a CVE the call did not ask about is ignored, and a CVE answered twice keeps
 // its first answer. An answer off its list, or one a key written twice
 // leaves in doubt, is kept as given and logged: Go reads it as cannot_tell.
-func readReplies(ctx context.Context, f contract.Factor, raw, evidenceRef string, cves []*cve) (map[string]reply, error) {
+// Each of these counts as a defect of the run's.
+func readReplies(ctx context.Context, run *scoringRun, f contract.Factor, raw, evidenceRef string, cves []*cve) (map[string]reply, error) {
 	entries, err := readEntries(ctx, f, raw)
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse LLM output: %w: %q", err, raw)
@@ -157,14 +158,16 @@ func readReplies(ctx context.Context, f contract.Factor, raw, evidenceRef string
 		if !asked[id] {
 			// A provider honouring the schema cannot write one: the call's
 			// ids are an enum.
+			run.defect(defectCVENotAsked)
 			slog.DebugContext(ctx, "ignoring an answer for a CVE the call did not ask about",
 				"vuln", id, "question", string(f))
 			continue
 		}
 		if _, ok := got[id]; ok {
+			run.defect(defectCVERepeated)
 			continue
 		}
-		got[id] = readEntry(ctx, f, id, e, evidenceRef)
+		got[id] = readEntry(ctx, run, f, id, e, evidenceRef)
 	}
 	return got, nil
 }
@@ -218,7 +221,7 @@ func readEntries(ctx context.Context, f contract.Factor, raw string) ([]entry, e
 // no list holds: Go reads it as cannot_tell, as an answer off the list. An
 // answer without reasoning, or with one that is no JSON string, is kept,
 // logged at WARN.
-func readEntry(ctx context.Context, f contract.Factor, id string, e entry, evidenceRef string) reply {
+func readEntry(ctx context.Context, run *scoringRun, f contract.Factor, id string, e entry, evidenceRef string) reply {
 	r := reply{
 		answer:      answerIDs(f, e.fields["answer"]),
 		raw:         e.fields["answer"],
@@ -228,13 +231,16 @@ func readEntry(ctx context.Context, f contract.Factor, id string, e entry, evide
 	if e.repeated {
 		r.raw = answersWritten(e.text)
 		r.answer = []string{string(r.raw)}
+		run.defect(defectAnswerKeyTwice)
 		slog.WarnContext(ctx, "Model wrote a key twice; reading the answer as cannot_tell",
 			"vuln", id, "question", string(f), "entry", string(e.text))
 	} else if reading, _ := contract.ReadAnswer(f, r.answer...); reading == contract.Invalid {
+		run.defect(defectAnswerOffList)
 		slog.WarnContext(ctx, "Model gave an answer off the list; reading it as cannot_tell",
 			"vuln", id, "question", string(f), "answer", string(r.raw))
 	}
 	if oneLine(r.reasoning) == "" {
+		run.defect(defectAnswerNoReasoning)
 		slog.WarnContext(ctx, "Model gave an answer without reasoning; keeping it",
 			"vuln", id, "question", string(f))
 	}

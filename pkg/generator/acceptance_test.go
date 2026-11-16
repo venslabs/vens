@@ -16,8 +16,9 @@ package generator
 
 import (
 	"context"
-	"log/slog"
+	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 
@@ -25,6 +26,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/venslabs/vens/pkg/contract"
 	"github.com/venslabs/vens/pkg/cvss"
+	"github.com/venslabs/vens/pkg/llm"
 	"github.com/venslabs/vens/pkg/llm/llmfactory"
 )
 
@@ -35,8 +37,7 @@ import (
 const acceptanceEnv = "VENS_PROVIDER_ACCEPTANCE"
 
 // Each provider gets one call per question's schema and one adjustment call,
-// and Go reads every reply: no answer missing, none off its list, the
-// adjustment's fields each on theirs.
+// and Go reads every reply as written: see acceptanceFailures.
 func TestProviderAcceptance(t *testing.T) {
 	var providers []string
 	for _, name := range strings.Split(os.Getenv(acceptanceEnv), ",") {
@@ -47,7 +48,115 @@ func TestProviderAcceptance(t *testing.T) {
 	if len(providers) == 0 {
 		t.Skipf("set %s to the providers to call, such as openai,anthropic", acceptanceEnv)
 	}
-	vulns := []Vulnerability{
+	for _, name := range providers {
+		t.Run(name, func(t *testing.T) {
+			client, provider, model, err := llmfactory.New(context.Background(), name)
+			require.NoError(t, err)
+			t.Logf("provider %s, model %s", provider, model)
+			assert.Empty(t, acceptanceFailures(t, client))
+		})
+	}
+}
+
+// The acceptance gate passes the mock's clean replies and fails on each
+// defect Go can find reading a reply, the mock writing one at a time.
+func TestProviderAcceptanceGate(t *testing.T) {
+	require.Empty(t, acceptanceFailures(t, &fakeLLM{}), "clean replies pass")
+
+	const first = "CVE-2024-24790"
+	const axes = `"confidentiality":"affected","integrity":"affected","availability":"affected"`
+	motive := func(c fakeCall, id string) bool { return c.factor == contract.M && id == first }
+	// motiveReply writes Motive's reply by hand: each entry clean but the
+	// first CVE's, which writes entry, and outside the answers extra.
+	motiveReply := func(entry, extra string) func(fakeCall) (string, bool) {
+		return func(c fakeCall) (string, bool) {
+			if c.factor != contract.M {
+				return "", false
+			}
+			entries := []string{entry}
+			for _, id := range c.ids[1:] {
+				entries = append(entries, `{"vulnId":"`+id+`","answer":"low_or_no_reward","reasoning":"r"}`)
+			}
+			return `{"answers":[` + strings.Join(entries, ",") + `]` + extra + `}`, true
+		}
+	}
+	reasoning := func(r any) func(fakeCall, map[string]any) {
+		return func(c fakeCall, entry map[string]any) {
+			if motive(c, entry["vulnId"].(string)) {
+				entry["reasoning"] = r
+			}
+		}
+	}
+	adjustment := func(reply string) func(fakeCall) (string, bool) {
+		return func(c fakeCall) (string, bool) { return reply, c.adjustment() }
+	}
+	for name, tc := range map[string]struct {
+		m    *fakeLLM
+		want string
+	}{
+		"an answer off its list": {&fakeLLM{answer: func(c fakeCall, id string) any {
+			if motive(c, id) {
+				return "bogus"
+			}
+			return nil
+		}}, "defects.answer_off_list: 1"},
+		"an answer key written twice": {&fakeLLM{reply: motiveReply(
+			`{"vulnId":"`+first+`","answer":"cannot_tell","answer":"low_or_no_reward","reasoning":"r"}`, "",
+		)}, "defects.answer_key_written_twice: 1"},
+		"a key written twice outside the answers": {&fakeLLM{reply: motiveReply(
+			`{"vulnId":"`+first+`","answer":"low_or_no_reward","reasoning":"r"}`, `,"note":"a","note":"b"`,
+		)}, "defects.answer_key_written_twice: 2"},
+		"no reasoning": {&fakeLLM{edit: func(c fakeCall, entry map[string]any) {
+			if motive(c, entry["vulnId"].(string)) {
+				delete(entry, "reasoning")
+			}
+		}}, "defects.answer_without_reasoning: 1"},
+		"a blank reasoning":         {&fakeLLM{edit: reasoning(" \n ")}, "defects.answer_without_reasoning: 1"},
+		"a reasoning that is a map": {&fakeLLM{edit: reasoning(map[string]any{})}, "defects.answer_without_reasoning: 1"},
+		"a reasoning that is a number": {&fakeLLM{edit: reasoning(7)},
+			"defects.answer_without_reasoning: 1"},
+		"a null reasoning": {&fakeLLM{edit: reasoning(nil)}, "defects.answer_without_reasoning: 1"},
+		"an answer for a CVE not asked": {&fakeLLM{extra: func(c fakeCall) []map[string]any {
+			if c.factor != contract.M {
+				return nil
+			}
+			return []map[string]any{{"vulnId": "CVE-2000-0001", "answer": "low_or_no_reward", "reasoning": "r"}}
+		}}, "defects.answer_cve_not_asked: 1"},
+		"a CVE answered twice": {&fakeLLM{extra: func(c fakeCall) []map[string]any {
+			if c.factor != contract.M {
+				return nil
+			}
+			return []map[string]any{{"vulnId": first, "answer": "high_reward", "reasoning": "r"}}
+		}}, "defects.answer_cve_repeated: 1"},
+		"a CVE left out": {&fakeLLM{skip: func(c fakeCall, id string) bool {
+			return motive(c, id) && c.n == 1
+		}}, "calls.M: 2, want 1"},
+		"an unreadable adjustment": {&fakeLLM{reply: adjustment(`not json`)}, "defects.adjustment_unreadable: 1"},
+		"an adjustment key written twice": {&fakeLLM{reply: adjustment(
+			`{"reasoning":"r","opportunity":"keep","opportunity":"keep",` + axes + `}`,
+		)}, "defects.adjustment_key_written_twice: 1"},
+		"an adjustment answer off its list": {&fakeLLM{reply: adjustment(
+			`{"reasoning":"r","opportunity":"bogus",` + axes + `}`,
+		)}, "defects.adjustment_off_list: 1"},
+		"an adjustment field left out": {&fakeLLM{reply: adjustment(
+			`{"reasoning":"r","opportunity":"keep","confidentiality":"affected","integrity":"affected"}`,
+		)}, "defects.adjustment_off_list: 1"},
+		"an adjustment without reasoning": {&fakeLLM{reply: adjustment(`{"opportunity":"keep",` + axes + `}`)},
+			"defects.adjustment_without_reasoning: 1"},
+		"an adjustment reasoning that is a list": {&fakeLLM{reply: adjustment(
+			`{"reasoning":["r"],"opportunity":"keep",` + axes + `}`,
+		)}, "defects.adjustment_without_reasoning: 1"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, []string{tc.want}, acceptanceFailures(t, tc.m))
+		})
+	}
+}
+
+// acceptanceVulns are two CVEs: one plain, one both flags send to the
+// adjustment.
+func acceptanceVulns() []Vulnerability {
+	return []Vulnerability{
 		{
 			VulnID: "CVE-2024-24790", PkgName: "stdlib", InstalledVersion: "1.21.0", FixedVersion: "1.21.11", BOMRef: "a",
 			Title:       "net/netip: Unexpected behavior from Is methods for IPv4-mapped IPv6 addresses",
@@ -65,28 +174,31 @@ func TestProviderAcceptance(t *testing.T) {
 			Flags:            Flags{MaintainerDisputed: true, SeverityContested: true},
 		},
 	}
-	for _, name := range providers {
-		t.Run(name, func(t *testing.T) {
-			ctx := context.Background()
-			client, provider, model, err := llmfactory.New(ctx, name)
-			require.NoError(t, err)
-			t.Logf("provider %s, model %s", provider, model)
-			logs := withCapturedLogs(t)
-			g := newGen(t, Opts{LLM: client, Config: fullConfig()})
-			require.NoError(t, g.GenerateRiskScore(ctx, vulns, nil))
+}
 
-			summary := runSummary(t, logs)
-			for _, f := range contract.Order() {
-				assert.Equal(t, int64(1), summary.attrs["calls."+string(f)], "question %s: one call, every CVE answered", f)
-			}
-			assert.Equal(t, int64(1), summary.attrs["calls."+adjustmentCall])
-			for _, msg := range []string{
-				"Model gave an answer off the list; reading it as cannot_tell",
-				"Adjustment answer off its list; the baseline stands",
-				"Unreadable adjustment reply; the baselines stand",
-			} {
-				assert.Empty(t, logs.find(slog.LevelWarn, msg), msg)
-			}
-		})
+// acceptanceFailures rates acceptanceVulns with client and lists what fails
+// the gate, from the run's summary: a question not asked in exactly one
+// call, every CVE answered at once; an adjustment not made in exactly one;
+// and each defect Go found reading the replies, by kind, which covers an
+// answer off its list, a key written twice, a reasoning that is no
+// non-empty string and an adjustment Go cannot read.
+func acceptanceFailures(t *testing.T, client llm.Client) []string {
+	t.Helper()
+	logs := withCapturedLogs(t)
+	g := newGen(t, Opts{LLM: client, Config: fullConfig()})
+	require.NoError(t, g.GenerateRiskScore(context.Background(), acceptanceVulns(), nil))
+	summary := runSummary(t, logs)
+	var failures []string
+	for _, q := range append(contract.Order(), adjustmentCall) {
+		if n := summary.attrs["calls."+string(q)]; n != int64(1) {
+			failures = append(failures, fmt.Sprintf("calls.%s: %v, want 1", q, n))
+		}
 	}
+	for key, n := range summary.attrs {
+		if strings.HasPrefix(key, "defects.") {
+			failures = append(failures, fmt.Sprintf("%s: %v", key, n))
+		}
+	}
+	slices.Sort(failures)
+	return failures
 }

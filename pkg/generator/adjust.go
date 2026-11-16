@@ -75,7 +75,7 @@ func (g *Generator) adjust(ctx context.Context, run *scoringRun, c *cve, a *asse
 	if err != nil {
 		return fmt.Errorf("LLM evaluation failed on the adjustment of %s: %w", c.id(), err)
 	}
-	got := readAdjustment(ctx, c.id(), raw, lists)
+	got := readAdjustment(ctx, run, c.id(), raw, lists)
 	a.adjusted, a.adjustment = &got.adjusted, got.reading
 	a.note("", got.shown, got.reasoning, ref)
 	return nil
@@ -111,16 +111,18 @@ func shownAs(f contract.Factor, answer string) string {
 // sent leaves the baseline, and a reply that is no JSON object, or that
 // writes a key twice at any depth, leaves them all, logged at WARN. A reply
 // without reasoning, or with one that is no JSON string, keeps its fields,
-// logged at WARN.
-func readAdjustment(ctx context.Context, id, raw string, lists map[string][]string) adjustmentReply {
+// logged at WARN. Each of these counts as a defect of the run's.
+func readAdjustment(ctx context.Context, run *scoringRun, id, raw string, lists map[string][]string) adjustmentReply {
 	var fields map[string]json.RawMessage
 	if err := json.Unmarshal([]byte(raw), &fields); err != nil || fields == nil {
+		run.defect(defectAdjustmentUnreadable)
 		slog.WarnContext(ctx, "Unreadable adjustment reply; the baselines stand", "vuln", id, "reply", raw)
 		return adjustmentReply{reading: adjustmentUnreadable, shown: "unreadable"}
 	}
 	if repeatedKeys([]byte(raw)) > 0 {
 		// encoding/json kept the last value of the key, which may lower a
 		// level the model meant to keep.
+		run.defect(defectAdjustmentKeyTwice)
 		slog.WarnContext(ctx, "Adjustment reply writes a key twice; the baselines stand", "vuln", id, "reply", raw)
 		return adjustmentReply{reading: adjustmentKeyTwice, shown: "a key written twice", reasoning: reasoningOf(fields["reasoning"])}
 	}
@@ -134,6 +136,7 @@ func readAdjustment(ctx context.Context, id, raw string, lists map[string][]stri
 		shown := value
 		if !slices.Contains(list, value) {
 			shown = offList(fields[name])
+			run.defect(defectAdjustmentOffList)
 			slog.WarnContext(ctx, "Adjustment answer off its list; the baseline stands",
 				"vuln", id, "field", name, "answer", string(fields[name]))
 		}
@@ -152,6 +155,7 @@ func readAdjustment(ctx context.Context, id, raw string, lists map[string][]stri
 		reasoning: reasoningOf(fields["reasoning"]),
 	}
 	if oneLine(got.reasoning) == "" {
+		run.defect(defectAdjustmentNoReasoning)
 		slog.WarnContext(ctx, "Adjustment reply gives no reasoning; keeping its answers", "vuln", id)
 	}
 	return got
