@@ -218,7 +218,7 @@ func checkKnownKeys(m *yaml.Node, t reflect.Type, path string) error {
 			if path != "" {
 				where = "under " + path
 			}
-			return &loadError{3, fmt.Sprintf("config.yaml line %d: unknown key `%s` %s", p.key.Line, p.key.Value, where)}
+			return &loadError{3, fmt.Sprintf("config.yaml line %d: unknown key `%s` %s", p.at.Line, p.key.Value, where)}
 		}
 		if ft.Kind() == reflect.Struct && p.value.Kind == yaml.MappingNode {
 			if err := checkKnownKeys(p.value, ft, strings.TrimPrefix(path+"."+p.key.Value, ".")); err != nil {
@@ -265,9 +265,11 @@ func lookup(m *yaml.Node, key string) (*yaml.Node, bool, error) {
 	return nil, false, nil
 }
 
-// pair is a key of a mapping and its value, aliases resolved.
+// pair is a key of a mapping and its value, aliases resolved. at is the key
+// as written, whose line an error names: an alias key's name is its
+// anchor's, its place is its own.
 type pair struct {
-	key, value *yaml.Node
+	key, at, value *yaml.Node
 }
 
 // entries returns the keys and values of mapping m: its own first, then
@@ -283,12 +285,12 @@ func entries(m *yaml.Node) ([]pair, error) {
 	walk = func(m *yaml.Node) error {
 		var sources []*yaml.Node
 		for i := 0; i+1 < len(m.Content); i += 2 {
-			k, v := resolve(m.Content[i]), m.Content[i+1]
-			if k.ShortTag() == "!!merge" {
+			k, v := m.Content[i], m.Content[i+1]
+			if isMergeKey(k) {
 				sources = append(sources, mergeSources(v)...)
 				continue
 			}
-			pairs = append(pairs, pair{k, resolve(v)})
+			pairs = append(pairs, pair{resolve(k), k, resolve(v)})
 		}
 		for _, src := range sources {
 			target := resolve(src)
@@ -307,6 +309,12 @@ func entries(m *yaml.Node) ([]pair, error) {
 		return nil
 	}
 	return pairs, walk(m)
+}
+
+// isMergeKey reports whether k is a merge key as yaml.v3 reads one: the
+// scalar << with the merge tag. A !!merge tag on another key is no merge.
+func isMergeKey(k *yaml.Node) bool {
+	return k.Kind == yaml.ScalarNode && k.Value == "<<" && k.ShortTag() == "!!merge"
 }
 
 // mergeSources returns what a merge key's value names: the value itself, or

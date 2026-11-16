@@ -407,6 +407,11 @@ func TestUnknownKeys(t *testing.T) {
 		{withContext("detection:", "  network: logged", "  host: logged", "  application: logged", "  cloud: logged"),
 			"config.yaml line 12: unknown key `cloud` under context.detection"},
 		{withContext("<<: {exposure: internet, exposed: true}"), "config.yaml line 8: unknown key `exposed` under context"},
+		// An alias key is named by its anchor and placed where it is written.
+		{strings.Replace(withContext("? *k", ": per_request"), "  name: svc\n", "  name: svc\n  description: &k tracability\n", 1),
+			"config.yaml line 9: unknown key `tracability` under context"},
+		// Only the scalar << is a merge key, whatever tag another key carries.
+		{withContext("!!merge x: {exposure: internet}"), "config.yaml line 8: unknown key `x` under context"},
 	} {
 		parseFails(t, tc.src, 3, tc.want)
 	}
