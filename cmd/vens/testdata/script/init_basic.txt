@@ -1,0 +1,41 @@
+# `vens init` writes a config that `vens generate` accepts: the required
+# questions are answered, optional ones are skipped with empty lines, and a
+# second run without --force refuses to overwrite the file it just wrote.
+
+stdin answers.txt
+exec vens init --output config.yaml
+stdout 'Wrote config.yaml'
+grep 'name: my-api' config.yaml
+grep 'exposure: internet' config.yaml
+grep 'data_sensitivity: high' config.yaml
+grep 'business_criticality: critical' config.yaml
+grep 'availability_requirement: high' config.yaml
+grep 'audit_requirement: medium' config.yaml
+grep 'GDPR' config.yaml
+grep 'vens generate --config-file' config.yaml
+
+# The generated file is accepted by vens generate.
+exec vens generate --llm=mock --config-file=config.yaml --sbom-serial-number=urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79 report.json out.cdx.json
+
+# A second run without --force refuses to overwrite.
+! exec vens init --output config.yaml
+stderr 'already exists'
+
+# --force overwrites the file it just wrote.
+stdin answers.txt
+exec vens init --force --output config.yaml
+stdout 'Wrote config.yaml'
+
+-- answers.txt --
+my-api
+Backend API
+internet
+high
+critical
+high
+gdpr
+medium
+Handles customer data
+
+-- report.json --
+{"SchemaVersion": 2, "Results": []}

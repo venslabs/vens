@@ -60,6 +60,8 @@ context:
 
 This is the step that makes scores meaningful. A dev/test environment would use different values and get _different_ scores. See [Describe your context](../guides/configuration.md) for the full field reference.
 
+Don't want to write this by hand? `vens init` asks a few questions and writes the file for you — see [`vens init`](../reference/init.md).
+
 ---
 
 ## Step 3 — Generate the VEX
