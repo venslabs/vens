@@ -42,17 +42,24 @@ func New() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "generate INPUT OUTPUT",
 		Short: "Score CVEs by real risk, output CycloneDX VEX",
-		Long: `Generate Vulnerability-Exploitability eXchange (VEX) information using an LLM to prioritize CVEs based on risk.
+		Long: `Generate Vulnerability-Exploitability eXchange (VEX) information that rates each CVE by its OWASP risk
+in your deployment.
 
-The LLM analyzes each vulnerability using the project context hints you provide:
-- Exposure: How is the system exposed? (internal, private, internet)
-- Data Sensitivity: What type of data is handled? (low, medium, high, critical)
-- Business Criticality: How critical is the system? (low, medium, high, critical)
+config.yaml describes the deployment: how it is exposed, the data it handles, how critical it is, how
+many people's personal data it holds, and what logs and records an attack on it
+(https://venslabs.github.io/vens/reference/config-schema/).
 
-The LLM calculates the OWASP risk score (0-81) for each vulnerability using:
-  Risk = Likelihood × Impact
-  Where: Likelihood = (Threat Agent + Vulnerability Factor) / 2
-         Impact = (Technical Impact + Business Impact) / 2`,
+For each CVE, the LLM answers one question per OWASP factor it is asked, up to 12 of the 16, each from
+a closed list of named answers. vens sets the others from the scan report, the config or a fixed
+level, then computes every level, the OWASP vector and the rating:
+  Likelihood = the average of the 8 threat agent and vulnerability factors
+  Impact     = the larger of the technical and the business impact, each the average of its 4 factors
+  Severity   = OWASP's matrix of the likelihood and impact levels
+  Score      = Likelihood × Impact, a vens number, not OWASP's
+
+Where an input is missing (an undeclared field; a CVE with no description, no CVSS vector or one vens
+cannot read; an answer read as cannot_tell), the factor falls back to its worst case, counted in the
+run summary; --strict fails the run instead.`,
 		Example:               Example(),
 		Args:                  cobra.ExactArgs(2),
 		RunE:                  action,
@@ -93,10 +100,11 @@ func Example() string {
   # (jq -r .serialNumber sbom.cdx.json), or an ad-hoc one:
   SBOM_UUID="urn:uuid:$(uuidgen | tr '[:upper:]' '[:lower:]')"
 
-  # Generate OWASP risk scores using LLM
-  %s generate --config-file config.yaml --sbom-serial-number "$SBOM_UUID" report.json output.cdx.json
+  # Rate each CVE's OWASP risk with the LLM
+  %[1]s generate --config-file config.yaml --sbom-serial-number "$SBOM_UUID" report.json output.cdx.json
 
   # Example config.yaml:
+  # schema_version: %[2]d
   # project:
   #   name: "nginx-production"
   #   description: "Production web server"
@@ -105,7 +113,7 @@ func Example() string {
   #   data_sensitivity: "high"          # low | medium | high | critical
   #   business_criticality: "critical"  # low | medium | high | critical
   #   notes: "Handles customer PII"     # optional
-`, exe)
+`, exe, riskconfig.SchemaVersion)
 }
 
 func action(cmd *cobra.Command, args []string) error {
