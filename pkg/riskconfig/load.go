@@ -16,13 +16,16 @@ package riskconfig
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
 	"reflect"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
+	"unicode/utf16"
 
 	"go.yaml.in/yaml/v3"
 )
@@ -56,9 +59,7 @@ var (
 	newerVersion = regexp.MustCompile(`^[1-9][0-9]*$`)
 
 	// lineBreaks are the line breaks yaml.v3 counts when it numbers lines.
-	lineBreaks      = strings.NewReplacer("\r\n", "\n", "\r", "\n", "\u0085", "\n", "\u2028", "\n", "\u2029", "\n")
-	trailingComment = regexp.MustCompile(`\s#.*$`)
-	anchorProperty  = regexp.MustCompile(`^&\S+\s+`)
+	lineBreaks = strings.NewReplacer("\r\n", "\n", "\r", "\n", "\u0085", "\n", "\u2028", "\n", "\u2029", "\n")
 )
 
 // rootMapping returns the top-level mapping of the file's one document,
@@ -107,8 +108,12 @@ func checkSchemaVersion(root *yaml.Node, src []byte) error {
 	switch {
 	case plain && v.Value == "2":
 		// yaml.v3 drops a bare ! tag, so only the source tells `! 2` from 2.
-		if s, ok := spelling(src, v); ok && strings.HasPrefix(anchorProperty.ReplaceAllString(s, ""), "!") {
-			return &loadError{2, "schema_version must be the integer 2, got " + s}
+		written, tagged, found := writtenMarker(src, v)
+		switch {
+		case !found:
+			return &loadError{2, fmt.Sprintf("schema_version must be the integer 2, written plain; vens cannot read it at line %d of the file", v.Line)}
+		case tagged:
+			return &loadError{2, "schema_version must be the integer 2, got " + written}
 		}
 		return nil
 	case plain && v.Value == "1":
@@ -119,24 +124,102 @@ func checkSchemaVersion(root *yaml.Node, src []byte) error {
 	return &loadError{2, "schema_version must be the integer 2, got " + asWritten(v)}
 }
 
-// spelling returns how the file writes scalar n on its line: its properties
-// and its value, without a trailing comment or the rest of a flow
-// collection. ok is false when the source has no such position.
-func spelling(src []byte, n *yaml.Node) (string, bool) {
-	lines := strings.Split(lineBreaks.Replace(strings.TrimPrefix(string(src), "\uFEFF")), "\n")
-	if n.Line < 1 || n.Line > len(lines) {
-		return "", false
+// writtenMarker reads the marker as the file writes it from the node's place:
+// its properties, anchor and tag in any order and over line breaks and
+// comments, then its value. found is false when that place does not hold a
+// value of 2, which a file yaml.v3 has read does not cause; the caller then
+// refuses the file rather than guess.
+func writtenMarker(src []byte, n *yaml.Node) (written string, tagged, found bool) {
+	text := []rune(lineBreaks.Replace(parsedText(src)))
+	i, found := position(text, n.Line, n.Column)
+	if !found {
+		return "", false, false
 	}
-	// yaml.v3 counts columns in characters, not bytes.
-	line := []rune(lines[n.Line-1])
-	if n.Column < 1 || n.Column > len(line) {
-		return "", false
+	var parts []string
+	for {
+		i = skipBlank(text, i)
+		if i == len(text) || (text[i] != '&' && text[i] != '!') {
+			break
+		}
+		end := tokenEnd(text, i)
+		parts = append(parts, string(text[i:end]))
+		tagged = tagged || text[i] == '!'
+		i = end
 	}
-	s := trailingComment.ReplaceAllString(string(line[n.Column-1:]), "")
-	if i := strings.IndexAny(s, ",]}"); i >= 0 {
-		s = s[:i]
+	if string(text[i:tokenEnd(text, i)]) != "2" {
+		return "", false, false
 	}
-	return strings.TrimSpace(s), true
+	return strings.Join(append(parts, "2"), " "), tagged, true
+}
+
+// parsedText returns the text yaml.v3 parses from src: UTF-16 decoded by its
+// byte-order mark, a UTF-8 one dropped.
+func parsedText(src []byte) string {
+	switch {
+	case bytes.HasPrefix(src, []byte{0xFF, 0xFE}):
+		return utf16Text(src[2:], binary.LittleEndian)
+	case bytes.HasPrefix(src, []byte{0xFE, 0xFF}):
+		return utf16Text(src[2:], binary.BigEndian)
+	}
+	return strings.TrimPrefix(string(src), "\uFEFF")
+}
+
+func utf16Text(b []byte, order binary.ByteOrder) string {
+	units := make([]uint16, len(b)/2)
+	for i := range units {
+		units[i] = order.Uint16(b[2*i:])
+	}
+	return string(utf16.Decode(units))
+}
+
+// position returns the offset in text of a 1-based line and column, which
+// yaml.v3 counts in characters, not bytes.
+func position(text []rune, line, col int) (int, bool) {
+	if line < 1 || col < 1 {
+		return 0, false
+	}
+	start := 0
+	for range line - 1 {
+		next := slices.Index(text[start:], '\n')
+		if next < 0 {
+			return 0, false
+		}
+		start += next + 1
+	}
+	length := slices.Index(text[start:], '\n')
+	if length < 0 {
+		length = len(text) - start
+	}
+	if col > length {
+		return 0, false
+	}
+	return start + col - 1, true
+}
+
+// skipBlank skips spaces, line breaks and comments from i.
+func skipBlank(text []rune, i int) int {
+	for i < len(text) {
+		switch text[i] {
+		case ' ', '\t', '\n':
+			i++
+		case '#':
+			for i < len(text) && text[i] != '\n' {
+				i++
+			}
+		default:
+			return i
+		}
+	}
+	return i
+}
+
+// tokenEnd returns where the token at i ends: at a space, a line break or a
+// flow indicator.
+func tokenEnd(text []rune, i int) int {
+	for i < len(text) && !strings.ContainsRune(" \t\n,[]{}", text[i]) {
+		i++
+	}
+	return i
 }
 
 // checkSchema2Keys checks the shape of the four schema-2 keys before the

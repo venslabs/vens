@@ -15,12 +15,14 @@
 package riskconfig
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"reflect"
 	"slices"
 	"strings"
 	"testing"
+	"unicode/utf16"
 
 	"go.yaml.in/yaml/v3"
 
@@ -324,7 +326,7 @@ func TestSchemaVersion(t *testing.T) {
 		"!!int 2": "!!int 2", `!!int "2"`: `!!int "2"`, "!!int 3": "!!int 3", "|\n  2": `a block scalar "2\n"`, ">-\n  2": `a block scalar "2"`,
 		"!!binary Mg==": "!!binary Mg==", "!<tag:yaml.org,2002:int> 2": "!!int 2",
 		// yaml.v3 drops a bare ! tag; the source still shows it.
-		"! 2": "! 2", "&v ! 2": "&v ! 2", "! &v 2": "! &v 2", "!   2   # the format": "!   2",
+		"! 2": "! 2", "&v ! 2": "&v ! 2", "! &v 2": "! &v 2", "!   2   # the format": "! 2", "!<!> 2": "!<!> 2",
 	} {
 		parseFails(t, "schema_version: "+written+"\n"+body, 2, "schema_version must be the integer 2, got "+shown)
 	}
@@ -351,6 +353,71 @@ func TestMarkerSpellingAtItsPlace(t *testing.T) {
 		mustParse(t, src)
 		if _, err := Parse([]byte(strings.Replace(src, "schema_version: 2", "schema_version: ! 2", 1))); errorCode(err) != 2 {
 			t.Errorf("%s line breaks: ! 2 gave %v, want E2", name, err)
+		}
+	}
+}
+
+// The marker's properties are read as a sequence from the node's place, so a
+// tag on the line after an anchor, or after a comment, is still seen.
+func TestMarkerPropertiesOverLines(t *testing.T) {
+	body := strings.TrimPrefix(minimal, "schema_version: 2\n")
+	for written, shown := range map[string]string{
+		"&v\n  ! 2":        "&v ! 2",
+		"&v # c\n  ! 2":    "&v ! 2",
+		"!\n  2":           "! 2",
+		"! # c\n  &v 2":    "! &v 2",
+		"&v\n  # c\n  ! 2": "&v ! 2",
+	} {
+		parseFails(t, "schema_version: "+written+"\n"+body, 2, "schema_version must be the integer 2, got "+shown)
+	}
+	for _, written := range []string{"&v\n  2", "&v # c\n  2", "\n  # c\n  2"} {
+		mustParse(t, "schema_version: "+written+"\n"+body)
+	}
+}
+
+// utf16File encodes s as UTF-16 in the given byte order, behind its
+// byte-order mark, as yaml.v3 reads such a file.
+func utf16File(s string, order binary.ByteOrder) []byte {
+	units := utf16.Encode([]rune(s))
+	out := make([]byte, 2+2*len(units))
+	order.PutUint16(out, 0xFEFF)
+	for i, u := range units {
+		order.PutUint16(out[2+2*i:], u)
+	}
+	return out
+}
+
+func TestMarkerInUTF16Files(t *testing.T) {
+	for name, order := range map[string]binary.ByteOrder{"UTF-16LE": binary.LittleEndian, "UTF-16BE": binary.BigEndian} {
+		for written, want := range map[string]string{
+			"! 2":    "schema_version must be the integer 2, got ! 2",
+			"&v ! 2": "schema_version must be the integer 2, got &v ! 2",
+			"2":      "",
+		} {
+			src := utf16File(strings.Replace(minimal, "schema_version: 2", "schema_version: "+written, 1), order)
+			_, err := Parse(src)
+			switch {
+			case want == "" && err != nil:
+				t.Errorf("%s, %s: %v", name, written, err)
+			case want != "" && (err == nil || err.Error() != want):
+				t.Errorf("%s, %s: error %v, want %q", name, written, err, want)
+			}
+		}
+	}
+}
+
+// A file yaml.v3 has read always shows its marker at the node's place; a
+// source that does not, here one other than the file parsed, is refused
+// rather than taken for a plain 2.
+func TestMarkerNotFoundFailsClosed(t *testing.T) {
+	root, err := rootMapping([]byte(minimal))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, src := range []string{"", "schema_version:\n", "schema_version: 3\n", "# the marker was here\n"} {
+		err := checkSchemaVersion(root, []byte(src))
+		if errorCode(err) != 2 || !strings.Contains(err.Error(), "vens cannot read it at line 1 of the file") {
+			t.Errorf("source %q: got %v, want E2 saying the marker cannot be read", src, err)
 		}
 	}
 }
