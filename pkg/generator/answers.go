@@ -58,9 +58,12 @@ type factorRecord struct {
 }
 
 // rated records a rated CVE for answers.json and adds its counters to the
-// run's.
+// run's, reasoning_missing last.
 func (run *scoringRun) rated(c *cve, a *assessment, l contract.Levels) {
 	counters := c.counters(l)
+	if a.unexplained {
+		counters = append(counters, reasoningMissing)
+	}
 	for _, name := range counters {
 		run.counters[name]++
 	}
@@ -82,7 +85,8 @@ func (run *scoringRun) rated(c *cve, a *assessment, l contract.Levels) {
 
 // unrated records, unrated, a CVE of a failing batch that was answered at
 // least once: each answer as its reply reads, before Go crosses it with the
-// CVE or the config, and the cannot_tell each such reading counts.
+// CVE or the config, the cannot_tell each such reading counts, and
+// reasoning_missing.
 func (run *scoringRun) unrated(c *cve, a *assessment) {
 	if len(a.read) == 0 {
 		return
@@ -94,6 +98,9 @@ func (run *scoringRun) unrated(c *cve, a *assessment) {
 		if reading == contract.CannotTell || reading == contract.Invalid {
 			e.Counters = append(e.Counters, f.Counter())
 		}
+	}
+	if a.unexplained {
+		e.Counters = append(e.Counters, reasoningMissing)
 	}
 	for _, name := range e.Counters {
 		run.counters[name]++

@@ -205,6 +205,51 @@ func TestGenerator_AdjustmentKeyWrittenTwiceKeepsTheBaselines(t *testing.T) {
 	}
 }
 
+// An adjustment reply without reasoning, or with one empty or blank, keeps
+// its answers, logged at WARN; its line of the claim reads "(no reasoning
+// given)" and the CVE counts reasoning_missing. A reply Go cannot read
+// leaves the baselines, and its line reads the same.
+func TestGenerator_AdjustmentWithoutReasoning(t *testing.T) {
+	const (
+		fields   = `"opportunity":"full_access_or_expensive_resources_required","confidentiality":"affected","integrity":"affected","availability":"affected"`
+		answered = "adjustment (opportunity: full_access_or_expensive_resources_required, confidentiality: affected, integrity: affected, availability: affected)"
+		kept     = "Adjustment reply gives no reasoning; keeping its answers"
+	)
+	for name, tc := range map[string]struct {
+		reply, head, warning string
+		want                 int
+	}{
+		"absent":     {`{` + fields + `}`, answered, kept, 0},
+		"empty":      {`{"reasoning":"",` + fields + `}`, answered, kept, 0},
+		"blank":      {`{"reasoning":" \n\t ",` + fields + `}`, answered, kept, 0},
+		"unreadable": {`not json`, "adjustment (unreadable)", "Unreadable adjustment reply; the baselines stand", 7},
+	} {
+		t.Run(name, func(t *testing.T) {
+			logs := withCapturedLogs(t)
+			at := attestation.NewBuilder(attestation.Opts{Provider: "mock", Model: "mock"})
+			m := &fakeLLM{
+				answer: func(c fakeCall, _ string) any {
+					if c.factor == contract.O {
+						return "some_access_or_resources_required"
+					}
+					return nil
+				},
+				reply: func(c fakeCall) (string, bool) { return tc.reply, c.adjustment() },
+			}
+			g := newGen(t, Opts{LLM: m})
+			g.SetAttestor(at)
+			var emitted []outputhandler.VulnRating
+			require.NoError(t, g.GenerateRiskScore(context.Background(), []Vulnerability{disputedRow(testVulns(1)[0])}, collect(&emitted)))
+
+			assert.Equal(t, tc.want, vectorLevel(t, emitted[0].Rating.Vector, "O"))
+			lines := strings.Split(claims(t, at)[0].Reasoning, "\n")
+			assert.Equal(t, tc.head+": (no reasoning given)", lines[len(lines)-1])
+			assert.Len(t, logs.find(slog.LevelWarn, tc.warning), 1)
+			assert.Equal(t, int64(1), runSummary(t, logs).attrs["counters."+reasoningMissing])
+		})
+	}
+}
+
 // The adjustment shows as its baseline the answer Go kept: an ordinary
 // answer off the list, which Go read as cannot_tell, is shown as cannot_tell,
 // so that keeping it keeps what Go keeps. A floored axis shows none.

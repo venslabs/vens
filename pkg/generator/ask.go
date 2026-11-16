@@ -215,7 +215,8 @@ func readEntries(ctx context.Context, f contract.Factor, raw string) ([]entry, e
 
 // readEntry reads the answer an entry gives for CVE id. An entry a key
 // written twice leaves in doubt keeps every answer it wrote, as a JSON array
-// no list holds: Go reads it as cannot_tell, as an answer off the list.
+// no list holds: Go reads it as cannot_tell, as an answer off the list. An
+// answer without reasoning is kept, logged at WARN.
 func readEntry(ctx context.Context, f contract.Factor, id string, e entry, evidenceRef string) reply {
 	r := reply{
 		answer:      answerIDs(f, e.fields["answer"]),
@@ -228,11 +229,13 @@ func readEntry(ctx context.Context, f contract.Factor, id string, e entry, evide
 		r.answer = []string{string(r.raw)}
 		slog.WarnContext(ctx, "Model wrote a key twice; reading the answer as cannot_tell",
 			"vuln", id, "question", string(f), "entry", string(e.text))
-		return r
-	}
-	if reading, _ := contract.ReadAnswer(f, r.answer...); reading == contract.Invalid {
+	} else if reading, _ := contract.ReadAnswer(f, r.answer...); reading == contract.Invalid {
 		slog.WarnContext(ctx, "Model gave an answer off the list; reading it as cannot_tell",
 			"vuln", id, "question", string(f), "answer", string(r.raw))
+	}
+	if oneLine(r.reasoning) == "" {
+		slog.WarnContext(ctx, "Model gave an answer without reasoning; keeping it",
+			"vuln", id, "question", string(f))
 	}
 	return r
 }

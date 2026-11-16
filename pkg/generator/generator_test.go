@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strconv"
 	"strings"
 	"testing"
@@ -505,4 +506,61 @@ func TestGenerator_ClaimReasoningKeepsOneLinePerAnswer(t *testing.T) {
 	require.Len(t, lines, len(questionsUndeclared)+1)
 	assert.Equal(t, "M (low_or_no_reward): It holds the keys. An attacker wants them. Enough.", lines[0])
 	assert.Equal(t, "adjustment (opportunity: keep, confidentiality: affected, integrity: affected, availability: affected): The dispute stands.", lines[len(lines)-1])
+}
+
+// An answer given without reasoning, or with one empty or blank, is kept:
+// logged at WARN, its line of the claim reads "(no reasoning given)", and
+// its CVE counts reasoning_missing once, however many answers lack one.
+func TestGenerator_AnswerWithoutReasoning(t *testing.T) {
+	logs := withCapturedLogs(t)
+	parent := t.TempDir()
+	at := attestation.NewBuilder(attestation.Opts{Provider: "mock", Model: "mock"})
+	m := &fakeLLM{edit: func(c fakeCall, entry map[string]any) {
+		switch id := entry["vulnId"]; {
+		case id == "CVE-2024-0000":
+			delete(entry, "reasoning")
+		case id == "CVE-2024-0001" && c.factor == contract.M:
+			entry["reasoning"] = ""
+		case id == "CVE-2024-0002" && c.factor == contract.M:
+			entry["reasoning"] = " \n\t "
+		}
+	}}
+	g := newGen(t, Opts{LLM: m, DebugDir: parent})
+	g.SetAttestor(at)
+	var emitted []outputhandler.VulnRating
+	require.NoError(t, g.GenerateRiskScore(context.Background(), testVulns(4), collect(&emitted)))
+
+	for _, r := range emitted {
+		assert.Equal(t, 1, vectorLevel(t, r.Rating.Vector, "M"), "%s keeps its answer", r.VulnID)
+	}
+	warned := map[string]int{}
+	for _, r := range logs.find(slog.LevelWarn, "Model gave an answer without reasoning; keeping it") {
+		warned[r.attrs["vuln"].(string)]++
+	}
+	assert.Equal(t, map[string]int{"CVE-2024-0000": len(questionsUndeclared), "CVE-2024-0001": 1, "CVE-2024-0002": 1}, warned)
+
+	got := claims(t, at)
+	require.Len(t, got, 4)
+	for _, line := range strings.Split(got[0].Reasoning, "\n") {
+		assert.True(t, strings.HasSuffix(line, "): (no reasoning given)"), line)
+	}
+	for i, want := range []string{
+		"M (low_or_no_reward): (no reasoning given)",
+		"M (low_or_no_reward): (no reasoning given)",
+		"M (low_or_no_reward): because of CVE-2024-0003",
+	} {
+		assert.Equal(t, want, strings.Split(got[i+1].Reasoning, "\n")[0])
+	}
+
+	assert.Equal(t, int64(3), runSummary(t, logs).attrs["counters."+reasoningMissing])
+	answers, _ := readAnswers(t, parent)
+	counted := map[string]int{}
+	for _, v := range answers.Vulnerabilities {
+		for _, name := range v.Counters {
+			if name == reasoningMissing {
+				counted[v.VulnID]++
+			}
+		}
+	}
+	assert.Equal(t, map[string]int{"CVE-2024-0000": 1, "CVE-2024-0001": 1, "CVE-2024-0002": 1}, counted)
 }

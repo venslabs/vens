@@ -41,10 +41,20 @@ type assessment struct {
 	// reasons holds each answer's sentence in call order, as "factor
 	// (answer): sentence", the adjustment's last.
 	reasons []string
+	// unexplained marks a CVE whose reasons hold noReasoning.
+	unexplained bool
 	// evidence lists the evidence of every call whose answer Go kept, in
 	// call order, each once.
 	evidence []string
 }
+
+const (
+	// noReasoning stands in a reason for a sentence the reply left out or
+	// left blank.
+	noReasoning = "(no reasoning given)"
+	// reasoningMissing counts the CVEs whose claim holds noReasoning.
+	reasoningMissing = "reasoning_missing"
+)
 
 func (a *assessment) answer(f contract.Factor, r reply) {
 	if f == contract.ID {
@@ -57,7 +67,7 @@ func (a *assessment) answer(f contract.Factor, r reply) {
 	}
 	a.read = append(a.read, f)
 	a.raw[f] = r.raw
-	a.note(fmt.Sprintf("%s (%s): %s", f, strings.Join(r.answer, ", "), oneLine(r.reasoning)), r.evidenceRef)
+	a.note(fmt.Sprintf("%s (%s)", f, strings.Join(r.answer, ", ")), r.reasoning, r.evidenceRef)
 }
 
 // oneLine collapses each run of whitespace, line breaks included, to one
@@ -66,8 +76,15 @@ func oneLine(s string) string {
 	return strings.Join(strings.Fields(s), " ")
 }
 
-func (a *assessment) note(reason, evidenceRef string) {
-	a.reasons = append(a.reasons, reason)
+// note adds a reason, "head: sentence", with the sentence on one line, and
+// the evidence of its call. A reasoning left out or blank reads noReasoning.
+func (a *assessment) note(head, reasoning, evidenceRef string) {
+	sentence := oneLine(reasoning)
+	if sentence == "" {
+		sentence = noReasoning
+		a.unexplained = true
+	}
+	a.reasons = append(a.reasons, head+": "+sentence)
 	if evidenceRef != "" && !slices.Contains(a.evidence, evidenceRef) {
 		a.evidence = append(a.evidence, evidenceRef)
 	}
