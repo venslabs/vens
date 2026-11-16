@@ -49,6 +49,7 @@ var (
 	preElement  = regexp.MustCompile(`(?s)<pre[^>]*>(.*?)</pre>`)
 	htmlTag     = regexp.MustCompile(`<[^>]+>`)
 	topLevelKey = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*:(\s|$)`)
+	docMarker   = regexp.MustCompile(`^(---|\.\.\.)(\s|$)`)
 	projectKey  = regexp.MustCompile(`(?m)^\s*project:`)
 	contextKey  = regexp.MustCompile(`(?m)^\s*context:`)
 )
@@ -139,16 +140,17 @@ func markedError(lines []string, i int) int {
 }
 
 // preBlocks returns the configs inside an HTML page's <pre> elements, tags
-// stripped. A <pre> on the landing page is a terminal session, so a config
-// is a run of YAML lines that starts at a top-level key; blank lines between
-// its keys do not end it.
+// stripped and the indentation every line shares removed. A <pre> on the
+// landing page is a terminal session, so a config is a run of YAML lines
+// that starts at a top-level key; blank lines between its keys and document
+// markers do not end it, so the run is what a reader would copy.
 func preBlocks(name, src string) []block {
 	var blocks []block
 	lines := strings.Split(src, "\n")
 	for _, loc := range preElement.FindAllStringSubmatchIndex(src, -1) {
 		start := strings.Count(src[:loc[0]], "\n")
 		text := html.UnescapeString(htmlTag.ReplaceAllString(src[loc[2]:loc[3]], ""))
-		textLines := strings.Split(text, "\n")
+		textLines := dedent(strings.Split(text, "\n"))
 		for _, run := range yamlRuns(textLines) {
 			blocks = append(blocks, block{
 				source: fmt.Sprintf("%s:%d", name, start+run.first+1),
@@ -163,10 +165,25 @@ func preBlocks(name, src string) []block {
 // yamlRun is a run of YAML lines, from first up to end.
 type yamlRun struct{ first, end int }
 
+// dedent removes the spaces that every non-blank line starts with.
+func dedent(lines []string) []string {
+	common := -1
+	for _, l := range lines {
+		if strings.TrimSpace(l) != "" && (common < 0 || leadingSpaces(l) < common) {
+			common = leadingSpaces(l)
+		}
+	}
+	out := make([]string, len(lines))
+	for i, l := range lines {
+		out[i] = l[min(max(common, 0), leadingSpaces(l)):]
+	}
+	return out
+}
+
 // yamlRuns returns the runs of YAML lines, in order. A run starts at a
-// top-level key and takes keys, indented lines, list items, comments and
-// blank lines, up to the first line that is none of these, such as a shell
-// command or its output.
+// top-level key and takes keys, indented lines, list items, comments,
+// document markers and blank lines, up to the first line that is none of
+// these, such as a shell command or its output.
 func yamlRuns(lines []string) []yamlRun {
 	var runs []yamlRun
 	for i := 0; i < len(lines); i++ {
@@ -186,7 +203,7 @@ func yamlRuns(lines []string) []yamlRun {
 func isYAMLLine(line string) bool {
 	trimmed := strings.TrimSpace(line)
 	return trimmed == "" || strings.HasPrefix(trimmed, "#") || strings.HasPrefix(line, "- ") ||
-		len(line) > len(strings.TrimLeft(line, " \t")) || topLevelKey.MatchString(line)
+		len(line) > len(strings.TrimLeft(line, " \t")) || topLevelKey.MatchString(line) || docMarker.MatchString(line)
 }
 
 // docsConfigBlocks finds every config the docs show: fenced YAML blocks in
@@ -356,6 +373,49 @@ func TestPreBlocksReadWholeConfigs(t *testing.T) {
 	}
 	if err := checkBlock(blocks[1]); err == nil || !strings.Contains(err.Error(), `got "everywhere"`) {
 		t.Errorf("the broken config: got %v, want its invalid exposure", err)
+	}
+}
+
+// A second document after a config stays in its block, as a reader would copy
+// it, and an example indented as a whole is read once its indentation is
+// removed: both broken examples are caught.
+func TestPreBlocksKeepDocumentsAndIndentation(t *testing.T) {
+	page := strings.Join([]string{
+		`<pre class="vens-code"><code><span class="c"># 1. describe your system</span>`,
+		`<span class="k">cat</span> config.yaml`,
+		`schema_version: 2`,
+		`project:`,
+		`  name: my-api`,
+		`context:`,
+		`  exposure: internet`,
+		`  data_sensitivity: high`,
+		`  business_criticality: high`,
+		`---`,
+		`context: {tracability: x}`,
+		``,
+		`<span class="c"># 2. score your scanner report</span>`,
+		`<span class="k">export</span> OPENAI_API_KEY=sk-...</code></pre>`,
+		`<pre><code>  schema_version: 2`,
+		`  project:`,
+		`    name: indented`,
+		``,
+		`  context:`,
+		`    exposure: everywhere`,
+		`    data_sensitivity: high`,
+		`    business_criticality: high</code></pre>`,
+	}, "\n")
+	blocks := preBlocks("page.html", page)
+	if len(blocks) != 2 {
+		t.Fatalf("found %d configs, want 2: %+v", len(blocks), blocks)
+	}
+	if !strings.Contains(blocks[0].text, "tracability") {
+		t.Errorf("the second document was cut from the block:\n%s", blocks[0].text)
+	}
+	if err := checkBlock(blocks[0]); err == nil || !strings.Contains(err.Error(), "a second YAML document") {
+		t.Errorf("a config followed by a second document: got %v, want it refused", err)
+	}
+	if err := checkBlock(blocks[1]); err == nil || !strings.Contains(err.Error(), `got "everywhere"`) {
+		t.Errorf("the indented config: got %v, want its invalid exposure", err)
 	}
 }
 
