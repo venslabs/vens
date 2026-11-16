@@ -31,11 +31,12 @@ type scoringRun struct {
 	llmCalls, askedAgain, splits int
 	// calls counts the calls of each question, and of the adjustments.
 	calls map[string]int
-	// counters sums each counter over the CVEs rated.
+	// counters sums each counter over the CVEs recorded, rated or not.
 	counters map[string]int
 	// defects counts each defect reading the replies found, by kind.
 	defects map[string]int
-	// entries holds each CVE rated, in run order, as answers.json writes it.
+	// entries holds each CVE recorded, rated or not, in run order, as
+	// answers.json writes it.
 	entries []answersEntry
 }
 

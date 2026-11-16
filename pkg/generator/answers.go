@@ -24,11 +24,13 @@ import (
 	"github.com/venslabs/vens/pkg/owasp"
 )
 
-// answersFile is answers.json, which --debug-dir gets once per run: per CVE
-// and factor, the answer as the reply gave it and how Go read it, the level
-// and where it came from; and the counters, per CVE and summed over the run.
-// A failed run also lists, unrated, the CVEs of its failing batch it read
-// answers for. It holds no reasoning and no CVE text.
+// answersFile is answers.json, which --debug-dir gets once per run: per CVE,
+// how its adjustment read, and per factor, the answer as the reply gave it
+// and how Go read it, the level and where it came from; and the counters,
+// per CVE and summed over the run. A failed run also lists, unrated, the
+// CVEs of its failing batch it read answers for. It holds no reasoning and
+// no CVE text Go sent, but keeps each answer verbatim: one off its list is
+// the model's own text, which may quote the CVE's.
 type answersFile struct {
 	Vulnerabilities []answersEntry `json:"vulnerabilities"`
 	Counters        map[string]int `json:"counters"`
@@ -44,7 +46,8 @@ type answersEntry struct {
 	// Adjustment is how the adjustment reply read: not_asked, answered,
 	// unreadable or key_written_twice.
 	Adjustment adjustmentReading `json:"adjustment"`
-	// Factors holds the 16 in the vector's order.
+	// Factors holds the 16 in the vector's order; an unrated entry, only the
+	// questions answered, in call order.
 	Factors  []factorRecord `json:"factors"`
 	Counters []string       `json:"counters,omitempty"`
 }

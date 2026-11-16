@@ -318,7 +318,8 @@ func readAnswers(t *testing.T, parent string) (answersJSON, string) {
 
 // answers.json holds, per CVE and factor in the vector's order, the answer as
 // replied, how Go read it, the adjustment's answer, the level and where it
-// came from; the counters per CVE and summed; and no reasoning or CVE text.
+// came from; the counters per CVE and summed; and no reasoning, nor CVE text
+// but what an answer off its list holds, kept verbatim.
 func TestDebugDir_AnswersJSON(t *testing.T) {
 	parent := t.TempDir()
 	cfg := fullConfig()
