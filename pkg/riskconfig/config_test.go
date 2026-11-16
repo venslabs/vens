@@ -422,6 +422,20 @@ func TestUnknownKeys(t *testing.T) {
 	mustParse(t, withContext("<<: {notes: merged}"))
 }
 
+// A key written in the mapping wins over a merged one, and an earlier merge
+// over a later one, in the checks as in the decode: the value the checks
+// read is the one that loads.
+func TestMergePrecedence(t *testing.T) {
+	for _, tc := range []struct{ name, want string }{
+		{"listener: present\n  <<: {listener: }", "present"},
+		{"<<: [{listener: absent}, {listener: }]", "absent"},
+	} {
+		if got := mustParse(t, withContext(tc.name)).Context.Listener; got != tc.want {
+			t.Errorf("%s: listener = %q, want %q", tc.name, got, tc.want)
+		}
+	}
+}
+
 func TestEmptyOrNotAMapping(t *testing.T) {
 	for _, src := range []string{"", "\n", "# only a comment\n", "---\n", "null\n", "~\n"} {
 		parseFails(t, src, 0, "config.yaml is empty")
