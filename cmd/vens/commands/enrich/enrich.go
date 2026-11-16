@@ -54,8 +54,9 @@ func Example() string {
   export OPENAI_MODEL=gpt-5.4-mini
 
   trivy image nginx:1.25 --format=json --severity HIGH,CRITICAL > report.json
+  SBOM_UUID="urn:uuid:$(uuidgen | tr '[:upper:]' '[:lower:]')"
 
-  %s generate --config-file config.yaml report.json vex.cdx.json
+  %s generate --config-file config.yaml --sbom-serial-number "$SBOM_UUID" report.json vex.cdx.json
   %s enrich --vex vex.cdx.json report.json
 
   # With output file

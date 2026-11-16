@@ -92,6 +92,7 @@ nav:
   - Blog: blog/index.md
   - Reference:
       - config.yaml schema: reference/config-schema.md
+      - vens init: reference/init.md
       - vens generate: reference/generate.md
       - vens enrich: reference/enrich.md
   - Troubleshooting: troubleshooting.md
