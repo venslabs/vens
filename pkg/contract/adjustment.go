@@ -177,7 +177,7 @@ func newAdjustmentEntry(c CVE, floored [3]bool, flags []Flag, given Answers) (ad
 		Flags:          flags,
 		Answers:        givenAnswers{Opportunity: given.O},
 	}
-	if !c.described() {
+	if !c.Described() {
 		e.Answers.Opportunity = cannotTell
 	}
 	for _, v := range c.vectors() {

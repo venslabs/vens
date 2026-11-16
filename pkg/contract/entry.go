@@ -59,8 +59,8 @@ type VendorSeverity struct {
 	Severity string
 }
 
-// described reports whether a row of the CVE has a description.
-func (c CVE) described() bool {
+// Described reports whether a row of the CVE has a description.
+func (c CVE) Described() bool {
 	return slices.ContainsFunc(c.Rows, func(r Row) bool { return strings.TrimSpace(r.Description) != "" })
 }
 
