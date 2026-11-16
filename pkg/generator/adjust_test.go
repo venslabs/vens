@@ -24,6 +24,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/venslabs/vens/pkg/attestation"
 	"github.com/venslabs/vens/pkg/contract"
 	"github.com/venslabs/vens/pkg/outputhandler"
 )
@@ -149,6 +150,57 @@ func TestGenerator_UnreadableAdjustmentKeepsTheBaselines(t *testing.T) {
 			warned := len(logs.find(slog.LevelWarn, "Unreadable adjustment reply; the baselines stand")) +
 				len(logs.find(slog.LevelWarn, "Adjustment answer off its list; the baseline stands"))
 			assert.Positive(t, warned)
+		})
+	}
+}
+
+// An adjustment reply that writes a key twice, at any depth, leaves every
+// baseline, logged at WARN with the reply: encoding/json would keep the last
+// value, and could lower a level the model meant to keep. The same reply
+// written once lowers it.
+func TestGenerator_AdjustmentKeyWrittenTwiceKeepsTheBaselines(t *testing.T) {
+	const (
+		lower = `"opportunity":"full_access_or_expensive_resources_required"`
+		axes  = `"confidentiality":"affected","integrity":"affected","availability":"affected"`
+	)
+	for name, tc := range map[string]struct {
+		reply, line string
+		want        int
+	}{
+		"twice": {`{"reasoning":"r","opportunity":"keep",` + lower + `,` + axes + `}`,
+			"adjustment (a key written twice): r", 7},
+		"nested": {`{"reasoning":"r",` + lower + `,` + axes + `,"detail":{"why":[{"a":1,"a":2}]}}`,
+			"adjustment (a key written twice): r", 7},
+		"once": {`{"reasoning":"r",` + lower + `,` + axes + `}`,
+			"adjustment (opportunity: full_access_or_expensive_resources_required, confidentiality: affected, integrity: affected, availability: affected): r", 0},
+	} {
+		t.Run(name, func(t *testing.T) {
+			logs := withCapturedLogs(t)
+			at := attestation.NewBuilder(attestation.Opts{Provider: "mock", Model: "mock"})
+			m := &fakeLLM{
+				answer: func(c fakeCall, _ string) any {
+					if c.factor == contract.O {
+						return "some_access_or_resources_required"
+					}
+					return nil
+				},
+				reply: func(c fakeCall) (string, bool) { return tc.reply, c.adjustment() },
+			}
+			g := newGen(t, Opts{LLM: m})
+			g.SetAttestor(at)
+			var emitted []outputhandler.VulnRating
+			require.NoError(t, g.GenerateRiskScore(context.Background(), []Vulnerability{disputedRow(testVulns(1)[0])}, collect(&emitted)))
+
+			assert.Equal(t, tc.want, vectorLevel(t, emitted[0].Rating.Vector, "O"))
+			lines := strings.Split(claims(t, at)[0].Reasoning, "\n")
+			assert.Equal(t, tc.line, lines[len(lines)-1])
+			warned := logs.find(slog.LevelWarn, "Adjustment reply writes a key twice; the baselines stand")
+			if tc.want == 0 {
+				assert.Empty(t, warned)
+				return
+			}
+			require.Len(t, warned, 1)
+			assert.Equal(t, tc.reply, warned[0].attrs["reply"])
 		})
 	}
 }

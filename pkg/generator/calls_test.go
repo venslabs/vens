@@ -394,6 +394,100 @@ func TestGenerator_UnprefixedV3VectorShownBesideV2(t *testing.T) {
 	assert.NotContains(t, request, "CVSS 2.0")
 }
 
+// A key an answer writes twice, at any depth, leaves the answer in doubt,
+// where encoding/json would keep the last value without a word: it reads as
+// cannot_tell, counted and logged with the answer's text, as an answer off
+// the list, and answers.json and the claim show every answer it wrote. An
+// answer without one reads as before.
+func TestGenerator_KeyWrittenTwiceReadsCannotTell(t *testing.T) {
+	const (
+		twice  = `{"vulnId":"CVE-2024-0000","answer":"cannot_tell","answer":"low_or_no_reward","reasoning":"r0"}`
+		nested = `{"vulnId":"CVE-2024-0001","answer":"low_or_no_reward","reasoning":"r1","detail":{"why":[{"a":1,"a":2}]}}`
+		once   = `{"vulnId":"CVE-2024-0002","answer":"low_or_no_reward","reasoning":"r2"}`
+	)
+	logs := withCapturedLogs(t)
+	parent := t.TempDir()
+	at := attestation.NewBuilder(attestation.Opts{Provider: "mock", Model: "mock"})
+	m := &fakeLLM{reply: func(c fakeCall) (string, bool) {
+		return `{"answers":[` + twice + "," + nested + "," + once + `]}`, c.factor == contract.M
+	}}
+	g := newGen(t, Opts{LLM: m, DebugDir: parent})
+	g.SetAttestor(at)
+	var emitted []outputhandler.VulnRating
+	require.NoError(t, g.GenerateRiskScore(context.Background(), testVulns(3), collect(&emitted)))
+
+	got := byID(emitted)
+	for id, want := range map[string]int{"CVE-2024-0000": 9, "CVE-2024-0001": 9, "CVE-2024-0002": 1} {
+		assert.Equal(t, want, vectorLevel(t, got[id].Rating.Vector, "M"), id)
+	}
+	warned := map[string]any{}
+	for _, r := range logs.find(slog.LevelWarn, "Model wrote a key twice; reading the answer as cannot_tell") {
+		assert.Equal(t, "M", r.attrs["question"])
+		warned[r.attrs["vuln"].(string)] = r.attrs["entry"]
+	}
+	assert.Equal(t, map[string]any{"CVE-2024-0000": twice, "CVE-2024-0001": nested}, warned)
+	assert.Empty(t, logs.find(slog.LevelWarn, "Model gave an answer off the list; reading it as cannot_tell"))
+	assert.Len(t, m.of(contract.M), 1, "an answer in doubt is an answer: no ask-again")
+	assert.Equal(t, int64(2), runSummary(t, logs).attrs["counters."+contract.M.Counter()])
+
+	answers, _ := readAnswers(t, parent)
+	written := map[string][]any{}
+	for _, v := range answers.Vulnerabilities {
+		for _, f := range v.Factors {
+			if f.Factor == "M" {
+				written[v.VulnID] = []any{f.Answer, f.Reading}
+			}
+		}
+	}
+	assert.Equal(t, map[string][]any{
+		"CVE-2024-0000": {[]any{"cannot_tell", "low_or_no_reward"}, "invalid"},
+		"CVE-2024-0001": {[]any{"low_or_no_reward"}, "invalid"},
+		"CVE-2024-0002": {"low_or_no_reward", "answered"},
+	}, written)
+	assert.Equal(t, `M (["cannot_tell","low_or_no_reward"]): r0`, strings.Split(claims(t, at)[0].Reasoning, "\n")[0])
+}
+
+// A key written twice outside every answer leaves them all in doubt. Here
+// the reply writes its list twice and encoding/json keeps the second alone:
+// its answer reads as cannot_tell, and the CVE only the first list answers
+// is asked again.
+func TestGenerator_KeyWrittenTwiceOutsideTheAnswers(t *testing.T) {
+	const reply = `{"answers":[{"vulnId":"CVE-2024-0001","answer":"high_reward","reasoning":"r"}],` +
+		`"answers":[{"vulnId":"CVE-2024-0000","answer":"low_or_no_reward","reasoning":"r"}]}`
+	logs := withCapturedLogs(t)
+	m := &fakeLLM{reply: func(c fakeCall) (string, bool) { return reply, c.factor == contract.M && c.n == 1 }}
+	g := newGen(t, Opts{LLM: m})
+	var emitted []outputhandler.VulnRating
+	require.NoError(t, g.GenerateRiskScore(context.Background(), testVulns(2), collect(&emitted)))
+
+	got := byID(emitted)
+	assert.Equal(t, 9, vectorLevel(t, got["CVE-2024-0000"].Rating.Vector, "M"))
+	assert.Equal(t, 1, vectorLevel(t, got["CVE-2024-0001"].Rating.Vector, "M"), "the fake's answer when asked again")
+	assert.Equal(t, []int{2, 1}, sizes(m.of(contract.M)))
+	warned := logs.find(slog.LevelWarn, "Model wrote a key twice outside its answers; reading each as cannot_tell")
+	require.Len(t, warned, 1)
+	assert.Equal(t, reply, warned[0].attrs["reply"])
+	assert.Len(t, logs.find(slog.LevelWarn, "Model wrote a key twice; reading the answer as cannot_tell"), 1)
+}
+
+func TestRepeatedKeys(t *testing.T) {
+	for text, want := range map[string]int{
+		`{"a":1,"b":2}`:                     0,
+		`{"a":1,"a":2}`:                     1,
+		`{"a":1,"a":2,"a":3}`:               2,
+		`{"a":{"b":1,"b":2}}`:               1,
+		`[{"a":1},{"a":2}]`:                 0,
+		`{"a":[{"b":1,"b":2}],"c":{"b":3}}`: 1,
+		`{"a":1,"\u0061":2}`:                1,
+		`{"a":"{\"b\":1,\"b\":2}"}`:         0,
+		`{"a":1e400,"a":2}`:                 1,
+		`"a"`:                               0,
+		`not json`:                          0,
+	} {
+		assert.Equal(t, want, repeatedKeys([]byte(text)), text)
+	}
+}
+
 func promptHashes(t *testing.T, at *attestation.Builder) []string {
 	t.Helper()
 	var hashes []string

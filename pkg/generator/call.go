@@ -15,6 +15,7 @@
 package generator
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -71,4 +72,56 @@ func text(raw json.RawMessage) string {
 		return s
 	}
 	return string(raw)
+}
+
+// repeatedKeys counts, at any depth of the JSON text data, the keys an
+// object writes again: encoding/json keeps the last value of such a key and
+// says nothing. data is text json.Unmarshal has accepted, which bounds its
+// depth; any other counts none.
+func repeatedKeys(data []byte) int {
+	dec := json.NewDecoder(bytes.NewReader(data))
+	// A number past float64's range would fail the walk, not the decode.
+	dec.UseNumber()
+	n, err := countRepeated(dec)
+	if err != nil {
+		return 0
+	}
+	return n
+}
+
+// countRepeated reads one JSON value from dec and counts the keys its
+// objects write again.
+func countRepeated(dec *json.Decoder) (int, error) {
+	t, err := dec.Token()
+	if err != nil {
+		return 0, err
+	}
+	if t != json.Delim('{') && t != json.Delim('[') {
+		return 0, nil
+	}
+	object := t == json.Delim('{')
+	seen := map[string]bool{}
+	n := 0
+	for dec.More() {
+		if object {
+			key, err := dec.Token()
+			if err != nil {
+				return 0, err
+			}
+			name, _ := key.(string)
+			if seen[name] {
+				n++
+			}
+			seen[name] = true
+		}
+		inner, err := countRepeated(dec)
+		if err != nil {
+			return 0, err
+		}
+		n += inner
+	}
+	if _, err := dec.Token(); err != nil {
+		return 0, err
+	}
+	return n, nil
 }

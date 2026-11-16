@@ -15,6 +15,7 @@
 package generator
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -34,7 +35,9 @@ type reply struct {
 	// answer is one id, or for Intrusion detection the ids of the set
 	// chosen; a value of another JSON type is kept as its JSON text.
 	answer []string
-	// raw is the answer as the reply wrote it, absent when it wrote none.
+	// raw is the answer as the reply wrote it, absent when it wrote none:
+	// every answer it wrote, as a JSON array, when a key written twice
+	// leaves it in doubt.
 	raw         json.RawMessage
 	reasoning   string
 	evidenceRef string
@@ -137,13 +140,11 @@ func (g *Generator) askOnce(ctx context.Context, run *scoringRun, f contract.Fac
 
 // readReplies reads a call's reply by key, one answer per CVE. An answer for
 // a CVE the call did not ask about is ignored, and a CVE answered twice keeps
-// its first answer. An answer off its list is kept as given and logged: Go
-// reads it as cannot_tell.
+// its first answer. An answer off its list, or one a key written twice
+// leaves in doubt, is kept as given and logged: Go reads it as cannot_tell.
 func readReplies(ctx context.Context, f contract.Factor, raw, evidenceRef string, cves []*cve) (map[string]reply, error) {
-	var out struct {
-		Answers []map[string]json.RawMessage `json:"answers"`
-	}
-	if err := json.Unmarshal([]byte(raw), &out); err != nil {
+	entries, err := readEntries(ctx, f, raw)
+	if err != nil {
 		return nil, fmt.Errorf("unable to parse LLM output: %w: %q", err, raw)
 	}
 	asked := make(map[string]bool, len(cves))
@@ -151,8 +152,8 @@ func readReplies(ctx context.Context, f contract.Factor, raw, evidenceRef string
 		asked[c.id()] = true
 	}
 	got := make(map[string]reply, len(cves))
-	for _, a := range out.Answers {
-		id := text(a["vulnId"])
+	for _, e := range entries {
+		id := text(e.fields["vulnId"])
 		if !asked[id] {
 			// A provider honouring the schema cannot write one: the call's
 			// ids are an enum.
@@ -163,14 +164,101 @@ func readReplies(ctx context.Context, f contract.Factor, raw, evidenceRef string
 		if _, ok := got[id]; ok {
 			continue
 		}
-		answer := answerIDs(f, a["answer"])
-		if r, _ := contract.ReadAnswer(f, answer...); r == contract.Invalid {
-			slog.WarnContext(ctx, "Model gave an answer off the list; reading it as cannot_tell",
-				"vuln", id, "question", string(f), "answer", string(a["answer"]))
-		}
-		got[id] = reply{answer: answer, raw: a["answer"], reasoning: text(a["reasoning"]), evidenceRef: evidenceRef}
+		got[id] = readEntry(ctx, f, id, e, evidenceRef)
 	}
 	return got, nil
+}
+
+// entry is one answer of a reply: its fields by key and its text. repeated
+// marks an answer a key written twice leaves in doubt, in the answer or
+// outside every answer of the reply.
+type entry struct {
+	fields   map[string]json.RawMessage
+	text     json.RawMessage
+	repeated bool
+}
+
+// readEntries decodes a reply's answers, each key read as written.
+// encoding/json keeps the last value of a key written twice and says
+// nothing, so the reply is walked for one; one outside every answer marks
+// them all.
+func readEntries(ctx context.Context, f contract.Factor, raw string) ([]entry, error) {
+	var top map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(raw), &top); err != nil {
+		return nil, err
+	}
+	var items []json.RawMessage
+	if list, ok := top["answers"]; ok {
+		if err := json.Unmarshal(list, &items); err != nil {
+			return nil, err
+		}
+	}
+	outside := repeatedKeys([]byte(raw))
+	entries := make([]entry, len(items))
+	for i, item := range items {
+		if err := json.Unmarshal(item, &entries[i].fields); err != nil {
+			return nil, err
+		}
+		n := repeatedKeys(item)
+		entries[i].text, entries[i].repeated = item, n > 0
+		outside -= n
+	}
+	if outside > 0 {
+		slog.WarnContext(ctx, "Model wrote a key twice outside its answers; reading each as cannot_tell",
+			"question", string(f), "reply", raw)
+		for i := range entries {
+			entries[i].repeated = true
+		}
+	}
+	return entries, nil
+}
+
+// readEntry reads the answer an entry gives for CVE id. An entry a key
+// written twice leaves in doubt keeps every answer it wrote, as a JSON array
+// no list holds: Go reads it as cannot_tell, as an answer off the list.
+func readEntry(ctx context.Context, f contract.Factor, id string, e entry, evidenceRef string) reply {
+	r := reply{
+		answer:      answerIDs(f, e.fields["answer"]),
+		raw:         e.fields["answer"],
+		reasoning:   text(e.fields["reasoning"]),
+		evidenceRef: evidenceRef,
+	}
+	if e.repeated {
+		r.raw = answersWritten(e.text)
+		r.answer = []string{string(r.raw)}
+		slog.WarnContext(ctx, "Model wrote a key twice; reading the answer as cannot_tell",
+			"vuln", id, "question", string(f), "entry", string(e.text))
+		return r
+	}
+	if reading, _ := contract.ReadAnswer(f, r.answer...); reading == contract.Invalid {
+		slog.WarnContext(ctx, "Model gave an answer off the list; reading it as cannot_tell",
+			"vuln", id, "question", string(f), "answer", string(r.raw))
+	}
+	return r
+}
+
+// answersWritten is every value the JSON object item writes for "answer",
+// in order, as a JSON array.
+func answersWritten(item json.RawMessage) json.RawMessage {
+	dec := json.NewDecoder(bytes.NewReader(item))
+	var values []string
+	if _, err := dec.Token(); err != nil {
+		return json.RawMessage("[]")
+	}
+	for dec.More() {
+		key, err := dec.Token()
+		if err != nil {
+			break
+		}
+		var value json.RawMessage
+		if err := dec.Decode(&value); err != nil {
+			break
+		}
+		if key == "answer" {
+			values = append(values, string(value))
+		}
+	}
+	return json.RawMessage("[" + strings.Join(values, ",") + "]")
 }
 
 // answerIDs reads an answer as a reply writes it: one id, or for Intrusion
