@@ -90,7 +90,7 @@ func action(cmd *cobra.Command, args []string) error {
 
 	p := &prompter{in: bufio.NewReader(cmd.InOrStdin()), out: cmd.OutOrStdout()}
 
-	cfg := riskconfig.Config{}
+	cfg := riskconfig.Config{SchemaVersion: riskconfig.SchemaVersion}
 	cfg.Project.Name, err = p.askRequired("Project name")
 	if err != nil {
 		return err
