@@ -54,6 +54,11 @@ var (
 	errNotChannels = &loadError{5, "context.detection must be a mapping of network, host and application"}
 
 	newerVersion = regexp.MustCompile(`^[1-9][0-9]*$`)
+
+	// lineBreaks are the line breaks yaml.v3 counts when it numbers lines.
+	lineBreaks      = strings.NewReplacer("\r\n", "\n", "\r", "\n", "\u0085", "\n", "\u2028", "\n", "\u2029", "\n")
+	trailingComment = regexp.MustCompile(`\s#.*$`)
+	anchorProperty  = regexp.MustCompile(`^&\S+\s+`)
 )
 
 // rootMapping returns the top-level mapping of the file's one document,
@@ -87,7 +92,7 @@ func rootMapping(b []byte) (*yaml.Node, error) {
 
 // checkSchemaVersion reads the marker before anything else, so that a file
 // written for another schema gets E1 or E2 and never an error of this one.
-func checkSchemaVersion(root *yaml.Node) error {
+func checkSchemaVersion(root *yaml.Node, src []byte) error {
 	v, ok, err := lookup(root, "schema_version")
 	switch {
 	case err != nil:
@@ -101,6 +106,10 @@ func checkSchemaVersion(root *yaml.Node) error {
 	plain := v.Kind == yaml.ScalarNode && v.Style == 0
 	switch {
 	case plain && v.Value == "2":
+		// yaml.v3 drops a bare ! tag, so only the source tells `! 2` from 2.
+		if s, ok := spelling(src, v); ok && strings.HasPrefix(anchorProperty.ReplaceAllString(s, ""), "!") {
+			return &loadError{2, "schema_version must be the integer 2, got " + s}
+		}
 		return nil
 	case plain && v.Value == "1":
 		return errSchemaVersion1
@@ -108,6 +117,26 @@ func checkSchemaVersion(root *yaml.Node) error {
 		return &loadError{2, fmt.Sprintf("schema_version %s is not supported: this vens reads schema 2; the file needs a newer vens.", v.Value)}
 	}
 	return &loadError{2, "schema_version must be the integer 2, got " + asWritten(v)}
+}
+
+// spelling returns how the file writes scalar n on its line: its properties
+// and its value, without a trailing comment or the rest of a flow
+// collection. ok is false when the source has no such position.
+func spelling(src []byte, n *yaml.Node) (string, bool) {
+	lines := strings.Split(lineBreaks.Replace(strings.TrimPrefix(string(src), "\uFEFF")), "\n")
+	if n.Line < 1 || n.Line > len(lines) {
+		return "", false
+	}
+	// yaml.v3 counts columns in characters, not bytes.
+	line := []rune(lines[n.Line-1])
+	if n.Column < 1 || n.Column > len(line) {
+		return "", false
+	}
+	s := trailingComment.ReplaceAllString(string(line[n.Column-1:]), "")
+	if i := strings.IndexAny(s, ",]}"); i >= 0 {
+		s = s[:i]
+	}
+	return strings.TrimSpace(s), true
 }
 
 // checkSchema2Keys checks the shape of the four schema-2 keys before the
@@ -136,10 +165,18 @@ func checkSingleValue(ctx *yaml.Node, f Field) error {
 		return err
 	case v.Kind == yaml.SequenceNode || v.Kind == yaml.MappingNode:
 		return &loadError{4, fmt.Sprintf("%s must be a single value, one of %v", f.Path(), f.Values())}
-	case isNull(v), f == Listener && strings.TrimSpace(v.Value) == "":
+	case isNull(v), f == Listener && decodesBlank(v):
 		return &loadError{4, fmt.Sprintf("%s has no value: write one of %v or remove the key", f.Path(), f.Values())}
 	}
 	return nil
+}
+
+// decodesBlank reports whether scalar v decodes to a string that trims to
+// empty. The decoded string, not the node's text, is what validation reads:
+// `!!binary IA==` is a space.
+func decodesBlank(v *yaml.Node) bool {
+	var s string
+	return v.Decode(&s) == nil && strings.TrimSpace(s) == ""
 }
 
 func checkDetection(ctx *yaml.Node) error {

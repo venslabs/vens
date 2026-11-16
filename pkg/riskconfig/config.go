@@ -159,7 +159,7 @@ func Parse(b []byte) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := checkSchemaVersion(root); err != nil {
+	if err := checkSchemaVersion(root, b); err != nil {
 		return nil, err
 	}
 	if err := checkSchema2Keys(root); err != nil {

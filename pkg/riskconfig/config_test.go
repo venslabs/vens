@@ -16,6 +16,7 @@ package riskconfig
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
 	"slices"
 	"strings"
@@ -126,6 +127,29 @@ func TestNewKeyWrittenWithNoValue(t *testing.T) {
 		{"traceability:", "context.traceability has no value: write one of [none per_request per_individual] or remove the key"},
 	} {
 		parseFails(t, withContext(tc.line), 4, tc.want)
+	}
+}
+
+// A value is checked as it decodes, not as the node writes it: `!!binary IA==`
+// is a single space, which no field may load as.
+func TestValueBlankOnceDecoded(t *testing.T) {
+	const blank = "!!binary IA=="
+	for _, tc := range []struct {
+		line string
+		code int
+		want string
+	}{
+		{"listener: " + blank, 4, "context.listener has no value: write one of [present absent unknown] or remove the key"},
+		{"data_subjects: " + blank, 4, `context.data_subjects must be one of [none one_individual hundreds thousands millions], got ""`},
+		{"traceability: " + blank, 4, `context.traceability must be one of [none per_request per_individual], got ""`},
+		{"detection: {network: " + blank + ", host: logged, application: logged}", 5,
+			"context.detection.network is required once context.detection is present (values: [not_logged logged logged_and_reviewed])"},
+	} {
+		parseFails(t, withContext(tc.line), tc.code, tc.want)
+	}
+	// The same decoding gives a listener that is present.
+	if cfg := mustParse(t, withContext("listener: !!binary cHJlc2VudA==")); cfg.Context.Listener != "present" {
+		t.Errorf("listener = %q, want present", cfg.Context.Listener)
 	}
 }
 
@@ -298,11 +322,37 @@ func TestSchemaVersion(t *testing.T) {
 		"2.0": "2.0", "2.5": "2.5", `"2"`: `"2"`, "'2'": "'2'", "0x2": "0x2", "+2": "+2", "0x3": "0x3", "+3": "+3",
 		"0": "0", "-2": "-2", "02": "02", "": "no value", "null": "null", "!!str 2": "!!str 2", "[2]": "a sequence",
 		"!!int 2": "!!int 2", `!!int "2"`: `!!int "2"`, "!!int 3": "!!int 3", "|\n  2": `a block scalar "2\n"`, ">-\n  2": `a block scalar "2"`,
+		"!!binary Mg==": "!!binary Mg==", "!<tag:yaml.org,2002:int> 2": "!!int 2",
+		// yaml.v3 drops a bare ! tag; the source still shows it.
+		"! 2": "! 2", "&v ! 2": "&v ! 2", "! &v 2": "! &v 2", "!   2   # the format": "!   2",
 	} {
 		parseFails(t, "schema_version: "+written+"\n"+body, 2, "schema_version must be the integer 2, got "+shown)
 	}
 	mustParse(t, "schema_version: 2 # the format\n"+body)
 	mustParse(t, body+"schema_version: 2\n")
+	mustParse(t, "schema_version: &v 2\n"+body)
+	mustParse(t, "schema_version:\n  2\n"+body)
+}
+
+// The marker's spelling is read from the source at the node's place, which
+// must hold in flow style and whatever the line breaks and encoding marks.
+func TestMarkerSpellingAtItsPlace(t *testing.T) {
+	flow := "{project: {name: é}, context: {exposure: internet, data_sensitivity: high, business_criticality: high}, schema_version: %s}\n"
+	mustParse(t, fmt.Sprintf(flow, "2"))
+	mustParse(t, strings.TrimSuffix(fmt.Sprintf(flow, "2"), "\n")+" # the format\n")
+	parseFails(t, fmt.Sprintf(flow, "! 2"), 2, "schema_version must be the integer 2, got ! 2")
+
+	mustParse(t, "\uFEFF"+minimal)
+	parseFails(t, "\uFEFF"+strings.Replace(minimal, "schema_version: 2", "schema_version: ! 2", 1), 2,
+		"schema_version must be the integer 2, got ! 2")
+	// Each of these is a line break to yaml.v3, so the marker is on line 2.
+	for name, br := range map[string]string{"CRLF": "\r\n", "CR": "\r", "NEL": "\u0085", "LS": "\u2028", "PS": "\u2029"} {
+		src := "# config" + br + strings.ReplaceAll(minimal, "\n", br)
+		mustParse(t, src)
+		if _, err := Parse([]byte(strings.Replace(src, "schema_version: 2", "schema_version: ! 2", 1))); errorCode(err) != 2 {
+			t.Errorf("%s line breaks: ! 2 gave %v, want E2", name, err)
+		}
+	}
 }
 
 // A merge key that brings a mapping into its own value fails with an error
