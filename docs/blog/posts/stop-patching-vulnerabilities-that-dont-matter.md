@@ -42,6 +42,8 @@ trivy image python:3.11-slim --format json --output report.json
 ### 3. Describe your system in a [`config.yaml`](https://github.com/venslabs/vens/blob/main/examples/quickstart/config.yaml)
 
 ```yaml
+schema_version: 2
+
 project:
   name: "my-api"
   description: "Customer-facing REST API"

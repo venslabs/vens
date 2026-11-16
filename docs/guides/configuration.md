@@ -12,6 +12,8 @@ The context file is the **single most important input to Vens**. Good context â†
 A minimal, valid `config.yaml`:
 
 ```yaml
+schema_version: 2
+
 project:
   name: "my-service"
 
@@ -161,6 +163,8 @@ Anything an engineer would say in a threat modeling session. The LLM reads it an
 ## A complete, production-ready example
 
 ```yaml
+schema_version: 2
+
 project:
   name: "checkout-api"
   description: "Public-facing checkout service, handles payment card data"

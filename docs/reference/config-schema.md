@@ -9,7 +9,7 @@ For a narrative explanation of how to use these fields, see **[Describe your sys
 
 ## Top-level structure
 
-```yaml
+```text
 project:
   name: string       # required
   description: string # optional
@@ -27,6 +27,12 @@ context:
   controls: {...}
   notes: string
 ```
+
+---
+
+## `schema_version`
+
+Required: the integer `2`. The version of this file's format. `2` is the format of the 16-factor scoring; a file without it was written for vens v0.6 or earlier, which is schema 1.
 
 ---
 
@@ -124,6 +130,55 @@ compliance_requirements:
 !!! warning
     Unknown framework names cause a **validation error** — Vens will refuse to start. Use the exact identifiers listed above.
 
+### `context.listener`
+
+Does this deployment accept connections others open? Omitted, it reads `unknown`.
+
+| Value | Meaning |
+|---|---|
+| `present` | this deployment accepts connections that other parties open: it listens on a port or socket, as a server or as a peer others connect to |
+| `absent` | it accepts none: no listening port or socket, such as a batch job, a command-line tool, or a client that only opens connections |
+| `unknown` | not stated |
+
+### `context.data_subjects`
+
+How many distinct people's personal data this service can read: what it stores, what passes through it, and what it can fetch with its own access. A count belongs to the band whose interval holds it, and a count of 2 to 99 belongs to `hundreds`. Nothing is inferred from `data_sensitivity`.
+
+| Value | People | Privacy violation at most |
+|---|---|---|
+| `none` | 0 | 3 |
+| `one_individual` | 1 | 3 |
+| `hundreds` | 2 to 999 | 5 |
+| `thousands` | 1,000 to 999,999 | 7 |
+| `millions` | 1,000,000 or more | 9 |
+
+### `context.detection`
+
+Declaring a channel's level states it for every instance of this service. Where only part of the service is covered, the level declared is the one that holds for all of it. Once `detection` is written, all three channels are required; `active_in_application` applies to `application` only.
+
+| Field | Meaning |
+|---|---|
+| `network` | each attempt crossing the network to or from the service is recorded where it can be seen |
+| `host` | process, file and privilege activity on the hosts that run the service is recorded |
+| `application` | the service's own logs record each request or action an attempt would make |
+
+| Value | Meaning |
+|---|---|
+| `not_logged` | nothing is recorded |
+| `logged` | recorded, and nobody reviews it |
+| `logged_and_reviewed` | recorded and reviewed, by people or by alerts that people act on |
+| `active_in_application` | the service itself detects attacks and acts on them |
+
+### `context.traceability`
+
+What is in place, not what is required. Records kept in front of the service count when they cover every request to it (a gateway or proxy log). The value declared must hold across the whole service: where only part of it records this, declare the weaker value.
+
+| Value | Meaning |
+|---|---|
+| `none` | nothing records the requests the service receives or who made them |
+| `per_request` | each request is recorded with its time and origin (source address, client), not with the individual who made it |
+| `per_individual` | as `per_request`, and each action of an authenticated user is recorded with that user's identity |
+
 ### `context.controls`
 
 Security controls currently active in production. All fields are booleans, default `false`. Each enabled control lowers the Vulnerability Factor for the attack types it neutralizes.
@@ -183,6 +238,8 @@ Values are normalized to lowercase. Extra unknown keys are ignored (forward-comp
 ## Minimal valid file
 
 ```yaml
+schema_version: 2
+
 project:
   name: "my-service"
 
