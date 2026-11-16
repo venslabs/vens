@@ -72,6 +72,7 @@ The LLM calculates the OWASP risk score (0-81) for each vulnerability using:
 	flags.String("sbom-serial-number", "", "SBOM serial number for BOM-Link (format: urn:uuid:...)")
 	flags.Int("sbom-version", 1, "SBOM version for BOM-Link (default: 1)")
 	flags.Bool("attest", false, "Emit a CycloneDX Attestations (CDXA) sibling file with prompt hash, input hash, model, seed, raw LLM response")
+	flags.Bool("strict", false, "Fail a run that would use a worst-case fallback, and write no VEX or attestation: an undeclared data_subjects, detection or traceability, a CVE with no description, no CVSS vector or one vens cannot read, or an answer read as cannot_tell")
 
 	return cmd
 }
@@ -168,6 +169,10 @@ func action(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	o.DebugDir, err = flags.GetString("debug-dir")
+	if err != nil {
+		return err
+	}
+	o.Strict, err = flags.GetBool("strict")
 	if err != nil {
 		return err
 	}
