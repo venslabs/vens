@@ -33,46 +33,49 @@ import (
 type reply struct {
 	// answer is one id, or for Intrusion detection the ids of the set
 	// chosen; a value of another JSON type is kept as its JSON text.
-	answer      []string
+	answer []string
+	// raw is the answer as the reply wrote it, absent when it wrote none.
+	raw         json.RawMessage
 	reasoning   string
 	evidenceRef string
 }
 
-// ask asks question f about cves. A call the provider truncates is split in
-// half and each half asked on its own, down to a single CVE. The CVEs the
-// replies leave out are asked again together, once; one still left out
-// stops the run, since no other batch holds it.
-func (g *Generator) ask(ctx context.Context, run *scoringRun, f contract.Factor, cves []*cve) (map[string]reply, error) {
-	got, err := g.askSplitting(ctx, run, f, cves)
+// ask asks question f about cves, keeping each answer in its CVE's
+// assessment as soon as a reply gives it. A call the provider truncates is
+// split in half and each half asked on its own, down to a single CVE. The
+// CVEs the replies leave out are asked again together, once; one still left
+// out stops the run, since no other batch holds it.
+func (g *Generator) ask(ctx context.Context, run *scoringRun, f contract.Factor, cves []*cve, assessed map[string]*assessment) error {
+	got, err := g.askSplitting(ctx, run, f, cves, assessed)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	missing := unanswered(cves, got)
 	if len(missing) == 0 {
-		return got, nil
+		return nil
 	}
 	// Counts go by distinct CVE: one hitting several components is one entry.
 	slog.WarnContext(ctx, "Model skipped vulnerabilities; asking again for those alone",
 		"question", string(f), "skipped", len(missing), "of", len(cves), "vulns", strings.Join(cveIDs(missing), ","))
 	run.askedAgain++
-	again, err := g.askSplitting(ctx, run, f, missing)
+	again, err := g.askSplitting(ctx, run, f, missing, assessed)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	maps.Copy(got, again)
 	if still := unanswered(cves, got); len(still) > 0 {
 		ids := cveIDs(still)
 		slices.Sort(ids)
-		return nil, fmt.Errorf("model returned no answer to %s (%s) for %s after asking again; stopping the run",
+		return fmt.Errorf("model returned no answer to %s (%s) for %s after asking again; stopping the run",
 			f.Name(), f, strings.Join(ids, ", "))
 	}
-	return got, nil
+	return nil
 }
 
 // askSplitting asks f about cves in one call or, when the provider truncates
 // it, in two halves, each split again until it fits or holds one CVE.
-func (g *Generator) askSplitting(ctx context.Context, run *scoringRun, f contract.Factor, cves []*cve) (map[string]reply, error) {
-	got, err := g.askOnce(ctx, run, f, cves)
+func (g *Generator) askSplitting(ctx context.Context, run *scoringRun, f contract.Factor, cves []*cve, assessed map[string]*assessment) (map[string]reply, error) {
+	got, err := g.askOnce(ctx, run, f, cves, assessed)
 	if len(cves) == 1 || !errors.Is(err, llm.ErrTruncated) {
 		return got, err
 	}
@@ -87,11 +90,11 @@ func (g *Generator) askSplitting(ctx context.Context, run *scoringRun, f contrac
 		"first_half", strings.Join(cveIDs(cves[:half]), ","),
 		"second_half", strings.Join(cveIDs(cves[half:]), ","),
 	)
-	first, err := g.askSplitting(ctx, run, f, cves[:half])
+	first, err := g.askSplitting(ctx, run, f, cves[:half], assessed)
 	if err != nil {
 		return nil, err
 	}
-	second, err := g.askSplitting(ctx, run, f, cves[half:])
+	second, err := g.askSplitting(ctx, run, f, cves[half:], assessed)
 	if err != nil {
 		return nil, err
 	}
@@ -99,9 +102,10 @@ func (g *Generator) askSplitting(ctx context.Context, run *scoringRun, f contrac
 	return first, nil
 }
 
-// askOnce makes one call asking f about cves and reads its reply. A strict
-// run stops right after a call that gave an answer Go reads as cannot_tell.
-func (g *Generator) askOnce(ctx context.Context, run *scoringRun, f contract.Factor, cves []*cve) (map[string]reply, error) {
+// askOnce makes one call asking f about cves, reads its reply and keeps each
+// answer in its CVE's assessment. A strict run stops right after a call that
+// gave an answer Go reads as cannot_tell, the answer kept.
+func (g *Generator) askOnce(ctx context.Context, run *scoringRun, f contract.Factor, cves []*cve, assessed map[string]*assessment) (map[string]reply, error) {
 	request, err := contract.Request(f, g.deployment, contractCVEs(cves))
 	if err != nil {
 		return nil, err
@@ -117,6 +121,11 @@ func (g *Generator) askOnce(ctx context.Context, run *scoringRun, f contract.Fac
 	got, err := readReplies(ctx, f, raw, ref, cves)
 	if err != nil {
 		return nil, err
+	}
+	for _, c := range cves {
+		if r, ok := got[c.id()]; ok {
+			assessed[c.id()].answer(f, r)
+		}
 	}
 	if g.o.Strict {
 		if err := firstCannotTell(f, cves, got); err != nil {
@@ -159,7 +168,7 @@ func readReplies(ctx context.Context, f contract.Factor, raw, evidenceRef string
 			slog.WarnContext(ctx, "Model gave an answer off the list; reading it as cannot_tell",
 				"vuln", id, "question", string(f), "answer", string(a["answer"]))
 		}
-		got[id] = reply{answer: answer, reasoning: text(a["reasoning"]), evidenceRef: evidenceRef}
+		got[id] = reply{answer: answer, raw: a["answer"], reasoning: text(a["reasoning"]), evidenceRef: evidenceRef}
 	}
 	return got, nil
 }

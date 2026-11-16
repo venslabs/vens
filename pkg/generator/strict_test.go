@@ -139,7 +139,9 @@ func TestGenerator_StrictStopsAfterTheFirstCannotTell(t *testing.T) {
 				}
 				return nil
 			}}
-			g := newGen(t, Opts{LLM: m, Config: strictConfig(), Strict: true, BatchSize: 1})
+			parent := t.TempDir()
+			logs := withCapturedLogs(t)
+			g := newGen(t, Opts{LLM: m, Config: strictConfig(), Strict: true, BatchSize: 1, DebugDir: parent})
 			var emitted []outputhandler.VulnRating
 			err := g.GenerateRiskScore(context.Background(), vulns, collect(&emitted))
 			require.EqualError(t, err, "strict: the answer to Privacy violation (PV) for CVE-2024-0001 reads as cannot_tell, counted as privacy_cannot_tell; stopping the run")
@@ -147,6 +149,16 @@ func TestGenerator_StrictStopsAfterTheFirstCannotTell(t *testing.T) {
 			assert.Equal(t, contract.PV, last.factor, "the run's last call")
 			assert.Equal(t, []string{"CVE-2024-0001"}, last.ids)
 			assert.Len(t, emitted, 1, "the first batch was rated; the run fails all the same")
+
+			// The answer that stopped the run is counted where the error says.
+			assert.Equal(t, int64(1), runSummary(t, logs).attrs["counters.privacy_cannot_tell"])
+			got, _ := readAnswers(t, parent)
+			require.Len(t, got.Vulnerabilities, 2)
+			stopped := got.Vulnerabilities[1]
+			assert.True(t, stopped.Unrated)
+			assert.Equal(t, []string{"privacy_cannot_tell"}, stopped.Counters)
+			pv := stopped.Factors[len(stopped.Factors)-1]
+			assert.Equal(t, []any{"PV", answer}, []any{pv.Factor, pv.Answer})
 		})
 	}
 

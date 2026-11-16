@@ -16,6 +16,7 @@ package generator
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"slices"
@@ -31,7 +32,11 @@ import (
 
 // assessment is what the calls of a batch gathered for one CVE.
 type assessment struct {
-	answers  contract.Answers
+	answers contract.Answers
+	// read lists the factors answered, in call order, and raw their answers
+	// as the replies wrote them.
+	read     []contract.Factor
+	raw      map[contract.Factor]json.RawMessage
 	adjusted *contract.Adjusted
 	// reasons holds each answer's sentence in call order, as "factor
 	// (answer): sentence", the adjustment's last.
@@ -47,6 +52,11 @@ func (a *assessment) answer(f contract.Factor, r reply) {
 	} else {
 		*answerField(&a.answers, f) = r.answer[0]
 	}
+	if a.raw == nil {
+		a.raw = map[contract.Factor]json.RawMessage{}
+	}
+	a.read = append(a.read, f)
+	a.raw[f] = r.raw
 	a.note(fmt.Sprintf("%s (%s): %s", f, strings.Join(r.answer, ", "), oneLine(r.reasoning)), r.evidenceRef)
 }
 
@@ -73,15 +83,41 @@ func answerField(a *contract.Answers, f contract.Factor) *string {
 	}[f]
 }
 
-// scoreBatch asks the batch's questions, one call per question in the
-// declared order, each about the batch's CVEs that get it, so that the order
-// never depends on which questions the first CVE gets; then makes each
-// flagged CVE's adjustment call; then rates each CVE, one rating per row.
-func (g *Generator) scoreBatch(ctx context.Context, run *scoringRun, batch []*cve) ([]outputhandler.VulnRating, error) {
+// scoreBatch asks the batch's questions, then rates each CVE, one rating per
+// row. When it fails, the run keeps, unrated, every CVE of the batch it read
+// an answer for and did not rate: a failed run is the one debugged.
+func (g *Generator) scoreBatch(ctx context.Context, run *scoringRun, batch []*cve) (ratings []outputhandler.VulnRating, err error) {
 	assessed := make(map[string]*assessment, len(batch))
 	for _, c := range batch {
 		assessed[c.id()] = &assessment{}
 	}
+	rated := 0
+	defer func() {
+		if err != nil {
+			for _, c := range batch[rated:] {
+				run.unrated(c, assessed[c.id()])
+			}
+		}
+	}()
+	if err := g.askBatch(ctx, run, batch, assessed); err != nil {
+		return nil, err
+	}
+	for _, c := range batch {
+		r, err := g.rate(ctx, run, c, assessed[c.id()])
+		if err != nil {
+			return nil, err
+		}
+		rated++
+		ratings = append(ratings, r...)
+	}
+	return ratings, nil
+}
+
+// askBatch asks the batch's questions, one call per question in the declared
+// order, each about the batch's CVEs that get it, so that the order never
+// depends on which questions the first CVE gets; then makes each flagged
+// CVE's adjustment call.
+func (g *Generator) askBatch(ctx context.Context, run *scoringRun, batch []*cve, assessed map[string]*assessment) error {
 	for _, f := range contract.Order() {
 		var asked []*cve
 		for _, c := range batch {
@@ -92,30 +128,18 @@ func (g *Generator) scoreBatch(ctx context.Context, run *scoringRun, batch []*cv
 		if len(asked) == 0 {
 			continue
 		}
-		got, err := g.ask(ctx, run, f, asked)
-		if err != nil {
-			return nil, err
-		}
-		for _, c := range asked {
-			assessed[c.id()].answer(f, got[c.id()])
+		if err := g.ask(ctx, run, f, asked, assessed); err != nil {
+			return err
 		}
 	}
 	for _, c := range batch {
 		if len(c.flags) > 0 {
 			if err := g.adjust(ctx, run, c, assessed[c.id()]); err != nil {
-				return nil, err
+				return err
 			}
 		}
 	}
-	var ratings []outputhandler.VulnRating
-	for _, c := range batch {
-		r, err := g.rate(ctx, run, c, assessed[c.id()])
-		if err != nil {
-			return nil, err
-		}
-		ratings = append(ratings, r...)
-	}
-	return ratings, nil
+	return nil
 }
 
 // rate computes a CVE's 16 levels and their rating, records them for the run,

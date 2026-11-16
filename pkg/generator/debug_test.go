@@ -289,12 +289,13 @@ func TestDebugDir_WriteFailureLogsTheFile(t *testing.T) {
 type answersJSON struct {
 	Vulnerabilities []struct {
 		VulnID  string `json:"vulnId"`
+		Unrated bool   `json:"unrated"`
 		Factors []struct {
 			Factor   string `json:"factor"`
 			Answer   any    `json:"answer"`
 			Reading  string `json:"reading"`
 			Adjusted string `json:"adjusted"`
-			Level    int    `json:"level"`
+			Level    *int   `json:"level"`
 			Source   string `json:"source"`
 		} `json:"factors"`
 		Counters []string `json:"counters"`
@@ -351,7 +352,7 @@ func TestDebugDir_AnswersJSON(t *testing.T) {
 	first := map[string]string{}
 	var order []string
 	for _, f := range got.Vulnerabilities[0].Factors {
-		first[f.Factor] = fmt.Sprintf("%v|%s|%s|%d|%s", f.Answer, f.Reading, f.Adjusted, f.Level, f.Source)
+		first[f.Factor] = fmt.Sprintf("%v|%s|%s|%d|%s", f.Answer, f.Reading, f.Adjusted, *f.Level, f.Source)
 		order = append(order, f.Factor)
 	}
 	assert.Equal(t, []string{"SL", "M", "O", "S", "ED", "EE", "A", "ID", "LC", "LI", "LAV", "LAC", "FD", "RD", "NC", "PV"}, order)
@@ -379,9 +380,9 @@ func TestDebugDir_AnswersJSON(t *testing.T) {
 	for _, f := range second.Factors {
 		switch f.Factor {
 		case "EE":
-			assert.Equal(t, []any{"bogus", "invalid", 9, "answer"}, []any{f.Answer, f.Reading, f.Level, f.Source})
+			assert.Equal(t, []any{"bogus", "invalid", 9, "answer"}, []any{f.Answer, f.Reading, *f.Level, f.Source})
 		case "PV":
-			assert.Equal(t, []any{"millions", 7, "config"}, []any{f.Answer, f.Level, f.Source}, "capped by thousands")
+			assert.Equal(t, []any{"millions", 7, "config"}, []any{f.Answer, *f.Level, f.Source}, "capped by thousands")
 		}
 	}
 	assert.Equal(t, []string{"ease_of_exploit_cannot_tell", "applicability_missing"}, second.Counters)
@@ -393,19 +394,84 @@ func TestDebugDir_AnswersJSON(t *testing.T) {
 	assert.NotContains(t, raw, "described vulnerability", "no CVE text")
 }
 
-// A failed run writes answers.json too, with the CVEs rated before it
-// stopped and their counters.
+// A failed run writes answers.json too: the CVEs rated before it stopped,
+// and, unrated, each CVE of the failing batch it read an answer for, with the
+// answers it read and the cannot_tell they count.
 func TestDebugDir_AnswersJSONOnAFailedRun(t *testing.T) {
 	parent := t.TempDir()
-	m := &fakeLLM{skip: func(_ fakeCall, id string) bool { return id == "CVE-2024-0002" }}
+	m := &fakeLLM{
+		answer: func(c fakeCall, id string) any {
+			if c.factor == contract.M && id == "CVE-2024-0002" {
+				return cannotTell
+			}
+			return nil
+		},
+		skip: func(_ fakeCall, id string) bool { return id == "CVE-2024-0003" },
+	}
 	g := newGen(t, Opts{LLM: m, BatchSize: 2, DebugDir: parent})
-	require.Error(t, g.GenerateRiskScore(context.Background(), testVulns(3), nil))
+	logs := withCapturedLogs(t)
+	require.Error(t, g.GenerateRiskScore(context.Background(), testVulns(4), nil))
 
 	got, _ := readAnswers(t, parent)
 	var ids []string
 	for _, v := range got.Vulnerabilities {
-		ids = append(ids, v.VulnID)
+		ids = append(ids, fmt.Sprintf("%s unrated:%t", v.VulnID, v.Unrated))
 	}
-	assert.Equal(t, []string{"CVE-2024-0000", "CVE-2024-0001"}, ids)
-	assert.Equal(t, 2, got.Counters["detection_undeclared"])
+	assert.Equal(t, []string{"CVE-2024-0000 unrated:false", "CVE-2024-0001 unrated:false", "CVE-2024-0002 unrated:true"}, ids,
+		"CVE-2024-0003, never answered, has no entry")
+	unrated := got.Vulnerabilities[2]
+	require.Len(t, unrated.Factors, 1, "Motive, the one question the failing batch was answered")
+	f := unrated.Factors[0]
+	assert.Equal(t, []any{"M", cannotTell, "cannot_tell"}, []any{f.Factor, f.Answer, f.Reading})
+	assert.Nil(t, f.Level, "an unrated CVE has no level")
+	assert.Equal(t, []string{"motive_cannot_tell"}, unrated.Counters)
+	assert.Equal(t, 2, got.Counters["detection_undeclared"], "the rated CVEs'")
+	assert.Equal(t, 1, got.Counters["motive_cannot_tell"])
+	assert.Equal(t, int64(1), runSummary(t, logs).attrs["counters.motive_cannot_tell"])
+}
+
+// answers.json keeps each answer as the reply wrote it, its JSON type kept: a
+// number stays a number, a list a list, an object an object.
+func TestDebugDir_AnswersJSONKeepsTheRawAnswer(t *testing.T) {
+	parent := t.TempDir()
+	m := &fakeLLM{answer: func(c fakeCall, _ string) any {
+		switch c.factor {
+		case contract.EE:
+			return 7
+		case contract.ID:
+			return []string{"network", "host"}
+		case contract.LC:
+			return map[string]any{"extent": "all"}
+		}
+		return nil
+	}}
+	g := newGen(t, Opts{LLM: m, Config: fullConfig(), DebugDir: parent})
+	require.NoError(t, g.GenerateRiskScore(context.Background(), testVulns(1), nil))
+
+	dirs := runDirs(t, parent)
+	b, err := os.ReadFile(filepath.Join(dirs[0], "answers.json"))
+	require.NoError(t, err)
+	var got struct {
+		Vulnerabilities []struct {
+			Factors []struct {
+				Factor  string          `json:"factor"`
+				Answer  json.RawMessage `json:"answer"`
+				Reading string          `json:"reading"`
+			} `json:"factors"`
+		} `json:"vulnerabilities"`
+	}
+	require.NoError(t, json.Unmarshal(b, &got))
+	raw := map[string]string{}
+	for _, f := range got.Vulnerabilities[0].Factors {
+		var compact bytes.Buffer
+		if len(f.Answer) > 0 {
+			require.NoError(t, json.Compact(&compact, f.Answer))
+		}
+		raw[f.Factor] = compact.String() + " " + f.Reading
+	}
+	assert.Equal(t, "7 invalid", raw["EE"])
+	assert.Equal(t, `["network","host"] answered`, raw["ID"])
+	assert.Equal(t, `{"extent":"all"} invalid`, raw["LC"])
+	assert.Equal(t, `"low_or_no_reward" answered`, raw["M"])
+	assert.Equal(t, " ", raw["SL"], "a factor not asked has no answer")
 }

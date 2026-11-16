@@ -26,7 +26,8 @@ import (
 // answersFile is answers.json, which --debug-dir gets once per run: per CVE
 // and factor, the answer as the reply gave it and how Go read it, the level
 // and where it came from; and the counters, per CVE and summed over the run.
-// It holds no reasoning and no CVE text.
+// A failed run also lists, unrated, the CVEs of its failing batch it read
+// answers for. It holds no reasoning and no CVE text.
 type answersFile struct {
 	Vulnerabilities []answersEntry `json:"vulnerabilities"`
 	Counters        map[string]int `json:"counters"`
@@ -34,6 +35,10 @@ type answersFile struct {
 
 type answersEntry struct {
 	VulnID string `json:"vulnId"`
+	// Unrated marks a CVE of the batch a run failed in: its factors are the
+	// questions it was answered, read as the replies give them, without the
+	// levels Go would have computed.
+	Unrated bool `json:"unrated,omitempty"`
 	// Factors holds the 16 in the vector's order.
 	Factors  []factorRecord `json:"factors"`
 	Counters []string       `json:"counters,omitempty"`
@@ -41,15 +46,15 @@ type answersEntry struct {
 
 type factorRecord struct {
 	Factor contract.Factor `json:"factor"`
-	// Answer is the question's answer, an id or for Intrusion detection a
-	// list of them; absent when the question was not asked.
-	Answer  any              `json:"answer,omitempty"`
+	// Answer is the question's answer as the reply wrote it, its JSON type
+	// kept; absent when the question was not asked.
+	Answer  json.RawMessage  `json:"answer,omitempty"`
 	Reading contract.Reading `json:"reading,omitempty"`
 	// Adjusted is a flagged CVE's adjustment answer for Opportunity or an
 	// axis's factor, as the reply gave it.
 	Adjusted string          `json:"adjusted,omitempty"`
-	Level    int             `json:"level"`
-	Source   contract.Source `json:"source"`
+	Level    *int            `json:"level,omitempty"`
+	Source   contract.Source `json:"source,omitempty"`
 }
 
 // rated records a rated CVE for answers.json and adds its counters to the
@@ -62,9 +67,10 @@ func (run *scoringRun) rated(c *cve, a *assessment, l contract.Levels) {
 	levels := vectorLevels(l.Vector)
 	e := answersEntry{VulnID: c.id(), Counters: counters}
 	for _, f := range vectorOrder {
-		r := factorRecord{Factor: f, Reading: l.Readings[f], Level: levels[f], Source: l.Sources[f]}
+		level := levels[f]
+		r := factorRecord{Factor: f, Reading: l.Readings[f], Level: &level, Source: l.Sources[f]}
 		if c.asks(f) {
-			r.Answer = answerOf(a.answers, f)
+			r.Answer = rawAnswer(a, f)
 		}
 		if a.adjusted != nil {
 			r.Adjusted = adjustedAnswer(*a.adjusted, f)
@@ -72,6 +78,36 @@ func (run *scoringRun) rated(c *cve, a *assessment, l contract.Levels) {
 		e.Factors = append(e.Factors, r)
 	}
 	run.entries = append(run.entries, e)
+}
+
+// unrated records, unrated, a CVE of a failing batch that was answered at
+// least once: each answer as its reply reads, before Go crosses it with the
+// CVE or the config, and the cannot_tell each such reading counts.
+func (run *scoringRun) unrated(c *cve, a *assessment) {
+	if len(a.read) == 0 {
+		return
+	}
+	e := answersEntry{VulnID: c.id(), Unrated: true}
+	for _, f := range a.read {
+		reading, _ := contract.ReadAnswer(f, answerOf(a.answers, f)...)
+		e.Factors = append(e.Factors, factorRecord{Factor: f, Answer: rawAnswer(a, f), Reading: reading})
+		if reading == contract.CannotTell || reading == contract.Invalid {
+			e.Counters = append(e.Counters, f.Counter())
+		}
+	}
+	for _, name := range e.Counters {
+		run.counters[name]++
+	}
+	run.entries = append(run.entries, e)
+}
+
+// rawAnswer is factor f's answer as the reply wrote it, null when it wrote
+// none.
+func rawAnswer(a *assessment, f contract.Factor) json.RawMessage {
+	if raw := a.raw[f]; len(raw) > 0 {
+		return raw
+	}
+	return json.RawMessage("null")
 }
 
 // writeAnswers writes answers.json to the run's debug directory, if any.
@@ -102,14 +138,12 @@ func vectorLevels(v owasp.Vector) map[contract.Factor]int {
 	}
 }
 
-func answerOf(a contract.Answers, f contract.Factor) any {
+// answerOf is factor f's answer as Go keeps it, one id or the ids of a set.
+func answerOf(a contract.Answers, f contract.Factor) []string {
 	if f == contract.ID {
-		if a.ID == nil {
-			return []string{}
-		}
 		return a.ID
 	}
-	return *answerField(&a, f)
+	return []string{*answerField(&a, f)}
 }
 
 func adjustedAnswer(a contract.Adjusted, f contract.Factor) string {
