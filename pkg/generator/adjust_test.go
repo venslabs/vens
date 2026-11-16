@@ -20,6 +20,7 @@ import (
 	"log/slog"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -240,4 +241,27 @@ func TestDisputeQuote(t *testing.T) {
 	} {
 		assert.Equal(t, want, DisputeQuote(description), "%q", description)
 	}
+}
+
+// A quote longer than quoteLimit keeps the words that matched, cut around
+// them, an ellipsis marking each cut.
+func TestDisputeQuoteIsCapped(t *testing.T) {
+	head, tail := strings.Repeat("ß", 300), strings.Repeat("b", 300)
+	for name, c := range map[string]struct {
+		description   string
+		before, after bool
+	}{
+		"in the middle": {head + " the vendor disputes it " + tail, true, true},
+		"at the start":  {"Disputed: " + tail, false, true},
+		"at the end":    {head + " but upstream disputes it", true, false},
+	} {
+		quote := DisputeQuote(c.description)
+		body := strings.TrimSuffix(strings.TrimPrefix(quote, "…"), "…")
+		assert.LessOrEqual(t, utf8.RuneCountInString(body), quoteLimit, name)
+		assert.Contains(t, strings.ToLower(quote), "disput", name)
+		assert.Equal(t, c.before, strings.HasPrefix(quote, "…"), name)
+		assert.Equal(t, c.after, strings.HasSuffix(quote, "…"), name)
+	}
+	short := "A short sentence the vendor disputes."
+	assert.Equal(t, short, DisputeQuote(short))
 }

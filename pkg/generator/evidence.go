@@ -19,6 +19,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/venslabs/vens/pkg/contract"
 	"github.com/venslabs/vens/pkg/cvss"
@@ -76,17 +77,43 @@ func CVEApplicability(rows []Vulnerability) cvss.Applicability {
 // not a security issue. None of its forms holds a sentence break.
 var disputed = regexp.MustCompile(`(?i)\bdisput|non-security|not a security issue|no real threat`)
 
+// quoteLimit is the most characters of a description a dispute quote holds.
+const quoteLimit = 200
+
 // DisputeQuote returns the sentence of a description that says its CVE is
-// disputed or not a security issue, or "" when none does.
+// disputed or not a security issue, or "" when none does. A sentence longer
+// than quoteLimit is cut around the words that matched, an ellipsis marking
+// each cut.
 func DisputeQuote(description string) string {
 	for line := range strings.SplitSeq(description, "\n") {
 		for sentence := range strings.SplitAfterSeq(line, ". ") {
-			if disputed.MatchString(sentence) {
-				return strings.TrimSpace(sentence)
+			sentence = strings.TrimSpace(sentence)
+			if loc := disputed.FindStringIndex(sentence); loc != nil {
+				return clip(sentence, loc)
 			}
 		}
 	}
 	return ""
+}
+
+// clip cuts s to quoteLimit characters around the match at loc, byte
+// offsets into s.
+func clip(s string, loc []int) string {
+	runes := []rune(s)
+	if len(runes) <= quoteLimit {
+		return s
+	}
+	start, end := utf8.RuneCountInString(s[:loc[0]]), utf8.RuneCountInString(s[:loc[1]])
+	from := max(0, min(start-(quoteLimit-(end-start))/2, len(runes)-quoteLimit))
+	to := from + quoteLimit
+	quote := strings.TrimSpace(string(runes[from:to]))
+	if from > 0 {
+		quote = "…" + quote
+	}
+	if to < len(runes) {
+		quote += "…"
+	}
+	return quote
 }
 
 // rowFlags lists, row by row, each flag a row raised with what the
