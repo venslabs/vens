@@ -141,11 +141,14 @@ var fieldDocs = map[Field]fieldDoc{
 	}},
 	// No question shows audit_requirement, so its values carry no meaning here.
 	AuditRequirement: {choices: []Choice{{Value: "low"}, {Value: "medium"}, {Value: "high"}}},
-	Listener: {choices: []Choice{
-		{"present", "this deployment accepts connections that other parties open: it listens on a port or socket, as a server or as a peer others connect to"},
-		{"absent", "it accepts none: no listening port or socket, such as a batch job, a command-line tool, or a client that only opens connections"},
-		{listenerUnknown, "not stated"},
-	}},
+	Listener: {
+		about: "Does this deployment accept connections others open?",
+		choices: []Choice{
+			{"present", "this deployment accepts connections that other parties open: it listens on a port or socket, as a server or as a peer others connect to"},
+			{"absent", "it accepts none: no listening port or socket, such as a batch job, a command-line tool, or a client that only opens connections"},
+			{listenerUnknown, "not stated"},
+		},
+	},
 	DataSubjects: {
 		about:   "How many distinct people's personal data this service can read: what it stores, what passes through it, and what it can fetch with its own access. A count belongs to the band whose interval holds it, and a count of 2 to 99 belongs to hundreds. Nothing is inferred from data_sensitivity.",
 		choices: bandChoices(),

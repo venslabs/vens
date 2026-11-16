@@ -25,6 +25,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -244,7 +245,7 @@ func (p *prompter) askDetection() (*riskconfig.DetectionCoverage, error) {
 	}); err != nil {
 		return nil, err
 	}
-	if err := p.explain("Levels", "", riskconfig.Detection.Choices()); err != nil {
+	if err := p.explain("Levels", "", detectionLevels()); err != nil {
 		return nil, err
 	}
 	var d riskconfig.DetectionCoverage
@@ -264,15 +265,27 @@ func (p *prompter) askDetection() (*riskconfig.DetectionCoverage, error) {
 	return &d, nil
 }
 
+// detectionLevels returns the levels a channel can be declared at, marking
+// those the network and host channels do not accept.
+func detectionLevels() []riskconfig.Choice {
+	levels := riskconfig.Detection.Choices()
+	for i, l := range levels {
+		if !slices.Contains(riskconfig.DetectionNetwork.Values(), l.Value) {
+			levels[i].Value += " (application only)"
+		}
+	}
+	return levels
+}
+
 // askControls asks the controls a question shows, each with its scope; ids,
 // siem and edr move no score and are not asked.
 func (p *prompter) askControls() (riskconfig.SecurityControls, error) {
 	var controls riskconfig.SecurityControls
-	if err := p.explain("Security controls in operation in front of this deployment", "", nil); err != nil {
+	if err := p.explain("Security controls in operation for this deployment", "", nil); err != nil {
 		return controls, err
 	}
 	for _, c := range riskconfig.ControlScopes() {
-		on, err := p.askYesNo(fmt.Sprintf("%s (%s; scope: %s)", c.Key, c.Description, c.Scope))
+		on, err := p.askYesNo(fmt.Sprintf("%s: %s. Scope: %s", c.Key, c.Description, c.Scope))
 		if err != nil {
 			return controls, err
 		}

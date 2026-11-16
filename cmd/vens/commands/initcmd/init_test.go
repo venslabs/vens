@@ -156,23 +156,27 @@ func TestInitAsksTheSchema2Fields(t *testing.T) {
 	}
 }
 
-// promptTexts are the meanings the reference documents for the fields the
-// wizard explains, and each control's description and scope.
+// promptTexts are what the prompts must show, in the reference's words: what
+// each explained field and value means, the levels only the application
+// channel takes marked as such, and each control's description and scope.
 func promptTexts() []string {
-	var texts []string
+	texts := []string{"Listener: Does this deployment accept connections others open?\n"}
 	for _, f := range []riskconfig.Field{riskconfig.Traceability, riskconfig.Listener, riskconfig.DataSubjects, riskconfig.Detection} {
-		if f.About() != "" {
-			texts = append(texts, f.About())
-		}
+		texts = append(texts, f.About())
 		for _, c := range f.Choices() {
-			texts = append(texts, c.Value+": "+c.Meaning)
+			label := c.Value
+			if f == riskconfig.Detection && c.Value == "active_in_application" {
+				label += " (application only)"
+			}
+			texts = append(texts, "  "+label+": "+c.Meaning+"\n")
 		}
 	}
 	for _, f := range []riskconfig.Field{riskconfig.DetectionNetwork, riskconfig.DetectionHost, riskconfig.DetectionApplication} {
 		texts = append(texts, f.About())
 	}
+	texts = append(texts, "\nSecurity controls in operation for this deployment:\n")
 	for _, c := range riskconfig.ControlScopes() {
-		texts = append(texts, c.Key+" ("+c.Description+"; scope: "+c.Scope+")")
+		texts = append(texts, c.Key+": "+c.Description+". Scope: "+c.Scope+" [y/N]: ")
 	}
 	return texts
 }
@@ -183,7 +187,7 @@ func TestInitDoesNotAskWhatMovesNoScore(t *testing.T) {
 	if err != nil {
 		t.Fatalf("init: %v", err)
 	}
-	for _, asked := range []string{"ids (", "siem (", "edr (", "Audit requirement"} {
+	for _, asked := range []string{"ids: ", "siem: ", "edr: ", "Audit requirement"} {
 		if strings.Contains(shown, asked) {
 			t.Errorf("the wizard asks %q", asked)
 		}

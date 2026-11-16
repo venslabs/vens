@@ -80,7 +80,7 @@ Traceability: What is in place, not what is required. Records kept in front of t
   per_individual: as per_request, and each action of an authenticated user is recorded with that user's identity
 Traceability (optional) [none/per_request/per_individual]: per_request
 
-Listener:
+Listener: Does this deployment accept connections others open?
   present: this deployment accepts connections that other parties open: it listens on a port or socket, as a server or as a peer others connect to
   absent: it accepts none: no listening port or socket, such as a batch job, a command-line tool, or a client that only opens connections
   unknown: not stated
@@ -106,17 +106,17 @@ Levels:
   not_logged: nothing is recorded
   logged: recorded, and nobody reviews it
   logged_and_reviewed: recorded and reviewed, by people or by alerts that people act on
-  active_in_application: the service itself detects attacks and acts on them
+  active_in_application (application only): the service itself detects attacks and acts on them
 Detection, network [not_logged/logged/logged_and_reviewed]: logged
 Detection, host [not_logged/logged/logged_and_reviewed]: not_logged
 Detection, application [not_logged/logged/logged_and_reviewed/active_in_application]: logged_and_reviewed
 
-Security controls in operation in front of this deployment:
-waf (Web Application Firewall; scope: SQL injection, XSS, path traversal) [y/N]: y
-ddos_protection (DDoS mitigation (CloudFlare, AWS Shield…); scope: Availability / DoS CVEs) [y/N]: n
-segmentation (Network micro-segmentation; scope: Lateral movement) [y/N]: n
-zero_trust (Zero-trust architecture; scope: Authentication bypass, lateral movement) [y/N]: n
-antivirus (Traditional AV / anti-malware; scope: Known malware signatures) [y/N]: n
+Security controls in operation for this deployment:
+waf: Web Application Firewall. Scope: SQL injection, XSS, path traversal [y/N]: y
+ddos_protection: DDoS mitigation (CloudFlare, AWS Shield…). Scope: Availability / DoS CVEs [y/N]: n
+segmentation: Network micro-segmentation. Scope: Lateral movement [y/N]: n
+zero_trust: Zero-trust architecture. Scope: Authentication bypass, lateral movement [y/N]: n
+antivirus: Traditional AV / anti-malware. Scope: Known malware signatures [y/N]: n
 Notes (optional, Enter to skip):
 Wrote config.yaml
 ```
