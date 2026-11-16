@@ -231,7 +231,7 @@ Vens validates the file on load. It will fail fast with a clear error if:
 - `context.business_criticality` is missing or not a valid value
 - any optional enum field has an unknown value
 
-Values are normalized to lowercase. Extra unknown keys are ignored (forward-compatible).
+Values are normalized to lowercase. Under schema 2 an unknown key is refused, and the error names its line.
 
 ---
 
