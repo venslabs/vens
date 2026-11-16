@@ -674,6 +674,31 @@ func TestEnable(t *testing.T) {
 	}
 }
 
+// Enabled reads the control a config sets by its YAML key, and no other.
+func TestEnabled(t *testing.T) {
+	keys := yamlKeys(reflect.TypeFor[SecurityControls]())
+	for key := range keys {
+		var s SecurityControls
+		if err := yaml.Unmarshal([]byte(key+": true"), &s); err != nil {
+			t.Fatal(err)
+		}
+		for other := range keys {
+			if got := s.Enabled(other); got != (other == key) {
+				t.Errorf("with %s set, Enabled(%q) = %t", key, other, got)
+			}
+		}
+	}
+	for key := range keys {
+		if (SecurityControls{}).Enabled(key) {
+			t.Errorf("Enabled(%q) is true with nothing set", key)
+		}
+	}
+	all := SecurityControls{WAF: true, DDoSProtection: true, IDS: true, SIEM: true, EDR: true, Antivirus: true, Segmentation: true, ZeroTrust: true}
+	if all.Enabled("firewall") {
+		t.Error(`Enabled("firewall") is true`)
+	}
+}
+
 func TestFieldValuesInTheirOrder(t *testing.T) {
 	for f, want := range map[Field][]string{
 		Exposure:                {"internal", "private", "internet"},

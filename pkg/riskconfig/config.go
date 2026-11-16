@@ -137,18 +137,30 @@ type SecurityControls struct {
 	ZeroTrust      bool `yaml:"zero_trust,omitempty"`
 }
 
+// byKey maps each control's YAML key to its field in s.
+func (s *SecurityControls) byKey() map[string]*bool {
+	return map[string]*bool{
+		"waf": &s.WAF, "ddos_protection": &s.DDoSProtection, "ids": &s.IDS, "siem": &s.SIEM,
+		"edr": &s.EDR, "antivirus": &s.Antivirus, "segmentation": &s.Segmentation, "zero_trust": &s.ZeroTrust,
+	}
+}
+
 // Enable returns s with the control named by its YAML key set to true, and
 // false when no control has that key.
 func (s SecurityControls) Enable(key string) (SecurityControls, bool) {
-	on := map[string]*bool{
-		"waf": &s.WAF, "ddos_protection": &s.DDoSProtection, "ids": &s.IDS, "siem": &s.SIEM,
-		"edr": &s.EDR, "antivirus": &s.Antivirus, "segmentation": &s.Segmentation, "zero_trust": &s.ZeroTrust,
-	}[key]
+	on := s.byKey()[key]
 	if on == nil {
 		return s, false
 	}
 	*on = true
 	return s, true
+}
+
+// Enabled reports whether the control named by its YAML key is set to true,
+// false for a key no control has.
+func (s SecurityControls) Enabled(key string) bool {
+	on := s.byKey()[key]
+	return on != nil && *on
 }
 
 // Parse loads config.yaml from its bytes. It reads the YAML tree first, so
