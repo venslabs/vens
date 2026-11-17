@@ -412,11 +412,15 @@ func checkBOMRefs(vulns []generator.Vulnerability) error {
 	return outputhandler.UnreferencedError("cannot generate VEX", ids)
 }
 
+// TempPattern is the os.CreateTemp pattern of the temp file each output is
+// written to before it is renamed into place.
+const TempPattern = ".vens-*.tmp"
+
 // tempOutputFile creates a temp file next to outputPath (same directory, so
 // the later os.Rename stays on one filesystem and is atomic). The caller is
 // responsible for closing, renaming, or removing it.
 func tempOutputFile(outputPath string) (*os.File, error) {
-	tmp, err := os.CreateTemp(filepath.Dir(outputPath), ".vens-*.tmp")
+	tmp, err := os.CreateTemp(filepath.Dir(outputPath), TempPattern)
 	if err != nil {
 		return nil, err
 	}

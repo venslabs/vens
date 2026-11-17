@@ -31,6 +31,7 @@ import (
 	"testing"
 
 	"github.com/rogpeppe/go-internal/testscript"
+	"github.com/venslabs/vens/cmd/vens/commands/generate"
 )
 
 func sourceDir() string {
@@ -105,6 +106,15 @@ func TestScript(t *testing.T) {
 func setupTestEnv(env *testscript.Env) error {
 	env.Setenv("VENS_TEST_BINARY", os.Getenv("VENS_TEST_BINARY"))
 	env.Setenv("QUICKSTART", filepath.Join(sourceDir(), "..", "..", "examples", "quickstart"))
+
+	// VENS_TEMP_GLOB matches the temp files the outputs are written to:
+	// os.CreateTemp puts its random part in place of the pattern's last "*",
+	// or at the end of a pattern without one.
+	tempGlob := generate.TempPattern
+	if !strings.Contains(tempGlob, "*") {
+		tempGlob += "*"
+	}
+	env.Setenv("VENS_TEMP_GLOB", tempGlob)
 
 	homeDir := filepath.Join(env.WorkDir, "home")
 	if err := os.MkdirAll(homeDir, 0755); err != nil {

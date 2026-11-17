@@ -36,7 +36,7 @@ stderr 'CVE-2024-0006: no description in the scanner''s report, so Motive, Oppor
 stderr 'Scoring run finished.* llm_calls=0 .*failed=true'
 ! exists out.cdx.json
 ! exists out.attestation.cdx.json
-! exec sh -c 'ls .vens-*.tmp'
+! exec sh -c 'ls $VENS_TEMP_GLOB'
 
 # Without --strict the same report is rated, each fallback counted.
 exec vens generate --llm=mock --attest --config-file=declared.yaml --sbom-serial-number=urn:uuid:22222222-2222-2222-2222-222222222222 report.json out.cdx.json

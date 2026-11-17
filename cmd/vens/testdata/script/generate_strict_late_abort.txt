@@ -12,7 +12,7 @@ stderr 'Scoring run finished.* llm_calls=17 .* calls.PV=1 .*counters.privacy_can
 ! stderr 'calls.adjustment'
 ! exists out.cdx.json
 ! exists out.attestation.cdx.json
-! exec sh -c 'ls .vens-*.tmp'
+! exec sh -c 'ls $VENS_TEMP_GLOB'
 
 # The same answers without --strict take Privacy violation's worst case,
 # counted, and write both files: the run makes the same 17 calls, so the
