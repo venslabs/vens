@@ -308,6 +308,23 @@ func TestGenerator_AdjustmentFieldNotAskedIsIgnored(t *testing.T) {
 	assert.Equal(t, "adjustment (opportunity: keep, integrity: affected, availability: affected): r", lines[len(lines)-1])
 }
 
+// The warning about a field the adjustment did not ask quotes at most
+// loggedLimit characters of its name and of its answer, both the model's text.
+func TestGenerator_AdjustmentFieldNotAskedWarningIsCapped(t *testing.T) {
+	long := strings.Repeat("é", 2*loggedLimit)
+	reply := `{"reasoning":"r","opportunity":"keep","confidentiality":"affected",` +
+		`"integrity":"affected","availability":"affected","` + long + `":"` + long + `"}`
+	logs := withCapturedLogs(t)
+	m := &fakeLLM{reply: func(c fakeCall) (string, bool) { return reply, c.adjustment() }}
+	g := newGen(t, Opts{LLM: m})
+	require.NoError(t, g.GenerateRiskScore(context.Background(), []Vulnerability{disputedRow(testVulns(1)[0])}, nil))
+
+	warned := logs.find(slog.LevelWarn, "Adjustment reply gives a field the call did not ask; ignoring it")
+	require.Len(t, warned, 1)
+	assert.Equal(t, strings.Repeat("é", loggedLimit)+"…", warned[0].attrs["field"])
+	assert.Equal(t, `"`+strings.Repeat("é", loggedLimit-1)+"…", warned[0].attrs["answer"])
+}
+
 // The adjustment shows as its baseline the answer Go kept: an ordinary
 // answer off the list, which Go read as cannot_tell, is shown as cannot_tell,
 // so that keeping it keeps what Go keeps. A floored axis shows none.

@@ -162,7 +162,7 @@ func readAdjustment(ctx context.Context, run *scoringRun, id, raw string, lists 
 			// is closed, and a floored axis is not in it.
 			run.defect(defectAdjustmentNotAsked)
 			slog.WarnContext(ctx, "Adjustment reply gives a field the call did not ask; ignoring it",
-				"vuln", id, "field", name, "answer", string(fields[name]))
+				"vuln", id, "field", cut(name, loggedLimit), "answer", cut(string(fields[name]), loggedLimit))
 		}
 	}
 	if oneLine(got.reasoning) == "" {
