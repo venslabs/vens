@@ -62,7 +62,7 @@ func (g *Generator) ask(ctx context.Context, run *scoringRun, f contract.Factor,
 		return nil
 	}
 	// Counts go by distinct CVE: one hitting several components is one entry.
-	slog.WarnContext(ctx, "Model skipped vulnerabilities; asking again for those alone",
+	slog.WarnContext(ctx, "No readable answer for vulnerabilities; asking again for those alone",
 		"question", string(f), "skipped", len(missing), "of", len(cves), "vulns", strings.Join(cveIDs(missing), ","))
 	run.askedAgain++
 	again, err := g.askSplitting(ctx, run, f, missing, assessed, unread)
