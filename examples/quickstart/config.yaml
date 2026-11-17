@@ -1,10 +1,11 @@
 # vens - Vulnerability Risk Scoring Configuration
-# Documentation: https://github.com/venslabs/vens#readme
+# Reference: https://venslabs.github.io/vens/reference/config-schema/
 #
-# This config provides context for OWASP Risk Rating of vulnerabilities.
-# The LLM scores EACH vulnerability based on its specific characteristics
-# within YOUR system context.
-# Reference: https://owasp.org/www-community/OWASP_Risk_Rating_Methodology
+# This config describes the deployment for the OWASP Risk Rating of its
+# vulnerabilities. The LLM answers closed questions about EACH vulnerability
+# within YOUR system context; vens computes every factor level, the severity
+# and the score.
+# Methodology: https://owasp.org/www-community/OWASP_Risk_Rating_Methodology
 
 schema_version: 2
 
@@ -20,79 +21,120 @@ context:
   # EXPOSURE: How is the system exposed to attackers?
   # Values: internal | private | internet
   #   - internal: Corporate network only, no external access
-  #   - private: Requires VPN or authentication to access
-  #   - internet: Publicly accessible from the internet
-  # Impact: Affects Threat Agent score for remote vulnerabilities
+  #   - private: Requires VPN / authenticated tunnel
+  #   - internet: Publicly accessible
+  # Impact: Sets Size (internal 4, private 6, internet 9) and the attacker group every question names
   exposure: "internet"
 
   # DATA SENSITIVITY: What type of data does the system handle?
   # Values: low | medium | high | critical
-  #   - low: Public data, no confidentiality requirements
+  #   - low: Public data
   #   - medium: Internal data, limited confidentiality
-  #   - high: PII, financial data, customer information
-  #   - critical: Secrets, credentials, PHI, payment card data
-  # Impact: Affects Technical Impact score for confidentiality/integrity vulnerabilities
+  #   - high: PII, financial data, customer info
+  #   - critical: Secrets, PHI, payment card data
+  # Impact: Picks the column of Loss of confidentiality (low and medium non-sensitive, high and critical critical);
+  #         shown to the Motive, Loss of integrity and Privacy violation questions
   data_sensitivity: "high"
 
   # BUSINESS CRITICALITY: How critical is this system for business?
   # Values: low | medium | high | critical
-  #   - low: Development/test environments
-  #   - medium: Internal tools, non-essential services
-  #   - high: Customer-facing services, important operations
-  #   - critical: Revenue-critical, compliance-required, core business
-  # Impact: Affects Business Impact score (all vulnerabilities)
+  #   - low: Dev / test / sandbox
+  #   - medium: Internal tools
+  #   - high: Customer-facing, important operations
+  #   - critical: Revenue-critical, compliance-required
+  # Impact: Shown to the Motive, Financial damage and Reputation damage questions,
+  #         and to Loss of availability when availability_requirement is not set
   business_criticality: "high"
+
+  # ============================================================================
+  # WHAT IS IN PLACE - Optional, but each one left out takes the fallback its
+  # Impact line states, with a warning at load; --strict refuses the run.
+  # vens reads them alone: they are never sent to the LLM.
+  # The values below illustrate the fields; declare what is true for yours.
+  # ============================================================================
+
+  # DATA SUBJECTS: How many distinct people's personal data can this service read?
+  # Values: none | one_individual | hundreds | thousands | millions
+  # Impact: Caps Privacy violation (none and one_individual 3, hundreds 5, thousands 7,
+  #         millions 9); left out, no cap
+  data_subjects: "thousands"
+
+  # DETECTION: What records an attack attempt, on each channel, across the whole service?
+  # Values: not_logged | logged | logged_and_reviewed, and active_in_application for application
+  # Declare all three channels, or leave the key out.
+  # Impact: Intrusion detection is the lowest level declared among the channels where
+  #         the LLM says an attempt would show (not_logged 9, logged 8, logged_and_reviewed 3,
+  #         active_in_application 1); left out, 9 on every finding
+  detection:
+    network: "logged"
+    host: "not_logged"
+    application: "logged"
+
+  # TRACEABILITY: What records who did what, as it is, not as required?
+  # Values: none | per_request | per_individual
+  # Impact: Crossed with the LLM's answer for Loss of accountability; left out, the none column
+  traceability: "per_request"
 
   # ============================================================================
   # OPTIONAL FIELDS - Provide additional context for precise scoring
   # ============================================================================
 
+  # LISTENER: Does this deployment accept connections others open? (optional)
+  # Values: present | absent | unknown
+  # Default: unknown, not shown; nothing warns when it is left out
+  # When to use: present for a service others connect to, such as this REST API;
+  #              absent for a batch job, a CLI or a client that only opens connections
+  # Impact: Shown in every call when present or absent
+  listener: "present"
+
   # AVAILABILITY REQUIREMENT: How critical is uptime? (optional)
   # Values: low | medium | high | critical
-  # Default: Inherits from business_criticality if not specified
+  # Default: The Loss of availability question shows business_criticality instead
   # When to use: Set explicitly if availability needs differ from business criticality
-  # Impact: Affects Technical Impact score for DoS/availability vulnerabilities
+  # Impact: Shown to the Loss of availability question
   availability_requirement: "high"
 
   # COMPLIANCE REQUIREMENTS: What regulations apply? (optional)
   # Supported: PCI-DSS, HIPAA, GDPR, SOC2, ISO27001, FISMA, FedRAMP, SOX, NIST, CCPA, CMMC, ITAR
   # Default: Empty (no compliance)
   # When to use: If non-compliance has legal/financial consequences
-  # Impact: Increases Business Impact score for compliance-relevant vulnerabilities (+2)
+  # Impact: The Non-compliance question names them and the LLM judges the violation;
+  #         empty, Non-compliance is 2 and the question is not asked
   compliance_requirements:
     - "GDPR"
     - "SOC2"
 
   # AUDIT REQUIREMENT: How critical is audit logging? (optional)
   # Values: low | medium | high
-  # Default: Not specified (accountability vulnerabilities scored lower)
-  # When to use: Financial systems, compliance-critical systems requiring forensic logs
-  # Impact: Affects Technical Impact score for accountability vulnerabilities
+  # Impact: None since v0.7.0: it states a requirement, not what is recorded.
+  #         Kept as information; traceability above is what vens reads.
   audit_requirement: "high"
 
   # SECURITY CONTROLS: What defenses are in place? (optional)
   # Default: All false (no controls assumed)
-  # When to use: You have active security controls that reduce exploitability
-  # Impact: Reduces Vulnerability score when controls block specific attack types
+  # When to use: You have active security controls in front of this service
+  # Impact: waf, ddos_protection, segmentation, zero_trust and antivirus, when true, are shown
+  #         with their scope to the Ease of exploit question; the LLM judges whether one stands
+  #         in the way of each exploit. ids, siem and edr move no score: detection above does.
   controls:
     # Perimeter controls
-    waf: true                    # Web Application Firewall (reduces web exploit scores)
-    ddos_protection: true        # DDoS mitigation (reduces DoS scores)
+    waf: true                    # Web Application Firewall (SQL injection, XSS, path traversal)
+    ddos_protection: true        # DDoS mitigation (Availability / DoS CVEs)
 
-    # Detection controls
-    ids: true                    # Intrusion Detection System (reduces network exploit scores)
+    # Detection controls: no score, see detection above
+    ids: true                    # Intrusion Detection System
     siem: true                   # Security Information & Event Management
 
     # Endpoint controls
-    edr: false                   # Endpoint Detection & Response (reduces malware scores)
-    antivirus: false             # Antivirus/Anti-malware
+    edr: false                   # Endpoint Detection & Response (no score)
+    antivirus: false             # Antivirus/Anti-malware (Known malware signatures)
 
     # Network controls
-    segmentation: true           # Network micro-segmentation (reduces lateral movement)
-    zero_trust: false            # Zero-trust architecture
+    segmentation: true           # Network micro-segmentation (Lateral movement)
+    zero_trust: false            # Zero-trust architecture (Authentication bypass, lateral movement)
 
   # ADDITIONAL NOTES: Free-form context (optional)
   # Default: Empty
   # When to use: Provide extra details that help understand risk (architecture, threat model, etc.)
-  # Impact: Helps LLM make better decisions on edge cases
+  # Impact: Shown in every call; the LLM reads it on every question
   notes: "Customer-facing REST API built with FastAPI/Flask running on Python 3.11-slim (Debian). Handles authentication, user data, and payment processing. Uses PostgreSQL database. Deployed in Kubernetes behind load balancer. Container runs as non-root user. SSL/TLS terminated at load balancer. Rate limiting and input validation implemented. Regular security patches applied monthly."

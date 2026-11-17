@@ -56,11 +56,18 @@ context:
   business_criticality: "high"  # low | medium | high | critical
   compliance_requirements:
     - "GDPR"
+  listener: "present"           # present | absent | unknown
+  data_subjects: "thousands"    # none | one_individual | hundreds | thousands | millions
+  detection:                    # not_logged | logged | logged_and_reviewed
+    network: "logged"
+    host: "not_logged"
+    application: "logged"
+  traceability: "per_request"   # none | per_request | per_individual
   controls:
     waf: true
 ```
 
-This is the step that makes scores meaningful. A dev/test environment would use different values and get _different_ scores. See [Describe your context](../guides/configuration.md) for the full field reference.
+This is the step the ratings depend on. A dev/test environment would use different values and get _different_ scores. Replace the values with what is true for your service today: `listener` says whether it accepts connections, `data_subjects` how many people's personal data it can read, `detection` what records an attack attempt, and `traceability` whether requests are recorded, and by whom. Leave out one of the last three and vens warns at load and uses its fallback, which the warning states. See [Describe your context](../guides/configuration.md) for the full field reference.
 
 Don't want to write this by hand? `vens init` asks a few questions and writes the file for you — see [`vens init`](../reference/init.md).
 
@@ -85,15 +92,17 @@ vens generate \
   output.vex.json
 ```
 
-You will see progress logs as Vens batches CVEs to the LLM:
+You will see progress logs as Vens asks the LLM its questions, batch by batch. With this config and the Trivy report in `examples/quickstart/reports/`:
 
 ```
-INFO Config loaded project=my-python-api exposure=internet ...
-INFO Processing vulnerabilities count=47
-INFO Scored vulnerability vuln=CVE-... score=52.0 severity=high ...
+INFO Config loaded schema_version=2 project=my-python-api exposure=internet ... undeclared=""
+INFO Processing vulnerabilities count=107
+INFO Scored vulnerability vuln=CVE-... score=43.3125 severity=high vector=SL:9/M:4/O:9/S:9/...
+...
+INFO Scoring run finished rows=107 cves=45 llm_calls=66 asked_again=0 splits=0 calls.M=5 ... calls.adjustment=6 ... failed=false
 ```
 
-Typical runtime: **30 seconds to 2 minutes** depending on CVE count and LLM provider.
+Your own scan gives other counts, and your model's answers set the scores. Each batch of up to 10 CVEs makes one call per question, so runtime grows with the number of distinct CVEs and depends on the LLM provider. The last line counts the calls and any fallback the run used: see [The run summary](../reference/generate.md#the-run-summary).
 
 !!! tip "Pin the UUID per service, not per run"
     For ad-hoc exploration it is fine to generate a fresh UUID on every run. In CI or for any service you will rescan regularly, **pin a single UUID per service** (as a repo/environment variable) and reuse it forever. BOM-Link references stay stable across scans, which is what downstream tools (Trivy, Dependency-Track, custom dashboards) expect when correlating VEX documents back to the same service over time.
@@ -115,9 +124,9 @@ Open `output.vex.json`. It is a CycloneDX 1.6 BOM (1.6 is the default; pass `--c
       "ratings": [
         {
           "method": "OWASP",
-          "score": 45.5,
+          "score": 43.3125,
           "severity": "high",
-          "vector": "SL:7/M:7/O:7/S:7/ED:6/EE:6/A:6/ID:6/LC:7/LI:7/LAV:7/LAC:7/FD:7/RD:7/NC:7/PV:7"
+          "vector": "SL:9/M:4/O:9/S:9/ED:9/EE:9/A:9/ID:8/LC:2/LI:9/LAV:1/LAC:9/FD:3/RD:5/NC:7/PV:3"
         }
       ],
       "affects": [{ "ref": "urn:cdx:.../1#pkg:..." }]
@@ -128,39 +137,41 @@ Open `output.vex.json`. It is a CycloneDX 1.6 BOM (1.6 is the default; pass `--c
 
 **The three things to look at:**
 
-1. `ratings[0].score` — the OWASP score (0–81)
-2. `ratings[0].severity` — bucket: `info` / `low` / `medium` / `high` / `critical`
-3. `ratings[0].vector` — the full 16-factor OWASP Risk Rating vector
+1. `ratings[0].severity` — `low` / `medium` / `high` / `critical`, from OWASP's matrix of the likelihood and the impact (never `info`: the likelihood is never LOW)
+2. `ratings[0].score` — likelihood × impact on a 0–81 scale, a vens number to sort CVEs within a severity
+3. `ratings[0].vector` — the 16 OWASP factor levels the severity and the score are computed from; see [How vens rates a CVE](../concepts/cvss-vs-owasp.md#how-vens-rates-a-cve)
 
 !!! note "Reasoning"
-    Vens logs the LLM's per-CVE reasoning to stderr as it scores (and to `--debug-dir` if you set it). The reasoning is not written into the VEX file itself — the VEX stays strictly CycloneDX-compliant. See [`vens generate --debug-dir`](../reference/generate.md#-debug-dir-path) to capture every prompt and response for auditing.
+    The model's answers and reasoning are not written into the VEX file — the VEX stays strictly CycloneDX-compliant. Pass `--attest` for a sidecar whose claims hold one line per question answered, or `--debug-dir` to capture every prompt and response, with `answers.json`; see [`vens generate --debug-dir`](../reference/generate.md#-debug-dir-path).
 
 ---
 
-## Step 5 — Sort by real risk
+## Step 5 — Sort by severity, then score
 
-Get your top 10 most critical CVEs with `jq`:
+Get your top 10 most critical CVEs with `jq`, by severity first, then by score:
 
 ```bash
-jq '[.vulnerabilities[] | {id, score: .ratings[0].score, severity: .ratings[0].severity}] | sort_by(-.score) | .[0:10]' output.vex.json
+jq '[.vulnerabilities[] | {id, score: .ratings[0].score, severity: .ratings[0].severity}]
+    | sort_by({"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}[.severity], -.score)
+    | .[0:10]' output.vex.json
 ```
 
-You now have a prioritized backlog where the top items are the ones that _actually_ threaten your system.
+You now have CVEs ranked by vens's computed rating, ready for review.
 
 ---
 
 ## What just happened
 
 1. Trivy found every known CVE in the image.
-2. You described _your_ system in 15 lines of YAML.
-3. Vens sent each CVE to an LLM along with your context and asked for an OWASP Risk Rating.
-4. You got a VEX file where a generic CVSS 8.8 may become a contextual OWASP 10 (low) — or a generic CVSS 5.3 may become an OWASP 52 (high).
+2. You described _your_ system in 19 lines of YAML.
+3. Vens asked an LLM closed questions about each CVE in your context, one question per call, and computed the 16 OWASP levels, the severity and the score from the answers.
+4. You got a VEX file where a generic CVSS 7.5 may become a contextual `low` — or a generic CVSS 5.3 may become a `critical`.
 
 ---
 
 ## Next steps
 
-- **[Prioritize a CVE backlog](../guides/prioritize-cves.md)** — the common use case, end to end.
-- **[Describe your context](../guides/configuration.md)** — make scores more accurate.
+- **[Prioritize a CVE backlog](../guides/prioritize-cves.md)** — the main use case, end to end.
+- **[Describe your context](../guides/configuration.md)** — what each field changes in the rating.
 - **[CVSS vs OWASP contextual](../concepts/cvss-vs-owasp.md)** — understand why the scores move.
 - **[Troubleshooting](../troubleshooting.md)** — when things don't go as expected.

@@ -12,7 +12,11 @@
 | CVE identifier (e.g. `CVE-2024-1234`) | ✅ Yes | ❌ No |
 | CVE description / title from your scanner report | ✅ Yes | ❌ No |
 | Package name, version, fixed version | ✅ Yes | ❌ No |
-| `config.yaml` fields (`exposure`, `data_sensitivity`, `business_criticality`, `availability_requirement`, `audit_requirement`, `compliance_requirements`, `controls`, `notes`) | ✅ Yes — **including the `notes` field verbatim** | ❌ No |
+| Scanner severity label | ✅ Yes | ❌ No |
+| CVSS vectors | ✅ Some metrics: `AV`, `AT`, `PR`, `UI` to the Opportunity question, `AC`, `AT`, `PR`, `UI` to Ease of exploit; the full vectors, with each source's severity, only in a flagged CVE's adjustment | ❌ No |
+| `config.yaml` fields shown in every call: `project.name`, `project.description`, `exposure`, `listener` (when `present` or `absent`), `notes` | ✅ Yes — **including the `notes` field verbatim** | ❌ No |
+| `config.yaml` fields shown to the questions they concern: `business_criticality`, `data_sensitivity`, `availability_requirement`, `compliance_requirements`, and the `waf`, `ddos_protection`, `segmentation`, `zero_trust` and `antivirus` controls set to `true` | ✅ Yes | ❌ No |
+| `config.yaml` fields vens reads alone: `data_subjects`, `detection`, `traceability`; and `audit_requirement` and the `ids`, `siem`, `edr` controls, which move no score | ❌ Never | ❌ No |
 | Your scanner report file as a whole | ❌ No — only the fields above are extracted | ❌ No |
 | SBOM contents beyond vulnerability metadata | ❌ No | ❌ No |
 | Source code, credentials, filesystem contents | ❌ Never | ❌ Never |
@@ -21,32 +25,30 @@ When you use **Ollama**, nothing leaves the machine running Ollama.
 
 ---
 
-## What Vens sends per batch
+## What Vens sends per call
 
-For each batch of CVEs (default: 10 per call, tunable via `--llm-batch-size`), Vens builds two messages:
+Vens splits the CVEs into batches (default: 10 distinct CVEs, tunable via `--llm-batch-size`). Each batch gets one call per question, about the batch's CVEs that get that question, and each flagged CVE gets one more call, the adjustment. Every call has two messages and the JSON Schema the reply must follow.
 
-**System prompt** — contains:
+**System prompt** — the same for every call of a run:
 
-- A fixed instruction block describing the OWASP Risk Rating methodology.
-- Your `config.yaml` context, formatted as plain text: `exposure`, `data_sensitivity`, `business_criticality`, and — when set — `availability_requirement`, `audit_requirement`, `compliance_requirements`, `controls`, and the **`notes` field verbatim**.
-- The JSON schema the LLM must return.
+- A fixed instruction block: the role, and how to answer.
+- Your deployment, as plain text: `project.name`, `project.description` when set, `exposure` with its documented meaning and the attacker group it names, `listener` when `present` or `absent`, and the **`notes` field verbatim**.
 
-**Human prompt** — contains a JSON array with, for each CVE in the batch:
+**Request** — contains:
 
-- `vulnId` (e.g. `CVE-2024-1234`)
-- `pkgId`, `pkgName`
-- `installedVersion`, `fixedVersion`
-- `title` (the CVE title as reported by your scanner)
-- `description` (the CVE description as reported by your scanner)
-- `severity` (the native scanner severity, as context)
+- A JSON array with, for each CVE of the call: `vulnId` (e.g. `CVE-2024-1234`), `title` and `description` as reported by your scanner, `severity` (the native scanner severity, as context), and its packages (`pkgId`, `name`, `installedVersion`, `fixedVersion`).
+- One question, with the facts it shows: the `config.yaml` fields it concerns, each with its documented meaning (for example `business_criticality` and `data_sensitivity` for Motive), and for Opportunity and Ease of exploit the CVSS metrics listed above with their source.
+- The question's closed list of answers.
 
-That is the complete list. Nothing else from the scanner report is forwarded.
+**Adjustment** — for a flagged CVE only: its entry, every CVSS vector published for it with its source and version, each source's severity, the quoted evidence of the flag (such as the sentence of the description that disputes the CVE), and the answers it was given.
+
+That is the complete list. Nothing else from the scanner report is forwarded, and `data_subjects`, `detection`, `traceability`, `audit_requirement` and the `ids`, `siem`, `edr` controls are never sent.
 
 ---
 
 ## What about the `notes` field?
 
-The `notes` field in `config.yaml` is free-form text that you author. It is designed to let you describe architecture and deployment context in plain English so the LLM can make better scoring decisions. **It is sent verbatim** to the configured LLM provider.
+The `notes` field in `config.yaml` is free-form text that you author. It is designed to let you describe architecture and deployment context in plain English so the model reads it with every question. **It is sent verbatim** to the configured LLM provider.
 
 **Do:**
 
@@ -99,11 +101,11 @@ For air-gapped networks: install Vens and Ollama on any box that can reach each 
 
 When you pass `--debug-dir <path>`, Vens creates one `run-*` directory per run inside it and writes there, for each LLM call:
 
-- `batch-NNNNN.system.prompt` — the full system prompt sent to the LLM, including your `config.yaml` context (and `notes`).
-- `batch-NNNNN.human.prompt` — the JSON array of CVEs sent in that call.
-- `batch-NNNNN.response` — the model's raw reply, with its reasoning for each CVE.
+- `batch-NNNNN.system.prompt` — the full system prompt sent to the LLM, including your deployment (and `notes`).
+- `batch-NNNNN.human.prompt` — the request of that call: its CVEs, the question and its facts.
+- `batch-NNNNN.response` — the model's raw reply, with its answer and reasoning for each CVE.
 
-The prompts contain exactly the same data the LLM receives, and the responses what it sends back. They are useful for audit and troubleshooting, but they inherit the same sensitivity as the prompts themselves. On Linux and macOS, Vens makes each run directory and its files readable by your user only (`0700` and `0600`). Treat `--debug-dir` output as containing:
+It also writes `answers.json` once per run: each answer as the model wrote it and the level vens read from it, without the reasoning or the CVE text. The prompts contain exactly the same data the LLM receives, and the responses what it sends back. They are useful for audit and troubleshooting, but they inherit the same sensitivity as the prompts themselves. On Linux and macOS, Vens makes each run directory and its files readable by your user only (`0700` and `0600`). Treat `--debug-dir` output as containing:
 
 - your full architectural context (`notes` field),
 - every CVE identifier from the scanned image,

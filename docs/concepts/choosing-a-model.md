@@ -3,11 +3,13 @@
 **Who this is for:** anyone about to run Vens and wondering *which model to put behind it* — and whether the expensive one is worth it.
 **By the end of this page:** you have a model to pick for your case, and you know where the cheap ones quietly fail.
 
-Vens makes one LLM call per CVE batch, so the model is a direct cost and quality knob. We benchmarked 12 models on the two things Vens actually does — reading a CVE and using your context — in a companion project, [venslabs/vens-benchmark](https://github.com/venslabs/vens-benchmark). The full write-up, with confidence intervals and failure cases, is in the paper:
+Vens makes one LLM call per question for each CVE batch, so the model is a direct cost and quality knob. We benchmarked 12 models on the two things Vens actually does — reading a CVE and using your context — in a companion project, [venslabs/vens-benchmark](https://github.com/venslabs/vens-benchmark). The full write-up, with confidence intervals and failure cases, is in the paper:
 
 [**Which LLM Should Score Your CVEs?** (PDF)](../assets/vens-benchmark.pdf)
 
 Cite it: [`10.5281/zenodo.21775841`](https://doi.org/10.5281/zenodo.21775841).
+
+The benchmark ran the scoring of earlier versions, where the model returned four numbers per CVE. It has not been rerun on the closed questions of vens v0.7.0, so read the recommendation below as a statement about the models, not about the current rating.
 
 ---
 
@@ -46,7 +48,7 @@ Every model in the table above qualifies; older lines (GPT-3.5, GPT-4 Turbo, Cla
 
 ## Local models
 
-Not there yet. Every local model tested (via Ollama: `llama3.2`, `qwen2.5:7b`, `gemma2:9b`, `deepseek-r1:8b`) came out statistically indistinguishable from a constant-guess baseline — their confidence intervals overlap the 1.57 floor — and only the reasoning model engaged the context at all. For context-conditioned scoring today, a small local model is close to not using an LLM.
+In the benchmark, which ran the earlier four-number scoring, every local model tested (via Ollama: `llama3.2`, `qwen2.5:7b`, `gemma2:9b`, `deepseek-r1:8b`) came out statistically indistinguishable from a constant-guess baseline — their confidence intervals overlapped the 1.57 floor — and only the reasoning model engaged the context at all. On that task, a small local model was close to not using an LLM. How local models do on the closed questions of vens v0.7.0 has not been measured: read a local model's answers on your own scans (`--debug-dir`) before you rely on its ratings.
 
 See the [paper](../assets/vens-benchmark.pdf) for the method, the two showcases (a 10.0 that ends LOW, a 6.5 that ends HIGH), and where the models (and the test itself) break.
 

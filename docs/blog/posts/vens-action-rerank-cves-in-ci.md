@@ -30,6 +30,8 @@ Trivy and Grype hand you a list of CVEs. CVSS is a score in a vacuum: it doesn't
 
 The bare minimum:
 
+*Updated for schema 2: since vens v0.7.0 the file starts with `schema_version: 2`, and `traceability`, `detection` and `data_subjects` take a fallback until declared; see [Migrating from vens v0.6](../../reference/config-schema.md#migrating).*
+
 ```yaml
 schema_version: 2
 project:
@@ -40,7 +42,7 @@ context:
   business_criticality: "critical"
 ```
 
-For scoring that actually reflects your service, fill in the rest: security controls (WAF, IDS, segmentation, ...), compliance requirements, availability target, free-form notes. The annotated reference lives in [`examples/quickstart/config.yaml`](https://github.com/venslabs/vens/blob/main/examples/quickstart/config.yaml). Wrong values mean wrong scores, so this file deserves the same review process as the rest of your code (CODEOWNERS, PR review, the works).
+To score with more of your service's context, fill in the rest: what records an attack attempt (`detection`) and who did what (`traceability`), how many people's personal data it can read (`data_subjects`), security controls (WAF, segmentation, ...), compliance requirements, availability target, free-form notes. The annotated reference lives in [`examples/quickstart/config.yaml`](https://github.com/venslabs/vens/blob/main/examples/quickstart/config.yaml). Wrong values mean wrong scores, so this file deserves the same review process as the rest of your code (CODEOWNERS, PR review, the works).
 
 ## The SBOM serial number
 
@@ -106,7 +108,7 @@ jobs:
 
 Each run gives you a CycloneDX VEX (`vex-file`), your original Trivy report annotated with `Custom.owasp_score` and `Custom.owasp_vector` (`enriched-report`, when `enrich: true`), and per-severity counts as step outputs (`count-critical`, `count-high`, ...). Pipe the counts into dashboards, PR comments, whatever you already do with scan metrics.
 
-`fail-on-severity: critical` makes the step fail if any CVE comes out CRITICAL by OWASP (score >= 60). Drop the line if you just want artifacts and a manual review.
+`fail-on-severity: critical` makes the step fail if any CVE comes out CRITICAL by OWASP (up to vens v0.6, a score of 60 or more; since v0.7.0, a HIGH likelihood and a HIGH impact on OWASP's matrix, whatever the score). Drop the line if you just want artifacts and a manual review.
 
 ## Things you'll probably want to tweak
 

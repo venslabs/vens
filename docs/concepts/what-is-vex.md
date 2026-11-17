@@ -34,12 +34,12 @@ Vens emits a **CycloneDX 1.6 VEX BOM** (1.6 is the default so Dependency-Track c
 - `source` — where the CVE comes from (NVD, GHSA, vendor tracker, …)
 - `ratings[0]` — a single OWASP rating with:
   - `method: "OWASP"`
-  - `score` — the OWASP Risk Rating score (0–81)
-  - `severity` — bucketed level: `info` / `low` / `medium` / `high` / `critical`
-  - `vector` — the full 16-factor OWASP Risk Rating vector (e.g. `SL:7/M:7/O:7/...`)
+  - `score` — likelihood × impact on a 0–81 scale, a vens extension to rank CVEs within a severity
+  - `severity` — `low` / `medium` / `high` / `critical`, from OWASP's likelihood × impact matrix
+  - `vector` — the 16 OWASP factor levels the severity and the score are computed from (e.g. `SL:9/M:4/O:9/...`)
 - `affects[]` — BOM-Link references to the vulnerable components
 
-Vens does **not** set a CycloneDX `analysis` block (`state`, `justification`, `detail`). It deliberately keeps the VEX to the scoring information: the human-readable reasoning is logged to stderr (and to `--debug-dir` if set) so the VEX stays strictly compliant and stable across runs.
+Vens does **not** set a CycloneDX `analysis` block (`state`, `justification`, `detail`). It deliberately leaves it out, which keeps the VEX focused on scoring information. The model's reasoning for each CVE is in the replies that `--debug-dir` writes and in the claims of the attestation that `--attest` writes; the log on stderr carries each rating, not its reasoning.
 
 ---
 
@@ -48,8 +48,8 @@ Vens does **not** set a CycloneDX `analysis` block (`state`, `justification`, `d
 - **Trivy** — `trivy image ... --vex vex.json`
 - **Grype** — `grype ... --vex vex.json`
 - **Dependency-Track** — ingests the file directly.
-- **Your own scripts / dashboards** — via `jq` on `ratings[0].score` (see the [quickstart](../getting-started/quickstart.md#step-5-sort-by-real-risk)).
-- **Any CI pipeline** — filter the VEX to fail the build only when there is real contextual risk.
+- **Your own scripts / dashboards** — via `jq` on `ratings[0].severity`, then `ratings[0].score` (see the [quickstart](../getting-started/quickstart.md#step-5-sort-by-severity-then-score)).
+- **Any CI pipeline** — apply your CI policy to vens's computed ratings, for example by filtering the VEX on `ratings[0].severity`.
 
 ---
 
