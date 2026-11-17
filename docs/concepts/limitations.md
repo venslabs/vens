@@ -93,7 +93,7 @@ On cloud, the benchmark-backed picks are `claude-sonnet-4-6` (most accurate and 
 
 Vens makes LLM calls and does not know how much they cost. There is no `--max-spend` flag, no per-run budget, no rate-limit other than the provider's. Monitor billing on your provider dashboard, and start with small batches in CI before scaling out.
 
-Since v0.7.0 each batch makes one call per question, so a run makes several calls per batch: on the quickstart example (45 CVEs, batches of 10), 61 calls before any retry, 11 questions in each of 5 batches and 6 adjustments. The run summary counts every call, per question.
+Since v0.7.0 each batch makes one call per question, so a run makes several calls per batch: on the quickstart example (45 CVEs, batches of 10), 66 calls before any retry, 12 questions in each of 5 batches and 6 adjustments. The run summary counts every call, per question.
 
 ---
 
