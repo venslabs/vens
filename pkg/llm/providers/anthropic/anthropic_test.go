@@ -15,18 +15,21 @@
 package anthropic
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/anthropics/anthropic-sdk-go/option"
 
 	"github.com/venslabs/vens/pkg/llm"
+	"github.com/venslabs/vens/pkg/llm/providers/internal/schematest"
 )
 
 // recordedReq captures what the fake Anthropic endpoint received.
@@ -361,5 +364,41 @@ func TestGenerate_UnknownModelRefusingTemperatureFails(t *testing.T) {
 	}
 	if rec.hits != 1 {
 		t.Errorf("hits = %d, want 1 (no retry)", rec.hits)
+	}
+}
+
+// The schema goes out as vens wrote it, its properties in the frame's order
+// rather than sorted, and output_config.format keeps its type.
+func TestGenerate_SchemaKeepsPropertyOrder(t *testing.T) {
+	for _, f := range schematest.Frames {
+		t.Run(f.Name, func(t *testing.T) {
+			frame := f.Read(t)
+			c, rec := newTestClient(t, "claude-sonnet-4-5", 200, successBody)
+
+			if _, err := c.Generate(context.Background(), llm.Request{System: "s", Human: "h", Schema: frame}); err != nil {
+				t.Fatalf("Generate: %v", err)
+			}
+			var body struct {
+				OutputConfig struct {
+					Format struct {
+						Type   string          `json:"type"`
+						Schema json.RawMessage `json:"schema"`
+					} `json:"format"`
+				} `json:"output_config"`
+			}
+			if err := json.Unmarshal([]byte(rec.raw), &body); err != nil {
+				t.Fatalf("request body: %v (%s)", err, rec.raw)
+			}
+			format := body.OutputConfig.Format
+			if format.Type != "json_schema" {
+				t.Errorf("format.type = %q", format.Type)
+			}
+			if got := schematest.PropertyNames(t, format.Schema, f.Object...); !slices.Equal(got, f.Order) {
+				t.Errorf("properties sent in order %v, want %v", got, f.Order)
+			}
+			if !bytes.Equal(format.Schema, frame) {
+				t.Errorf("schema sent:\n%s\nwant the frame:\n%s", format.Schema, frame)
+			}
+		})
 	}
 }

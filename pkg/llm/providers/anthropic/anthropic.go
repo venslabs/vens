@@ -84,6 +84,11 @@ func (c *Client) Generate(ctx context.Context, req llm.Request) (string, error) 
 	if err := json.Unmarshal(req.Schema, &schema); err != nil {
 		return "", fmt.Errorf("anthropic: invalid schema: %w", err)
 	}
+	// The SDK types the schema as a map, which goes out with its keys sorted.
+	// The extra field writes the schema's own bytes in its place, so the model
+	// writes the properties in the order the schema lists them.
+	format := sdk.JSONOutputFormatParam{Schema: schema}
+	format.SetExtraFields(map[string]any{"schema": req.Schema})
 
 	params := sdk.MessageNewParams{
 		Model:     sdk.Model(c.model),
@@ -92,9 +97,7 @@ func (c *Client) Generate(ctx context.Context, req llm.Request) (string, error) 
 		Messages: []sdk.MessageParam{
 			sdk.NewUserMessage(sdk.NewTextBlock(req.Human)),
 		},
-		OutputConfig: sdk.OutputConfigParam{
-			Format: sdk.JSONOutputFormatParam{Schema: schema},
-		},
+		OutputConfig: sdk.OutputConfigParam{Format: format},
 	}
 	if req.Temperature != nil && llm.ModelRefusesTemperature(c.model) {
 		return "", fmt.Errorf("anthropic: %q refuses an explicit temperature: omit --llm-temperature for this model", c.model)

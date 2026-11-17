@@ -15,6 +15,7 @@
 package openai
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -22,12 +23,14 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/openai/openai-go/v3/option"
 
 	"github.com/venslabs/vens/pkg/llm"
+	"github.com/venslabs/vens/pkg/llm/providers/internal/schematest"
 )
 
 func TestIsReasoningModel(t *testing.T) {
@@ -364,5 +367,45 @@ func TestGenerate_OtherBadRequestIsNotStructuredOutput(t *testing.T) {
 	}
 	if errors.Is(err, llm.ErrUnsupportedStructuredOutput) {
 		t.Errorf("err = %v, want it classified as a plain provider error", err)
+	}
+}
+
+// The schema goes out as vens wrote it, its properties in the frame's order
+// rather than sorted: strict structured output has the model write them in
+// the order the schema lists them.
+func TestGenerate_SchemaKeepsPropertyOrder(t *testing.T) {
+	for _, f := range schematest.Frames {
+		t.Run(f.Name, func(t *testing.T) {
+			frame := f.Read(t)
+			var sent []byte
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				sent, _ = io.ReadAll(r.Body)
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = io.WriteString(w, successBody)
+			}))
+			defer srv.Close()
+			c := newTestClient(t, "gpt-4o", srv.URL)
+
+			if _, err := c.Generate(context.Background(), llm.Request{System: "s", Human: "h", Schema: frame}); err != nil {
+				t.Fatalf("Generate: %v", err)
+			}
+			var body struct {
+				ResponseFormat struct {
+					JSONSchema struct {
+						Schema json.RawMessage `json:"schema"`
+					} `json:"json_schema"`
+				} `json:"response_format"`
+			}
+			if err := json.Unmarshal(sent, &body); err != nil {
+				t.Fatalf("request body: %v (%s)", err, sent)
+			}
+			schema := body.ResponseFormat.JSONSchema.Schema
+			if got := schematest.PropertyNames(t, schema, f.Object...); !slices.Equal(got, f.Order) {
+				t.Errorf("properties sent in order %v, want %v", got, f.Order)
+			}
+			if !bytes.Equal(schema, frame) {
+				t.Errorf("schema sent:\n%s\nwant the frame:\n%s", schema, frame)
+			}
+		})
 	}
 }
