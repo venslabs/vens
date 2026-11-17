@@ -37,8 +37,8 @@ func CheckStrictConfig(cfg *riskconfig.Config) error {
 // preflight is a strict run's check before any call. A CVE whose vectors
 // leave an axis's Applicability unknown keeps that axis applicable, and a
 // CVE no row describes is not asked Motive, Opportunity and Ease of exploit,
-// each taking cannot_tell's level: each falls back to a worst case known
-// before anything is spent. One error names every such CVE with its causes.
+// each at its worst level: each falls back to a worst case known before
+// anything is spent. One error names every such CVE with its causes.
 func preflight(cves []*cve) error {
 	var lines []string
 	for _, c := range cves {
@@ -51,7 +51,7 @@ func preflight(cves []*cve) error {
 			causes = append(causes, "applicability_missing: "+strings.Join(parts, "; "))
 		}
 		if !c.in.Described() {
-			causes = append(causes, "no description in the scanner's report, so Motive, Opportunity and Ease of exploit read cannot_tell")
+			causes = append(causes, "no description in the scanner's report, so Motive, Opportunity and Ease of exploit are not asked and take their worst case")
 		}
 		if len(causes) > 0 {
 			lines = append(lines, c.id()+": "+strings.Join(causes, "; "))

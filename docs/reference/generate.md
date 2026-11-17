@@ -293,7 +293,7 @@ A strict run fails at the first of three checks that finds one, with exit code 1
     ```text
     failed to generate risk scores: strict: 2 vulnerabilities would fall back to a worst case, so no LLM call is made:
       CVE-2026-2673: applicability_missing: no CVSS vector in the scanner's report
-      CVE-2026-3184: applicability_missing: no CVSS vector in the scanner's report; no description in the scanner's report, so Motive, Opportunity and Ease of exploit read cannot_tell
+      CVE-2026-3184: applicability_missing: no CVSS vector in the scanner's report; no description in the scanner's report, so Motive, Opportunity and Ease of exploit are not asked and take their worst case
     ```
 
     Here the cause is the scan, not your config. A scan holding a CVE with no CVSS vector in the scanner's report cannot pass `--strict`, and nothing in vens fixes it: the vector has to come from the scanner. Without `--strict`, such a CVE has its losses asked instead of floored, and counts in `applicability_missing`.

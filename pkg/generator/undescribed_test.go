@@ -157,7 +157,7 @@ func TestGenerator_StrictRefusesAnUndescribedCVEFirst(t *testing.T) {
 	v.Description = ""
 	require.EqualError(t, g.GenerateRiskScore(context.Background(), []Vulnerability{v}, nil),
 		"strict: 1 vulnerability would fall back to a worst case, so no LLM call is made:\n  "+
-			"CVE-2024-0000: no description in the scanner's report, so Motive, Opportunity and Ease of exploit read cannot_tell")
+			"CVE-2024-0000: no description in the scanner's report, so Motive, Opportunity and Ease of exploit are not asked and take their worst case")
 	assert.Empty(t, m.calls)
 	assert.Empty(t, logs.find(slog.LevelWarn, undescribedWarning))
 }
