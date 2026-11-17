@@ -303,6 +303,7 @@ type answersJSON struct {
 		Counters []string `json:"counters"`
 	} `json:"vulnerabilities"`
 	Counters map[string]int `json:"counters"`
+	Defects  map[string]int `json:"defects"`
 }
 
 func readAnswers(t *testing.T, parent string) (answersJSON, string) {
@@ -431,6 +432,46 @@ func TestDebugDir_AnswersJSONOnAFailedRun(t *testing.T) {
 	assert.Equal(t, 2, got.Counters["detection_undeclared"], "the rated CVEs'")
 	assert.Equal(t, 1, got.Counters["motive_cannot_tell"])
 	assert.Equal(t, int64(1), runSummary(t, logs).attrs["counters.motive_cannot_tell"])
+}
+
+// answers.json gives the defects the run summary counts, under the same
+// names and with the same totals: only the kinds found, {} on a clean run,
+// and on a failed run those counted before it stopped, in the batch it
+// rated and in the one it stopped in.
+func TestDebugDir_AnswersJSONCountsTheDefects(t *testing.T) {
+	offList := func(c fakeCall, _ string) any {
+		if c.factor == contract.EE {
+			return "bogus"
+		}
+		return nil
+	}
+	for name, tc := range map[string]struct {
+		m       *fakeLLM
+		failed  bool
+		defects map[string]int
+	}{
+		"clean": {&fakeLLM{}, false, map[string]int{}},
+		"unreadable and off its list": {&fakeLLM{reply: replyOnce("not json"), answer: offList}, false,
+			map[string]int{"reply_unreadable": 1, "answer_off_list": 2}},
+		"failed": {&fakeLLM{answer: offList, reply: func(c fakeCall) (string, bool) {
+			return "not json", c.factor == contract.LC && slices.Contains(c.ids, "CVE-2024-0001")
+		}}, true, map[string]int{"answer_off_list": 2, "reply_unreadable": 2}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			parent := t.TempDir()
+			logs := withCapturedLogs(t)
+			g := newGen(t, Opts{LLM: tc.m, BatchSize: 1, DebugDir: parent})
+			err := g.GenerateRiskScore(context.Background(), testVulns(2), nil)
+			require.Equal(t, tc.failed, err != nil, "error: %v", err)
+
+			got, raw := readAnswers(t, parent)
+			assert.Equal(t, tc.defects, got.Defects)
+			assert.Equal(t, tc.defects, defectsOf(runSummary(t, logs)), "the run summary's")
+			if len(tc.defects) == 0 {
+				assert.Contains(t, raw, `"defects": {}`)
+			}
+		})
+	}
 }
 
 // adjustedCVE is the CVE an adjustment call is about.

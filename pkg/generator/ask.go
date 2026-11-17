@@ -46,10 +46,14 @@ type reply struct {
 // ask asks question f about cves, keeping each answer in its CVE's
 // assessment as soon as a reply gives it. A call the provider truncates is
 // split in half and each half asked on its own, down to a single CVE. The
-// CVEs the replies leave out are asked again together, once; one still left
-// out stops the run, since no other batch holds it.
+// CVEs the replies leave out, or leave without an answer Go can read, are
+// asked again together, once; one still without an answer stops the run,
+// since no other batch holds it.
 func (g *Generator) ask(ctx context.Context, run *scoringRun, f contract.Factor, cves []*cve, assessed map[string]*assessment) error {
-	got, err := g.askSplitting(ctx, run, f, cves, assessed)
+	// unread holds, per CVE a reply Go could not read in full left without
+	// an answer, what Go could not read: the error that stops the run says it.
+	unread := map[string]error{}
+	got, err := g.askSplitting(ctx, run, f, cves, assessed, unread)
 	if err != nil {
 		return err
 	}
@@ -58,27 +62,44 @@ func (g *Generator) ask(ctx context.Context, run *scoringRun, f contract.Factor,
 		return nil
 	}
 	// Counts go by distinct CVE: one hitting several components is one entry.
-	slog.WarnContext(ctx, "Model skipped vulnerabilities; asking again for those alone",
-		"question", string(f), "skipped", len(missing), "of", len(cves), "vulns", strings.Join(cveIDs(missing), ","))
+	slog.WarnContext(ctx, "No readable answer for vulnerabilities; asking again for those alone",
+		"question", string(f), "unanswered", len(missing), "of", len(cves), "vulns", strings.Join(cveIDs(missing), ","))
 	run.askedAgain++
-	again, err := g.askSplitting(ctx, run, f, missing, assessed)
+	again, err := g.askSplitting(ctx, run, f, missing, assessed, unread)
 	if err != nil {
 		return err
 	}
 	maps.Copy(got, again)
 	if still := unanswered(cves, got); len(still) > 0 {
-		ids := cveIDs(still)
-		slices.Sort(ids)
-		return fmt.Errorf("model returned no answer to %s (%s) for %s after asking again; stopping the run",
-			f.Name(), f, strings.Join(ids, ", "))
+		return noAnswer(f, still, unread)
 	}
 	return nil
 }
 
+// noAnswer is the error that stops the run on the CVEs still without an
+// answer to f after asking again, each named once, sorted, followed by what
+// Go could not read of the replies that left them so.
+func noAnswer(f contract.Factor, still []*cve, unread map[string]error) error {
+	ids := cveIDs(still)
+	slices.Sort(ids)
+	msg := fmt.Sprintf("model returned no answer to %s (%s) for %s after asking again; stopping the run",
+		f.Name(), f, strings.Join(ids, ", "))
+	var why []string
+	for _, id := range ids {
+		if err := unread[id]; err != nil && !slices.Contains(why, err.Error()) {
+			why = append(why, err.Error())
+		}
+	}
+	if len(why) > 0 {
+		msg += ": " + strings.Join(why, "; ")
+	}
+	return errors.New(msg)
+}
+
 // askSplitting asks f about cves in one call or, when the provider truncates
 // it, in two halves, each split again until it fits or holds one CVE.
-func (g *Generator) askSplitting(ctx context.Context, run *scoringRun, f contract.Factor, cves []*cve, assessed map[string]*assessment) (map[string]reply, error) {
-	got, err := g.askOnce(ctx, run, f, cves, assessed)
+func (g *Generator) askSplitting(ctx context.Context, run *scoringRun, f contract.Factor, cves []*cve, assessed map[string]*assessment, unread map[string]error) (map[string]reply, error) {
+	got, err := g.askOnce(ctx, run, f, cves, assessed, unread)
 	if len(cves) == 1 || !errors.Is(err, llm.ErrTruncated) {
 		return got, err
 	}
@@ -93,11 +114,11 @@ func (g *Generator) askSplitting(ctx context.Context, run *scoringRun, f contrac
 		"first_half", strings.Join(cveIDs(cves[:half]), ","),
 		"second_half", strings.Join(cveIDs(cves[half:]), ","),
 	)
-	first, err := g.askSplitting(ctx, run, f, cves[:half], assessed)
+	first, err := g.askSplitting(ctx, run, f, cves[:half], assessed, unread)
 	if err != nil {
 		return nil, err
 	}
-	second, err := g.askSplitting(ctx, run, f, cves[half:], assessed)
+	second, err := g.askSplitting(ctx, run, f, cves[half:], assessed, unread)
 	if err != nil {
 		return nil, err
 	}
@@ -106,9 +127,11 @@ func (g *Generator) askSplitting(ctx context.Context, run *scoringRun, f contrac
 }
 
 // askOnce makes one call asking f about cves, reads its reply and keeps each
-// answer in its CVE's assessment. A strict run stops right after a call that
-// gave an answer Go reads as cannot_tell, the answer kept.
-func (g *Generator) askOnce(ctx context.Context, run *scoringRun, f contract.Factor, cves []*cve, assessed map[string]*assessment) (map[string]reply, error) {
+// answer in its CVE's assessment. A CVE a reply Go cannot read in full leaves
+// without an answer gets what Go could not read in unread. A strict run stops
+// right after a call that gave an answer Go reads as cannot_tell, the answer
+// kept.
+func (g *Generator) askOnce(ctx context.Context, run *scoringRun, f contract.Factor, cves []*cve, assessed map[string]*assessment, unread map[string]error) (map[string]reply, error) {
 	request, err := contract.Request(f, g.deployment, contractCVEs(cves))
 	if err != nil {
 		return nil, err
@@ -121,9 +144,11 @@ func (g *Generator) askOnce(ctx context.Context, run *scoringRun, f contract.Fac
 	if err != nil {
 		return nil, fmt.Errorf("LLM evaluation failed: %w", err)
 	}
-	got, err := readReplies(ctx, run, f, raw, ref, cves)
-	if err != nil {
-		return nil, err
+	got, unreadable := readReplies(ctx, run, f, raw, ref, cves)
+	if unreadable != nil {
+		for _, c := range unanswered(cves, got) {
+			unread[c.id()] = unreadable
+		}
 	}
 	for _, c := range cves {
 		if r, ok := got[c.id()]; ok {
@@ -142,15 +167,22 @@ func (g *Generator) askOnce(ctx context.Context, run *scoringRun, f contract.Fac
 // ignored answer quotes: an entry's reasoning can run long.
 const loggedLimit = 200
 
-// readReplies reads a call's reply by key, one answer per CVE. An answer for
-// a CVE the call did not ask about is ignored, and a CVE answered twice keeps
-// its first answer, each logged. An answer off its list, or one a key written
-// twice leaves in doubt, is kept as given and logged: Go reads it as
-// cannot_tell. Each of these counts as a defect of the run's.
+// readReplies reads a call's reply by key, one answer per CVE. A reply that
+// is no JSON object, or whose answers are no array, answers no CVE, and an
+// answer that is no JSON object is skipped: such a reply is logged at WARN,
+// and the error returned beside the answers read says what Go could not
+// read. An answer for a CVE the call did not ask about is ignored, and a CVE
+// answered twice keeps its first answer, each logged. An answer off its
+// list, or one a key written twice leaves in doubt, is kept as given and
+// logged: Go reads it as cannot_tell. Each of these counts as a defect of
+// the run's.
 func readReplies(ctx context.Context, run *scoringRun, f contract.Factor, raw, evidenceRef string, cves []*cve) (map[string]reply, error) {
-	entries, err := readEntries(ctx, f, raw)
-	if err != nil {
-		return nil, fmt.Errorf("unable to parse LLM output: %w: %q", err, raw)
+	entries, unreadable := readEntries(ctx, f, raw)
+	if unreadable != nil {
+		run.defect(defectReplyUnreadable)
+		slog.WarnContext(ctx, "Unreadable reply; the vulnerabilities it leaves without an answer count as left out",
+			"question", string(f), "error", unreadable.Error(), "reply", cut(raw, loggedLimit))
+		unreadable = fmt.Errorf("unable to parse LLM output: %w: %q", unreadable, cut(raw, loggedLimit))
 	}
 	asked := make(map[string]bool, len(cves))
 	for _, c := range cves {
@@ -175,7 +207,7 @@ func readReplies(ctx context.Context, run *scoringRun, f contract.Factor, raw, e
 		}
 		got[id] = readEntry(ctx, run, f, id, e, evidenceRef)
 	}
-	return got, nil
+	return got, unreadable
 }
 
 // entry is one answer of a reply: its fields by key and its text. repeated
@@ -187,30 +219,37 @@ type entry struct {
 	repeated bool
 }
 
-// readEntries decodes a reply's answers, each key read as written.
-// encoding/json keeps the last value of a key written twice and says
-// nothing, so the reply is walked for one; one outside every answer marks
-// them all.
+// readEntries decodes a reply's answers, each key read as written. A reply
+// that is no JSON object, or whose answers are no array, gives none, and an
+// answer that is no JSON object is skipped; the error says what it could not
+// read, beside the answers it could. encoding/json keeps the last value of a
+// key written twice and says nothing, so the reply is walked for one; one
+// outside every answer marks them all.
 func readEntries(ctx context.Context, f contract.Factor, raw string) ([]entry, error) {
 	var top map[string]json.RawMessage
-	if err := json.Unmarshal([]byte(raw), &top); err != nil {
-		return nil, err
+	if err := json.Unmarshal([]byte(raw), &top); err != nil || top == nil {
+		return nil, notA("the reply is", "a JSON object", []byte(raw), err)
 	}
 	var items []json.RawMessage
 	if list, ok := top["answers"]; ok {
-		if err := json.Unmarshal(list, &items); err != nil {
-			return nil, err
+		if err := json.Unmarshal(list, &items); err != nil || items == nil {
+			return nil, notA("the answers are", "an array", list, err)
 		}
 	}
 	outside := repeatedKeys([]byte(raw))
-	entries := make([]entry, len(items))
+	var entries []entry
+	var skipped []string
 	for i, item := range items {
-		if err := json.Unmarshal(item, &entries[i].fields); err != nil {
-			return nil, err
-		}
+		// Taken before the skip: a key an answer skipped writes twice is no
+		// reason to doubt the other answers.
 		n := repeatedKeys(item)
-		entries[i].text, entries[i].repeated = item, n > 0
 		outside -= n
+		var fields map[string]json.RawMessage
+		if err := json.Unmarshal(item, &fields); err != nil || fields == nil {
+			skipped = append(skipped, notA(fmt.Sprintf("answer %d of %d is", i+1, len(items)), "an object", item, err).Error())
+			continue
+		}
+		entries = append(entries, entry{fields: fields, text: item, repeated: n > 0})
 	}
 	if outside > 0 {
 		slog.WarnContext(ctx, "Model wrote a key twice outside its answers; reading each as cannot_tell",
@@ -219,7 +258,42 @@ func readEntries(ctx context.Context, f contract.Factor, raw string) ([]entry, e
 			entries[i].repeated = true
 		}
 	}
+	if len(skipped) > 0 {
+		return entries, errors.New(strings.Join(skipped, "; "))
+	}
 	return entries, nil
+}
+
+// notA says why raw, which subject names, is not the JSON value want: it is
+// no JSON at all, or JSON of another type. encoding/json reads null into a
+// map or a slice without an error, so err can be nil.
+func notA(subject, want string, raw []byte, err error) error {
+	var syntax *json.SyntaxError
+	if errors.As(err, &syntax) {
+		return fmt.Errorf("%s not JSON: %w", subject, err)
+	}
+	return fmt.Errorf("%s %s, not %s", subject, jsonType(raw), want)
+}
+
+// jsonType names the type of the JSON value raw, which is valid JSON.
+func jsonType(raw []byte) string {
+	b := bytes.TrimLeft(raw, " \t\r\n")
+	if len(b) == 0 {
+		return "nothing"
+	}
+	switch b[0] {
+	case '{':
+		return "an object"
+	case '[':
+		return "an array"
+	case '"':
+		return "a string"
+	case 't', 'f':
+		return "a boolean"
+	case 'n':
+		return "null"
+	}
+	return "a number"
 }
 
 // readEntry reads the answer an entry gives for CVE id. An entry a key

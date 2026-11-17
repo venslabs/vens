@@ -31,7 +31,7 @@ stderr 'CVE-2024-0002: applicability_missing: nvd CVSS 3.1 vector \\"CVSS:3.1/AV
 stderr 'CVE-2024-0003: applicability_missing: nvd CVSS 3.1 vector lacks A'
 stderr 'CVE-2024-0004: applicability_missing: redhat CVSS 3.1 vector gives I:X, off its version''s scale'
 stderr 'CVE-2024-0005: applicability_missing: nvd CVSS 4.0 vector lacks SA'
-stderr 'CVE-2024-0006: no description in the scanner''s report, so Motive, Opportunity and Ease of exploit read cannot_tell'
+stderr 'CVE-2024-0006: no description in the scanner''s report, so Motive, Opportunity and Ease of exploit are not asked and take their worst case'
 ! stderr 'CVE-2024-0007:'
 stderr 'Scoring run finished.* llm_calls=0 .*failed=true'
 ! exists out.cdx.json

@@ -25,8 +25,9 @@ import (
 )
 
 // A flagged CVE first gets the ordinary questions; then one call shows it the
-// evidence the flag rests on and lets it lower Opportunity and each axis
-// Applicability did not floor, never raise them.
+// evidence the flag rests on and lets it lower Opportunity, when a row
+// describes the CVE, and each axis Applicability did not floor, never raise
+// them.
 
 const adjustmentTemplate = `FLAGGED VULNERABILITY
 {entry}
@@ -91,19 +92,39 @@ type sourcedVector struct {
 }
 
 // givenAnswers are the baselines the adjustment may lower: Opportunity's
-// answer, and the answer of each axis's factor Applicability did not floor.
+// answer, when a row describes the CVE, and the answer of each axis's factor
+// Applicability did not floor.
 type givenAnswers struct {
-	Opportunity     string  `json:"opportunity"`
+	Opportunity     *string `json:"opportunity,omitempty"`
 	Confidentiality *string `json:"confidentiality,omitempty"`
 	Integrity       *string `json:"integrity,omitempty"`
 	Availability    *string `json:"availability,omitempty"`
 }
 
+const adjustOpportunity = "opportunity"
+
+// AdjustmentFields lists the fields a flagged CVE's adjustment asks, in the
+// order its request asks them: opportunity, when a row describes the CVE,
+// then each axis Applicability did not floor (indexed as cvss's axes). A
+// description is a prerequisite of any Opportunity answer, ordinary or
+// adjusted. With no field left, there is no adjustment to make.
+func AdjustmentFields(c CVE, floored [3]bool) []string {
+	var fields []string
+	if c.Described() {
+		fields = append(fields, adjustOpportunity)
+	}
+	for axis, name := range axisNames {
+		if !floored[axis] {
+			fields = append(fields, name)
+		}
+	}
+	return fields
+}
+
 // AdjustmentRequest returns the request of a flagged CVE's adjustment call:
 // its entry with every row's evidence, its flags and the answers its
-// ordinary calls gave, then the question on Opportunity and one per axis
-// Applicability did not floor (indexed as cvss's axes). The call shares the
-// run's system prompt.
+// ordinary calls gave, then one question per field AdjustmentFields lists.
+// The call shares the run's system prompt.
 func AdjustmentRequest(d Deployment, c CVE, floored [3]bool, flags []Flag, given Answers) (string, error) {
 	if err := d.Check(); err != nil {
 		return "", err
@@ -112,40 +133,52 @@ func AdjustmentRequest(d Deployment, c CVE, floored [3]bool, flags []Flag, given
 	if err != nil {
 		return "", err
 	}
+	fields := AdjustmentFields(c, floored)
+	if len(fields) == 0 {
+		return "", noAdjustment(c)
+	}
 	e, err := json.Marshal(entry)
 	if err != nil {
 		return "", err
 	}
-	questions := []string{fill(adjustOpportunityLine, "{group}", group(d), "{o_ids}", strings.Join(lowerable(), ", "))}
-	fields := []string{`"opportunity": "..."`}
-	for axis, name := range axisNames {
-		if !floored[axis] {
-			questions = append(questions, fill(adjustAxisLine, "{axis}", name))
-			fields = append(fields, `"`+name+`": "..."`)
+	var questions, replied []string
+	for _, name := range fields {
+		line := fill(adjustAxisLine, "{axis}", name)
+		if name == adjustOpportunity {
+			line = fill(adjustOpportunityLine, "{group}", group(d), "{o_ids}", strings.Join(lowerable(), ", "))
 		}
+		questions = append(questions, line)
+		replied = append(replied, `"`+name+`": "..."`)
 	}
 	return fill(adjustmentTemplate,
 		"{entry}", string(e),
 		"{questions}", strings.Join(questions, "\n"),
-		"{fields}", strings.Join(fields, ", "),
+		"{fields}", strings.Join(replied, ", "),
 	), nil
 }
 
 // AdjustmentSchema returns the JSON Schema of a flagged CVE's adjustment
-// call: the reasoning; Opportunity's answer, keep or cannot_tell; and
-// affected, not_affected or cannot_tell for each axis Applicability did not
-// floor.
-func AdjustmentSchema(floored [3]bool) (json.RawMessage, error) {
-	ps := []property{
-		{"reasoning", &schema{Type: "string"}},
-		{"opportunity", enum(append(lowerable(), keep, cannotTell)...)},
+// call: the reasoning; then, for each field AdjustmentFields lists,
+// Opportunity's answer, keep or cannot_tell, or an axis's affected,
+// not_affected or cannot_tell.
+func AdjustmentSchema(c CVE, floored [3]bool) (json.RawMessage, error) {
+	fields := AdjustmentFields(c, floored)
+	if len(fields) == 0 {
+		return nil, noAdjustment(c)
 	}
-	for axis, name := range axisNames {
-		if !floored[axis] {
-			ps = append(ps, property{name, enum(affected, notAffected, cannotTell)})
+	ps := []property{{"reasoning", &schema{Type: "string"}}}
+	for _, name := range fields {
+		answers := enum(affected, notAffected, cannotTell)
+		if name == adjustOpportunity {
+			answers = enum(append(lowerable(), keep, cannotTell)...)
 		}
+		ps = append(ps, property{name, answers})
 	}
 	return json.Marshal(object(ps...))
+}
+
+func noAdjustment(c CVE) error {
+	return fmt.Errorf("%s has nothing left to adjust: no row describes it and every axis is floored", c.ID)
 }
 
 // lowerable returns Opportunity's answers besides cannot_tell, the ones an
@@ -157,9 +190,7 @@ func lowerable() []string {
 
 // newAdjustmentEntry writes a flagged CVE's entry, its evidence and the
 // answers its ordinary calls gave, which are the baselines the adjustment may
-// lower. A CVE no row describes shows cannot_tell as Opportunity's: Go reads
-// whatever was answered as that, and a baseline the reply keeps must be the
-// one Go keeps.
+// lower. A CVE no row describes was not asked Opportunity: it shows none.
 func newAdjustmentEntry(c CVE, floored [3]bool, flags []Flag, given Answers) (adjustmentEntry, error) {
 	if err := checkCVE(c); err != nil {
 		return adjustmentEntry{}, err
@@ -167,7 +198,7 @@ func newAdjustmentEntry(c CVE, floored [3]bool, flags []Flag, given Answers) (ad
 	if err := CheckFlags(flags, c); err != nil {
 		return adjustmentEntry{}, err
 	}
-	if err := checkGiven(given, floored); err != nil {
+	if err := checkGiven(c, given, floored); err != nil {
 		return adjustmentEntry{}, err
 	}
 	e := adjustmentEntry{
@@ -175,10 +206,9 @@ func newAdjustmentEntry(c CVE, floored [3]bool, flags []Flag, given Answers) (ad
 		VendorSeverity: vendorSeverities(c),
 		CVSS:           []sourcedVector{},
 		Flags:          flags,
-		Answers:        givenAnswers{Opportunity: given.O},
 	}
-	if !c.Described() {
-		e.Answers.Opportunity = cannotTell
+	if c.Described() {
+		e.Answers.Opportunity = &given.O
 	}
 	for _, v := range c.vectors() {
 		sv := sourcedVector{Source: v.Source, Version: v.Version, Vector: v.Vector}
@@ -240,12 +270,16 @@ func CheckFlags(flags []Flag, c CVE) error {
 	return nil
 }
 
-// checkGiven checks the baselines the adjustment shows: Opportunity's answer
-// and, for each axis Applicability did not floor, its factor's, each one its
-// question lists, cannot_tell included. An axis floored was not asked and
-// has no answer.
-func checkGiven(given Answers, floored [3]bool) error {
-	if !slices.Contains(table[O].ids, given.O) {
+// checkGiven checks the baselines the adjustment shows: Opportunity's answer,
+// when a row describes the CVE, and, for each axis Applicability did not
+// floor, its factor's, each one its question lists, cannot_tell included. An
+// axis floored, and Opportunity for a CVE no row describes, were not asked
+// and have no answer.
+func checkGiven(c CVE, given Answers, floored [3]bool) error {
+	switch {
+	case !c.Described() && given.O != "":
+		return fmt.Errorf("%s was not asked, %s described by no row, yet has the answer %q", O, c.ID, given.O)
+	case c.Described() && !slices.Contains(table[O].ids, given.O):
 		return fmt.Errorf("%s's answer %q is not one its question lists", O, given.O)
 	}
 	factors := [3]Factor{cvss.Confidentiality: LC, cvss.Integrity: LI, cvss.Availability: LAV}

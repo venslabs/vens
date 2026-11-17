@@ -59,16 +59,18 @@ OWASP's Risk Rating Methodology rates a vulnerability from 16 factors, each with
 
 Four factors also have a CVSS floor: when every CVSS vector of the CVE rates the axis as no impact, vens asks no question and sets Loss of confidentiality to 2, Loss of integrity to 1 and Loss of availability to 1, and Privacy violation, which follows confidentiality, to 3.
 
-A question is asked only when the factor's contract requires it: at most 12 questions per CVE. A CVE whose description says it is disputed or not a security issue, or that the scanner rates low while NVD rates it high or critical, is flagged: it gets one more call, the adjustment, which can lower Opportunity, a loss the CVSS vectors did not floor, and Privacy violation, and never raises a level.
+A description is a prerequisite of three answers: when no row of the scanner's report describes the CVE, a title alone included, vens does not ask Motive, Opportunity and Ease of exploit, and sets each to its worst level, 9, counted as `cannot_tell`.
+
+A question is asked only when the factor's contract requires it: at most 12 questions per CVE. A CVE whose description says it is disputed or not a security issue, or that the scanner rates low while NVD rates it high or critical, is flagged: it gets one more call, the adjustment, when it has a field left to ask, which can lower Opportunity (not for a CVE with no description), a loss the CVSS vectors did not floor, and Privacy violation, and never raises a level.
 
 | Factor | Group | Way | What sets the level |
 |---|---|---|---|
 | Skill level (SL) | likelihood | set by vens | always 9 |
-| Motive (M) | likelihood | answer | the reward an exploit brings; shows `business_criticality` and `data_sensitivity` |
-| Opportunity (O) | likelihood | answer | the access or resources an exploit needs; shows the CVSS AV, AT, PR and UI metrics |
+| Motive (M) | likelihood | answer | the reward an exploit brings; shows `business_criticality` and `data_sensitivity`; 9, not asked, when the CVE has no description |
+| Opportunity (O) | likelihood | answer | the access or resources an exploit needs; shows the CVSS AV, AT, PR and UI metrics; 9, not asked, when the CVE has no description |
 | Size (S) | likelihood | set by vens | `exposure`: `internal` 4, `private` 6, `internet` 9 |
 | Ease of discovery (ED) | likelihood | set by vens | always 9 |
-| Ease of exploit (EE) | likelihood | answer | how easy the exploit is here; shows the CVSS AC, AT, PR and UI metrics and five of the controls, when set to `true` |
+| Ease of exploit (EE) | likelihood | answer | how easy the exploit is here; shows the CVSS AC, AT, PR and UI metrics and five of the controls, when set to `true`; 9, not asked, when the CVE has no description |
 | Awareness (A) | likelihood | set by vens | always 9 |
 | Intrusion detection (ID) | likelihood | answer and `detection` | the lowest declared level among the channels the model picks; 9 when `detection` is left out |
 | Loss of confidentiality (LC) | technical impact | answer and `data_sensitivity` | how much data an exploit could read, crossed with the sensitivity; 2 when the CVSS vectors floor it |
@@ -120,7 +122,7 @@ This explains the mechanism; it is not a measurement of accuracy.
 | | Up to v0.6 | Since v0.7.0 |
 |---|---|---|
 | What the model returns | four numbers from 0 to 9 per CVE: threat agent, vulnerability, technical impact, business impact | one named answer per question, from a closed list; never a number |
-| Calls | one call per batch of CVEs | one call per question per batch, at most 12 questions per CVE, and one adjustment call per flagged CVE |
+| Calls | one call per batch of CVEs | one call per question per batch, at most 12 questions per CVE, and one adjustment call per flagged CVE with a field left to ask |
 | The 16 levels in the vector | each of the four numbers repeated over its group's four factors | 4 set by vens, 8 read from an answer, 4 from an answer combined with a declared field |
 | Impact | the average of the technical and the business impact | the larger of the two |
 | Severity | bands of the score: 0–4 `info`, 5–19 `low`, 20–39 `medium`, 40–59 `high`, 60–81 `critical` | OWASP's matrix of the likelihood and impact levels; never `info` |

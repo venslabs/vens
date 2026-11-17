@@ -27,7 +27,7 @@ When you use **Ollama**, nothing leaves the machine running Ollama.
 
 ## What Vens sends per call
 
-Vens splits the CVEs into batches (default: 10 distinct CVEs, tunable via `--llm-batch-size`). Each batch gets one call per question, about the batch's CVEs that get that question, and each flagged CVE gets one more call, the adjustment. Every call has two messages and the JSON Schema the reply must follow.
+Vens splits the CVEs into batches (default: 10 distinct CVEs, tunable via `--llm-batch-size`). Each batch gets one call per question, about the batch's CVEs that get that question, and each flagged CVE gets one more call, the adjustment, when it has a field left to ask. Every call has two messages and the JSON Schema the reply must follow.
 
 **System prompt** — the same for every call of a run:
 

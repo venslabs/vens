@@ -119,7 +119,8 @@ func TestMockSkipsAndForcesCannotTell(t *testing.T) {
 // The adjustment's reply holds the reasoning and, for each field its schema
 // asks, an answer from that field's list.
 func TestMockAnswersTheAdjustment(t *testing.T) {
-	schema, err := contract.AdjustmentSchema([3]bool{true, false, false})
+	described := contract.CVE{ID: "CVE-X", Rows: []contract.Row{{Description: "A described vulnerability."}}}
+	schema, err := contract.AdjustmentSchema(described, [3]bool{true, false, false})
 	if err != nil {
 		t.Fatal(err)
 	}

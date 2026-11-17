@@ -128,6 +128,9 @@ func TestProviderAcceptanceGate(t *testing.T) {
 			}
 			return []map[string]any{{"vulnId": first, "answer": "high_reward", "reasoning": "r"}}
 		}}, "defects.answer_cve_repeated: 1"},
+		"an answer that is no JSON object": {&fakeLLM{reply: motiveReply(
+			`1,{"vulnId":"`+first+`","answer":"low_or_no_reward","reasoning":"r"}`, "",
+		)}, "defects.reply_unreadable: 1"},
 		"a CVE left out": {&fakeLLM{skip: func(c fakeCall, id string) bool {
 			return motive(c, id) && c.n == 1
 		}}, "calls.M: 2, want 1"},
@@ -187,7 +190,7 @@ func acceptanceVulns() []Vulnerability {
 // call, every CVE answered at once; an adjustment not made in exactly one;
 // and each defect Go found reading the replies, by kind, which covers an
 // answer off its list, a key written twice, a reasoning that is no
-// non-empty string and an adjustment Go cannot read.
+// non-empty string, and a reply or an adjustment Go cannot read.
 func acceptanceFailures(t *testing.T, client llm.Client) []string {
 	t.Helper()
 	logs := withCapturedLogs(t)

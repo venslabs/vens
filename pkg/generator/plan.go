@@ -77,7 +77,7 @@ func (g *Generator) plan(ctx context.Context, vulns []Vulnerability) ([]*cve, er
 				return nil, err
 			}
 		}
-		questions, err := contract.Questions(g.deployment, c.applicability.Floored)
+		questions, err := contract.Questions(g.deployment, c.in, c.applicability.Floored)
 		if err != nil {
 			return nil, err
 		}
@@ -90,6 +90,18 @@ func (g *Generator) plan(ctx context.Context, vulns []Vulnerability) ([]*cve, er
 		cves = append(cves, c)
 	}
 	return cves, nil
+}
+
+// undescribed lists the CVEs no row describes, which are not asked Motive,
+// Opportunity and Ease of exploit.
+func undescribed(cves []*cve) []string {
+	var ids []string
+	for _, c := range cves {
+		if !c.in.Described() {
+			ids = append(ids, c.id())
+		}
+	}
+	return ids
 }
 
 // groupVulnsByCVE groups the flat (CVE, component) scanner rows by CVE,

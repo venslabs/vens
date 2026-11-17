@@ -83,7 +83,7 @@ func TestGenerator_StrictPreflight(t *testing.T) {
 		{"CVE-2024-0005", []cvss.Vector{{Source: "nvd", Version: "4.0", Vector: "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:N/VI:N/VA:N/SC:N/SI:N"}}, false,
 			"applicability_missing: nvd CVSS 4.0 vector lacks SA"},
 		{"CVE-2024-0006", []cvss.Vector{v31("nvd", noImpact)}, true,
-			"no description in the scanner's report, so Motive, Opportunity and Ease of exploit read cannot_tell"},
+			"no description in the scanner's report, so Motive, Opportunity and Ease of exploit are not asked and take their worst case"},
 	}
 	vulnOf := func(i int) Vulnerability {
 		c := cases[i]

@@ -42,9 +42,14 @@ type scoringRun struct {
 
 // The defects reading a reply can find, which a provider honouring the
 // schema and the prompt does not write. A question's are counted once per
-// entry that has one; an adjustment's once per reply, but those of a field,
-// adjustment_off_list and adjustment_field_not_asked, once per field.
+// entry that has one, reply_unreadable once per reply; an adjustment's once
+// per reply, but those of a field, adjustment_off_list and
+// adjustment_field_not_asked, once per field.
 const (
+	// A reply that is no JSON object, whose answers are no array, or that
+	// holds an answer that is no JSON object: the CVEs it leaves without an
+	// answer are asked again, as CVEs left out.
+	defectReplyUnreadable = "reply_unreadable"
 	// An answer off its question's list, read as cannot_tell.
 	defectAnswerOffList = "answer_off_list"
 	// An answer its entry, or its reply outside every entry, leaves in doubt

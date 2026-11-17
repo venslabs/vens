@@ -557,11 +557,12 @@ func TestGenerator_ClaimReasoningKeepsOneLinePerAnswer(t *testing.T) {
 	assert.Equal(t, "adjustment (opportunity: keep, confidentiality: affected, integrity: affected, availability: affected): The dispute stands.", lines[len(lines)-1])
 }
 
-// Outside a strict run, a CVE no row describes is still asked Motive,
-// Opportunity and Ease of exploit, yet its vector holds cannot_tell's level
-// for each: their lines of the claim say so, the others and the
-// adjustment's read as ever.
-func TestGenerator_ClaimMarksTheAnswersAnUndescribedCVEDoesNotUse(t *testing.T) {
+// Outside a strict run, a CVE no row describes is not asked Motive,
+// Opportunity and Ease of exploit, its vector holding cannot_tell's level for
+// each: its claim says so in their place, with no answer, and the lines of
+// the questions it is asked read as ever. Its adjustment asks the axes
+// alone.
+func TestGenerator_ClaimSaysWhatAnUndescribedCVEIsNotAsked(t *testing.T) {
 	at := attestation.NewBuilder(attestation.Opts{Provider: "mock", Model: "mock"})
 	g := newGen(t, Opts{LLM: &fakeLLM{}})
 	g.SetAttestor(at)
@@ -581,16 +582,16 @@ func TestGenerator_ClaimMarksTheAnswersAnUndescribedCVEDoesNotUse(t *testing.T) 
 	lines := strings.Split(got[0].Reasoning, "\n")
 	require.Len(t, lines, len(questionsUndeclared)+1)
 	assert.Equal(t, []string{
-		"M (low_or_no_reward, not used: no description): because of CVE-2024-0000",
-		"O (no_access_or_resources_required, not used: no description): because of CVE-2024-0000",
-		"EE (theoretical, not used: no description): because of CVE-2024-0000",
+		"M (not asked: no description)",
+		"O (not asked: no description)",
+		"EE (not asked: no description)",
 		"LC (minimal): because of CVE-2024-0000",
 	}, lines[:4])
-	for _, line := range lines[4:] {
-		assert.NotContains(t, line, "not used")
+	for _, line := range lines[3:] {
+		assert.NotContains(t, line, "not asked")
 	}
-	assert.True(t, strings.HasPrefix(lines[len(lines)-1], "adjustment (opportunity: keep, "), lines[len(lines)-1])
-	assert.NotContains(t, got[1].Reasoning, "not used", "a described CVE's answers are all read")
+	assert.Equal(t, "adjustment (confidentiality: affected, integrity: affected, availability: affected): the evidence", lines[len(lines)-1])
+	assert.NotContains(t, got[1].Reasoning, "not asked", "a described CVE is asked them")
 }
 
 // An answer off its list takes its claim's line as its JSON text, on one

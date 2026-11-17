@@ -22,7 +22,8 @@ import (
 )
 
 // every generated schema, decoded: each question's over two CVEs, and the
-// adjustment's for each set of floored axes.
+// adjustment's for each set of floored axes, of a CVE a row describes and
+// of one none does, with something left to adjust.
 func generatedSchemas(t *testing.T) map[string]any {
 	t.Helper()
 	out := map[string]any{}
@@ -38,7 +39,10 @@ func generatedSchemas(t *testing.T) map[string]any {
 	}
 	for mask := range 8 {
 		floored := [3]bool{mask&1 != 0, mask&2 != 0, mask&4 != 0}
-		decode("adjustment "+string(rune('0'+mask)), data(t)(AdjustmentSchema(floored)))
+		decode("adjustment "+string(rune('0'+mask)), data(t)(AdjustmentSchema(describedCVE, floored)))
+		if mask < 7 {
+			decode("undescribed adjustment "+string(rune('0'+mask)), data(t)(AdjustmentSchema(CVE{ID: "CVE-N", Rows: []Row{{PkgName: "liba"}}}, floored)))
+		}
 	}
 	return out
 }

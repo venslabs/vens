@@ -24,7 +24,7 @@ import (
 
 func questions(t *testing.T, d Deployment, floored [3]bool) []Factor {
 	t.Helper()
-	q, err := Questions(d, floored)
+	q, err := Questions(d, describedCVE, floored)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,8 +63,13 @@ func TestQuestionsInTheDeclaredOrder(t *testing.T) {
 
 // What is not asked: LC and PV when C is floored, LI when I is, LAV when A
 // is, ID when detection is undeclared or declared at one level, NC when no
-// framework is declared, PV when data_subjects caps it at the lowest level.
+// framework is declared, PV when data_subjects caps it at the lowest level,
+// and M, O and EE when no row describes the CVE, a title alone or a blank
+// description included; one row described of two is enough.
 func TestQuestionsNotAsked(t *testing.T) {
+	titled := CVE{ID: "CVE-N", Rows: []Row{{PkgName: "liba", Title: "[Privilege escalation possible to other user than root]"}}}
+	blank := CVE{ID: "CVE-N", Rows: []Row{{PkgName: "liba", Description: " \n\t"}, {PkgName: "libb"}}}
+	oneOfTwo := CVE{ID: "CVE-N", Rows: []Row{{PkgName: "liba"}, {PkgName: "libb", Description: "Described."}}}
 	uniform := declared()
 	uniform.Detection = &Detection{Network: "logged", Host: "logged", Application: "logged"}
 	undeclared := declared()
@@ -76,22 +81,31 @@ func TestQuestionsNotAsked(t *testing.T) {
 	for _, c := range []struct {
 		name    string
 		d       Deployment
+		cve     CVE
 		floored [3]bool
 		missing []Factor
 	}{
-		{"C floored", declared(), cFloored, []Factor{LC, PV}},
-		{"I floored", declared(), [3]bool{cvss.Integrity: true}, []Factor{LI}},
-		{"A floored", declared(), [3]bool{cvss.Availability: true}, []Factor{LAV}},
-		{"detection undeclared", undeclared, [3]bool{}, []Factor{ID}},
-		{"detection at one level", uniform, [3]bool{}, []Factor{ID}},
-		{"no framework", noFramework, [3]bool{}, []Factor{NC}},
-		{"data_subjects none", none, [3]bool{}, []Factor{PV}},
-		{"data_subjects one_individual", one, [3]bool{}, []Factor{PV}},
-		{"data_subjects hundreds", hundreds, [3]bool{}, nil},
-		{"data_subjects undeclared", unset, [3]bool{}, nil},
+		{"C floored", declared(), describedCVE, cFloored, []Factor{LC, PV}},
+		{"I floored", declared(), describedCVE, [3]bool{cvss.Integrity: true}, []Factor{LI}},
+		{"A floored", declared(), describedCVE, [3]bool{cvss.Availability: true}, []Factor{LAV}},
+		{"detection undeclared", undeclared, describedCVE, [3]bool{}, []Factor{ID}},
+		{"detection at one level", uniform, describedCVE, [3]bool{}, []Factor{ID}},
+		{"no framework", noFramework, describedCVE, [3]bool{}, []Factor{NC}},
+		{"data_subjects none", none, describedCVE, [3]bool{}, []Factor{PV}},
+		{"data_subjects one_individual", one, describedCVE, [3]bool{}, []Factor{PV}},
+		{"data_subjects hundreds", hundreds, describedCVE, [3]bool{}, nil},
+		{"data_subjects undeclared", unset, describedCVE, [3]bool{}, nil},
+		{"a title alone", declared(), titled, [3]bool{}, []Factor{M, O, EE}},
+		{"a blank description", declared(), blank, [3]bool{}, []Factor{M, O, EE}},
+		{"no description, every axis floored", base(), titled, allFloored, []Factor{M, O, EE, ID, LC, LI, LAV, NC, PV}},
+		{"one row described of two", declared(), oneOfTwo, [3]bool{}, nil},
 	} {
 		want := slices.DeleteFunc(Order(), func(f Factor) bool { return slices.Contains(c.missing, f) })
-		if got := questions(t, c.d, c.floored); !slices.Equal(got, want) {
+		got, err := Questions(c.d, c.cve, c.floored)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !slices.Equal(got, want) {
 			t.Errorf("%s: %v, want %v", c.name, got, want)
 		}
 	}
@@ -318,7 +332,7 @@ func TestComputeRefusesAnInvalidDeployment(t *testing.T) {
 			t.Errorf("Compute took %+v", c)
 		}
 	}
-	if _, err := Questions(d, [3]bool{}); err == nil {
+	if _, err := Questions(d, describedCVE, [3]bool{}); err == nil {
 		t.Error("Questions took an exposure off its list")
 	}
 }
@@ -335,8 +349,8 @@ func TestReadingsHoldEveryQuestionAsked(t *testing.T) {
 }
 
 // With no description on any row, Motive, Opportunity and Ease of exploit
-// read whatever they were answered as cannot_tell: 9, each counted once. The
-// questions are still asked, and the rest reads as usual.
+// are not asked: whatever answers they hold, each reads no_description and
+// takes cannot_tell's 9, counted once. The rest reads as usual.
 func TestNoDescriptionReadsTheLikelihoodAnswersAsCannotTell(t *testing.T) {
 	answers := Answers{M: "low_or_no_reward", O: "full_access_or_expensive_resources_required", EE: cannotTell,
 		LC: "minimal", LAC: "identified", FD: "bankruptcy", RD: "minimal_damage"}
@@ -365,11 +379,16 @@ func TestNoDescriptionReadsTheLikelihoodAnswersAsCannotTell(t *testing.T) {
 	if got := levels(computeFor(t, base(), c, [3]bool{}, answers, nil).Vector); got["M"] != 1 || got["O"] != 0 {
 		t.Errorf("one row described: M %d, O %d, want 1 and 0", got["M"], got["O"])
 	}
-	// The adjustment can still lower Opportunity from there.
+	// Nor can the adjustment lower Opportunity from there, whatever the call
+	// asked: a description is a prerequisite of that answer too. Its axes
+	// still take the adjustment.
 	l := computeFor(t, base(), CVE{ID: "CVE-N", Rows: []Row{{PkgName: "liba"}}}, [3]bool{}, answers,
-		&Adjusted{Opportunity: "special_access_or_resources_required"})
-	if l.Vector.O != 4 || l.Sources[O] != SourceAdjustment {
-		t.Errorf("adjusted with no description: O %d from %v, want 4 from the adjustment", l.Vector.O, l.Sources[O])
+		&Adjusted{Opportunity: "special_access_or_resources_required", Integrity: notAffected})
+	if l.Vector.O != 9 || l.Sources[O] != SourceAnswer || l.Readings[O] != NoDescription {
+		t.Errorf("adjusted with no description: O %d from %v read %v, want 9 from no description", l.Vector.O, l.Sources[O], l.Readings[O])
+	}
+	if l.Vector.LI != 1 || l.Sources[LI] != SourceAdjustment {
+		t.Errorf("adjusted with no description: LI %d from %v, want the floor from the adjustment", l.Vector.LI, l.Sources[LI])
 	}
 }
 

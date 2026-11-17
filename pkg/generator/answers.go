@@ -26,14 +26,17 @@ import (
 
 // answersFile is answers.json, which --debug-dir gets once per run: per CVE,
 // how its adjustment read, and per factor, the answer as the reply gave it
-// and how Go read it, the level and where it came from; and the counters,
-// per CVE and summed over the run. A failed run also lists, unrated, the
-// CVEs of its failing batch it read answers for. It holds no reasoning and
-// no CVE text Go sent, but keeps each answer verbatim: one off its list is
-// the model's own text, which may quote the CVE's.
+// and how Go read it, the level and where it came from; the counters, per
+// CVE and summed over the run; and the run summary's defects, each kind found
+// with its total, {} when the replies held none. A failed run also lists,
+// unrated, the CVEs of its failing batch it read answers for, and the defects
+// counted before it stopped. It holds no reasoning and no CVE text Go sent,
+// but keeps each answer verbatim: one off its list is the model's own text,
+// which may quote the CVE's.
 type answersFile struct {
 	Vulnerabilities []answersEntry `json:"vulnerabilities"`
 	Counters        map[string]int `json:"counters"`
+	Defects         map[string]int `json:"defects"`
 }
 
 type answersEntry struct {
@@ -134,7 +137,7 @@ func (g *Generator) writeAnswers(ctx context.Context, run *scoringRun) {
 	if g.debugRunDir == "" {
 		return
 	}
-	b, err := json.MarshalIndent(answersFile{Vulnerabilities: run.entries, Counters: run.counters}, "", "  ")
+	b, err := json.MarshalIndent(answersFile{Vulnerabilities: run.entries, Counters: run.counters, Defects: run.defects}, "", "  ")
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to write a debug file", "file", "answers.json", "error", err)
 		return

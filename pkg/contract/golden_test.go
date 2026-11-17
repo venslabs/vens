@@ -114,7 +114,10 @@ var frameBatch = []CVE{
 		CVSS: []cvss.Vector{v31("redhat", "AV:L/AC:L/PR:L/UI:N/S:U/C:N/I:N/A:H")}}}},
 }
 
+// frameFlagged is the flagged CVE whose adjustment the frames show. A row
+// describes it: one no row describes is not asked Opportunity.
 var frameFlagged = CVE{ID: "CVE-F", Rows: []Row{{PkgName: "libexample", InstalledVersion: "1.0.0", Severity: "LOW",
+	Description:      "A crafted request overflows the parser. NOTE: the maintainer disputes it.",
 	CVSS:             []cvss.Vector{v31("nvd", "AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H")},
 	VendorSeverities: []VendorSeverity{{Source: "nvd", Severity: "HIGH"}}}}}
 
@@ -156,7 +159,7 @@ func frames(t *testing.T, d Deployment, adjustFloored [3]bool) map[string]string
 	}
 	entry := data(json.Marshal(e))
 	out["13-adjustment.request.txt"] = elide(t, request, entry, "[entry]")
-	out["13-adjustment.schema.json"] = data(AdjustmentSchema(adjustFloored))
+	out["13-adjustment.schema.json"] = data(AdjustmentSchema(frameFlagged, adjustFloored))
 	return out
 }
 
