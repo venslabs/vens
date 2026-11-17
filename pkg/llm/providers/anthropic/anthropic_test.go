@@ -389,6 +389,11 @@ func TestGenerate_SchemaKeepsPropertyOrder(t *testing.T) {
 			if err := json.Unmarshal([]byte(rec.raw), &body); err != nil {
 				t.Fatalf("request body: %v (%s)", err, rec.raw)
 			}
+			// The raw schema replaces the SDK's sorted one in place; a second
+			// "schema" key would let the API read the sorted copy.
+			if n := strings.Count(rec.raw, `"schema":`); n != 1 {
+				t.Errorf("request carries %d \"schema\" keys, want 1: %s", n, rec.raw)
+			}
 			format := body.OutputConfig.Format
 			if format.Type != "json_schema" {
 				t.Errorf("format.type = %q", format.Type)
