@@ -169,7 +169,7 @@ A generic 5.3 can come out `high` or `critical`. **This is the CVE you patch fir
 ## When to be cautious
 
 ⚠️ Generic or sparse `config.yaml` → the questions get generic answers
-⚠️ Fields left out → their worst case on every finding; the run summary counts them
+⚠️ Fields left out → their fallback: Intrusion detection 9 and Loss of accountability's `none` column on every finding, no cap on Privacy violation; the run summary counts them
 ⚠️ You lie about controls → optimistic scores that miss real risk
 ⚠️ The LLM has no information about a very recent CVE (< 2 weeks) → its answers rest on the description alone, and `cannot_tell` takes the worst case
 ⚠️ Deeply custom internal CVEs → the LLM may not know the specifics; review manually

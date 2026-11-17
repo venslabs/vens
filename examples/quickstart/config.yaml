@@ -47,15 +47,16 @@ context:
   business_criticality: "high"
 
   # ============================================================================
-  # WHAT IS IN PLACE - Optional, but each one left out takes its worst case on
-  # every finding, with a warning at load; --strict refuses the run.
+  # WHAT IS IN PLACE - Optional, but each one left out takes the fallback its
+  # Impact line states, with a warning at load; --strict refuses the run.
   # vens reads them alone: they are never sent to the LLM.
   # The values below illustrate the fields; declare what is true for yours.
   # ============================================================================
 
   # DATA SUBJECTS: How many distinct people's personal data can this service read?
   # Values: none | one_individual | hundreds | thousands | millions
-  # Impact: Caps Privacy violation (none and one_individual 3, hundreds 5, thousands 7, millions 9)
+  # Impact: Caps Privacy violation (none and one_individual 3, hundreds 5, thousands 7,
+  #         millions 9); left out, no cap
   data_subjects: "thousands"
 
   # DETECTION: What records an attack attempt, on each channel, across the whole service?

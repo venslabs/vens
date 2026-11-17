@@ -80,7 +80,7 @@ context:
     waf: true
 ```
 
-Leave out `data_subjects`, `detection` or `traceability` and vens warns at load and uses that field's worst case. See the [config.yaml reference](https://venslabs.github.io/vens/reference/config-schema/).
+Leave out `data_subjects`, `detection` or `traceability` and vens warns at load and uses that field's fallback, which the warning states. See the [config.yaml reference](https://venslabs.github.io/vens/reference/config-schema/).
 
 ## LLM Providers
 

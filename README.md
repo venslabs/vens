@@ -123,7 +123,7 @@ context:
     waf: true
 ```
 
-Leave out `data_subjects`, `detection` or `traceability` and vens warns at load and uses that field's worst case on every finding. Every field is in the [config.yaml reference](https://venslabs.github.io/vens/reference/config-schema/); a file written for vens v0.6 needs the [migration](https://venslabs.github.io/vens/reference/config-schema/#migrating).
+Leave out `data_subjects`, `detection` or `traceability` and vens warns at load and uses that field's fallback: no cap on Privacy violation, Intrusion detection at 9 on every finding, or Loss of accountability from its `none` column. Every field is in the [config.yaml reference](https://venslabs.github.io/vens/reference/config-schema/); a file written for vens v0.6 needs the [migration](https://venslabs.github.io/vens/reference/config-schema/#migrating).
 
 **LLM Providers:**
 

@@ -30,7 +30,7 @@ Trivy and Grype hand you a list of CVEs. CVSS is a score in a vacuum: it doesn't
 
 The bare minimum:
 
-*Updated for schema 2: since vens v0.7.0 the file starts with `schema_version: 2`, and `traceability`, `detection` and `data_subjects` take their worst case until declared; see [Migrating from vens v0.6](../../reference/config-schema.md#migrating).*
+*Updated for schema 2: since vens v0.7.0 the file starts with `schema_version: 2`, and `traceability`, `detection` and `data_subjects` take a fallback until declared; see [Migrating from vens v0.6](../../reference/config-schema.md#migrating).*
 
 ```yaml
 schema_version: 2

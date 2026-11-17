@@ -67,7 +67,7 @@ context:
     waf: true
 ```
 
-This is the step that makes scores meaningful. A dev/test environment would use different values and get _different_ scores. Replace the values with what is true for your service today: `listener` says whether it accepts connections, `data_subjects` how many people's personal data it can read, `detection` what records an attack attempt, and `traceability` whether requests are recorded, and by whom. Leave out one of the last three and vens warns at load and uses its worst case on every finding. See [Describe your context](../guides/configuration.md) for the full field reference.
+This is the step that makes scores meaningful. A dev/test environment would use different values and get _different_ scores. Replace the values with what is true for your service today: `listener` says whether it accepts connections, `data_subjects` how many people's personal data it can read, `detection` what records an attack attempt, and `traceability` whether requests are recorded, and by whom. Leave out one of the last three and vens warns at load and uses its fallback, which the warning states. See [Describe your context](../guides/configuration.md) for the full field reference.
 
 Don't want to write this by hand? `vens init` asks a few questions and writes the file for you — see [`vens init`](../reference/init.md).
 

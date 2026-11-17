@@ -39,7 +39,7 @@ context:
   audit_requirement: string  # moves no score
 ```
 
-`data_subjects`, `detection` and `traceability` are optional, but each one left out falls back to its worst case: vens warns at load, counts each use in the run summary, and `--strict` refuses the run. Declare them. See the **[fully declared file](#fully-declared-file)**.
+`data_subjects`, `detection` and `traceability` are optional, but each one left out takes the fallback its section states: vens warns at load, counts each use in the run summary, and `--strict` refuses the run. Declare them. See the **[fully declared file](#fully-declared-file)**.
 
 ---
 

@@ -117,7 +117,7 @@ Every message is in **[Load errors and warnings](reference/config-schema.md#load
 level=WARN msg="context.detection is not declared: every channel counts as not logged, so Intrusion detection is 9 on every finding."
 ```
 
-The run goes on: vens uses the field's worst case on every finding and counts each use in the run summary. Declare `detection`, `traceability` and `data_subjects` for what is in place to remove the warning. `audit_requirement` and the `ids`, `siem` and `edr` controls do not stand in for them; the warning says so when they are set. Each warning is in **[Load errors and warnings](reference/config-schema.md#warnings)**.
+The run goes on: vens uses the fallback the warning states and counts each use in the run summary. Declare `detection`, `traceability` and `data_subjects` for what is in place to remove the warning. `audit_requirement` and the `ids`, `siem` and `edr` controls do not stand in for them; the warning says so when they are set. Each warning is in **[Load errors and warnings](reference/config-schema.md#warnings)**.
 
 ---
 

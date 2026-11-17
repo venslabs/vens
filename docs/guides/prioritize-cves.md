@@ -78,7 +78,7 @@ context:
   notes: "Behind AWS ALB, WAF with OWASP ruleset, deployed across 3 AZs"
 ```
 
-This file lives in your repo. You write it **once**, version it with the service, and re-use it on every scan. Declare `data_subjects`, `detection` and `traceability` for what is in place: each one left out takes its worst case on every finding. See [Describe your context](configuration.md) for every field.
+This file lives in your repo. You write it **once**, version it with the service, and re-use it on every scan. Declare `data_subjects`, `detection` and `traceability` for what is in place: each one left out takes a fallback, with a warning at load. See [Describe your context](configuration.md) for every field.
 
 ---
 

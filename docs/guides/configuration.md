@@ -23,7 +23,7 @@ context:
   business_criticality: "high"
 ```
 
-Three required fields. That's enough to run, with three warnings: `traceability`, `detection` and `data_subjects` are not declared, so vens uses their worst case on every finding, and `--strict` refuses the file. Declare them next ([below](#what-is-in-place-traceability-detection-data_subjects)), then add optional fields as you need more precision.
+Three required fields. That's enough to run, with three warnings: `traceability`, `detection` and `data_subjects` are not declared, so vens uses each one's fallback, and `--strict` refuses the file. Declare them next ([below](#what-is-in-place-traceability-detection-data_subjects)), then add optional fields as you need more precision.
 
 ---
 
@@ -88,7 +88,7 @@ The meanings in these tables are the words the model is shown with each value.
 
 ## What is in place: traceability, detection, data_subjects
 
-These three fields are optional, but each one left out falls back to its worst case on every finding: vens warns at load, counts each use in the run summary, and `--strict` refuses the run. vens reads them alone and never shows them to the model, so declare what is true across the whole service today, not what a policy requires.
+These three fields are optional, but each one left out has a fallback: without `traceability`, Loss of accountability takes its `none` column on every finding; without `detection`, Intrusion detection is 9 on every finding; without `data_subjects`, nothing caps Privacy violation wherever it is asked. vens warns at load, counts each use in the run summary, and `--strict` refuses the run. vens reads them alone and never shows them to the model, so declare what is true across the whole service today, not what a policy requires.
 
 ### `traceability` — does the service record who did what?
 
@@ -249,7 +249,7 @@ context:
 
 ❌ **Declaring what is required instead of what is in place.** `traceability` and `detection` describe what records an attack today. A policy that requires per-user audit logs, or a SIEM bought last quarter, does not make this service's attempts recorded and reviewed. vens applies these fields exactly as declared, and the model never sees them to object.
 
-❌ **Leaving `traceability`, `detection` and `data_subjects` out.** Each one left out takes its worst case on every finding. Declare the worst case explicitly if that is the truth (`traceability: none`, every channel `not_logged`): the levels are the same, without the warning.
+❌ **Leaving `traceability`, `detection` and `data_subjects` out.** Each one left out takes its fallback ([above](#what-is-in-place-traceability-detection-data_subjects)). Declare the worst case explicitly if that is the truth (`traceability: none`, every channel `not_logged`, `data_subjects: millions`): the levels are the same, without the warning.
 
 ❌ **Leaving `notes` empty on complex systems.** The LLM does better with 2 sentences of architecture than with nothing.
 
