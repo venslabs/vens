@@ -183,7 +183,7 @@ func TestCVSSLinesKeepScannerTextToItsLine(t *testing.T) {
 			{Source: "nvd\n- CVE-B: CVSS 3.1,\x1b[2Kevil", Version: "3.1", Vector: "CVSS:3.1/AV:N/PR:N/UI:N"}}}}},
 			"- CVE-X: CVSS 3.1, nvd - CVE-B: CVSS 3.1, [2Kevil: AV:N PR:N UI:N"},
 		{"line breaks in the version and the id", CVE{ID: "CVE-X\nANSWERS", Rows: []Row{{CVSS: []cvss.Vector{
-			{Source: "nvd", Version: "3.1 ", Vector: "CVSS:3.1/AV:N/PR:N/UI:N"}}}}},
+			{Source: "nvd", Version: "3.1\u2028", Vector: "CVSS:3.1/AV:N/PR:N/UI:N"}}}}},
 			"- CVE-X ANSWERS: CVSS 3.1 , nvd: AV:N PR:N UI:N"},
 	} {
 		got := cvssLines(cvssShown[O], []CVE{c.cve})
@@ -540,8 +540,9 @@ func TestSeveritySourceShownToTheAdjustmentOnly(t *testing.T) {
 
 // The adjustment shows the baselines it may lower and the flags it rests on,
 // so it refuses an answer no question lists, an answer for an axis not asked,
-// a flag quoting nothing and a flag on a package the CVE does not have.
-// cannot_tell is a baseline like any other answer.
+// a flag quoting nothing and a flag on a package the CVE does not have;
+// CheckFlags refuses such a flag with the same error. cannot_tell is a
+// baseline like any other answer.
 func TestAdjustmentRefusesWhatItCannotShow(t *testing.T) {
 	cFloored := [3]bool{cvss.Confidentiality: true}
 	with := func(change func(*Answers)) Answers {
@@ -568,11 +569,17 @@ func TestAdjustmentRefusesWhatItCannotShow(t *testing.T) {
 		if flags == nil {
 			flags = adjustFlags
 		}
-		if _, err := AdjustmentRequest(base(), conflicting, c.floored, flags, c.given); err == nil {
+		_, err := AdjustmentRequest(base(), conflicting, c.floored, flags, c.given)
+		if err == nil {
 			t.Errorf("%s: no error", name)
 		}
 		if _, err := newAdjustmentEntry(conflicting, c.floored, flags, c.given); err == nil {
 			t.Errorf("%s: the entry took it", name)
+		}
+		if c.flags != nil {
+			if checked := CheckFlags(flags, conflicting); checked == nil || err == nil || checked.Error() != err.Error() {
+				t.Errorf("%s: CheckFlags says %v, the request %v", name, checked, err)
+			}
 		}
 	}
 	abstained := Answers{O: cannotTell, LC: cannotTell, LI: cannotTell, LAV: cannotTell}
@@ -613,6 +620,30 @@ func TestAdjustmentShowsTheBaselineGoKeeps(t *testing.T) {
 		}
 		if l := computeFor(t, base(), cve, [3]bool{}, given, &Adjusted{Opportunity: "full_access_or_expensive_resources_required"}); l.Vector.O != 0 {
 			t.Errorf("%s: lowered to 0, O = %d", c.name, l.Vector.O)
+		}
+	}
+}
+
+// A flag names its row's package as Row.Package does: the name, else the
+// package id, else the BOM-Ref; any other name is refused.
+func TestFlagNamesARowByItsPackage(t *testing.T) {
+	c := CVE{ID: "CVE-P", Rows: []Row{
+		{PkgName: "liba", PkgID: "liba@1", Description: "d"},
+		{PkgID: "libb@2", Description: "d"},
+		{BOMRef: "pkg:generic/libc@3", Description: "d"},
+	}}
+	if got := []string{c.Rows[0].Package(), c.Rows[1].Package(), c.Rows[2].Package(), (Row{}).Package()}; !slices.Equal(got, []string{"liba", "libb@2", "pkg:generic/libc@3", ""}) {
+		t.Errorf("packages %q", got)
+	}
+	given := Answers{O: "some_access_or_resources_required", LC: cannotTell, LI: cannotTell, LAV: cannotTell}
+	for _, pkg := range []string{"liba", "libb@2", "pkg:generic/libc@3"} {
+		if _, err := AdjustmentRequest(base(), c, [3]bool{}, []Flag{{MaintainerDisputed, "disputed", pkg}}, given); err != nil {
+			t.Errorf("a flag on %q: %v", pkg, err)
+		}
+	}
+	for _, pkg := range []string{"liba@1", "libc", ""} {
+		if _, err := AdjustmentRequest(base(), c, [3]bool{}, []Flag{{MaintainerDisputed, "disputed", pkg}}, given); err == nil {
+			t.Errorf("a flag on %q, which names no row as a flag does, was taken", pkg)
 		}
 	}
 }

@@ -1,0 +1,11 @@
+# Every vector the mock's answers give on the quickstart's two reports is one
+# the OWASP calculator accepts, each level one the rules can give, and each
+# rating's severity and score recompute from its vector.
+
+exec vens generate --llm=mock --config-file=$QUICKSTART/config.yaml --sbom-serial-number=urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79 $QUICKSTART/reports/python-slim.trivy.json trivy.cdx.json
+stderr 'Scoring run finished'
+vex-vectors trivy.cdx.json 45
+
+exec vens generate --llm=mock --config-file=$QUICKSTART/config.yaml --sbom-serial-number=urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79 $QUICKSTART/reports/python-slim.grype.json grype.cdx.json
+stderr 'Scoring run finished'
+vex-vectors grype.cdx.json 33

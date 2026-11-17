@@ -15,6 +15,7 @@
 package contract
 
 import (
+	"fmt"
 	"slices"
 
 	"github.com/venslabs/vens/pkg/cvss"
@@ -193,7 +194,7 @@ func Compute(d Deployment, c CVE, floored [3]bool, a Answers, adjusted *Adjusted
 	if adjusted == nil {
 		adjusted = &Adjusted{}
 	}
-	s := &scorer{d: d, floored: floored, described: c.described(), levels: Levels{
+	s := &scorer{d: d, floored: floored, described: c.Described(), levels: Levels{
 		Sources: map[Factor]Source{}, Readings: map[Factor]Reading{},
 	}}
 	var v owasp.Vector
@@ -308,25 +309,63 @@ func (s *scorer) intrusionDetection(chosen []string) owasp.IntrusionDetection {
 // the highest of the three.
 func readChannels(chosen []string, levels [3]owasp.IntrusionDetection) (owasp.IntrusionDetection, Reading) {
 	worst := slices.Max(levels[:])
-	if len(chosen) == 0 {
-		return worst, Invalid
+	channels, r := readSet(chosen)
+	if r != Answered {
+		return worst, r
 	}
-	lowest, reading := worst, Answered
+	lowest := worst
+	for _, c := range channels {
+		lowest = min(lowest, levels[c])
+	}
+	return lowest, Answered
+}
+
+// readSet reads Intrusion detection's answer: the channels chosen, or how a
+// set that names none is read.
+func readSet(chosen []string) ([]channel, Reading) {
+	if len(chosen) == 0 {
+		return nil, Invalid
+	}
+	var channels []channel
+	reading := Answered
 	for _, id := range chosen {
 		c, r := intrusionDetection.read(id)
 		switch r {
 		case Invalid:
-			return worst, Invalid
+			return nil, Invalid
 		case CannotTell:
 			reading = CannotTell
 		default:
-			lowest = min(lowest, levels[c])
+			channels = append(channels, c)
 		}
 	}
 	if reading == CannotTell {
-		return worst, CannotTell
+		return nil, CannotTell
 	}
-	return lowest, Answered
+	return channels, Answered
+}
+
+// ReadAnswer returns how Go reads an answer to factor f's question, as a
+// reply gives it: one id, or for Intrusion detection the ids of the set
+// chosen. An answer of no other shape is read as Invalid. Unlike Compute, it
+// does not read the CVE: Motive's, Opportunity's and Ease of exploit's
+// answers for a CVE no row describes are Answered here.
+func ReadAnswer(f Factor, answer ...string) (Reading, error) {
+	q, ok := table[f]
+	if !ok {
+		return 0, fmt.Errorf("%q is not a model-answered factor", f)
+	}
+	if f == ID {
+		_, r := readSet(answer)
+		return r, nil
+	}
+	switch {
+	case len(answer) != 1 || !slices.Contains(q.ids, answer[0]):
+		return Invalid, nil
+	case answer[0] == cannotTell:
+		return CannotTell, nil
+	}
+	return Answered, nil
 }
 
 func (s *scorer) confidentiality(id, adjusted string) owasp.LossOfConfidentiality {

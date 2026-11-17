@@ -1,0 +1,24 @@
+# vens-demo contexts/internal-api.yaml at 1dd6971, with the schema 2 marker
+# and the listener its notes give.
+schema_version: 2
+project:
+  name: "stock-api"
+  description: "Internal REST API that warehouse and support tools query for stock levels"
+context:
+  exposure: "internal"
+  data_sensitivity: "medium"
+  business_criticality: "medium"
+  availability_requirement: "medium"
+  compliance_requirements: []
+  audit_requirement: "medium"
+  listener: "present"
+  controls:
+    waf: false
+    ddos_protection: false
+    ids: true
+    siem: true
+    edr: true
+    antivirus: false
+    segmentation: true
+    zero_trust: false
+  notes: "Listens on HTTP on the corporate network only: reachable from every employee workstation and internal service, no route from the internet. Callers are not authenticated, so any host on the corporate network can send requests, and the service parses their JSON."

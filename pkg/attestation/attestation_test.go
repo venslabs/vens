@@ -266,12 +266,12 @@ func TestBuilder_Write_Claims(t *testing.T) {
 		CompName: "openssl", CompVersion: "3.0.11", PURL: "pkg:deb/debian/openssl@3.0.11",
 		Score: 56, Severity: "high", Reasoning: "RCE",
 	}
-	b.AddClaim(ref, openssl)
+	b.AddClaim([]string{ref}, openssl)
 	// Same component, second CVE: one more claim, but no duplicate target.
 	second := openssl
 	second.VulnID = "CVE-2024-5678"
 	second.Reasoning = "DoS"
-	b.AddClaim(ref, second)
+	b.AddClaim([]string{ref}, second)
 
 	var buf bytes.Buffer
 	require.NoError(t, b.Write(&buf))
@@ -333,59 +333,46 @@ func TestBuilder_Write_Claims(t *testing.T) {
 
 // A claim marked reused must say in its predicate that the cited batch's
 // prompt did not contain this package, while a fresh claim must not.
-func TestBuilder_Write_ReusedClaimMarksPredicate(t *testing.T) {
+// A claim cites every call that answered for its CVE, in call order: the
+// ordinary questions' calls, an ask-again and the adjustment.
+func TestBuilder_Write_ClaimCitesEveryCall(t *testing.T) {
 	b := newTestBuilder(t, nil)
-	ref := b.AddBatch("sys", "hum", []byte(`{"results":[]}`))
-
-	fresh := ClaimInput{
+	refs := []string{
+		b.AddBatch("sys", "M", []byte(`{"answers":[]}`)),
+		b.AddBatch("sys", "O", []byte(`{"answers":[]}`)),
+		b.AddBatch("sys", "adjustment", []byte(`{}`)),
+	}
+	b.AddClaim(refs, ClaimInput{
 		VulnID: "CVE-2024-1234", CompRef: "pkg:deb/debian/openssl@3.0.11",
 		CompName: "openssl", CompVersion: "3.0.11", PURL: "pkg:deb/debian/openssl@3.0.11",
-		Score: 56, Severity: "high", Reasoning: "RCE",
-	}
-	b.AddClaim(ref, fresh)
-
-	reused := fresh
-	reused.CompRef = "pkg:deb/debian/libssl3@3.0.11"
-	reused.CompName = "libssl3"
-	reused.PURL = "pkg:deb/debian/libssl3@3.0.11"
-	reused.Reused = true
-	b.AddClaim(ref, reused)
+		Score: 31.71875, Severity: "high", Reasoning: "M (high_reward): it holds the keys.",
+	})
+	refs[0] = "changed after the call"
 
 	var buf bytes.Buffer
 	require.NoError(t, b.Write(&buf))
 	var got struct {
 		Declarations struct {
 			Claims []struct {
-				Target    string   `json:"target"`
 				Predicate string   `json:"predicate"`
+				Reasoning string   `json:"reasoning"`
 				Evidence  []string `json:"evidence"`
 			} `json:"claims"`
 		} `json:"declarations"`
 	}
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &got), "output:\n%s", buf.String())
-	require.Len(t, got.Declarations.Claims, 2)
-
-	byTarget := map[string]struct {
-		Predicate string
-		Evidence  []string
-	}{}
-	for _, c := range got.Declarations.Claims {
-		byTarget[c.Target] = struct {
-			Predicate string
-			Evidence  []string
-		}{c.Predicate, c.Evidence}
-	}
-
-	assert.NotContains(t, byTarget["pkg:deb/debian/openssl@3.0.11"].Predicate, "this package was not in the cited batch's prompt")
-	assert.Contains(t, byTarget["pkg:deb/debian/libssl3@3.0.11"].Predicate, "this package was not in the cited batch's prompt")
-	assert.Equal(t, []string{ref}, byTarget["pkg:deb/debian/libssl3@3.0.11"].Evidence,
-		"a reused claim still cites the batch's evidence bundle")
+	require.Len(t, got.Declarations.Claims, 1)
+	c := got.Declarations.Claims[0]
+	assert.Equal(t, []string{"evidence-batch-1", "evidence-batch-2", "evidence-batch-3"}, c.Evidence,
+		"the claim keeps the refs it was given")
+	assert.Equal(t, "CVE-2024-1234 on openssl 3.0.11 assessed at OWASP risk 31.72 (high)", c.Predicate)
+	assert.Equal(t, "M (high_reward): it holds the keys.", c.Reasoning)
 }
 
 func TestBuilder_AddClaim_EmptyCompRefSkipped(t *testing.T) {
 	b := newTestBuilder(t, nil)
 	ref := b.AddBatch("s", "h", []byte("{}"))
-	b.AddClaim(ref, ClaimInput{VulnID: "CVE-X", Score: 1, Severity: "info"}) // no CompRef
+	b.AddClaim([]string{ref}, ClaimInput{VulnID: "CVE-X", Score: 1, Severity: "info"}) // no CompRef
 
 	var buf bytes.Buffer
 	require.NoError(t, b.Write(&buf))

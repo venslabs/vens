@@ -14,7 +14,10 @@
 
 package contract
 
-import "github.com/venslabs/vens/pkg/owasp"
+import (
+	"github.com/venslabs/vens/pkg/owasp"
+	"github.com/venslabs/vens/pkg/riskconfig"
+)
 
 // The 12 questions and their answers. A question names the attacker group
 // as {group}; Non-compliance's names the declared frameworks as {frameworks}.
@@ -195,21 +198,34 @@ var nonCompliance = contract[owasp.NonCompliance]{
 	counter: "non_compliance_cannot_tell",
 }
 
-// Privacy violation's bands are data_subjects' too: Go caps the answer's
-// level with the declared band's. none takes OWASP's lowest level, a floor
-// for a service holding no personal data.
+// Privacy violation's answers are data_subjects' bands, ids and levels read
+// from the config's one table: Go caps the answer's level with the declared
+// band's, so the two cannot drift apart. Only the text each band is shown
+// with is the question's. none takes OWASP's lowest level, a floor for a
+// service holding no personal data.
 var privacyViolation = contract[owasp.PrivacyViolation]{
 	factor:   PV,
 	question: "If {group} exploited this vulnerability in this deployment, how many distinct people's personal data could be disclosed, at most? Choose the band that holds that count.",
-	answers: []answer[owasp.PrivacyViolation]{
-		{"none", "None: no personal data could be disclosed (0 people).", owasp.PrivacyViolationOneIndividual},
-		{"one_individual", "One individual: 1 person.", owasp.PrivacyViolationOneIndividual},
-		{"hundreds", "Hundreds: 2 to 999 people; a count under 100 belongs here.", owasp.PrivacyViolationHundredsOfPeople},
-		{"thousands", "Thousands: 1,000 to 999,999 people.", owasp.PrivacyViolationThousandsOfPeople},
-		{"millions", "Millions: 1,000,000 people or more.", owasp.PrivacyViolationMillionsOfPeople},
-		{cannotTell, cannotTellText, owasp.PrivacyViolationMillionsOfPeople},
-	},
+	answers: bandAnswers(riskconfig.DataSubjectsBands(), map[string]string{
+		"none":           "None: no personal data could be disclosed (0 people).",
+		"one_individual": "One individual: 1 person.",
+		"hundreds":       "Hundreds: 2 to 999 people; a count under 100 belongs here.",
+		"thousands":      "Thousands: 1,000 to 999,999 people.",
+		"millions":       "Millions: 1,000,000 people or more.",
+	}),
 	counter: "privacy_cannot_tell",
+}
+
+// bandAnswers lists the bands in their order, each with its text, then
+// cannot_tell at the largest band's level.
+func bandAnswers(bands []riskconfig.Band, texts map[string]string) []answer[owasp.PrivacyViolation] {
+	answers := make([]answer[owasp.PrivacyViolation], 0, len(bands)+1)
+	var worst owasp.PrivacyViolation
+	for _, b := range bands {
+		answers = append(answers, answer[owasp.PrivacyViolation]{b.Name, texts[b.Name], b.Level})
+		worst = max(worst, b.Level)
+	}
+	return append(answers, answer[owasp.PrivacyViolation]{cannotTell, cannotTellText, worst})
 }
 
 // table is the one table the request, the schema and the rules read, so the

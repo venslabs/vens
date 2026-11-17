@@ -29,71 +29,37 @@ import (
 	"testing"
 
 	"github.com/venslabs/vens/pkg/cvss"
+	"github.com/venslabs/vens/pkg/riskconfig"
 )
 
 var update = flag.Bool("update", false, "rewrite the golden files under testdata from what the renderers write")
 
-// The meanings docs/reference/config-schema.md documents for the values the
-// frames show, and listener's.
-var meanings = map[string]map[string]string{
-	"exposure": {
-		"internal": "Corporate network only, no external access",
-		"private":  "Requires VPN / authenticated tunnel",
-		"internet": "Publicly accessible",
-	},
-	"data_sensitivity": {
-		"low":      "Public data",
-		"medium":   "Internal data, limited confidentiality",
-		"high":     "PII, financial data, customer info",
-		"critical": "Secrets, PHI, payment card data",
-	},
-	"business_criticality": {
-		"low":      "Dev / test / sandbox",
-		"medium":   "Internal tools",
-		"high":     "Customer-facing, important operations",
-		"critical": "Revenue-critical, compliance-required",
-	},
-	"availability_requirement": {
-		"low":      "Best-effort uptime",
-		"medium":   "Business-hours SLA",
-		"high":     "24/7 required",
-		"critical": "Zero downtime tolerance",
-	},
-	"listener": {
-		"present": "this deployment accepts connections that other parties open: it listens on a port or socket, as a server or as a peer others connect to",
-		"absent":  "it accepts none: no listening port or socket, such as a batch job, a command-line tool, or a client that only opens connections",
-	},
-}
-
-var controlDocs = map[string][2]string{
-	"waf":             {"Web Application Firewall", "SQL injection, XSS, path traversal"},
-	"ddos_protection": {"DDoS mitigation (CloudFlare, AWS Shield…)", "Availability / DoS CVEs"},
-	"antivirus":       {"Traditional AV / anti-malware", "Known malware signatures"},
-	"segmentation":    {"Network micro-segmentation", "Lateral movement"},
-	"zero_trust":      {"Zero-trust architecture", "Authentication bypass, lateral movement"},
-}
-
-func meant(key, value string) Setting {
-	return Setting{Value: value, Meaning: meanings[key][value]}
+// meant is a value the frames show with the meaning the config's one table
+// documents for it, the table docs/reference/config-schema.md is checked
+// against.
+func meant(field riskconfig.Field, value string) Setting {
+	return Setting{Value: value, Meaning: field.Meaning(value)}
 }
 
 // config builds a deployment from its values: the three required settings
 // at one level, as the vens-demo contexts and the quickstart declare them.
 func config(name, description, exposure, level, listener, notes string, frameworks []string, controls ...string) Deployment {
-	availability := meant("availability_requirement", level)
+	availability := meant(riskconfig.AvailabilityRequirement, level)
 	d := Deployment{
 		Name:                    name,
 		Description:             description,
 		Notes:                   notes,
-		Exposure:                meant("exposure", exposure),
-		Listener:                meant("listener", listener),
-		BusinessCriticality:     meant("business_criticality", level),
-		DataSensitivity:         meant("data_sensitivity", level),
+		Exposure:                meant(riskconfig.Exposure, exposure),
+		Listener:                meant(riskconfig.Listener, listener),
+		BusinessCriticality:     meant(riskconfig.BusinessCriticality, level),
+		DataSensitivity:         meant(riskconfig.DataSensitivity, level),
 		AvailabilityRequirement: &availability,
 		Frameworks:              frameworks,
 	}
+	scopes := riskconfig.ControlScopes()
 	for _, key := range controls {
-		d.Controls = append(d.Controls, Control{Key: key, Description: controlDocs[key][0], Scope: controlDocs[key][1]})
+		i := slices.IndexFunc(scopes, func(c riskconfig.Control) bool { return c.Key == key })
+		d.Controls = append(d.Controls, Control{Key: key, Description: scopes[i].Description, Scope: scopes[i].Scope})
 	}
 	return d
 }

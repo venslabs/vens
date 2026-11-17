@@ -95,8 +95,8 @@ func TestTrivyScanner_Parse_EvidenceEdges(t *testing.T) {
 		trivytypes.DetectedVulnerability{
 			VulnerabilityID: "CVE-2024-0003", PkgID: "c@1", PkgName: "c",
 			Vulnerability: dbtypes.Vulnerability{
-				// Severities off Trivy's scale and a v3 vector without its CVSS:
-				// prefix are kept as they are; the vector then does not parse.
+				// Severities off Trivy's scale are kept as they are; a v3 vector
+				// without its CVSS: prefix keeps the major version its field gives.
 				VendorSeverity: dbtypes.VendorSeverity{"nvd": 7, "ghsa": -1},
 				CVSS:           dbtypes.VendorCVSS{"nvd": {V3Vector: "AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N"}},
 			},
@@ -118,9 +118,12 @@ func TestTrivyScanner_Parse_EvidenceEdges(t *testing.T) {
 		t.Errorf("a row with no evidence: CVSS %v, VendorSeverities %v, SeveritySource %q; want none",
 			rows[0].CVSS, rows[0].VendorSeverities, rows[0].SeveritySource)
 	}
-	wantCVSS := []cvss.Vector{{Source: "nvd", Version: "", Vector: "AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N"}}
+	wantCVSS := []cvss.Vector{{Source: "nvd", Version: "3", Vector: "AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N"}}
 	if !reflect.DeepEqual(rows[1].CVSS, wantCVSS) {
 		t.Errorf("CVSS = %+v, want %+v", rows[1].CVSS, wantCVSS)
+	}
+	if _, err := rows[1].CVSS[0].Parse(); err != nil {
+		t.Errorf("Parse: %v", err)
 	}
 	wantSeverities := []generator.VendorSeverity{{Source: "ghsa", Severity: "-1"}, {Source: "nvd", Severity: "7"}}
 	if !reflect.DeepEqual(rows[1].VendorSeverities, wantSeverities) {
@@ -168,6 +171,54 @@ const grypeEvidenceReport = `{"matches": [{
   "relatedVulnerabilities": [],
   "artifact": {"id": "p2", "name": "b", "version": "1"}
 }]}`
+
+// A v3 or v4 vector without its CVSS: prefix keeps the version of Trivy's
+// field beside a v2 vector, which never carries one: the newest version is
+// the v3 or v4 one, and Applicability reads every vector on its own scale.
+// Left without a version, it would not parse, every axis would stay
+// applicable and the v2 vector would pass for the newest.
+func TestTrivyScanner_Parse_UnprefixedVectorsBesideV2(t *testing.T) {
+	rows := parseTrivy(t,
+		trivytypes.DetectedVulnerability{
+			VulnerabilityID: "CVE-2024-0010", PkgID: "a@1", PkgName: "a",
+			Vulnerability: dbtypes.Vulnerability{CVSS: dbtypes.VendorCVSS{
+				"nvd": {V2Vector: "AV:N/AC:L/Au:N/C:P/I:N/A:N", V3Vector: "AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:N"},
+			}},
+		},
+		trivytypes.DetectedVulnerability{
+			VulnerabilityID: "CVE-2024-0011", PkgID: "b@1", PkgName: "b",
+			Vulnerability: dbtypes.Vulnerability{CVSS: dbtypes.VendorCVSS{
+				"nvd":    {V2Vector: "AV:N/AC:L/Au:N/C:N/I:N/A:N"},
+				"redhat": {V40Vector: "AV:N/AC:L/AT:N/PR:N/UI:N/VC:N/VI:N/VA:H/SC:N/SI:N/SA:N"},
+			}},
+		},
+	)
+	tests := []struct {
+		versions []string
+		newest   int
+		floored  [3]bool
+	}{
+		{[]string{"2.0", "3"}, 3, [3]bool{false, true, true}},
+		{[]string{"2.0", "4.0"}, 4, [3]bool{true, true, false}},
+	}
+	for i, tt := range tests {
+		row := rows[i]
+		var versions []string
+		for _, v := range row.CVSS {
+			versions = append(versions, v.Version)
+			if _, err := v.Parse(); err != nil {
+				t.Errorf("%s: %s: %v", row.VulnID, v.Vector, err)
+			}
+		}
+		if !reflect.DeepEqual(versions, tt.versions) || cvss.Newest(row.CVSS) != tt.newest {
+			t.Errorf("%s: versions %v, newest %d; want %v, %d", row.VulnID, versions, cvss.Newest(row.CVSS), tt.versions, tt.newest)
+		}
+		got := generator.CVEApplicability([]generator.Vulnerability{row})
+		if got.Floored != tt.floored || len(got.Missing) != 0 {
+			t.Errorf("%s: Applicability %+v, want floored %v and nothing missing", row.VulnID, got, tt.floored)
+		}
+	}
+}
 
 func TestGrypeScanner_Parse_KeepsEveryVectorAndSeverity(t *testing.T) {
 	rows := parseGrype(t, grypeEvidenceReport)

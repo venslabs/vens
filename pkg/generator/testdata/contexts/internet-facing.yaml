@@ -1,0 +1,26 @@
+# vens-demo contexts/internet-facing.yaml at 1dd6971, with the schema 2
+# marker and the listener its notes give.
+schema_version: 2
+project:
+  name: "checkout-api"
+  description: "Public checkout API handling card payments for the storefront"
+context:
+  exposure: "internet"
+  data_sensitivity: "critical"
+  business_criticality: "critical"
+  availability_requirement: "critical"
+  compliance_requirements:
+    - "PCI-DSS"
+    - "GDPR"
+  audit_requirement: "high"
+  listener: "present"
+  controls:
+    waf: true
+    ddos_protection: true
+    ids: true
+    siem: true
+    edr: true
+    antivirus: false
+    segmentation: true
+    zero_trust: false
+  notes: "Accepts unauthenticated traffic on the payment initiation route and parses attacker-controlled JSON."

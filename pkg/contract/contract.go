@@ -59,6 +59,24 @@ func Order() []Factor {
 	return slices.Clone(order[:])
 }
 
+var factorNames = map[Factor]string{
+	SL: "Skill level", M: "Motive", O: "Opportunity", S: "Size",
+	ED: "Ease of discovery", EE: "Ease of exploit", A: "Awareness", ID: "Intrusion detection",
+	LC: "Loss of confidentiality", LI: "Loss of integrity", LAV: "Loss of availability", LAC: "Loss of accountability",
+	FD: "Financial damage", RD: "Reputation damage", NC: "Non-compliance", PV: "Privacy violation",
+}
+
+// Name returns the factor's name as OWASP's methodology writes it.
+func (f Factor) Name() string {
+	return factorNames[f]
+}
+
+// Counter returns the counter a model-answered factor's cannot_tell adds
+// to, "" for a factor Go sets alone.
+func (f Factor) Counter() string {
+	return table[f].counter
+}
+
 // Reading is how Go read an asked factor's answer.
 type Reading int
 
@@ -76,6 +94,22 @@ const (
 	// answers, whatever they are, are read as cannot_tell and counted.
 	NoDescription
 )
+
+var readingNames = [...]string{
+	Answered: "answered", CannotTell: "cannot_tell", Invalid: "invalid", NoDescription: "no_description",
+}
+
+func (r Reading) String() string {
+	if r > 0 && int(r) < len(readingNames) {
+		return readingNames[r]
+	}
+	return "unknown"
+}
+
+// MarshalText writes the reading by name.
+func (r Reading) MarshalText() ([]byte, error) {
+	return []byte(r.String()), nil
+}
 
 // Source is where a level came from.
 type Source int

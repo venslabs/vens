@@ -137,18 +137,30 @@ type SecurityControls struct {
 	ZeroTrust      bool `yaml:"zero_trust,omitempty"`
 }
 
+// byKey maps each control's YAML key to its field in s.
+func (s *SecurityControls) byKey() map[string]*bool {
+	return map[string]*bool{
+		"waf": &s.WAF, "ddos_protection": &s.DDoSProtection, "ids": &s.IDS, "siem": &s.SIEM,
+		"edr": &s.EDR, "antivirus": &s.Antivirus, "segmentation": &s.Segmentation, "zero_trust": &s.ZeroTrust,
+	}
+}
+
 // Enable returns s with the control named by its YAML key set to true, and
 // false when no control has that key.
 func (s SecurityControls) Enable(key string) (SecurityControls, bool) {
-	on := map[string]*bool{
-		"waf": &s.WAF, "ddos_protection": &s.DDoSProtection, "ids": &s.IDS, "siem": &s.SIEM,
-		"edr": &s.EDR, "antivirus": &s.Antivirus, "segmentation": &s.Segmentation, "zero_trust": &s.ZeroTrust,
-	}[key]
+	on := s.byKey()[key]
 	if on == nil {
 		return s, false
 	}
 	*on = true
 	return s, true
+}
+
+// Enabled reports whether the control named by its YAML key is set to true,
+// false for a key no control has.
+func (s SecurityControls) Enabled(key string) bool {
+	on := s.byKey()[key]
+	return on != nil && *on
 }
 
 // Parse loads config.yaml from its bytes. It reads the YAML tree first, so
@@ -321,88 +333,4 @@ func normalizePtr(s *string) *string {
 	}
 	n := normalize(*s)
 	return &n
-}
-
-// FormatForLLM returns a formatted string representation of the context
-// suitable for inclusion in LLM prompts.
-func (c *Config) FormatForLLM() string {
-	var sb strings.Builder
-	fmt.Fprintf(&sb, "Project: %s\n", c.Project.Name)
-	if c.Project.Description != "" {
-		fmt.Fprintf(&sb, "Description: %s\n", c.Project.Description)
-	}
-
-	// Required fields
-	fmt.Fprintf(&sb, "Exposure: %s\n", c.Context.Exposure)
-	fmt.Fprintf(&sb, "Data Sensitivity: %s\n", c.Context.DataSensitivity)
-	fmt.Fprintf(&sb, "Business Criticality: %s\n", c.Context.BusinessCriticality)
-
-	// Optional fields - only show if explicitly provided
-	if c.Context.AvailabilityRequirement != nil {
-		fmt.Fprintf(&sb, "Availability Requirement: %s\n", *c.Context.AvailabilityRequirement)
-	}
-
-	if len(c.Context.ComplianceRequirements) > 0 {
-		fmt.Fprintf(&sb, "Compliance Requirements: %s\n", strings.Join(c.Context.ComplianceRequirements, ", "))
-	}
-
-	if c.Context.AuditRequirement != nil {
-		fmt.Fprintf(&sb, "Audit Requirement: %s\n", *c.Context.AuditRequirement)
-	}
-
-	// Format security controls if any are enabled
-	controls := c.Context.Controls
-	var activeControls []string
-	if controls.WAF {
-		activeControls = append(activeControls, "WAF")
-	}
-	if controls.DDoSProtection {
-		activeControls = append(activeControls, "DDoS Protection")
-	}
-	if controls.IDS {
-		activeControls = append(activeControls, "IDS")
-	}
-	if controls.SIEM {
-		activeControls = append(activeControls, "SIEM")
-	}
-	if controls.EDR {
-		activeControls = append(activeControls, "EDR")
-	}
-	if controls.Antivirus {
-		activeControls = append(activeControls, "Antivirus")
-	}
-	if controls.Segmentation {
-		activeControls = append(activeControls, "Network Segmentation")
-	}
-	if controls.ZeroTrust {
-		activeControls = append(activeControls, "Zero Trust")
-	}
-
-	if len(activeControls) > 0 {
-		fmt.Fprintf(&sb, "Security Controls: %s\n", strings.Join(activeControls, ", "))
-	}
-
-	if c.Context.Notes != "" {
-		fmt.Fprintf(&sb, "Additional Notes: %s\n", c.Context.Notes)
-	}
-	return sb.String()
-}
-
-// RiskSeverity returns a human-readable severity level based on the OWASP risk score.
-// Based on OWASP Risk Rating: score range is [0, 81].
-// Returns lowercase severity strings compatible with CycloneDX specification.
-// Reference: https://owasp.org/www-community/OWASP_Risk_Rating_Methodology
-func RiskSeverity(score float64) string {
-	switch {
-	case score >= 60:
-		return "critical"
-	case score >= 40:
-		return "high"
-	case score >= 20:
-		return "medium"
-	case score >= 5:
-		return "low"
-	default:
-		return "info"
-	}
 }

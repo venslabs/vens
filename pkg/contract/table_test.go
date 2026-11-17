@@ -20,6 +20,9 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/venslabs/vens/pkg/owasp"
+	"github.com/venslabs/vens/pkg/riskconfig"
 )
 
 func leveled[V ~int](c contract[V]) string {
@@ -88,6 +91,35 @@ func TestTableHoldsTheTwelveQuestions(t *testing.T) {
 		if names := strings.Contains(q.question, "{group}"); names == (f == ID) {
 			t.Errorf("%s's question names the attacker group: %t", f, names)
 		}
+	}
+}
+
+// Privacy violation's answers are the config's bands, in their order and at
+// their levels, each with a text of its own, and a declared band caps at its
+// level: the answer and the cap are one table.
+func TestPrivacyAnswersAreTheConfigsBands(t *testing.T) {
+	bands := riskconfig.DataSubjectsBands()
+	answers := privacyViolation.answers
+	if len(answers) != len(bands)+1 || answers[len(bands)].id != cannotTell {
+		t.Fatalf("Privacy violation lists %d answers, want the %d bands then cannot_tell", len(answers), len(bands))
+	}
+	for i, b := range bands {
+		a := answers[i]
+		if a.id != b.Name || a.value != b.Level || a.text == "" {
+			t.Errorf("answer %d is %s at %d (text %q), want band %s at %d with a text", i, a.id, a.value, a.text, b.Name, b.Level)
+		}
+		if got := band(b.Name); got != b.Level {
+			t.Errorf("data_subjects %s caps at %d, its band's level is %d", b.Name, got, b.Level)
+		}
+	}
+	if got := answers[len(bands)].value; got != owasp.PrivacyViolationMillionsOfPeople {
+		t.Errorf("cannot_tell maps to %d, want the largest band's 9", got)
+	}
+	// Built from another table, the answers follow it.
+	other := []riskconfig.Band{{Name: "few", Level: owasp.PrivacyViolationOneIndividual}, {Name: "many", Level: owasp.PrivacyViolationThousandsOfPeople}}
+	got := contract[owasp.PrivacyViolation]{answers: bandAnswers(other, map[string]string{"few": "Few.", "many": "Many."})}
+	if want := "few=3 many=7 cannot_tell=7"; leveled(got) != want {
+		t.Errorf("bandAnswers over another table = %s, want %s", leveled(got), want)
 	}
 }
 
