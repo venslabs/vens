@@ -61,7 +61,7 @@ Four factors also have a CVSS floor: when every CVSS vector of the CVE rates the
 
 A description is a prerequisite of three answers: when no row of the scanner's report describes the CVE, a title alone included, vens does not ask Motive, Opportunity and Ease of exploit, and sets each to its worst level, 9, counted as `cannot_tell`.
 
-A question is asked only when the factor's contract requires it: at most 12 questions per CVE. A CVE whose description says it is disputed or not a security issue, or that the scanner rates low while NVD rates it high or critical, is flagged: it gets one more call, the adjustment, which can lower Opportunity, unless the CVE has no description, a loss the CVSS vectors did not floor, and Privacy violation, and never raises a level.
+A question is asked only when the factor's contract requires it: at most 12 questions per CVE. A CVE whose description says it is disputed or not a security issue, or that the scanner rates low while NVD rates it high or critical, is flagged: it gets one more call, the adjustment, which can lower Opportunity (not for a CVE with no description), a loss the CVSS vectors did not floor, and Privacy violation, and never raises a level.
 
 | Factor | Group | Way | What sets the level |
 |---|---|---|---|

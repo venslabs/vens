@@ -174,7 +174,7 @@ sha256sum --check --ignore-missing SHA256SUMS
 
 Vens calls an LLM to score each CVE. All four providers below are first-class — pick whichever matches your constraints. Export credentials for **one**:
 
-Vens asks the LLM closed questions and expects structured JSON: for each question, one named answer and one sentence of reasoning per CVE. If a model emits malformed JSON, Vens logs a `WARN` and asks again for the CVEs that reply should have answered; you'll see `unable to parse LLM output` only if one is still without an answer — see [troubleshooting](../troubleshooting.md#unable-to-parse-llm-output).
+Vens asks the LLM closed questions and expects structured JSON: for each question, one named answer and one sentence of reasoning per CVE. If a model emits malformed JSON, Vens logs a `WARN` and asks again for the CVEs that reply leaves without an answer; you'll see `unable to parse LLM output` only if one is still without an answer — see [troubleshooting](../troubleshooting.md#unable-to-parse-llm-output).
 
 === "Ollama (local, no cloud, zero cost)"
 
