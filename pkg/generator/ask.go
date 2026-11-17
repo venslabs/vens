@@ -138,6 +138,10 @@ func (g *Generator) askOnce(ctx context.Context, run *scoringRun, f contract.Fac
 	return got, nil
 }
 
+// loggedLimit is the most characters of model text a warning about an
+// ignored answer quotes: an entry's reasoning can run long.
+const loggedLimit = 200
+
 // readReplies reads a call's reply by key, one answer per CVE. An answer for
 // a CVE the call did not ask about is ignored, and a CVE answered twice keeps
 // its first answer, each logged. An answer off its list, or one a key written
@@ -160,13 +164,13 @@ func readReplies(ctx context.Context, run *scoringRun, f contract.Factor, raw, e
 			// ids are an enum.
 			run.defect(defectCVENotAsked)
 			slog.WarnContext(ctx, "Model answered a CVE the call did not ask about; ignoring the answer",
-				"vuln", id, "question", string(f), "entry", string(e.text))
+				"vuln", cut(id, loggedLimit), "question", string(f), "entry", cut(string(e.text), loggedLimit))
 			continue
 		}
 		if _, ok := got[id]; ok {
 			run.defect(defectCVERepeated)
 			slog.WarnContext(ctx, "Model answered a CVE twice; keeping its first answer",
-				"vuln", id, "question", string(f), "entry", string(e.text))
+				"vuln", id, "question", string(f), "entry", cut(string(e.text), loggedLimit))
 			continue
 		}
 		got[id] = readEntry(ctx, run, f, id, e, evidenceRef)

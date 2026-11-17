@@ -105,8 +105,13 @@ func offList(raw json.RawMessage) string {
 	if s == "" {
 		return "null"
 	}
-	if runes := []rune(s); len(runes) > shownLimit {
-		return string(runes[:shownLimit]) + "…"
+	return cut(s, shownLimit)
+}
+
+// cut is s cut to limit characters, an ellipsis marking the cut.
+func cut(s string, limit int) string {
+	if runes := []rune(s); len(runes) > limit {
+		return string(runes[:limit]) + "…"
 	}
 	return s
 }
