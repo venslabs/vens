@@ -137,7 +137,7 @@ See **[`--strict`](reference/generate.md#-strict)**.
 
 A run that reaches scoring ends with a `Scoring run finished` line, also when it fails during scoring. Its `counters.*` count, per CVE, each fallback the run used:
 
-- `<factor>_cannot_tell` (such as `privacy_cannot_tell`) — the model answered `cannot_tell`, or off its list, so the question's worst answer applied: the factor's worst level, unless `detection` or `data_subjects` limits it or a flagged CVE's adjustment lowers it. A CVE with no description counts in `motive_cannot_tell`, `opportunity_cannot_tell` and `ease_of_exploit_cannot_tell`.
+- `<factor>_cannot_tell` (such as `privacy_cannot_tell`) — the model answered `cannot_tell`, or off its list, so the question's worst answer applied: the factor's worst level, unless `detection` or `data_subjects` limits it or a flagged CVE's adjustment lowers it. A CVE with no description is not asked Motive, Opportunity and Ease of exploit, a description being a prerequisite of their answers, and counts in `motive_cannot_tell`, `opportunity_cannot_tell` and `ease_of_exploit_cannot_tell`.
 - `detection_undeclared`, `traceability_missing`, `data_subjects_missing` — a field left out of `config.yaml`. Declare it.
 - `applicability_missing` — the CVE's CVSS vectors could not rule out a loss, so the loss was asked instead of floored.
 

@@ -173,6 +173,10 @@ func (g *Generator) GenerateRiskScore(ctx context.Context, vulns []Vulnerability
 			return err
 		}
 	}
+	if ids := undescribed(cves); len(ids) > 0 {
+		slog.WarnContext(ctx, "No description in the scanner's report; Motive, Opportunity and Ease of exploit are not asked, each at its worst level",
+			"cves", len(ids), "vulns", strings.Join(ids, ","))
+	}
 	size := max(g.o.BatchSize, 1)
 	for start := 0; start < len(cves); start += size {
 		batch := cves[start:min(start+size, len(cves))]

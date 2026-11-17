@@ -89,9 +89,9 @@ const (
 	// Invalid: an answer off the list, which only a provider ignoring the
 	// schema can give. It is read as cannot_tell and counted with it.
 	Invalid
-	// NoDescription: no row of the CVE has a description, which leaves
-	// Motive, Opportunity and Ease of exploit nothing to judge it by. Their
-	// answers, whatever they are, are read as cannot_tell and counted.
+	// NoDescription: no row of the CVE has a description, a prerequisite of
+	// Motive's, Opportunity's and Ease of exploit's answers. Those questions
+	// are not asked, and each takes cannot_tell's level, counted.
 	NoDescription
 )
 
@@ -116,7 +116,8 @@ type Source int
 
 const (
 	// SourceAnswer: the model's answer as Go read it, cannot_tell included,
-	// crossed with the config for a factor Go crosses it with.
+	// crossed with the config for a factor Go crosses it with; for a question
+	// not asked for want of a description, cannot_tell's.
 	SourceAnswer Source = iota + 1
 	// SourceConstant: the same level for every finding.
 	SourceConstant

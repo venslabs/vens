@@ -131,20 +131,23 @@ func (a *assessment) note(f contract.Factor, answer, reasoning, evidenceRef stri
 	}
 }
 
-// reasoning is a claim's reasoning, one line per reason, "factor (answer):
-// sentence". An answer Go did not read, its CVE described by no row, says
-// so: the vector holds cannot_tell's level instead.
+// reasoning is a claim's reasoning: for a CVE no row describes, one line per
+// question it is not asked for want of a description, "factor (not asked: no
+// description)", the vector holding cannot_tell's level; then one line per
+// reason, "factor (answer): sentence".
 func (a *assessment) reasoning(readings map[contract.Factor]contract.Reading) string {
-	lines := make([]string, len(a.reasons))
-	for i, r := range a.reasons {
-		head, answer := string(r.factor), r.answer
+	var lines []string
+	for _, f := range contract.Order() {
+		if readings[f] == contract.NoDescription {
+			lines = append(lines, string(f)+" (not asked: no description)")
+		}
+	}
+	for _, r := range a.reasons {
+		head := string(r.factor)
 		if r.factor == "" {
 			head = adjustmentCall
 		}
-		if readings[r.factor] == contract.NoDescription {
-			answer += ", not used: no description"
-		}
-		lines[i] = fmt.Sprintf("%s (%s): %s", head, answer, r.sentence)
+		lines = append(lines, fmt.Sprintf("%s (%s): %s", head, r.answer, r.sentence))
 	}
 	return strings.Join(lines, "\n")
 }

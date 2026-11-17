@@ -95,8 +95,12 @@ func band(s string) owasp.PrivacyViolation {
 // asked reports whether a CVE gets factor f's question. A question is not
 // asked where Go has decided the level, so the model cannot contradict Go,
 // nor where no answer could move it.
-func asked(f Factor, d Deployment, floored [3]bool) bool {
+func asked(f Factor, d Deployment, floored [3]bool, described bool) bool {
 	switch f {
+	case M, O, EE:
+		// A description is a prerequisite of their answers: a CVE no row
+		// describes takes cannot_tell's level for each.
+		return described
 	case ID:
 		// Undeclared, every channel is the worst case; declared at one level,
 		// every set of channels gives that level.
@@ -122,15 +126,18 @@ func asked(f Factor, d Deployment, floored [3]bool) bool {
 }
 
 // Questions returns the questions a CVE gets, in the order the calls ask
-// them, from the deployment and the axes Applicability floored, indexed as
-// cvss's axes.
-func Questions(d Deployment, floored [3]bool) ([]Factor, error) {
+// them, from the deployment, whether a row describes the CVE, and the axes
+// Applicability floored over its vectors, indexed as cvss's axes.
+func Questions(d Deployment, c CVE, floored [3]bool) ([]Factor, error) {
 	if err := d.Check(); err != nil {
+		return nil, err
+	}
+	if err := checkCVE(c); err != nil {
 		return nil, err
 	}
 	var questions []Factor
 	for _, f := range order {
-		if asked(f, d, floored) {
+		if asked(f, d, floored, c.Described()) {
 			questions = append(questions, f)
 		}
 	}
@@ -171,7 +178,8 @@ type Levels struct {
 	// Sources says where each of the 16 levels came from.
 	Sources map[Factor]Source
 	// Readings holds how the answer to each question the CVE was asked was
-	// read.
+	// read, and NoDescription for Motive, Opportunity and Ease of exploit
+	// when no row describes the CVE, which is not asked them.
 	Readings map[Factor]Reading
 	// Counters names, in factor order, each counter the CVE adds one to: a
 	// cannot_tell, or an answer read as one, and each undeclared field a
@@ -255,10 +263,10 @@ func answered[V any](s *scorer, c contract[V], id string) V {
 }
 
 // likelihood reads Motive's, Opportunity's or Ease of exploit's answer. A CVE
-// with no description gives the model nothing to judge it by: whatever the
-// answer, it reads as cannot_tell.
+// no row describes is not asked them, a description being a prerequisite of
+// their answers: each takes cannot_tell's level, counted, whatever id holds.
 func likelihood[L ~int](s *scorer, c contract[L], id string) L {
-	if s.described {
+	if asked(c.factor, s.d, s.floored, s.described) {
 		return answered(s, c, id)
 	}
 	level, _ := c.read(cannotTell)
@@ -279,7 +287,7 @@ func lowered[L ~int](s *scorer, f Factor, baseline, adjusted L) L {
 // Applicability floored the axis, which is then not asked, or when the
 // adjustment answered not_affected; the answer's level otherwise.
 func axis[L owasp.LossOfIntegrity | owasp.LossOfAvailability](s *scorer, c contract[L], id, adjusted string, floor L) L {
-	if !asked(c.factor, s.d, s.floored) {
+	if !asked(c.factor, s.d, s.floored, s.described) {
 		return from(s, c.factor, SourceFloor, floor)
 	}
 	level := answered(s, c, id)
@@ -295,7 +303,7 @@ func (s *scorer) intrusionDetection(chosen []string) owasp.IntrusionDetection {
 		return from(s, ID, SourceConfig, owasp.IntrusionDetectionNotLogged)
 	}
 	levels := s.d.Detection.levels()
-	if !asked(ID, s.d, s.floored) {
+	if !asked(ID, s.d, s.floored, s.described) {
 		return from(s, ID, SourceConfig, levels[0])
 	}
 	level, r := readChannels(chosen, levels)
@@ -369,7 +377,7 @@ func ReadAnswer(f Factor, answer ...string) (Reading, error) {
 }
 
 func (s *scorer) confidentiality(id, adjusted string) owasp.LossOfConfidentiality {
-	if !asked(LC, s.d, s.floored) {
+	if !asked(LC, s.d, s.floored, s.described) {
 		return from(s, LC, SourceFloor, confidentialityFloor)
 	}
 	e := answered(s, confidentiality, id)
@@ -398,7 +406,7 @@ func (s *scorer) accountability(id string) owasp.LossOfAccountability {
 
 // nonCompliance is OWASP's lowest level, a floor, when no framework applies.
 func (s *scorer) nonCompliance(id string) owasp.NonCompliance {
-	if !asked(NC, s.d, s.floored) {
+	if !asked(NC, s.d, s.floored, s.described) {
 		return from(s, NC, SourceConfig, owasp.NonComplianceMinorViolation)
 	}
 	return answered(s, nonCompliance, id)
@@ -410,7 +418,7 @@ func (s *scorer) privacy(id, adjustedConfidentiality string) owasp.PrivacyViolat
 	switch {
 	case s.floored[cvss.Confidentiality]:
 		return from(s, PV, SourceFloor, privacyFloor)
-	case !asked(PV, s.d, s.floored):
+	case !asked(PV, s.d, s.floored, s.described):
 		// data_subjects declares none or one individual: the cap is the floor.
 		return from(s, PV, SourceConfig, privacyFloor)
 	}

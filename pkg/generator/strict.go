@@ -35,10 +35,10 @@ func CheckStrictConfig(cfg *riskconfig.Config) error {
 }
 
 // preflight is a strict run's check before any call. A CVE whose vectors
-// leave an axis's Applicability unknown keeps that axis applicable, and the
-// questions of a CVE no row describes read Motive, Opportunity and Ease of
-// exploit as cannot_tell: each falls back to a worst case known before
-// anything is spent. One error names every such CVE with its causes.
+// leave an axis's Applicability unknown keeps that axis applicable, and a
+// CVE no row describes is not asked Motive, Opportunity and Ease of exploit,
+// each taking cannot_tell's level: each falls back to a worst case known
+// before anything is spent. One error names every such CVE with its causes.
 func preflight(cves []*cve) error {
 	var lines []string
 	for _, c := range cves {

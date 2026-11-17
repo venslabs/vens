@@ -29,8 +29,10 @@ import (
 // Applicability state, description state and adjustment: whatever the
 // replies hold, the vector is one the calculator takes, each level in the set
 // its JAR ran, each with its source; its severity and score are OWASP's
-// matrix and likelihood × impact recomputed from the vector alone; and the
-// readings are the questions asked.
+// matrix and likelihood × impact recomputed from the vector alone; Motive,
+// Opportunity and Ease of exploit are asked only of a CVE a row describes;
+// and the readings are the questions asked, and those three for a CVE no row
+// describes.
 func FuzzCompute(f *testing.F) {
 	sets := owaspLevelSets(f)
 	f.Add([]byte{}, "")
@@ -104,12 +106,21 @@ func FuzzCompute(f *testing.F) {
 		if len(l.Sources) != len(vectorOrder) || slices.Contains(slices.Collect(maps.Values(l.Sources)), 0) {
 			t.Errorf("sources %v, want one for each of the 16 levels", l.Sources)
 		}
-		asked, err := Questions(d, floored)
+		asked, err := Questions(d, c, floored)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got := slices.Sorted(maps.Keys(l.Readings)); !slices.Equal(got, slices.Sorted(slices.Values(asked))) {
+		read := slices.Clone(asked)
+		if !c.Described() {
+			read = append(read, M, O, EE)
+		}
+		if got := slices.Sorted(maps.Keys(l.Readings)); !slices.Equal(got, slices.Sorted(slices.Values(read))) {
 			t.Errorf("readings for %v, questions %v", got, asked)
+		}
+		for _, f := range []Factor{M, O, EE} {
+			if slices.Contains(asked, f) == !c.Described() {
+				t.Errorf("%s asked: %v, described: %v", f, slices.Contains(asked, f), c.Described())
+			}
 		}
 	})
 }
