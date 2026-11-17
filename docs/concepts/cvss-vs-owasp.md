@@ -39,9 +39,10 @@ Why:      The model answers that reaching the parser takes full access to the
 Vector:   SL:9/M:4/O:9/S:9/ED:9/EE:5/A:9/ID:8/LC:2/LI:1/LAV:7/LAC:7/FD:7/RD:5/NC:2/PV:3
 Severity: high     (likelihood 7.75 HIGH, impact 4.25 MEDIUM)
 Score:    32.94
-Why:      CSV upload is open to anonymous Internet users, so no access is
-          needed; an outage stops what the service exists to do, with a
-          significant effect on annual profit.
+Why:      The model answers that the CSV upload is open to anonymous
+          Internet users, so no access is needed, and that an outage stops
+          what the service exists to do, with a significant effect on
+          annual profit.
 ```
 
 Same CVE, same base score, two different risks. The model answered the questions; vens computed every level, the severity and the score.
@@ -54,9 +55,11 @@ OWASP's Risk Rating Methodology rates a vulnerability from 16 factors, each with
 
 1. **Set by vens (4 factors).** Skill level, Ease of discovery and Awareness are 9 for every finding: each finding is a published CVE that a scanner matched, so vens takes OWASP's worst case for them. Size comes from your declared `exposure`.
 2. **Read from the model's answer (8 factors).** The model gets one question per call, about a batch of CVEs, and picks one named answer from a closed list that always includes `cannot_tell`. vens maps the answer to the factor's level; `cannot_tell` maps to the worst case and is counted.
-3. **An answer combined with a declared field or a CVSS floor (4 factors).** vens crosses the model's answer with a field of `config.yaml` the question does not show, or floors the factor when every CVSS vector of the CVE rates that axis as no impact.
+3. **An answer combined with a declared field (4 factors).** vens crosses the model's answer with a field of `config.yaml` the question does not show: Intrusion detection with `detection`, Loss of confidentiality with `data_sensitivity`, Loss of accountability with `traceability`, Privacy violation with `data_subjects`.
 
-A question is asked only when its answer can move the level: at most 12 questions per CVE. A CVE whose description says it is disputed or not a security issue, or that the scanner rates low while NVD rates it high or critical, is flagged: it gets one more call, the adjustment, which can lower Opportunity, a loss the CVSS vectors did not floor, and Privacy violation, and never raises a level.
+Four factors also have a CVSS floor: when every CVSS vector of the CVE rates the axis as no impact, vens asks no question and sets Loss of confidentiality to 2, Loss of integrity to 1 and Loss of availability to 1, and Privacy violation, which follows confidentiality, to 3.
+
+A question is asked only when the factor's contract requires it: at most 12 questions per CVE. A CVE whose description says it is disputed or not a security issue, or that the scanner rates low while NVD rates it high or critical, is flagged: it gets one more call, the adjustment, which can lower Opportunity, a loss the CVSS vectors did not floor, and Privacy violation, and never raises a level.
 
 | Factor | Group | Way | What sets the level |
 |---|---|---|---|
@@ -118,7 +121,7 @@ This explains the mechanism; it is not a measurement of accuracy.
 |---|---|---|
 | What the model returns | four numbers from 0 to 9 per CVE: threat agent, vulnerability, technical impact, business impact | one named answer per question, from a closed list; never a number |
 | Calls | one call per batch of CVEs | one call per question per batch, at most 12 questions per CVE, and one adjustment call per flagged CVE |
-| The 16 levels in the vector | each of the four numbers repeated over its group's four factors | 4 set by vens, 8 read from an answer, 4 from an answer combined with a declared field or a CVSS floor |
+| The 16 levels in the vector | each of the four numbers repeated over its group's four factors | 4 set by vens, 8 read from an answer, 4 from an answer combined with a declared field |
 | Impact | the average of the technical and the business impact | the larger of the two |
 | Severity | bands of the score: 0–4 `info`, 5–19 `low`, 20–39 `medium`, 40–59 `high`, 60–81 `critical` | OWASP's matrix of the likelihood and impact levels; never `info` |
 | Score | likelihood × impact | the same product, which no longer sets the severity |
@@ -133,11 +136,11 @@ Expect ratings to change, whatever your `config.yaml` declares. Your file also n
 
 A CVE has a base score of 7.5 but:
 
-- The vulnerable code path is not used in your build: the model reads it from the CVE description and your `notes`, and answers Opportunity and Ease of exploit accordingly
-- A control in front of the service stands in the way of this exploit, and the model judges it does
+- The model judges, from the CVE description and your `notes`, that the vulnerable code path is not used in your build, and answers Opportunity and Ease of exploit accordingly
+- The model judges that a control set to `true` stands in the way of this exploit, and answers Ease of exploit accordingly
 - The CVSS vectors give no confidentiality or integrity impact, so vens floors those losses
-- The affected data is public, or the declared `data_subjects` caps Privacy violation
-- The service has low business criticality
+- Your `data_sensitivity` is `low` or `medium`, so vens reads the model's Loss of confidentiality answer in the non-sensitive column, or the declared `data_subjects` caps Privacy violation
+- The model reads a low `business_criticality` and answers Financial damage and Reputation damage accordingly
 
 A generic 7.5 can come out `low` or `medium`. That rating is an input to your review, not a verdict: how well it matches real risk is not measured, and vens runs no reachability check of its own (see [Limitations](limitations.md)).
 
@@ -147,10 +150,10 @@ A generic 7.5 can come out `low` or `medium`. That rating is an input to your re
 
 A CVE has a base score of 5.3, "medium", but:
 
-- It discloses the kind of data your system handles, and your `data_sensitivity` is `high` or `critical`
+- The model answers that an exploit discloses data, and your `data_sensitivity` is `high` or `critical`, so vens reads that answer in the critical-data column
 - You declared GDPR or PCI-DSS, and the model judges a breach a high profile violation
-- The service is publicly exposed and accepts connections
-- Many people's personal data could be disclosed, within the declared `data_subjects`
+- You declared `exposure: internet`, which sets Size to 9, and `listener: present`, which the model reads
+- The model answers that many people's personal data could be disclosed, within the declared `data_subjects`
 
 A generic 5.3 can come out `high` or `critical`, which moves the CVE from deep in your scanner report to near the top of your review. That rating is an input to the review, not a patch decision.
 
