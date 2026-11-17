@@ -8,7 +8,7 @@
 
     **Its Trivy analyzer, enabled.** Both sides then share one vulnerability database, and the CVE sets line up by construction. Dependency-Track has no Grype analyzer, so this is the only supported pairing today.
 
-![The VEX feeds the CI gate and Dependency-Track: the same CVE scores 2.0 in the internal context and 22.5 in the internet-facing one](../assets/vex-consumers.svg)
+![The VEX feeds the CI gate and Dependency-Track: the same CVE rates low in the internal context and high in the internet-facing one](../assets/vex-consumers.svg)
 
 ---
 
@@ -129,6 +129,8 @@ Open the project, go to **Audit Vulnerabilities**, and select a finding. The aud
 OWASP Vector: (None) → SL:5/M:5/O:5/S:5/ED:4/EE:4/A:4/ID:4/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5
 OWASP Score:  (None) → 22.5
 ```
+
+This trail comes from a vens v0.6 run, whose vectors repeat four numbers over the 16 factors. Since v0.7.0 each factor has its own level; see [How vens rates a CVE](../concepts/cvss-vs-owasp.md#how-vens-rates-a-cve).
 
 Over the API, `GET /api/v1/finding/project/$PROJECT` returns the vector and the score on every finding at once. Vens emits a single score, so the likelihood, technical and business fields all carry the same number.
 

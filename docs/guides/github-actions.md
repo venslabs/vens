@@ -48,7 +48,7 @@ Set `attest: "true"` to also emit a [CycloneDX attestation](https://cyclonedx.or
 
 ## Using the mock provider in CI
 
-For testing or cost savings, use the `mock` LLM provider — it returns fixed scores and costs nothing:
+For testing or cost savings, use the `mock` LLM provider — it returns fixed answers and costs nothing:
 
 ```yaml
 - uses: venslabs/vens-action@v0.2.0

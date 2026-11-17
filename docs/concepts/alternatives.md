@@ -37,7 +37,7 @@ The two are not mutually exclusive: you can use Vens to rank, triage the top N, 
 **[vexllm](https://github.com/AkihiroSuda/vexllm)** (now archived) — an LLM-based tool that marked CVEs as `not_affected` in OpenVEX format.
 
 - vexllm outputs a binary **affected / not_affected** per CVE — yes/no suppression.
-- Vens outputs a **continuous OWASP Risk Rating score (0–81)** per CVE, with the four OWASP factors, and maps it to the CycloneDX VEX severity bucket.
+- Vens outputs an **OWASP Risk Rating** per CVE: the 16 factor levels, the severity from OWASP's likelihood × impact matrix, and a score on a 0–81 scale to rank CVEs within a severity.
 
 They answer different questions. vexllm answers "should I hide this CVE?"; Vens answers "how urgent is it compared to the others?". vexllm is now archived and unmaintained: for anything you set up today Vens is the maintained path, and if you need a prioritized patch queue and CI gating by contextual risk it is also the closer fit.
 
@@ -83,7 +83,7 @@ Trivy and Grype both accept `--vex <file>` on the command line. They use it to a
 - **Use reachability tools when:** you can afford them, you can run them on your codebase, and you need authoritative answers about whether a CVE is exploitable in *this* build.
 - **Use Vens when:** reachability analysis is out of reach (budget, closed source, polyglot stack, or early evaluation) and you still want a context-aware prioritization better than raw CVSS.
 
-Vens scores will improve if you paste the conclusions of a reachability scan into `config.yaml` `notes` — the LLM uses them as ground truth.
+Vens scores can improve if you paste the conclusions of a reachability scan into `config.yaml` `notes`: every question shows them, and they reach the rating through the model's answers, chiefly Opportunity and Ease of exploit. Nothing makes the model treat them as ground truth, and the likelihood never falls below MEDIUM (see [Limitations](limitations.md)).
 
 ---
 

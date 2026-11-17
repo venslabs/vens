@@ -21,14 +21,14 @@ vens enrich --vex VEX_FILE [--output PATH] REPORT_FILE
   "VulnerabilityID": "CVE-XXXX-YYYY",
   "Severity": "HIGH",
   "Custom": {
-    "owasp_score": 45.5,
+    "owasp_score": 43.3125,
     "owasp_severity": "high",
-    "owasp_vector": "SL:7/M:7/O:7/S:7/ED:6/EE:6/A:6/ID:6/LC:7/LI:7/LAV:7/LAC:7/FD:7/RD:7/NC:7/PV:7"
+    "owasp_vector": "SL:9/M:4/O:9/S:9/ED:9/EE:9/A:9/ID:8/LC:2/LI:9/LAV:1/LAC:9/FD:3/RD:5/NC:7/PV:3"
   }
 }
 ```
 
-`Severity` still holds Trivy's value. Gate on `Custom.owasp_severity`, and sort by band rank then `Custom.owasp_score` — sorting on the band sorts strings alphabetically, so order the bands yourself and break ties by the score, which lives on vens's internal 0–81 scale. If a CVE appears more than once in the VEX, the last OWASP rating wins.
+`Severity` still holds Trivy's value. Gate on `Custom.owasp_severity`, and sort by band rank then `Custom.owasp_score` — sorting on the band sorts strings alphabetically, so order the bands yourself and break ties by the score, likelihood × impact on a 0–81 scale. The band comes from OWASP's matrix, not from the score, so a `high` can score below a `medium`. If a CVE appears more than once in the VEX, the last OWASP rating wins.
 
 Use it when your downstream tooling reads Trivy JSON directly and does not know how to parse a separate CycloneDX VEX.
 

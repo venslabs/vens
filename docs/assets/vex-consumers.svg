@@ -42,10 +42,10 @@
   <text class="t"   x="30" y="316" font-size="15" font-weight="700">CI gate</text>
   <text class="dim" x="30" y="337" font-size="12.5">fail-on-severity: medium</text>
   <circle class="ok" cx="37" cy="362" r="5"/>
-  <text class="t"  x="52" y="367" font-size="13">internal, 2.0 (info)</text>
+  <text class="t"  x="52" y="367" font-size="13">internal, low</text>
   <text class="ok" x="52" y="388" font-size="13" font-weight="600">build passes</text>
   <circle class="ko" cx="180" cy="362" r="5"/>
-  <text class="t"  x="195" y="367" font-size="13">exposed, 22.5</text>
+  <text class="t"  x="195" y="367" font-size="13">exposed, high</text>
   <text class="ko" x="195" y="388" font-size="13" font-weight="600">build fails</text>
 
   <!-- consumer 2: the platform -->

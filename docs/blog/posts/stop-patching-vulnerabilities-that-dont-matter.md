@@ -41,6 +41,8 @@ trivy image python:3.11-slim --format json --output report.json
 
 ### 3. Describe your system in a [`config.yaml`](https://github.com/venslabs/vens/blob/main/examples/quickstart/config.yaml)
 
+*Updated for schema 2: since vens v0.7.0 the file starts with `schema_version: 2`, and `ids` moves no score; see [Migrating from vens v0.6](../../reference/config-schema.md#migrating).*
+
 ```yaml
 schema_version: 2
 
@@ -72,6 +74,8 @@ trivy vens generate --config-file config.yaml --sbom-serial-number "$SBOM_UUID" 
 ## The output
 
 Here is an extract of what vens generates:
+
+*Output of vens v0.6. Since v0.7.0 the vector holds the 16 OWASP levels vens computes from the model's answers, and the severity comes from OWASP's matrix; see [How vens rates a CVE](../../concepts/cvss-vs-owasp.md#how-vens-rates-a-cve).*
 
 ```json
 {

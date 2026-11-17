@@ -72,12 +72,12 @@
         <li class="vens-step">
           <span class="vens-step__n">2</span>
           <h3 class="vens-step__t">Describe your system</h3>
-          <p class="vens-step__d">A short <code>config.yaml</code>: exposure, data sensitivity, compliance, controls.</p>
+          <p class="vens-step__d">A short <code>config.yaml</code>: exposure, data, what records an attack, compliance, controls.</p>
         </li>
         <li class="vens-step">
           <span class="vens-step__n">3</span>
           <h3 class="vens-step__t">Score</h3>
-          <p class="vens-step__d"><code>vens generate</code> sends your CVEs, with your context, to an LLM and computes an OWASP risk score for each one.</p>
+          <p class="vens-step__d"><code>vens generate</code> asks an LLM closed questions about each CVE in your context, then computes its OWASP risk rating.</p>
         </li>
         <li class="vens-step">
           <span class="vens-step__n">4</span>
@@ -96,19 +96,19 @@
       <div class="vens-ba">
         <div class="vens-ba__card">
           <div class="vens-ba__flip">
-            <span class="vens-badge vens-badge--from">CVSS 8.8 HIGH</span>
+            <span class="vens-badge vens-badge--from">CVSS 7.5 HIGH</span>
             <span class="vens-ba__arrow">&rarr;</span>
-            <span class="vens-badge vens-badge--low">OWASP 10.0 LOW</span>
+            <span class="vens-badge vens-badge--low">OWASP LOW 14.1</span>
           </div>
-          <p class="vens-ba__d">RCE in a library whose vulnerable path never runs in your build. Not reachable, not urgent.</p>
+          <p class="vens-ba__d">Denial of service in a library function your internal service never calls. Reaching it takes full access, and the CVSS vectors rule out data loss.</p>
         </div>
         <div class="vens-ba__card">
           <div class="vens-ba__flip">
             <span class="vens-badge vens-badge--from">CVSS 5.3 MED</span>
             <span class="vens-ba__arrow">&rarr;</span>
-            <span class="vens-badge vens-badge--high">OWASP 52.0 HIGH</span>
+            <span class="vens-badge vens-badge--high">OWASP CRITICAL 54.4</span>
           </div>
-          <p class="vens-ba__d">Info leak in a handler that processes PII under GDPR. Higher risk for your system, not lower.</p>
+          <p class="vens-ba__d">Info leak in a handler that processes thousands of people's PII under GDPR. Higher risk for your system, not lower.</p>
         </div>
         <div class="vens-ba__card">
           <div class="vens-ba__flip">
@@ -131,7 +131,7 @@
       <div class="vens-cards">
         <div class="vens-card">
           <h3 class="vens-card__t">Context-aware OWASP scoring</h3>
-          <p class="vens-card__d">Risk = Likelihood &times; Impact (0 to 81), driven by your exposure, data, and controls. Not generic CVSS.</p>
+          <p class="vens-card__d">The 16 OWASP factors, set from your exposure, data, records and controls and the LLM's answers to closed questions; the severity from OWASP's likelihood &times; impact matrix. Not generic CVSS.</p>
         </div>
         <div class="vens-card">
           <h3 class="vens-card__t">Works with Trivy and Grype</h3>
@@ -151,7 +151,7 @@
         </div>
         <div class="vens-card">
           <h3 class="vens-card__t">Backed by a benchmark</h3>
-          <p class="vens-card__d">We measured 12 LLMs on this exact job. <a href="{{ 'blog/which-llm-should-score-your-cves/' | url }}">Pick a model on evidence.</a></p>
+          <p class="vens-card__d">We measured 12 LLMs on contextual CVE scoring. <a href="{{ 'blog/which-llm-should-score-your-cves/' | url }}">Pick a model on evidence.</a></p>
         </div>
       </div>
     </div>

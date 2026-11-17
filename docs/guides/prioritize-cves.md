@@ -64,15 +64,21 @@ context:
   compliance_requirements:
     - "PCI-DSS"
     - "GDPR"
+  listener: "present"
+  data_subjects: "millions"          # card holders
+  detection:
+    network: "logged_and_reviewed"   # WAF and ALB logs, alerting on-call
+    host: "logged"
+    application: "logged_and_reviewed"
+  traceability: "per_individual"     # every action logged with the user's id
   controls:
     waf: true
     ddos_protection: true
     segmentation: true
-    siem: true
   notes: "Behind AWS ALB, WAF with OWASP ruleset, deployed across 3 AZs"
 ```
 
-This file lives in your repo. You write it **once**, version it with the service, and re-use it on every scan. See [Describe your context](configuration.md) for every field.
+This file lives in your repo. You write it **once**, version it with the service, and re-use it on every scan. Declare `data_subjects`, `detection` and `traceability` for what is in place: each one left out takes its worst case on every finding. See [Describe your context](configuration.md) for every field.
 
 ---
 
@@ -90,7 +96,7 @@ vens generate \
 
 `--sbom-serial-number` is required — pass the `serialNumber` of the CycloneDX SBOM paired with this scan so each `affects` in the VEX resolves back to that SBOM via BOM-Link.
 
-Runtime: ~1 minute for 300 CVEs with `gpt-5.4-mini`.
+Runtime grows with the number of distinct CVEs: each batch of 10 makes one call per question, up to 12, and the run summary counts every call.
 
 ---
 
@@ -103,33 +109,35 @@ jq '[.vulnerabilities[] | {
        severity: .ratings[0].severity,
        vector: .ratings[0].vector
      }]
-    | sort_by(-.score)
+    | sort_by({"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}[.severity], -.score)
     | .[0:10]' output.vex.json
 ```
 
-Example output:
+Sort by severity first: it comes from OWASP's matrix, not from the score, so a `high` can score below a `medium`. The score sorts CVEs within a severity.
+
+Example output (illustrative):
 
 ```json
 [
   {
     "id": "CVE-XXXX-YYYY",
-    "score": 67.5,
+    "score": 70.125,
     "severity": "critical",
-    "vector": "SL:8/M:8/O:8/S:8/ED:7/EE:7/A:7/ID:7/LC:9/LI:9/LAV:9/LAC:9/FD:9/RD:9/NC:9/PV:9"
+    "vector": "SL:9/M:9/O:9/S:9/ED:9/EE:9/A:9/ID:3/LC:9/LI:9/LAV:7/LAC:9/FD:7/RD:9/NC:7/PV:9"
   },
   {
-    "id": "CVE-2025-4477",
-    "score": 56,
+    "id": "CVE-XXXX-ZZZZ",
+    "score": 33.125,
     "severity": "high",
-    "vector": "SL:7/M:7/O:7/S:7/ED:7/EE:7/A:7/ID:7/LC:8/LI:8/LAV:8/LAC:8/FD:8/RD:8/NC:8/PV:8"
+    "vector": "SL:9/M:4/O:7/S:9/ED:9/EE:3/A:9/ID:3/LC:7/LI:1/LAV:1/LAC:1/FD:3/RD:5/NC:5/PV:7"
   }
 ]
 ```
 
-**These are the CVEs you patch first.** Everything in the low and info bands can be deferred or suppressed.
+**These are the CVEs you patch first.** Everything in the low band can be deferred or suppressed.
 
 !!! tip "Where is the reasoning?"
-    Vens prints the LLM's per-CVE reasoning to stderr as it runs, and dumps every prompt and response to disk if you pass `--debug-dir ./debug`. The reasoning is intentionally not embedded in the VEX file — VEX stays a pure CycloneDX document. Use `--debug-dir` for audits.
+    Pass `--attest` for a sidecar whose claims hold, per CVE, one line per question answered, or `--debug-dir ./debug` to dump every prompt and response to disk, with `answers.json`. The reasoning is intentionally not embedded in the VEX file — VEX stays a pure CycloneDX document.
 
 ---
 
@@ -147,7 +155,7 @@ vens enrich --vex output.vex.json --output enriched-report.json report.json
 jq '.Results[]?.Vulnerabilities[]? | {VulnerabilityID, Severity, owasp_severity: .Custom.owasp_severity, owasp_score: .Custom.owasp_score}' enriched-report.json
 ```
 
-`Severity` and the CVSS block stay exactly as Trivy wrote them, so read `Custom.owasp_severity` in whatever consumes the JSON next. Reach for the raw `Custom.owasp_score` only when you need the number itself — it lives on vens's internal 0–81 scale and its mapping may change.
+`Severity` and the CVSS block stay exactly as Trivy wrote them, so read `Custom.owasp_severity` in whatever consumes the JSON next. Reach for the raw `Custom.owasp_score` only when you need the number itself — it is likelihood × impact on a 0–81 scale, a vens extension, and the severity does not come from it.
 
 !!! note "From v0.6.0"
     `owasp_severity` is written from v0.6.0 on. v0.5.0 and earlier don't emit it.
@@ -185,8 +193,8 @@ For a turnkey Action, see [GitHub Actions integration](github-actions.md). The m
 
 - name: Fail on high contextual risk
   run: |
-    # Gate on the band, it's the field vens commits to for gates and the one
-    # vens-action's fail-on-severity reads; re-check the threshold when venslabs/vens#310 ships.
+    # Gate on the severity: it's the field vens commits to for gates and the one
+    # vens-action's fail-on-severity reads. It comes from OWASP's matrix and is never info.
     HIGH_COUNT=$(jq '[.vulnerabilities[] | select(any(.ratings[]?; .method == "OWASP" and (.severity | IN("high", "critical"))))] | length' vex.json)
     if [ "$HIGH_COUNT" -gt 0 ]; then
       echo "::error::$HIGH_COUNT CVEs above contextual threshold"
