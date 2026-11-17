@@ -149,7 +149,7 @@ func TestGenerator_TruncatedCallSplitsThenAsksAgainForAnUnreadableHalf(t *testin
 			assert.Equal(t, int64(1), summary.attrs["defects.reply_unreadable"])
 			warned := logs.find(slog.LevelWarn, askAgainWarning)
 			require.Len(t, warned, 1)
-			assert.Equal(t, map[string]any{"question": "M", "skipped": int64(2), "of": int64(4), "vulns": strings.Join(tc.again, ",")},
+			assert.Equal(t, map[string]any{"question": "M", "unanswered": int64(2), "of": int64(4), "vulns": strings.Join(tc.again, ",")},
 				warned[0].attrs)
 		})
 	}
