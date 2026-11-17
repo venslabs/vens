@@ -236,7 +236,7 @@ controls:
 ```
 
 !!! warning
-    Only set controls to `true` when they are actually operational. The Ease of exploit question shows each control set to `true` as in place, so one you don't run can lower the ratings.
+    Only set controls to `true` when they are actually operational. For the five controls the Ease of exploit question shows (`waf`, `ddos_protection`, `segmentation`, `zero_trust`, `antivirus`), claiming one as present when it is absent can lower ratings through the model's answer.
 
 ### `context.notes`
 

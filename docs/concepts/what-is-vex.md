@@ -49,7 +49,7 @@ Vens does **not** set a CycloneDX `analysis` block (`state`, `justification`, `d
 - **Grype** — `grype ... --vex vex.json`
 - **Dependency-Track** — ingests the file directly.
 - **Your own scripts / dashboards** — via `jq` on `ratings[0].severity`, then `ratings[0].score` (see the [quickstart](../getting-started/quickstart.md#step-5-sort-by-severity-then-score)).
-- **Any CI pipeline** — filter the VEX to fail the build only when there is real contextual risk.
+- **Any CI pipeline** — apply your CI policy to vens's computed ratings, for example by filtering the VEX on `ratings[0].severity`.
 
 ---
 

@@ -175,7 +175,7 @@ controls:
   zero_trust: false      # Zero-trust architecture
 ```
 
-**Only set `true` for controls that are actually active in production.** The Ease of exploit question shows each control set to `true` with its documented scope, and the model judges whether it stands in the way of this exploit in this deployment. vens applies no fixed reduction. Lying here produces false confidence.
+**Only set `true` for controls that are actually active in production.** The Ease of exploit question shows each of the five controls the Ease of exploit question shows (`waf`, `ddos_protection`, `segmentation`, `zero_trust`, `antivirus`) set to `true`, with its documented scope, and the model judges whether it stands in the way of this exploit in this deployment. vens applies no fixed reduction. Lying here produces false confidence.
 
 `ids`, `siem` and `edr` still load but move no score and are not sent: declare [`detection`](#detection-what-records-an-attack-attempt-channel-by-channel) instead.
 
@@ -245,7 +245,7 @@ context:
 
 ❌ **Copy-pasting the same config everywhere.** Your dev API and your prod checkout service should not have the same context. Different criticality → different scores.
 
-❌ **Setting all controls to `true` "just in case".** The Ease of exploit question shows each of them as in place, so the model judges exploits against controls you do not run, which can lower the ratings.
+❌ **Setting all controls to `true` "just in case".** For the five controls the Ease of exploit question shows (`waf`, `ddos_protection`, `segmentation`, `zero_trust`, `antivirus`), claiming one as present when it is absent can lower ratings through the model's answer.
 
 ❌ **Declaring what is required instead of what is in place.** `traceability` and `detection` describe what records an attack today. A policy that requires per-user audit logs, or a SIEM bought last quarter, does not make this service's attempts recorded and reviewed. vens applies these fields exactly as declared, and the model never sees them to object.
 

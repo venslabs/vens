@@ -68,7 +68,7 @@ A question is asked only when the factor's contract requires it: at most 12 ques
 | Opportunity (O) | likelihood | answer | the access or resources an exploit needs; shows the CVSS AV, AT, PR and UI metrics |
 | Size (S) | likelihood | set by vens | `exposure`: `internal` 4, `private` 6, `internet` 9 |
 | Ease of discovery (ED) | likelihood | set by vens | always 9 |
-| Ease of exploit (EE) | likelihood | answer | how easy the exploit is here; shows the CVSS AC, AT, PR and UI metrics and the controls set to `true` |
+| Ease of exploit (EE) | likelihood | answer | how easy the exploit is here; shows the CVSS AC, AT, PR and UI metrics and the five shown controls set to `true` |
 | Awareness (A) | likelihood | set by vens | always 9 |
 | Intrusion detection (ID) | likelihood | answer and `detection` | the lowest declared level among the channels the model picks; 9 when `detection` is left out |
 | Loss of confidentiality (LC) | technical impact | answer and `data_sensitivity` | how much data an exploit could read, crossed with the sensitivity; 2 when the CVSS vectors floor it |
@@ -173,7 +173,7 @@ A generic 5.3 can come out `high` or `critical`, which moves the CVE from deep i
 
 ⚠️ Generic or sparse `config.yaml` → the questions get generic answers
 ⚠️ Fields left out → their fallback: Intrusion detection 9 and Loss of accountability's `none` column on every finding, no cap on Privacy violation; the run summary counts them
-⚠️ Controls set to `true` that you do not run → Ease of exploit is judged against them, which can lower ratings on a false premise
+⚠️ For the five controls the Ease of exploit question shows (`waf`, `ddos_protection`, `segmentation`, `zero_trust`, `antivirus`), claiming one as present when it is absent can lower ratings through the model's answer
 ⚠️ The LLM has no information about a very recent CVE (< 2 weeks) → its answers rest on the description alone, and `cannot_tell` takes the worst case
 ⚠️ Deeply custom internal CVEs → the LLM may not know the specifics; review manually
 
