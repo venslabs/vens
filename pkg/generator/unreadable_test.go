@@ -16,6 +16,7 @@ package generator
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"strings"
 	"testing"
@@ -23,11 +24,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/venslabs/vens/pkg/contract"
+	"github.com/venslabs/vens/pkg/llm"
 	"github.com/venslabs/vens/pkg/outputhandler"
 )
 
 const (
 	unreadableWarning = "Unreadable reply; the vulnerabilities it leaves without an answer count as left out"
+	askAgainWarning   = "No readable answer for vulnerabilities; asking again for those alone"
 	// highReward answers Motive for CVE-2024-0000 with a level the fake's
 	// default answer, low_or_no_reward, does not give: an M of 9 says which
 	// reply answered.
@@ -87,6 +90,67 @@ func TestGenerator_UnreadableReplyIsAskedAgain(t *testing.T) {
 			warned := logs.find(slog.LevelWarn, unreadableWarning)
 			require.Len(t, warned, 1)
 			assert.Equal(t, map[string]any{"question": "M", "error": tc.why, "reply": tc.reply}, warned[0].attrs)
+		})
+	}
+}
+
+// A call the provider truncates is still split in half. A half whose reply is
+// cut short with no flag from the provider is not split again: its CVEs are
+// asked again once, together, and the other half's answers are kept. The
+// halves answer high_reward, an M of 9, and the ask-again the fake's default,
+// an M of 1.
+func TestGenerator_TruncatedCallSplitsThenAsksAgainForAnUnreadableHalf(t *testing.T) {
+	all := []string{"CVE-2024-0000", "CVE-2024-0001", "CVE-2024-0002", "CVE-2024-0003"}
+	first, second := all[:2], all[2:]
+	for name, tc := range map[string]struct {
+		cut         int
+		again, kept []string
+	}{
+		"first half unreadable":  {2, first, second},
+		"second half unreadable": {3, second, first},
+	} {
+		t.Run(name, func(t *testing.T) {
+			logs := withCapturedLogs(t)
+			m := &fakeLLM{
+				fail: func(c fakeCall) error {
+					if c.n == 1 {
+						return fmt.Errorf("mock truncated: %w", llm.ErrTruncated)
+					}
+					return nil
+				},
+				reply: func(c fakeCall) (string, bool) { return `{"answers":[{"vulnId":"CVE-2024-00`, c.n == tc.cut },
+				answer: func(c fakeCall, _ string) any {
+					if c.factor == contract.M && c.n <= 3 {
+						return "high_reward"
+					}
+					return nil
+				},
+			}
+			g := newGen(t, Opts{LLM: m})
+			var emitted []outputhandler.VulnRating
+			require.NoError(t, g.GenerateRiskScore(context.Background(), testVulns(4), collect(&emitted)))
+
+			var asked [][]string
+			for _, c := range m.of(contract.M) {
+				asked = append(asked, c.ids)
+			}
+			assert.Equal(t, [][]string{all, first, second, tc.again}, asked, "the call, its halves, then one ask-again")
+			got := byID(emitted)
+			for _, id := range tc.kept {
+				assert.Equal(t, 9, vectorLevel(t, got[id].Rating.Vector, "M"), "%s keeps its half's answer", id)
+			}
+			for _, id := range tc.again {
+				assert.Equal(t, 1, vectorLevel(t, got[id].Rating.Vector, "M"), "%s answered when asked again", id)
+			}
+
+			summary := runSummary(t, logs)
+			assert.Equal(t, int64(1), summary.attrs["splits"])
+			assert.Equal(t, int64(1), summary.attrs["asked_again"])
+			assert.Equal(t, int64(1), summary.attrs["defects.reply_unreadable"])
+			warned := logs.find(slog.LevelWarn, askAgainWarning)
+			require.Len(t, warned, 1)
+			assert.Equal(t, map[string]any{"question": "M", "skipped": int64(2), "of": int64(4), "vulns": strings.Join(tc.again, ",")},
+				warned[0].attrs)
 		})
 	}
 }
