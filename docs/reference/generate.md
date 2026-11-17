@@ -316,7 +316,7 @@ BOM-Link `version` number used alongside `--sbom-serial-number`. Default: `1`.
 
 ## The run summary
 
-Each run ends with one `INFO` line, `Scoring run finished`, also when it fails:
+A run that reaches scoring ends with one `INFO` line, `Scoring run finished`, also when it fails during scoring:
 
 ```text
 level=INFO msg="Scoring run finished" rows=107 cves=45 llm_calls=61 asked_again=0 splits=0 calls.M=5 calls.O=5 ... calls.adjustment=6 counters.applicability_missing=5 counters.data_subjects_missing=25 counters.detection_undeclared=45 counters.traceability_missing=45 failed=false
@@ -326,13 +326,15 @@ level=INFO msg="Scoring run finished" rows=107 cves=45 llm_calls=61 asked_again=
 - `llm_calls`, `asked_again`, `splits` — every call made, the calls that asked again for CVEs a reply left out, and the calls split in half after the provider truncated them.
 - `calls.<factor>` — the calls of each question (`M`, `O`, `EE`, `ID`, `LC`, `LI`, `LAV`, `LAC`, `FD`, `RD`, `NC`, `PV`), and `calls.adjustment`. A question no CVE needs makes no call.
 - `counters.*` — one per CVE that used a fallback, shown when not zero:
-    - `<factor>_cannot_tell` (`motive_cannot_tell`, `opportunity_cannot_tell`, `ease_of_exploit_cannot_tell`, `intrusion_detection_cannot_tell`, `confidentiality_cannot_tell`, `integrity_cannot_tell`, `availability_cannot_tell`, `accountability_cannot_tell`, `financial_damage_cannot_tell`, `reputation_cannot_tell`, `non_compliance_cannot_tell`, `privacy_cannot_tell`) — the answer read as `cannot_tell`, or an answer off its list, so the factor took its worst case. A CVE with no description counts in `motive_cannot_tell`, `opportunity_cannot_tell` and `ease_of_exploit_cannot_tell`, whatever the model answered.
+    - `<factor>_cannot_tell` (`motive_cannot_tell`, `opportunity_cannot_tell`, `ease_of_exploit_cannot_tell`, `intrusion_detection_cannot_tell`, `confidentiality_cannot_tell`, `integrity_cannot_tell`, `availability_cannot_tell`, `accountability_cannot_tell`, `financial_damage_cannot_tell`, `reputation_cannot_tell`, `non_compliance_cannot_tell`, `privacy_cannot_tell`) — the answer read as `cannot_tell`, or an answer off its list, so the question's worst answer applied. That is the factor's worst level, except where a rule still limits it: Intrusion detection takes the worst channel `detection` declares, `data_subjects` caps Privacy violation, and a flagged CVE's adjustment can lower Opportunity, a loss or Privacy violation. A CVE with no description counts in `motive_cannot_tell`, `opportunity_cannot_tell` and `ease_of_exploit_cannot_tell`, whatever the model answered.
     - `detection_undeclared`, `traceability_missing`, `data_subjects_missing` — the fallback of a field left out of `config.yaml`.
     - `applicability_missing` — the CVE's CVSS vectors left an axis undecided, so its loss was asked instead of floored.
     - `severity_contested_unavailable` — no record in the report to check the CVE's severity against NVD's, so a contested severity could not be flagged.
     - `reasoning_missing` — a reply gave no reasoning for one of the CVE's answers; the answer is kept.
 - `defects.*` — replies that break the schema or the instructions, counted by kind: `answer_off_list`, `answer_key_written_twice`, `answer_without_reasoning`, `answer_cve_not_asked`, `answer_cve_repeated`, and for the adjustment `adjustment_unreadable`, `adjustment_key_written_twice`, `adjustment_off_list`, `adjustment_field_not_asked`, `adjustment_without_reasoning`. A provider that honours the schema and the prompt writes none.
 - `failed` — whether the run failed.
+
+A run that stops before scoring starts logs no summary, such as one whose config fails to load or fails `--strict`'s config check; a report with no vulnerabilities logs none either.
 
 `--debug-dir` writes the same counters, per CVE, to `answers.json`.
 

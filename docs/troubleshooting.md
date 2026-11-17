@@ -135,9 +135,9 @@ See **[`--strict`](reference/generate.md#-strict)**.
 
 ## What the counters in the run summary mean
 
-Every run ends with a `Scoring run finished` line. Its `counters.*` count, per CVE, each worst-case fallback the run used:
+A run that reaches scoring ends with a `Scoring run finished` line, also when it fails during scoring. Its `counters.*` count, per CVE, each fallback the run used:
 
-- `<factor>_cannot_tell` (such as `privacy_cannot_tell`) — the model answered `cannot_tell`, or off its list, so the factor took its worst case. A CVE with no description counts in `motive_cannot_tell`, `opportunity_cannot_tell` and `ease_of_exploit_cannot_tell`.
+- `<factor>_cannot_tell` (such as `privacy_cannot_tell`) — the model answered `cannot_tell`, or off its list, so the question's worst answer applied: the factor's worst level, unless `detection` or `data_subjects` limits it or a flagged CVE's adjustment lowers it. A CVE with no description counts in `motive_cannot_tell`, `opportunity_cannot_tell` and `ease_of_exploit_cannot_tell`.
 - `detection_undeclared`, `traceability_missing`, `data_subjects_missing` — a field left out of `config.yaml`. Declare it.
 - `applicability_missing` — the CVE's CVSS vectors could not rule out a loss, so the loss was asked instead of floored.
 
@@ -225,7 +225,7 @@ Vens processes CVEs in batches (default 10, tunable via `--llm-batch-size`), one
 - **Network error / provider outage mid-run** → same behaviour: exit non-zero, no partial VEX.
 - **The provider truncates a call** → Vens asks each half of its CVEs on its own, down to a single CVE.
 - **The LLM leaves CVEs out of its answer** → Vens asks for them again, together, in one more call. If one is still missing, the run stops there, names the question and the missing CVEs and writes no VEX.
-- **The LLM answers `cannot_tell`, or off the list** → Vens uses the factor's worst case and counts it in the run summary; under `--strict` the run stops instead.
+- **The LLM answers `cannot_tell`, or off the list** → Vens uses the question's worst answer and counts it in the run summary; under `--strict` the run stops instead.
 - **An adjustment reply cannot be read** → the CVE keeps the levels its questions gave; the run summary counts it under `defects`.
 
 For CI pipelines, this means you should either:
