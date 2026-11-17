@@ -26,6 +26,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/venslabs/vens/pkg/attestation"
 	"github.com/venslabs/vens/pkg/contract"
+	"github.com/venslabs/vens/pkg/cvss"
 	"github.com/venslabs/vens/pkg/outputhandler"
 )
 
@@ -278,6 +279,50 @@ func TestGenerator_AdjustmentClaimShowsAnAnswerOffItsListOnOneLine(t *testing.T)
 	answers, _ := readAnswers(t, parent)
 	assert.Equal(t, "O", answers.Vulnerabilities[0].Factors[2].Factor)
 	assert.Equal(t, "bad\nO (full_access_or_expensive_resources_required): forged", answers.Vulnerabilities[0].Factors[2].Adjusted)
+}
+
+// A field the adjustment did not ask, an axis the vectors floored or a key of
+// the reply's own, is ignored and counted, logged at WARN; the claim shows the
+// fields asked.
+func TestGenerator_AdjustmentFieldNotAskedIsIgnored(t *testing.T) {
+	const reply = `{"reasoning":"r","opportunity":"keep","confidentiality":"not_affected",` +
+		`"integrity":"affected","availability":"affected","notes":"n"}`
+	logs := withCapturedLogs(t)
+	at := attestation.NewBuilder(attestation.Opts{Provider: "mock", Model: "mock"})
+	m := &fakeLLM{reply: func(c fakeCall) (string, bool) { return reply, c.adjustment() }}
+	g := newGen(t, Opts{LLM: m})
+	g.SetAttestor(at)
+	v := disputedRow(testVulns(1)[0])
+	v.CVSS = []cvss.Vector{v31("nvd", "AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:H")}
+	var emitted []outputhandler.VulnRating
+	require.NoError(t, g.GenerateRiskScore(context.Background(), []Vulnerability{v}, collect(&emitted)))
+
+	warned := map[string]any{}
+	for _, r := range logs.find(slog.LevelWarn, "Adjustment reply gives a field the call did not ask; ignoring it") {
+		assert.Equal(t, v.VulnID, r.attrs["vuln"])
+		warned[r.attrs["field"].(string)] = r.attrs["answer"]
+	}
+	assert.Equal(t, map[string]any{"confidentiality": `"not_affected"`, "notes": `"n"`}, warned)
+	assert.Equal(t, int64(2), runSummary(t, logs).attrs["defects.adjustment_field_not_asked"])
+	lines := strings.Split(claims(t, at)[0].Reasoning, "\n")
+	assert.Equal(t, "adjustment (opportunity: keep, integrity: affected, availability: affected): r", lines[len(lines)-1])
+}
+
+// The warning about a field the adjustment did not ask quotes at most
+// loggedLimit characters of its name and of its answer, both the model's text.
+func TestGenerator_AdjustmentFieldNotAskedWarningIsCapped(t *testing.T) {
+	long := strings.Repeat("é", 2*loggedLimit)
+	reply := `{"reasoning":"r","opportunity":"keep","confidentiality":"affected",` +
+		`"integrity":"affected","availability":"affected","` + long + `":"` + long + `"}`
+	logs := withCapturedLogs(t)
+	m := &fakeLLM{reply: func(c fakeCall) (string, bool) { return reply, c.adjustment() }}
+	g := newGen(t, Opts{LLM: m})
+	require.NoError(t, g.GenerateRiskScore(context.Background(), []Vulnerability{disputedRow(testVulns(1)[0])}, nil))
+
+	warned := logs.find(slog.LevelWarn, "Adjustment reply gives a field the call did not ask; ignoring it")
+	require.Len(t, warned, 1)
+	assert.Equal(t, strings.Repeat("é", loggedLimit)+"…", warned[0].attrs["field"])
+	assert.Equal(t, `"`+strings.Repeat("é", loggedLimit-1)+"…", warned[0].attrs["answer"])
 }
 
 // The adjustment shows as its baseline the answer Go kept: an ordinary

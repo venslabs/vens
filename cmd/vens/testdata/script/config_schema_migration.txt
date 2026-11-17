@@ -13,8 +13,22 @@ stderr 'Read https://venslabs.github.io/vens/reference/config-schema/#migrating,
 stderr 'schema_version 1 is not supported: this vens reads schema 2 only. Read https://venslabs.github.io/vens/reference/config-schema/#migrating, then set `schema_version: 2`.'
 ! exists out.cdx.json
 
-# The old config with the marker added and the four new fields declared loads.
+# The old config with only the marker added loads, with one warning per field
+# it leaves undeclared, saying what its worst case does: audit_requirement
+# stands in for no traceability, nor the ids control for detection.
+exec vens generate --llm=mock --config-file=marked.yaml --sbom-serial-number=urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79 report.json out.cdx.json
+stderr 'level=WARN msg="context.audit_requirement no longer moves any score, and context.traceability is not declared: Loss of accountability uses its `none` column, 7 when the attacker must authenticate and cannot act as someone else or tamper with the records, 9 otherwise."'
+stderr 'level=WARN msg="controls ids/siem/edr give no detection credit, and context.detection is not declared: every channel counts as not logged, so Intrusion detection is 9 on every finding."'
+stderr 'level=WARN msg="context.data_subjects is not declared: Privacy violation has no cap, so the model''s band stands wherever Privacy violation is asked."'
+! stderr '(?s)(level=WARN.*){4}msg="Config loaded"'
+stderr 'msg="Config loaded" schema_version=2 .* listener=unknown undeclared=context.data_subjects,context.detection,context.traceability$'
+exists out.cdx.json
+
+# The old config with the marker added and the four new fields declared loads
+# with no warning. (The empty report's own warning comes after the load.)
 exec vens generate --llm=mock --config-file=migrated.yaml --sbom-serial-number=urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79 report.json out.cdx.json
+! stderr '(?s)level=WARN.*msg="Config loaded"'
+stderr 'msg="Config loaded" schema_version=2 .* listener=present undeclared=""$'
 exists out.cdx.json
 
 -- old.yaml --
@@ -36,6 +50,18 @@ context:
   exposure: "internet"
   data_sensitivity: "high"
   business_criticality: "critical"
+-- marked.yaml --
+schema_version: 2
+project:
+  name: "old-config"
+context:
+  exposure: "internet"
+  data_sensitivity: "high"
+  business_criticality: "critical"
+  audit_requirement: "high"
+  controls:
+    waf: true
+    ids: true
 -- migrated.yaml --
 schema_version: 2
 project:

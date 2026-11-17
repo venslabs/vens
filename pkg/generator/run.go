@@ -41,8 +41,9 @@ type scoringRun struct {
 }
 
 // The defects reading a reply can find, which a provider honouring the
-// schema and the prompt does not write. Each is counted once per answer,
-// entry or adjustment reply that has it.
+// schema and the prompt does not write. A question's are counted once per
+// entry that has one; an adjustment's once per reply, but those of a field,
+// adjustment_off_list and adjustment_field_not_asked, once per field.
 const (
 	// An answer off its question's list, read as cannot_tell.
 	defectAnswerOffList = "answer_off_list"
@@ -62,6 +63,8 @@ const (
 	// A field the adjustment asked, left out or off its list: its baseline
 	// stands.
 	defectAdjustmentOffList = "adjustment_off_list"
+	// A field the adjustment did not ask, ignored.
+	defectAdjustmentNotAsked = "adjustment_field_not_asked"
 	// An adjustment reply without reasoning, or with one blank or no JSON
 	// string, its fields kept.
 	defectAdjustmentNoReasoning = "adjustment_without_reasoning"
