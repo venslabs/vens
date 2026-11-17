@@ -129,9 +129,8 @@ func New(o Opts) (*Generator, error) {
 		return nil, fmt.Errorf("config: %w", err)
 	}
 	if o.Strict {
-		if undeclared := o.Config.Undeclared(); len(undeclared) > 0 {
-			return nil, fmt.Errorf("strict: %s not declared, so each would fall back to its worst case",
-				strings.Join(undeclared, ", "))
+		if err := CheckStrictConfig(o.Config); err != nil {
+			return nil, err
 		}
 	}
 	if o.BatchSize == 0 {

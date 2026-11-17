@@ -10,6 +10,17 @@ stderr 'strict: context.data_subjects, context.detection, context.traceability n
 ! stderr 'missing-report'
 ! exists out.cdx.json
 
+# The refusal also comes before the provider is set up: with no API key, a
+# strict run still names the undeclared fields, where a run that is not
+# strict stops at the missing key.
+env OPENAI_API_KEY=
+! exec vens generate --strict --llm=openai --config-file=undeclared.yaml --sbom-serial-number=urn:uuid:22222222-2222-2222-2222-222222222222 missing-report.json out.cdx.json
+stderr 'strict: context.data_subjects, context.detection, context.traceability not declared'
+! stderr 'OPENAI_API_KEY'
+! exec vens generate --llm=openai --config-file=undeclared.yaml --sbom-serial-number=urn:uuid:22222222-2222-2222-2222-222222222222 missing-report.json out.cdx.json
+stderr 'openai: OPENAI_API_KEY is not set'
+! stderr 'strict:'
+
 # Before any LLM call, a strict run refuses every CVE whose vectors leave an
 # axis unknown, whatever the cause, and every CVE no row describes. One error
 # names each; CVE-2024-0007, complete, is not named.

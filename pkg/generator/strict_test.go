@@ -56,6 +56,10 @@ func TestNew_StrictRefusesUndeclaredFields(t *testing.T) {
 	require.NoError(t, err)
 	_, err = New(Opts{LLM: &fakeLLM{}, Config: testConfig()})
 	require.NoError(t, err, "a run that is not strict takes the worst cases, counted")
+
+	// The same check, for a command to run as soon as the config loads.
+	require.EqualError(t, CheckStrictConfig(cfg), "strict: context.detection not declared, so each would fall back to its worst case")
+	require.NoError(t, CheckStrictConfig(strictConfig()))
 }
 
 // Before any call, a strict run refuses every CVE whose vectors leave an

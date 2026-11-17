@@ -144,6 +144,17 @@ func action(cmd *cobra.Command, args []string) error {
 	for _, w := range cfg.Warnings() {
 		slog.WarnContext(ctx, w)
 	}
+	strict, err := flags.GetBool("strict")
+	if err != nil {
+		return err
+	}
+	// Refused at load, before any provider is set up: a missing API key must
+	// not come first.
+	if strict {
+		if err := generator.CheckStrictConfig(cfg); err != nil {
+			return err
+		}
+	}
 
 	slog.InfoContext(ctx, "Config loaded",
 		"schema_version", cfg.SchemaVersion,
@@ -157,6 +168,7 @@ func action(cmd *cobra.Command, args []string) error {
 
 	var o generator.Opts
 	o.Config = cfg
+	o.Strict = strict
 
 	llmName, err := flags.GetString("llm")
 	if err != nil {
@@ -187,10 +199,6 @@ func action(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	o.DebugDir, err = flags.GetString("debug-dir")
-	if err != nil {
-		return err
-	}
-	o.Strict, err = flags.GetBool("strict")
 	if err != nil {
 		return err
 	}

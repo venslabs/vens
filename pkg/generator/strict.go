@@ -19,7 +19,20 @@ import (
 	"strings"
 
 	"github.com/venslabs/vens/pkg/contract"
+	"github.com/venslabs/vens/pkg/riskconfig"
 )
+
+// CheckStrictConfig refuses a config a strict run cannot take: one leaving
+// data_subjects, detection or traceability undeclared, each of which would
+// fall back to its worst case. New runs it for a strict run; a command can
+// run it as soon as the config loads, before setting up a provider.
+func CheckStrictConfig(cfg *riskconfig.Config) error {
+	if undeclared := cfg.Undeclared(); len(undeclared) > 0 {
+		return fmt.Errorf("strict: %s not declared, so each would fall back to its worst case",
+			strings.Join(undeclared, ", "))
+	}
+	return nil
+}
 
 // preflight is a strict run's check before any call. A CVE whose vectors
 // leave an axis's Applicability unknown keeps that axis applicable, and the
