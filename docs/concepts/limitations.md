@@ -9,12 +9,12 @@ Vens is a pragmatic prioritization tool, not a certification or a deterministic 
 
 ## 1. Scores are not byte-reproducible across runs
 
-Even at `--llm-temperature 0.0` and with `--llm-seed`, cloud LLM providers do not expose true deterministic decoding, and provider-side models get silently updated. Expect **±1–3 points of drift on a minority of CVEs** between runs with the same config and model.
+Even at `--llm-temperature 0.0` and with `--llm-seed`, cloud LLM providers do not expose true deterministic decoding, and provider-side models get silently updated. Between runs with the same config and model, an answer can change: its factor's level moves, the score with it, and the severity when the likelihood or the impact crosses a band boundary. vens does not promise a drift figure.
 
 Mitigations Vens applies:
 
-- Final OWASP score is computed in Go from the LLM's four 0–9 component scores, so small drift averages out.
-- Same prompt, same schema, same ordering on every run.
+- The model never gives a number. It picks a named answer from a closed list for each question, and vens computes every level, the severity and the score in Go: the same answers always give the same rating.
+- Same prompts, same schemas, same question order on every run.
 
 If you need strict reproducibility for audit evidence at a point in time, pin a local Ollama model tag (model tags are immutable on disk), pass `--llm-temperature 0 --llm-seed <n>`, and archive `--debug-dir` output alongside the VEX. Together they give you a byte-exact record.
 
@@ -25,6 +25,8 @@ You can also pass [`--attest`](../reference/generate.md#-attest) to write a CDXA
 ## 2. Benchmarked for model choice, not calibrated to your outcomes
 
 There is now a public benchmark, [vens-benchmark](https://github.com/venslabs/vens-benchmark), measuring how 12 LLMs do the vens scoring task: predicting a CVE's severity and reacting when the context changes. It is what backs the model advice in [Choosing a model](choosing-a-model.md) and the [writeup](../blog/posts/which-llm-should-score-your-cves.md).
+
+The benchmark ran the scoring of earlier versions, where the model returned four numbers per CVE. It has not been rerun on the closed questions of v0.7.0, so its figures describe the models, not the current rating.
 
 What it does **not** give you is a calibration study proving Vens' priorities match expert human judgment on your systems. It tells you which model to run, not "Vens agreed with a human N% of the time" on your backlog. Treat Vens scores as a **ranking aid over CVSS alone**, not a certified risk assessment.
 
@@ -46,6 +48,8 @@ How to use it responsibly:
 
 then the LLM has no way of knowing, and the scores will silently reflect your bad data. There is no automated validation of your claims. This is by design (Vens cannot inspect your production), but it is a limitation you should mitigate with [governance](../guides/configuration.md#governing-your-context-file).
 
+`data_subjects`, `detection` and `traceability` go further: vens applies them exactly as declared, without showing them to the model, so nothing questions them. Declaring `detection` as `logged_and_reviewed` where nobody reviews the logs lowers Intrusion detection on every finding. The attestation records only a hash of `config.yaml`, and it is not signed.
+
 Quality also depends on the model you run. A weak model produces weak scores even with perfect context, and the [benchmark](https://github.com/venslabs/vens-benchmark) shows the spread between models is large. See [Choosing a model](choosing-a-model.md) for the ones that hold up.
 
 ---
@@ -63,7 +67,7 @@ If you need a justification record (for audit), use `--debug-dir`, or pass [`--a
 
 ## 5. Vens sends data to third-party LLM providers (unless you use Ollama)
 
-When you pick OpenAI, Anthropic or Google AI, every batch of CVEs — with title, description, package metadata, and your full `config.yaml` context including the `notes` field — is transmitted to that provider. Vens does not filter, redact, or negotiate data handling terms on your behalf.
+When you pick OpenAI, Anthropic or Google AI, every call sends that provider a batch of CVEs — with title, description, package metadata — and the parts of your `config.yaml` the questions show, including the `notes` field. Vens does not filter, redact, or negotiate data handling terms on your behalf.
 
 See [Privacy and data flow](privacy-and-data-flow.md) for the full list of what is sent, and use [Ollama locally](../getting-started/installation.md#configure-an-llm-provider) when this is not acceptable.
 
@@ -77,11 +81,11 @@ Vens itself is an MIT-ish Apache 2.0 Go binary — it holds no data and signs no
 
 ## 7. Local models underperform on this task today
 
-Vens asks the LLM to return structured JSON with four component scores per CVE. Small local models (under ~7B parameters) frequently emit malformed JSON or produce flat, uniform scores regardless of input. Smaller batches (`--llm-batch-size 3–5`) cut down the malformed JSON, but they do not fix the quality gap.
+Vens asks the LLM for structured JSON: for each question, one named answer per CVE from a closed list. Small local models (under ~7B parameters) frequently emit malformed JSON or give the same answer regardless of input. Smaller batches (`--llm-batch-size 3–5`) cut down the malformed JSON, but they do not fix the quality gap.
 
 Larger local models are not a safe fix either: in the [benchmark](https://github.com/venslabs/vens-benchmark), the local models tried through Ollama all scored at or below a constant-guess baseline on the context task. If you need air-gapped **and** high quality, that is a real gap right now.
 
-On cloud, the benchmark-backed picks are `claude-sonnet-4-6` (most accurate and stable) and `gpt-5.4-mini` (best value, run it a few times); `gemini-2.5-flash-lite` is fine only for rough triage. See [Choosing a model](choosing-a-model.md).
+On cloud, the benchmark-backed picks are `claude-sonnet-4-6` (most accurate and stable) and `gpt-5.4-mini` (best value, run it a few times); `gemini-2.5-flash-lite` is fine only for rough triage. These come from the benchmark of the earlier scoring (limitation 2). See [Choosing a model](choosing-a-model.md).
 
 ---
 
@@ -89,19 +93,37 @@ On cloud, the benchmark-backed picks are `claude-sonnet-4-6` (most accurate and 
 
 Vens makes LLM calls and does not know how much they cost. There is no `--max-spend` flag, no per-run budget, no rate-limit other than the provider's. Monitor billing on your provider dashboard, and start with small batches in CI before scaling out.
 
+Since v0.7.0 each batch makes one call per question, so a run makes several calls per batch: on the quickstart example (45 CVEs, batches of 10), 61 calls before any retry, 11 questions in each of 5 batches and 6 adjustments. The run summary counts every call, per question.
+
 ---
 
 ## 9. No reachability analysis
 
 Vens reasons from CVE metadata (id, title, description, package) plus your text-described context. It **does not** inspect your source code, build graph, call graph, or runtime. If a CVE lives in a code path your build never executes, Vens will only know about it if you mention it in `notes` or if the CVE description makes it obvious.
 
+vens has no reachability check of its own. A reachability verdict in `notes` reaches the rating only through the model's answers, chiefly Opportunity and Ease of exploit, and nothing guarantees that the model lowers them. The only floor vens applies itself comes from the CVSS vectors: an axis every vector of the CVE rates as no impact takes its lowest level. Even with Opportunity at 0 and Ease of exploit at 1, the likelihood stays at 4.25 or above (limitation 10), so an unreachable CVE is never published as `info`: it rates through OWASP's matrix like any other, `low` at best with a LOW impact.
+
 For true reachability signals, chain a dedicated tool (Semgrep Code, Snyk Reachability, Endor Labs…) in front of Vens and paste its conclusions into `config.yaml` `notes`. See [Alternatives](alternatives.md).
 
 ---
 
-## 10. Pre-1.0 — API surface may change
+## 10. Likelihood is never LOW, and the severity never `info`
+
+vens sets Skill level, Ease of discovery and Awareness to 9 for every finding: each is a published CVE that a scanner matched. With those three at 9, the likelihood never falls below 4.25, which is MEDIUM. So `info`, OWASP's Note, never occurs, and a `low` severity needs a LOW impact. With `detection` left out, Intrusion detection is 9 and the floor is 5.25.
+
+---
+
+## 11. Impact is the larger of the technical and the business impact
+
+OWASP rates impact on the business impact when the assessor holds good business impact information, and on the technical impact otherwise. vens cannot establish per finding that its business answers are such information: they are a model's reading of your deployment's description. So vens takes the larger of the two, extending to this choice the caution OWASP advises when several attacker groups or business impacts are possible; Dependency-Track's own OWASP severity, on its vulnerability-mirror path, takes the same larger value. A business impact lower than the technical impact never lowers a vens severity. On OWASP's own worked example, vens says High where OWASP says Low. If you hold the business information OWASP asks for, re-rate the four business factors of the vector and apply OWASP's choice.
+
+---
+
+## 12. Pre-1.0 — API surface may change
 
 Vens is under active development and has not reached a 1.0 release yet. The CLI flags and `config.yaml` schema may evolve between minor versions. Pin a specific version in CI (`go install github.com/venslabs/vens/cmd/vens@vX.Y.Z`) and read the release notes before upgrading.
+
+`config.yaml` carries `schema_version`, and vens refuses a file written for another version instead of reading it differently. The version goes up only when a file valid today would change meaning or stop loading; a new optional field whose omission keeps today's behaviour, or a new value in a list, does not raise it. A field no factor reads any more stays in the schema, documented as moving nothing, as `audit_requirement` does. Since unknown keys are refused, an older vens fails on a file that uses a field it does not know, rather than scoring it differently.
 
 ---
 
