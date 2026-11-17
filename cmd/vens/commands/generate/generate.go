@@ -65,10 +65,10 @@ model's band; an axis whose CVSS vectors are missing, unparsable, or lack one of
 one a value off its scale has its loss asked, not floored.
 
 A CVE whose description says it is disputed or not a security issue, or that the report rates low
-while NVD rates it high or critical, is flagged: one more call, the adjustment, may lower its
-Opportunity, an axis's loss and Privacy violation, even below these fallbacks, but not the
-Opportunity of a CVE with no description, which keeps its worst level. The adjustment's
-cannot_tell keeps the baseline: it is not counted and does not fail a --strict run.`,
+while NVD rates it high or critical, is flagged: one more call, the adjustment, when it has a field
+left to ask, may lower its Opportunity, an axis's loss and Privacy violation, even below these
+fallbacks, but not the Opportunity of a CVE with no description, which keeps its worst level. The
+adjustment's cannot_tell keeps the baseline: it is not counted and does not fail a --strict run.`,
 		Example:               Example(),
 		Args:                  cobra.ExactArgs(2),
 		RunE:                  action,
