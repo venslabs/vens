@@ -16,6 +16,8 @@ package generator
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -23,6 +25,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/venslabs/vens/pkg/attestation"
 	"github.com/venslabs/vens/pkg/contract"
 	"github.com/venslabs/vens/pkg/llm"
 	"github.com/venslabs/vens/pkg/outputhandler"
@@ -90,6 +93,49 @@ func TestGenerator_UnreadableReplyIsAskedAgain(t *testing.T) {
 			warned := logs.find(slog.LevelWarn, unreadableWarning)
 			require.Len(t, warned, 1)
 			assert.Equal(t, map[string]any{"question": "M", "error": tc.why, "reply": tc.reply}, warned[0].attrs)
+		})
+	}
+}
+
+// The attestation keeps an unreadable reply as its call's evidence, one entry
+// per call that returned a reply, in call order. A claim cites the calls that
+// answered for its CVE: the ask-again for a CVE the reply left without an
+// answer, the reply itself for an answer Go read in it.
+func TestGenerator_Attestor_UnreadableReplyAskedAgain(t *testing.T) {
+	for name, tc := range map[string]struct {
+		reply string
+		// motive is the call each claim, in claim order, cites for Motive:
+		// 1 the reply, 2 its ask-again.
+		motive []int
+	}{
+		"whole reply unreadable": {`Here are the answers: high_reward for both.`, []int{2, 2}},
+		"one answer unreadable":  {`{"answers":[` + highReward + `,"CVE-2024-0001: high_reward"]}`, []int{1, 2}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			at := attestation.NewBuilder(attestation.Opts{Provider: "mock", Model: "mock"})
+			m := &fakeLLM{reply: replyOnce(tc.reply)}
+			g := newGen(t, Opts{LLM: m})
+			g.SetAttestor(at)
+			require.NoError(t, g.GenerateRiskScore(context.Background(), testVulns(2), nil))
+			require.Equal(t, append([]string{"M"}, questionsUndeclared...), m.log(), "Motive, its ask-again, then each other question")
+
+			evidence := attestedCalls(t, at)
+			require.Len(t, evidence, len(m.calls), "one per call that returned a reply, the unreadable one included")
+			for i, c := range m.calls {
+				sum := sha256.Sum256([]byte(c.req.System + "\n\n" + c.req.Human))
+				assert.Equal(t, hex.EncodeToString(sum[:]), evidence[i].promptHash, "evidence-batch-%d is call %d", i+1, i+1)
+			}
+			assert.Equal(t, tc.reply, evidence[0].rawResponse, "the unreadable reply, as the model wrote it")
+
+			cited := claims(t, at)
+			require.Len(t, cited, len(tc.motive))
+			for i, c := range cited {
+				want := []string{fmt.Sprintf("evidence-batch-%d", tc.motive[i])}
+				for n := 3; n <= len(m.calls); n++ {
+					want = append(want, fmt.Sprintf("evidence-batch-%d", n))
+				}
+				assert.Equal(t, want, c.Evidence, "the claim on %s", c.Target)
+			}
 		})
 	}
 }
