@@ -3,20 +3,20 @@
 **Who this is for:** security engineers staring at a massive CVE report and asking _"which ones do I patch first?"_.
 **By the end of this page:** you have your CVEs ranked by their risk in your context, and the top of the list to review first.
 
-This is the most common use case for Vens.
+This is the main use case for Vens.
 
 ---
 
 ## The problem
 
-A typical Trivy scan of a production image returns 150–500 CVEs. Most of them:
+A Trivy or Grype scan of a production image hands you a long list of CVEs. Some of them may:
 
-- Are not reachable in your runtime
+- Not be reachable in your runtime
 - Exploit features you don't use
-- Are mitigated by your existing controls (WAF, network segmentation, read-only filesystem…)
+- Be mitigated by your existing controls (WAF, network segmentation, read-only filesystem…)
 - Touch low-sensitivity data
 
-Without context, every CVE looks equally urgent. You waste engineering time patching things that don't matter, and you miss the few that really do.
+A CVE's base score is the same wherever the component runs, so it says none of this about your deployment.
 
 ---
 

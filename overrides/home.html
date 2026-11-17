@@ -10,11 +10,11 @@
     <div class="vens-hero__inner">
       <div class="vens-hero__content">
         <p class="vens-eyebrow">Open source · Contextual scoring</p>
-        <h1 class="vens-hero__title">Prioritize vulnerabilities by real risk, not just the generic CVSS score.</h1>
+        <h1 class="vens-hero__title">Prioritize vulnerabilities in your system's context, not just by the generic CVSS score.</h1>
         <p class="vens-hero__lead">
           Your scanner hands you a long list of CVEs. Vens takes your Trivy or Grype report plus a short
-          description of your system, and scores every CVE by its real risk to you. You get a
-          CycloneDX VEX with OWASP Risk Rating scores, so you fix what matters.
+          description of your system, and rates every CVE with OWASP Risk Rating in that context. You get a
+          CycloneDX VEX with one rating per CVE, to sort by severity, then score, for review.
         </p>
         <div class="vens-hero__actions">
           <a href="{{ 'getting-started/quickstart/' | url }}" class="md-button vens-btn vens-btn--primary">Get started</a>
@@ -101,7 +101,7 @@
         </div>
         <div class="vens-card">
           <h3 class="vens-card__t">Machine-readable VEX</h3>
-          <p class="vens-card__d">Standard CycloneDX VEX. Suppress noise in CI, or feed it to Dependency-Track.</p>
+          <p class="vens-card__d">Standard CycloneDX VEX. Filter on severity in CI, or feed it to Dependency-Track.</p>
         </div>
         <div class="vens-card">
           <h3 class="vens-card__t">Model-agnostic</h3>
@@ -112,8 +112,8 @@
           <p class="vens-card__d"><code>--attest</code> writes a CycloneDX attestation: model, hashes, and reasoning, so every score can be reproduced.</p>
         </div>
         <div class="vens-card">
-          <h3 class="vens-card__t">Backed by a benchmark</h3>
-          <p class="vens-card__d">We measured 12 LLMs on contextual CVE scoring. <a href="{{ 'blog/which-llm-should-score-your-cves/' | url }}">Pick a model on evidence.</a></p>
+          <h3 class="vens-card__t">Benchmarked up to v0.6</h3>
+          <p class="vens-card__d">We measured 12 LLMs on vens's scoring up to v0.6, where the model returned four numbers per CVE. It has not been rerun on v0.7.0. <a href="{{ 'blog/which-llm-should-score-your-cves/' | url }}">See the results.</a></p>
         </div>
       </div>
     </div>
@@ -151,8 +151,8 @@ context:
       <div class="vens-who">
         <ul class="vens-who__list">
           <li><strong>Security engineers</strong> drowning in CVE backlogs from Trivy, Grype, or Dependency-Track.</li>
-          <li><strong>DevSecOps teams</strong> who need machine-readable VEX to suppress noise in CI.</li>
-          <li><strong>Security architects</strong> who want risk that reflects business impact, not generic CVSS.</li>
+          <li><strong>DevSecOps teams</strong> who need machine-readable VEX to filter findings in CI.</li>
+          <li><strong>Security architects</strong> who want a rating that includes business impact, not generic CVSS.</li>
         </ul>
         <div class="vens-who__aside">
           <p><strong>Vens is not a scanner.</strong> You still need Trivy or Grype to find CVEs. Vens tells you which ones to care about.</p>
@@ -174,8 +174,8 @@ context:
       <div class="vens-docs">
         <a class="vens-doc" href="{{ 'getting-started/quickstart/' | url }}"><span class="vens-doc__t">Quickstart, 5 min</span><span class="vens-doc__d">Your first VEX from a real image.</span></a>
         <a class="vens-doc" href="{{ 'guides/github-actions/' | url }}"><span class="vens-doc__t">GitHub Actions</span><span class="vens-doc__d">Drop vens into your Trivy or Grype pipeline.</span></a>
-        <a class="vens-doc" href="{{ 'guides/configuration/' | url }}"><span class="vens-doc__t">Describe your context</span><span class="vens-doc__d">The config.yaml that makes scores accurate.</span></a>
-        <a class="vens-doc" href="{{ 'guides/prioritize-cves/' | url }}"><span class="vens-doc__t">Prioritize a CVE backlog</span><span class="vens-doc__d">The most common use case.</span></a>
+        <a class="vens-doc" href="{{ 'guides/configuration/' | url }}"><span class="vens-doc__t">Describe your context</span><span class="vens-doc__d">The config.yaml the ratings are computed from.</span></a>
+        <a class="vens-doc" href="{{ 'guides/prioritize-cves/' | url }}"><span class="vens-doc__t">Prioritize a CVE backlog</span><span class="vens-doc__d">The main use case.</span></a>
         <a class="vens-doc" href="{{ 'reference/enrich/' | url }}"><span class="vens-doc__t">Enrich your report</span><span class="vens-doc__d">Fold OWASP scores back into Trivy.</span></a>
         <a class="vens-doc" href="{{ 'reference/config-schema/' | url }}"><span class="vens-doc__t">config.yaml schema</span><span class="vens-doc__d">Every field, explained.</span></a>
       </div>
@@ -185,8 +185,8 @@ context:
   <!-- ===================== FINAL CTA ===================== -->
   <section class="vens-cta">
     <div class="vens-wrap" data-reveal>
-      <h2 class="vens-cta__t">Stop patching by CVSS.</h2>
-      <p class="vens-cta__d">Score the CVEs that actually matter for your system.</p>
+      <h2 class="vens-cta__t">Rank CVEs in your context, not by CVSS alone.</h2>
+      <p class="vens-cta__d">Rate every CVE of your scan with OWASP Risk Rating, from a description of your system.</p>
       <div class="vens-hero__actions">
         <a href="{{ 'getting-started/quickstart/' | url }}" class="md-button vens-btn vens-btn--primary">Get started</a>
         <a href="{{ config.repo_url }}" class="md-button vens-btn vens-btn--ghost">View on GitHub</a>

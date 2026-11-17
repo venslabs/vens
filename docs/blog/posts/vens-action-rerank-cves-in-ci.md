@@ -42,7 +42,7 @@ context:
   business_criticality: "critical"
 ```
 
-For scoring that actually reflects your service, fill in the rest: what records an attack attempt (`detection`) and who did what (`traceability`), how many people's personal data it can read (`data_subjects`), security controls (WAF, segmentation, ...), compliance requirements, availability target, free-form notes. The annotated reference lives in [`examples/quickstart/config.yaml`](https://github.com/venslabs/vens/blob/main/examples/quickstart/config.yaml). Wrong values mean wrong scores, so this file deserves the same review process as the rest of your code (CODEOWNERS, PR review, the works).
+To score with more of your service's context, fill in the rest: what records an attack attempt (`detection`) and who did what (`traceability`), how many people's personal data it can read (`data_subjects`), security controls (WAF, segmentation, ...), compliance requirements, availability target, free-form notes. The annotated reference lives in [`examples/quickstart/config.yaml`](https://github.com/venslabs/vens/blob/main/examples/quickstart/config.yaml). Wrong values mean wrong scores, so this file deserves the same review process as the rest of your code (CODEOWNERS, PR review, the works).
 
 ## The SBOM serial number
 

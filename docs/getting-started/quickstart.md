@@ -67,7 +67,7 @@ context:
     waf: true
 ```
 
-This is the step that makes scores meaningful. A dev/test environment would use different values and get _different_ scores. Replace the values with what is true for your service today: `listener` says whether it accepts connections, `data_subjects` how many people's personal data it can read, `detection` what records an attack attempt, and `traceability` whether requests are recorded, and by whom. Leave out one of the last three and vens warns at load and uses its fallback, which the warning states. See [Describe your context](../guides/configuration.md) for the full field reference.
+This is the step the ratings depend on. A dev/test environment would use different values and get _different_ scores. Replace the values with what is true for your service today: `listener` says whether it accepts connections, `data_subjects` how many people's personal data it can read, `detection` what records an attack attempt, and `traceability` whether requests are recorded, and by whom. Leave out one of the last three and vens warns at load and uses its fallback, which the warning states. See [Describe your context](../guides/configuration.md) for the full field reference.
 
 Don't want to write this by hand? `vens init` asks a few questions and writes the file for you — see [`vens init`](../reference/init.md).
 
@@ -146,7 +146,7 @@ Open `output.vex.json`. It is a CycloneDX 1.6 BOM (1.6 is the default; pass `--c
 
 ---
 
-## Step 5 — Sort by real risk
+## Step 5 — Sort by severity, then score
 
 Get your top 10 most critical CVEs with `jq`, by severity first, then by score:
 
@@ -156,7 +156,7 @@ jq '[.vulnerabilities[] | {id, score: .ratings[0].score, severity: .ratings[0].s
     | .[0:10]' output.vex.json
 ```
 
-You now have a prioritized backlog where the top items are the ones that _actually_ threaten your system.
+You now have CVEs ranked by vens's computed rating, ready for review.
 
 ---
 
@@ -171,7 +171,7 @@ You now have a prioritized backlog where the top items are the ones that _actual
 
 ## Next steps
 
-- **[Prioritize a CVE backlog](../guides/prioritize-cves.md)** — the common use case, end to end.
-- **[Describe your context](../guides/configuration.md)** — make scores more accurate.
+- **[Prioritize a CVE backlog](../guides/prioritize-cves.md)** — the main use case, end to end.
+- **[Describe your context](../guides/configuration.md)** — what each field changes in the rating.
 - **[CVSS vs OWASP contextual](../concepts/cvss-vs-owasp.md)** — understand why the scores move.
 - **[Troubleshooting](../troubleshooting.md)** — when things don't go as expected.

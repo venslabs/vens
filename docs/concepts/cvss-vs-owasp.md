@@ -131,7 +131,7 @@ Expect ratings to change, whatever your `config.yaml` declares. Your file also n
 
 ## Why scores go _down_ from CVSS
 
-The most common case. A CVE has a base score of 7.5 but:
+A CVE has a base score of 7.5 but:
 
 - The vulnerable code path is not used in your build: the model reads it from the CVE description and your `notes`, and answers Opportunity and Ease of exploit accordingly
 - A control in front of the service stands in the way of this exploit, and the model judges it does
@@ -145,7 +145,7 @@ A generic 7.5 can come out `low` or `medium`. That rating is an input to your re
 
 ## Why scores go _up_ from CVSS
 
-Less common but critical. A CVE has a base score of 5.3, "medium", but:
+A CVE has a base score of 5.3, "medium", but:
 
 - It discloses the kind of data your system handles, and your `data_sensitivity` is `high` or `critical`
 - You declared GDPR or PCI-DSS, and the model judges a breach a high profile violation
@@ -156,7 +156,7 @@ A generic 5.3 can come out `high` or `critical`, which moves the CVE from deep i
 
 ---
 
-## When to trust the Vens score
+## Before you use a rating
 
 ✅ You've described your context honestly and precisely in `config.yaml`
 ✅ You declared `traceability`, `detection` and `data_subjects` for what is in place
@@ -170,7 +170,7 @@ A generic 5.3 can come out `high` or `critical`, which moves the CVE from deep i
 
 ⚠️ Generic or sparse `config.yaml` → the questions get generic answers
 ⚠️ Fields left out → their fallback: Intrusion detection 9 and Loss of accountability's `none` column on every finding, no cap on Privacy violation; the run summary counts them
-⚠️ You lie about controls → optimistic scores that miss real risk
+⚠️ Controls set to `true` that you do not run → Ease of exploit is judged against them, which can lower ratings on a false premise
 ⚠️ The LLM has no information about a very recent CVE (< 2 weeks) → its answers rest on the description alone, and `cannot_tell` takes the worst case
 ⚠️ Deeply custom internal CVEs → the LLM may not know the specifics; review manually
 

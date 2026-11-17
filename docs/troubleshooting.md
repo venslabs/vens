@@ -1,7 +1,7 @@
 # Troubleshooting
 
 **Who this is for:** anyone whose `vens generate` run didn't go the way the quickstart promised.
-**By the end of this page:** you know how to diagnose the most common failure modes.
+**By the end of this page:** you know how to diagnose the failure modes below.
 
 When in doubt, rerun with debug output:
 
@@ -162,7 +162,7 @@ Or force a provider explicitly: `--llm ollama`.
 
 ## `unable to parse LLM output`
 
-The LLM returned text that is not valid JSON matching the expected schema. Most common causes:
+The LLM returned text that is not valid JSON matching the expected schema. Possible causes:
 
 - **Small / local model with weak JSON compliance.** Vens asks for structured JSON: for each question, one named answer and one sentence of reasoning per CVE. On the scoring of earlier versions, which asked for four component scores per CVE, models under 7B parameters routinely failed on batches of 10. These recommendations for Ollama come from then and have not been rechecked on the v0.7.0 questions:
     - `llama3.1:70b` / `llama3.3:70b` — robust on the default batch size of 10.

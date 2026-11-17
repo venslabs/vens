@@ -1,9 +1,9 @@
 # Describe your system context
 
 **Who this is for:** anyone using Vens for the first time on a real system.
-**By the end of this page:** you can write a `config.yaml` that produces accurate, defensible OWASP scores.
+**By the end of this page:** you can write a `config.yaml` that states what is true of your service, and know what each field changes in the rating.
 
-The context file is the **single most important input to Vens**. Good context → useful scores. Sloppy context → scores you can't trust.
+The context file is the **single most important input to Vens**: every rating is computed from it, and each level a field feeds follows what you declare, true or not.
 
 ---
 
@@ -44,7 +44,7 @@ Your `config.yaml` fields work in two ways. A field **shown to the model** is co
 | `data_subjects` | vens reads it alone, to cap Privacy violation | A leak of a hundred people's data is not a leak of millions. |
 | `listener` | shown in every call | A batch job accepts no connection. |
 | `controls.*` | the Ease of exploit question shows five of them | A WAF makes some exploits harder. |
-| `notes` | shown in every call | Helps the LLM on edge cases. |
+| `notes` | shown in every call | What the other fields cannot say about your architecture. |
 
 ---
 
@@ -245,21 +245,21 @@ context:
 
 ❌ **Copy-pasting the same config everywhere.** Your dev API and your prod checkout service should not have the same context. Different criticality → different scores.
 
-❌ **Setting all controls to `true` "just in case".** You'll get optimistic scores that miss real risk.
+❌ **Setting all controls to `true` "just in case".** The Ease of exploit question shows each of them as in place, so the model judges exploits against controls you do not run, which can lower the ratings.
 
 ❌ **Declaring what is required instead of what is in place.** `traceability` and `detection` describe what records an attack today. A policy that requires per-user audit logs, or a SIEM bought last quarter, does not make this service's attempts recorded and reviewed. vens applies these fields exactly as declared, and the model never sees them to object.
 
 ❌ **Leaving `traceability`, `detection` and `data_subjects` out.** Each one left out takes its fallback ([above](#what-is-in-place-traceability-detection-data_subjects)). Declare the worst case explicitly if that is the truth (`traceability: none`, every channel `not_logged`, `data_subjects: millions`): the levels are the same, without the warning.
 
-❌ **Leaving `notes` empty on complex systems.** The LLM does better with 2 sentences of architecture than with nothing.
+❌ **Leaving `notes` empty on complex systems.** Every call shows `notes`; empty, the model judges your architecture from the other fields alone.
 
-❌ **Using `internet` for everything.** Internal services with `internal` exposure produce very different — and more accurate — scoring.
+❌ **Using `internet` for everything.** `internal` sets a lower Size and names a different attacker group in every question, so an internal service declared `internal` gets different ratings.
 
 ---
 
 ## Managing multiple services
 
-Once you have more than one service scanned by Vens, copy-pasting the same `config.yaml` everywhere is the first mistake to avoid. A dev sandbox and a production checkout service should **not** share context — different criticality, different exposure, different compliance scope. The scores you get out of Vens are only as accurate as that per-service distinction.
+Once you have more than one service scanned by Vens, copy-pasting the same `config.yaml` everywhere is the first mistake to avoid. A dev sandbox and a production checkout service should **not** share context — different criticality, different exposure, different compliance scope. Each service's ratings are computed from its own file.
 
 The pattern that works:
 

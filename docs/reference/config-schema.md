@@ -236,7 +236,7 @@ controls:
 ```
 
 !!! warning
-    Only set controls to `true` when they are actually operational. Claiming controls you don't run produces optimistic scores that miss real risk.
+    Only set controls to `true` when they are actually operational. The Ease of exploit question shows each control set to `true` as in place, so one you don't run can lower the ratings.
 
 ### `context.notes`
 

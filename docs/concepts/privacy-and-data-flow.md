@@ -48,7 +48,7 @@ That is the complete list. Nothing else from the scanner report is forwarded, an
 
 ## What about the `notes` field?
 
-The `notes` field in `config.yaml` is free-form text that you author. It is designed to let you describe architecture and deployment context in plain English so the LLM can make better scoring decisions. **It is sent verbatim** to the configured LLM provider.
+The `notes` field in `config.yaml` is free-form text that you author. It is designed to let you describe architecture and deployment context in plain English so the model reads it with every question. **It is sent verbatim** to the configured LLM provider.
 
 **Do:**
 

@@ -48,7 +48,7 @@ Vens does **not** set a CycloneDX `analysis` block (`state`, `justification`, `d
 - **Trivy** — `trivy image ... --vex vex.json`
 - **Grype** — `grype ... --vex vex.json`
 - **Dependency-Track** — ingests the file directly.
-- **Your own scripts / dashboards** — via `jq` on `ratings[0].severity`, then `ratings[0].score` (see the [quickstart](../getting-started/quickstart.md#step-5-sort-by-real-risk)).
+- **Your own scripts / dashboards** — via `jq` on `ratings[0].severity`, then `ratings[0].score` (see the [quickstart](../getting-started/quickstart.md#step-5-sort-by-severity-then-score)).
 - **Any CI pipeline** — filter the VEX to fail the build only when there is real contextual risk.
 
 ---

@@ -5,7 +5,7 @@ This example demonstrates how **vens** transforms generic CVSS scores into conte
 ## Why vens?
 
 **CVSS asks**: "How severe is this vulnerability technically?"
-**OWASP asks**: "What's the real risk **for MY system**?"
+**OWASP asks**: "What's the risk **for MY system**?"
 
 ## Quick Start
 
@@ -47,27 +47,27 @@ vens + LLM → The LLM answers closed questions about each CVE in your context
 OWASP rating → vens computes the 16 factor levels, the severity (OWASP's
                likelihood × impact matrix) and a 0-81 score
      ↓
-Prioritized List → Sort by severity, then score: fix what matters for YOU
+Prioritized List → Sort by severity, then score: the order to review them in
 ```
 
 **Supported Scanners:**
 - ✅ Trivy (auto-detected)
 - ✅ Grype (auto-detected)
 
-## Value Comparison: Before vs After
+## Before and after
 
 ### Before (CVSS only)
 ```
-107 findings → Sort by CVSS score → Patch top 20
-❌ Waste time on CVE-2019-1010023 (CVSS 8.8, not exploitable)
-❌ Miss CVE-2026-0915 (CVSS 5.3, but leaks PII under GDPR)
+107 findings → Sort by CVSS score → Review in that order
+CVE-2019-1010023: CVSS 8.8, the same wherever the package runs
+CVE-2026-0915: CVSS 5.3, whatever data this service holds
 ```
 
 ### After (OWASP contextual)
 ```
-107 findings → Sort by OWASP severity, then score → Patch real risks
-✅ CVE-2019-1010023: its likelihood follows whether it can be reached here, its impact what it can touch
-✅ CVE-2026-0915: GDPR and the people whose data it can expose weigh on its impact
+107 findings → Sort by OWASP severity, then score → Review in that order
+CVE-2019-1010023: its likelihood follows whether it can be reached here, its impact what it can touch
+CVE-2026-0915: GDPR and the people whose data it can expose weigh on its impact
 ```
 
 ## Output Example

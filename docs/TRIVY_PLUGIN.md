@@ -1,6 +1,6 @@
 # Vens as a Trivy Plugin
 
-Use vens as a [Trivy plugin](https://trivy.dev/docs/latest/plugin/) to prioritize vulnerabilities by real risk, not just the generic CVSS score.
+Use vens as a [Trivy plugin](https://trivy.dev/docs/latest/plugin/) to prioritize vulnerabilities in your system's context, not just by the generic CVSS score.
 
 ## Installation
 

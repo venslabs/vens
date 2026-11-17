@@ -5,9 +5,9 @@
 [![GitHub Downloads][github-downloads-img]][release]
 [![Documentation][docs-img]][docs]
 
-# vens — Prioritize vulnerabilities by real risk, not just the generic CVSS score
+# vens — Prioritize vulnerabilities in your system's context, not just by the generic CVSS score
 
-**Your scanner hands you a long list of CVEs. Which ones actually matter?** Vens takes a Trivy or Grype report, combines it with a description of _your_ system (exposure, data sensitivity, compliance, security controls), and scores every CVE based on its real risk to you — not just its generic severity.
+**Your scanner hands you a long list of CVEs. Which ones do you review first?** Vens takes a Trivy or Grype report, combines it with a description of _your_ system (exposure, data sensitivity, compliance, security controls), and rates every CVE with OWASP Risk Rating in your context — not just by its generic severity.
 
 The output is a [CycloneDX VEX](https://www.ntia.gov/files/ntia/publications/vex_one-page_summary.pdf) file with [OWASP Risk Rating](https://owasp.org/www-community/OWASP_Risk_Rating_Methodology) scores.
 Your CI gate fails the build on it, and [Dependency-Track 5.1+](https://venslabs.github.io/vens/guides/dependency-track/) puts it on every matching finding.
@@ -18,14 +18,14 @@ Your CI gate fails the build on it, and [Dependency-Track 5.1+](https://venslabs
 
 ## Why vens?
 
-OWASP Risk Rating reflects your system's exposure, data, records and controls — not just generic CVE severity. For each CVE, the LLM answers closed questions about 12 of the 16 OWASP factors in your context; vens computes every level, the severity from OWASP's likelihood × impact matrix, and a 0-81 score to sort CVEs within a severity:
+OWASP Risk Rating reflects your system's exposure, data, records and controls — not just generic CVE severity. For each CVE, the LLM answers closed questions on up to 12 of the 16 OWASP factors in your context; vens computes every level, the severity from OWASP's likelihood × impact matrix, and a 0-81 score to sort CVEs within a severity:
 
 | Scenario | CVSS base | OWASP (Contextual) | Why? |
 |-----|----------------|-------------------|------|
 | Denial of service in a library function your internal service never calls | 7.5 HIGH | **low** (14.1) ⬇️ | Reaching it takes full access; the CVSS vectors rule out data loss |
 | Info leak in a PII handler running under GDPR | 5.3 MEDIUM | **critical** (54.4) ⬆️ | Thousands of people's data and a GDPR violation: the business impact is HIGH |
 
-*Ratings above are illustrative — actual ratings depend on your `config.yaml` and the LLM model. Code that never runs lowers the likelihood through the model's answers, never below MEDIUM, so an unreachable RCE with a HIGH impact still rates `high` or `critical`: see [Limitations](https://venslabs.github.io/vens/concepts/limitations/).*
+*Ratings above are illustrative — actual ratings depend on your `config.yaml` and the LLM model. Code that never runs can lower the likelihood through the model's answers, never below MEDIUM, so an unreachable RCE with a HIGH impact still rates `high` or `critical`: see [Limitations](https://venslabs.github.io/vens/concepts/limitations/).*
 
 ## Installation
 
@@ -200,7 +200,7 @@ Apache License 2.0 - See [LICENSE](LICENSE)
 
 ---
 
-**Focus on what matters. Patch smarter, not harder.**
+**Rank CVEs in your context, not by CVSS alone.**
 
 [docs-img]: https://img.shields.io/badge/docs-venslabs.github.io%2Fvens-blue?logo=readthedocs&logoColor=white
 [docs]: https://venslabs.github.io/vens/
