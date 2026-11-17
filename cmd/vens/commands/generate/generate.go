@@ -57,9 +57,12 @@ level, then computes every level, the OWASP vector and the rating:
   Severity   = OWASP's matrix of the likelihood and impact levels
   Score      = Likelihood × Impact, a vens number, not OWASP's
 
-Where an input is missing (an undeclared field; a CVE with no description, no CVSS vector or one vens
-cannot read; an answer read as cannot_tell), the factor falls back to its worst case, counted in the
-run summary; --strict fails the run instead.`,
+A missing input takes a fallback, counted in the run summary, unless --strict fails the run: an
+answer read as cannot_tell, and Motive, Opportunity and Ease of exploit for a CVE with no
+description, count as the worst answer; undeclared, detection makes Intrusion detection 9,
+traceability makes Loss of accountability 7 or 9, and data_subjects leaves Privacy violation at the
+model's band; an axis whose CVSS vectors are missing or unreadable has its loss asked, not floored.
+A flagged CVE's adjustment may lower Opportunity, an axis's loss and Privacy violation below these.`,
 		Example:               Example(),
 		Args:                  cobra.ExactArgs(2),
 		RunE:                  action,
