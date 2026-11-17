@@ -58,11 +58,16 @@ level, then computes every level, the OWASP vector and the rating:
   Score      = Likelihood × Impact, a vens number, not OWASP's
 
 A missing input takes a fallback, counted in the run summary, unless --strict fails the run: an
-answer read as cannot_tell, and Motive, Opportunity and Ease of exploit for a CVE with no
-description, count as the worst answer; undeclared, detection makes Intrusion detection 9,
+answer to a question read as cannot_tell, and Motive, Opportunity and Ease of exploit for a CVE
+with no description, count as the worst answer; undeclared, detection makes Intrusion detection 9,
 traceability makes Loss of accountability 7 or 9, and data_subjects leaves Privacy violation at the
-model's band; an axis whose CVSS vectors are missing or unreadable has its loss asked, not floored.
-A flagged CVE's adjustment may lower Opportunity, an axis's loss and Privacy violation below these.`,
+model's band; an axis whose CVSS vectors are missing, unparsable, or lack one of its metrics or give
+one a value off its scale has its loss asked, not floored.
+
+A CVE whose description says it is disputed or not a security issue, or that the report rates low
+while NVD rates it high or critical, is flagged: one more call, the adjustment, may lower its
+Opportunity, an axis's loss and Privacy violation, even below these fallbacks. The adjustment's
+cannot_tell keeps the baseline: it is not counted and does not fail a --strict run.`,
 		Example:               Example(),
 		Args:                  cobra.ExactArgs(2),
 		RunE:                  action,
@@ -82,7 +87,7 @@ A flagged CVE's adjustment may lower Opportunity, an axis's loss and Privacy vio
 	flags.String("sbom-serial-number", "", "SBOM serial number for BOM-Link (format: urn:uuid:...)")
 	flags.Int("sbom-version", 1, "SBOM version for BOM-Link (default: 1)")
 	flags.Bool("attest", false, "Emit a CycloneDX Attestations (CDXA) sibling file with prompt hash, input hash, model, seed, raw LLM response")
-	flags.Bool("strict", false, "Fail a run that would use a worst-case fallback, and write no VEX or attestation: an undeclared data_subjects, detection or traceability, a CVE with no description, no CVSS vector or one vens cannot read, or an answer read as cannot_tell")
+	flags.Bool("strict", false, "Fail a run that would use a worst-case fallback, and write no VEX or attestation: an undeclared data_subjects, detection or traceability; a CVE with no description, or with no CVSS vector or one that does not parse, lacks an axis metric or gives one a value off its scale; or an answer to a question read as cannot_tell (the adjustment's cannot_tell keeps the baseline)")
 
 	return cmd
 }
