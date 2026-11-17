@@ -3,7 +3,7 @@
 **Who this is for:** security engineers staring at a massive CVE report and asking _"which ones do I patch first?"_.
 **By the end of this page:** you have your CVEs ranked by their risk in your context, and the top of the list to review first.
 
-This is the most common use case for Vens. It takes ~3 minutes end to end.
+This is the most common use case for Vens.
 
 ---
 
