@@ -82,7 +82,7 @@ Each batch gets one call per question, in a fixed order, about the batch's CVEs 
 - Lower values (e.g. `5`) — fewer CVEs per call, more calls, safer for small context windows.
 - Higher values (e.g. `20`) — fewer calls, more tokens per call.
 
-The run summary at the end of each run gives the calls made, per question (see **[The run summary](#the-run-summary)**).
+The run summary, logged for runs that reach scoring, gives the calls made, per question (see **[The run summary](#the-run-summary)**).
 
 ```bash
 vens generate --llm-batch-size 15 ...
@@ -161,6 +161,7 @@ Each run adds a new `run-*` directory, and nothing deletes the old ones. Remove 
     Project: python-backend-api
     Description: Python 3.11 backend API service handling customer data
     Exposure: internet (Publicly accessible). The attacker group to consider is anonymous Internet users.
+    Listener: present (this deployment accepts connections that other parties open: it listens on a port or socket, as a server or as a peer others connect to).
     Notes: Customer-facing REST API built with FastAPI/Flask ...
 
     Judge each vulnerability from its own entry and this deployment. Choose cannot_tell only when the facts given do not decide between the other answers. ...
@@ -193,7 +194,7 @@ The JSON Schema of each reply is sent to the provider with the call, not written
 
 Numbers count LLM calls, not `--llm-batch-size` batches: each batch makes one call per question, a call the provider truncates is retried in two halves, and the CVEs a reply leaves out are asked again in one more call, each with its own number.
 
-Each run also writes **`answers.json`**: for each CVE, each of the 16 factors in the vector's order with the answer as the reply wrote it (when the question was asked), how vens read it (`answered`, `cannot_tell`, `invalid` for an answer off its list, `no_description`), the level, and where the level came from (`answer`, `constant`, `config`, `floor`, `adjustment`); whether the adjustment was made and how it read; the CVE's counters; and the run's counters summed. A run that fails also lists, marked `unrated` and without levels, the CVEs of the batch it failed in that already had answers. It holds no reasoning and no CVE text, but keeps each answer verbatim.
+Each run also writes **`answers.json`**: for each CVE, each of the 16 factors in the vector's order with the answer as the reply wrote it (when the question was asked), how vens read it (`answered`, `cannot_tell`, `invalid` for an answer off its list, `no_description`), the level, and where the level came from (`answer`, `constant`, `config`, `floor`, `adjustment`); whether the adjustment was made and how it read; the CVE's counters; and the run's counters summed. A run that fails also lists, marked `unrated` and without levels, the CVEs of the batch it failed in that already had answers. It holds no reasoning and no CVE text, but keeps each answer verbatim. From a run on `examples/quickstart`'s Trivy report with `data_subjects`, `detection` and `traceability` removed from its `config.yaml`, so their fallbacks are counted:
 
 ```json
 {
@@ -210,7 +211,7 @@ Each run also writes **`answers.json`**: for each CVE, each of the 16 factors in
     },
     ...
   ],
-  "counters": { "applicability_missing": 5, "data_subjects_missing": 25, "detection_undeclared": 45, "traceability_missing": 45, ... }
+  "counters": { "applicability_missing": 5, "data_subjects_missing": 25, "detection_undeclared": 45, "ease_of_exploit_cannot_tell": 4, "motive_cannot_tell": 4, "opportunity_cannot_tell": 4, "traceability_missing": 45 }
 }
 ```
 
@@ -316,10 +317,10 @@ BOM-Link `version` number used alongside `--sbom-serial-number`. Default: `1`.
 
 ## The run summary
 
-A run that reaches scoring ends with one `INFO` line, `Scoring run finished`, also when it fails during scoring:
+A run that reaches scoring ends with one `INFO` line, `Scoring run finished`, also when it fails during scoring. From a run on `examples/quickstart`'s Trivy report with `data_subjects`, `detection` and `traceability` removed from its `config.yaml`, so their fallbacks are counted:
 
 ```text
-level=INFO msg="Scoring run finished" rows=107 cves=45 llm_calls=61 asked_again=0 splits=0 calls.M=5 calls.O=5 ... calls.adjustment=6 counters.applicability_missing=5 counters.data_subjects_missing=25 counters.detection_undeclared=45 counters.traceability_missing=45 failed=false
+level=INFO msg="Scoring run finished" rows=107 cves=45 llm_calls=61 asked_again=0 splits=0 calls.M=5 calls.O=5 ... calls.adjustment=6 counters.applicability_missing=5 counters.data_subjects_missing=25 counters.detection_undeclared=45 counters.ease_of_exploit_cannot_tell=4 counters.motive_cannot_tell=4 counters.opportunity_cannot_tell=4 counters.traceability_missing=45 failed=false
 ```
 
 - `rows` and `cves` — the scanner's findings, and the distinct CVEs among them.
@@ -334,7 +335,7 @@ level=INFO msg="Scoring run finished" rows=107 cves=45 llm_calls=61 asked_again=
 - `defects.*` — replies that break the schema or the instructions, counted by kind: `answer_off_list`, `answer_key_written_twice`, `answer_without_reasoning`, `answer_cve_not_asked`, `answer_cve_repeated`, and for the adjustment `adjustment_unreadable`, `adjustment_key_written_twice`, `adjustment_off_list`, `adjustment_field_not_asked`, `adjustment_without_reasoning`. A provider that honours the schema and the prompt writes none.
 - `failed` — whether the run failed.
 
-A run that stops before scoring starts logs no summary, such as one whose config fails to load or fails `--strict`'s config check; a report with no vulnerabilities logs none either.
+A run that fails `--strict`'s check before any LLM call logs it too, with `llm_calls=0`, no counters and `failed=true`. A run that stops earlier logs no summary, such as one whose config fails to load or fails `--strict`'s config check; a report with no vulnerabilities logs none either.
 
 `--debug-dir` writes the same counters, per CVE, to `answers.json`.
 
