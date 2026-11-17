@@ -84,7 +84,7 @@ context:
   # When to use: present for a service others connect to, such as this REST API;
   #              absent for a batch job, a CLI or a client that only opens connections
   # Impact: Shown in every call when present or absent
-  # listener: "present"
+  listener: "present"
 
   # AVAILABILITY REQUIREMENT: How critical is uptime? (optional)
   # Values: low | medium | high | critical

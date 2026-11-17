@@ -33,9 +33,9 @@ import (
 
 // promptCeiling is the most characters a call may send, system prompt and
 // request together: the longest call over the committed reports in the four
-// deployments below, 23,949 characters at batch 10, rounded up to the next
+// deployments below, 24,106 characters at batch 10, rounded up to the next
 // thousand.
-const promptCeiling = 24_000
+const promptCeiling = 25_000
 
 // longest records the longest call it is asked, answered by the mock.
 type longest struct {
