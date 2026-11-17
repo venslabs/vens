@@ -423,31 +423,59 @@ func TestAdjustmentEntryListsEveryRowsEvidence(t *testing.T) {
 	}
 }
 
-// The adjustment asks Opportunity, then each axis Applicability did not
-// floor, in its request, its reply line and its schema alike.
+// The adjustment asks Opportunity, when a row describes the CVE, then each
+// axis Applicability did not floor, in its request, its reply line and its
+// schema alike, as AdjustmentFields lists them: a CVE no row describes is
+// shown no Opportunity at all. With nothing left to ask, the request and the
+// schema are refused.
 func TestAdjustmentAsksTheAxesNotFloored(t *testing.T) {
-	for mask := range 8 {
-		floored := [3]bool{mask&1 != 0, mask&2 != 0, mask&4 != 0}
-		want := []string{"opportunity"}
-		for axis, name := range axisNames {
-			if !floored[axis] {
-				want = append(want, name)
+	undescribed := CVE{ID: "CVE-N", Rows: []Row{{PkgName: "libfoo", Title: "Overflow in libfoo", Severity: "LOW"}}}
+	for _, c := range []CVE{conflicting, undescribed} {
+		for mask := range 8 {
+			floored := [3]bool{mask&1 != 0, mask&2 != 0, mask&4 != 0}
+			var want []string
+			if c.Described() {
+				want = append(want, "opportunity")
 			}
-		}
-		request := text(t)(AdjustmentRequest(base(), conflicting, floored, adjustFlags, baselines(adjustGiven, floored)))
-		questions := strings.Split(strings.Split(request, "\nQUESTIONS\n")[1], "\n\n")[0]
-		var asked []string
-		for _, line := range strings.Split(questions, "\n") {
-			name, _, _ := strings.Cut(line, ":")
-			asked = append(asked, name)
-		}
-		var s struct{ Required []string }
-		if err := json.Unmarshal([]byte(data(t)(AdjustmentSchema(floored))), &s); err != nil {
-			t.Fatal(err)
-		}
-		reply := `Reply with {"reasoning": "...", "` + strings.Join(want, `": "...", "`) + `": "..."}.`
-		if !slices.Equal(asked, want) || !slices.Equal(s.Required, append([]string{"reasoning"}, want...)) || !strings.HasSuffix(request, reply) {
-			t.Errorf("floored %v: asks %v, requires %v, ends %q", floored, asked, s.Required, request[strings.LastIndex(request, "\n")+1:])
+			for axis, name := range axisNames {
+				if !floored[axis] {
+					want = append(want, name)
+				}
+			}
+			if got := AdjustmentFields(c, floored); !slices.Equal(got, want) {
+				t.Errorf("%s, floored %v: fields %v, want %v", c.ID, floored, got, want)
+			}
+			given := baselines(adjustGiven, floored)
+			if !c.Described() {
+				given.O = ""
+			}
+			if len(want) == 0 {
+				if _, err := AdjustmentRequest(base(), c, floored, adjustFlags, given); err == nil {
+					t.Errorf("%s, floored %v: a request with nothing to ask", c.ID, floored)
+				}
+				if _, err := AdjustmentSchema(c, floored); err == nil {
+					t.Errorf("%s, floored %v: a schema with nothing to ask", c.ID, floored)
+				}
+				continue
+			}
+			request := text(t)(AdjustmentRequest(base(), c, floored, adjustFlags, given))
+			questions := strings.Split(strings.Split(request, "\nQUESTIONS\n")[1], "\n\n")[0]
+			var asked []string
+			for _, line := range strings.Split(questions, "\n") {
+				name, _, _ := strings.Cut(line, ":")
+				asked = append(asked, name)
+			}
+			var s struct{ Required []string }
+			if err := json.Unmarshal([]byte(data(t)(AdjustmentSchema(c, floored))), &s); err != nil {
+				t.Fatal(err)
+			}
+			reply := `Reply with {"reasoning": "...", "` + strings.Join(want, `": "...", "`) + `": "..."}.`
+			if !slices.Equal(asked, want) || !slices.Equal(s.Required, append([]string{"reasoning"}, want...)) || !strings.HasSuffix(request, reply) {
+				t.Errorf("%s, floored %v: asks %v, requires %v, ends %q", c.ID, floored, asked, s.Required, request[strings.LastIndex(request, "\n")+1:])
+			}
+			if !c.Described() && strings.Contains(strings.ToLower(request), "opportunit") {
+				t.Errorf("%s, floored %v: the request shows Opportunity:\n%s", c.ID, floored, request)
+			}
 		}
 	}
 }
@@ -517,7 +545,7 @@ func TestSeveritySourceShownToTheAdjustmentOnly(t *testing.T) {
 		}}
 	}
 	flags := []Flag{{SeverityContested, "LOW from debian, NVD says HIGH", "liba"}}
-	given := Answers{O: cannotTell, LC: cannotTell, LI: cannotTell, LAV: cannotTell}
+	given := Answers{LC: cannotTell, LI: cannotTell, LAV: cannotTell}
 	for _, c := range []struct {
 		cve        CVE
 		adjustment string
@@ -588,38 +616,62 @@ func TestAdjustmentRefusesWhatItCannotShow(t *testing.T) {
 			t.Errorf("cannot_tell baselines, floored %v: %v", floored, err)
 		}
 	}
+	// A CVE no row describes was not asked Opportunity.
+	undescribed := CVE{ID: "CVE-N", Rows: []Row{{PkgName: "libfoo"}}}
+	if _, err := AdjustmentRequest(base(), undescribed, [3]bool{}, adjustFlags, adjustGiven); err == nil {
+		t.Error("an Opportunity answer for a CVE no row describes was shown")
+	}
+	without := adjustGiven
+	without.O = ""
+	if _, err := AdjustmentRequest(base(), undescribed, [3]bool{}, adjustFlags, without); err != nil {
+		t.Errorf("no Opportunity answer for a CVE no row describes: %v", err)
+	}
 }
 
-// A flagged CVE no row describes shows cannot_tell as Opportunity's baseline,
-// the one Go keeps: whatever the ordinary call answered, keep leaves 9 and a
-// lower answer lowers it, as for any cannot_tell baseline. A described CVE
-// shows its answer, which keep keeps.
-func TestAdjustmentShowsTheBaselineGoKeeps(t *testing.T) {
+// A description is a prerequisite of any Opportunity answer, the
+// adjustment's too. A flagged CVE no row describes is shown no Opportunity
+// baseline, and Compute leaves its O at cannot_tell's 9 whatever the
+// adjustment answers, as it would an answer the call did not ask. A
+// described CVE is shown the answer Go keeps, which keep keeps and a lower
+// answer lowers, a cannot_tell baseline included: there the model abstained,
+// and Go set nothing aside.
+func TestAdjustmentLowersTheOpportunityOfADescribedCVEOnly(t *testing.T) {
 	flags := []Flag{{SeverityContested, "LOW from debian, NVD says HIGH", "liba"}}
-	given := Answers{O: "special_access_or_resources_required", LC: "minimal", LI: "minimal_slightly_corrupt", LAV: "minimal_secondary_interrupted"}
+	axes := Answers{LC: "minimal", LI: "minimal_slightly_corrupt", LAV: "minimal_secondary_interrupted"}
+	with := func(o string) Answers {
+		a := axes
+		a.O = o
+		return a
+	}
+	undescribed := []Row{{PkgName: "liba", Severity: "LOW"}}
+	described := []Row{{PkgName: "liba", Severity: "LOW", Description: "Described."}}
 	for _, c := range []struct {
-		name     string
-		rows     []Row
-		baseline string
-		kept     int
+		name          string
+		rows          []Row
+		given         Answers
+		shown         string
+		kept, lowered int
+		source        Source
 	}{
-		{"no description", []Row{{PkgName: "liba", Severity: "LOW"}}, cannotTell, 9},
-		{"a description", []Row{{PkgName: "liba", Severity: "LOW", Description: "Described."}}, "special_access_or_resources_required", 4},
+		{"no description", undescribed, axes, `"answers":{"confidentiality":"minimal",`, 9, 9, SourceAnswer},
+		{"a description", described, with("special_access_or_resources_required"),
+			`"answers":{"opportunity":"special_access_or_resources_required",`, 4, 0, SourceAdjustment},
+		{"a description, cannot_tell", described, with(cannotTell), `"answers":{"opportunity":"cannot_tell",`, 9, 0, SourceAdjustment},
 	} {
 		cve := CVE{ID: "CVE-N", Rows: c.rows}
-		request := text(t)(AdjustmentRequest(base(), cve, [3]bool{}, flags, given))
-		if !strings.Contains(request, `"answers":{"opportunity":"`+c.baseline+`",`) {
-			t.Errorf("%s: the request does not show %s as Opportunity's baseline:\n%s", c.name, c.baseline, request)
+		request := text(t)(AdjustmentRequest(base(), cve, [3]bool{}, flags, c.given))
+		if !strings.Contains(request, c.shown) {
+			t.Errorf("%s: the request does not show %s:\n%s", c.name, c.shown, request)
 		}
-		shown, _ := opportunity.read(c.baseline)
-		if l := computeFor(t, base(), cve, [3]bool{}, given, nil); int(l.Vector.O) != int(shown) || int(shown) != c.kept {
-			t.Errorf("%s: Go's baseline %d, the request's %d, want %d", c.name, l.Vector.O, shown, c.kept)
+		if l := computeFor(t, base(), cve, [3]bool{}, c.given, nil); int(l.Vector.O) != c.kept {
+			t.Errorf("%s: Go's baseline %d, want %d", c.name, l.Vector.O, c.kept)
 		}
-		if l := computeFor(t, base(), cve, [3]bool{}, given, &Adjusted{Opportunity: keep}); int(l.Vector.O) != c.kept {
+		if l := computeFor(t, base(), cve, [3]bool{}, c.given, &Adjusted{Opportunity: keep}); int(l.Vector.O) != c.kept {
 			t.Errorf("%s: kept, O = %d, want %d", c.name, l.Vector.O, c.kept)
 		}
-		if l := computeFor(t, base(), cve, [3]bool{}, given, &Adjusted{Opportunity: "full_access_or_expensive_resources_required"}); l.Vector.O != 0 {
-			t.Errorf("%s: lowered to 0, O = %d", c.name, l.Vector.O)
+		l := computeFor(t, base(), cve, [3]bool{}, c.given, &Adjusted{Opportunity: "full_access_or_expensive_resources_required"})
+		if int(l.Vector.O) != c.lowered || l.Sources[O] != c.source {
+			t.Errorf("%s: adjusted to 0, O = %d from %v, want %d from %v", c.name, l.Vector.O, l.Sources[O], c.lowered, c.source)
 		}
 	}
 }

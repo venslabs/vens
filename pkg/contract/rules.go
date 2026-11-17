@@ -163,8 +163,9 @@ const (
 
 // Adjusted is a flagged CVE's adjustment reply. A field the call did not ask,
 // or the reply left out, is empty. Only an Opportunity answer below the
-// baseline, or an axis answered not_affected, moves a level: keep, affected,
-// cannot_tell and anything off the lists leave the baseline.
+// baseline of a CVE a row describes, or an axis answered not_affected, moves
+// a level: keep, affected, cannot_tell and anything off the lists leave the
+// baseline.
 type Adjusted struct {
 	Opportunity     string
 	Confidentiality string
@@ -190,8 +191,9 @@ type Levels struct {
 // Compute applies the 16 rules to one CVE: the deployment, the CVE's rows,
 // the axes Applicability floored over its vectors (indexed as cvss's axes),
 // its answers, and for a flagged CVE its adjustment, nil otherwise. The
-// adjustment never raises a level, and leaves Loss of accountability and the
-// business factors as computed.
+// adjustment never raises a level, leaves Loss of accountability and the
+// business factors as computed, and leaves the Opportunity of a CVE no row
+// describes at cannot_tell's level, whatever it answers.
 func Compute(d Deployment, c CVE, floored [3]bool, a Answers, adjusted *Adjusted) (Levels, error) {
 	if err := d.Check(); err != nil {
 		return Levels{}, err
@@ -211,7 +213,9 @@ func Compute(d Deployment, c CVE, floored [3]bool, a Answers, adjusted *Adjusted
 	v.SL = from(s, SL, SourceConstant, owasp.SkillLevelSecurityPenetrationSkills)
 	v.M = likelihood(s, motive, a.M)
 	v.O = likelihood(s, opportunity, a.O)
-	if level, r := opportunity.read(adjusted.Opportunity); r == Answered {
+	// A description is a prerequisite of any Opportunity answer, the
+	// adjustment's too, whether or not the call asked it.
+	if level, r := opportunity.read(adjusted.Opportunity); r == Answered && asked(O, d, floored, s.described) {
 		v.O = lowered(s, O, v.O, level)
 	}
 	v.S = from(s, S, SourceConfig, exposures[d.Exposure.Value].size)

@@ -37,8 +37,8 @@ const (
 type adjustmentReading string
 
 const (
-	// adjustmentNotAsked: no reply was read, the CVE having no flag or its
-	// run stopping first.
+	// adjustmentNotAsked: no reply was read, the CVE having no flag, nothing
+	// left to adjust, or its run stopping first.
 	adjustmentNotAsked   adjustmentReading = "not_asked"
 	adjustmentAnswered   adjustmentReading = "answered"
 	adjustmentUnreadable adjustmentReading = "unreadable"
@@ -56,15 +56,20 @@ type adjustmentReply struct {
 
 // adjust makes a flagged CVE's adjustment call, after its ordinary
 // questions: it shows every row's evidence, the flags and the answers given,
-// and may lower Opportunity and each axis Applicability did not floor, never
-// raise them. A reply Go cannot read leaves the baselines.
+// and may lower Opportunity, when a row describes the CVE, and each axis
+// Applicability did not floor, never raise them. With none of them left, it
+// makes no call. A reply Go cannot read leaves the baselines.
 func (g *Generator) adjust(ctx context.Context, run *scoringRun, c *cve, a *assessment) error {
 	floored := c.applicability.Floored
-	request, err := contract.AdjustmentRequest(g.deployment, c.in, floored, c.flags, baselines(a.answers, floored))
+	if len(contract.AdjustmentFields(c.in, floored)) == 0 {
+		slog.DebugContext(ctx, "no adjustment call: no description and every axis floored", "vuln", c.id())
+		return nil
+	}
+	request, err := contract.AdjustmentRequest(g.deployment, c.in, floored, c.flags, baselines(c.in, a.answers, floored))
 	if err != nil {
 		return err
 	}
-	schema, err := contract.AdjustmentSchema(floored)
+	schema, err := contract.AdjustmentSchema(c.in, floored)
 	if err != nil {
 		return err
 	}
@@ -83,11 +88,14 @@ func (g *Generator) adjust(ctx context.Context, run *scoringRun, c *cve, a *asse
 }
 
 // baselines are the answers the adjustment shows as given: Opportunity's,
-// and each axis's that Applicability did not floor. An answer Go reads as
-// cannot_tell is shown as cannot_tell, so that a reply keeping it keeps what
-// Go keeps.
-func baselines(given contract.Answers, floored [3]bool) contract.Answers {
-	b := contract.Answers{O: shownAs(contract.O, given.O)}
+// when a row describes the CVE, and each axis's that Applicability did not
+// floor. An answer Go reads as cannot_tell is shown as cannot_tell, so that
+// a reply keeping it keeps what Go keeps.
+func baselines(c contract.CVE, given contract.Answers, floored [3]bool) contract.Answers {
+	var b contract.Answers
+	if c.Described() {
+		b.O = shownAs(contract.O, given.O)
+	}
 	if !floored[cvss.Confidentiality] {
 		b.LC = shownAs(contract.LC, given.LC)
 	}

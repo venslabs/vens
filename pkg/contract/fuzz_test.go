@@ -30,8 +30,9 @@ import (
 // replies hold, the vector is one the calculator takes, each level in the set
 // its JAR ran, each with its source; its severity and score are OWASP's
 // matrix and likelihood × impact recomputed from the vector alone; Motive,
-// Opportunity and Ease of exploit are asked only of a CVE a row describes;
-// and the readings are the questions asked, and those three for a CVE no row
+// Opportunity and Ease of exploit are asked only of a CVE a row describes,
+// and no adjustment lowers the Opportunity of one none does; and the
+// readings are the questions asked, and those three for a CVE no row
 // describes.
 func FuzzCompute(f *testing.F) {
 	sets := owaspLevelSets(f)
@@ -121,6 +122,9 @@ func FuzzCompute(f *testing.F) {
 			if slices.Contains(asked, f) == !c.Described() {
 				t.Errorf("%s asked: %v, described: %v", f, slices.Contains(asked, f), c.Described())
 			}
+		}
+		if !c.Described() && (l.Vector.O != 9 || l.Sources[O] != SourceAnswer) {
+			t.Errorf("no description, adjusted by %+v: O %d from %v, want cannot_tell's 9", adjusted, l.Vector.O, l.Sources[O])
 		}
 	})
 }

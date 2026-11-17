@@ -111,6 +111,19 @@ func TestGenerator_AdjustmentNeverRaisesOpportunity(t *testing.T) {
 	}
 }
 
+// A described CVE whose Opportunity was answered cannot_tell is shown that
+// baseline, and its adjustment can still lower it: there the model
+// abstained, and Go set nothing aside. The cannot_tell still counts.
+func TestGenerator_AdjustmentLowersADescribedCannotTellOpportunity(t *testing.T) {
+	logs := withCapturedLogs(t)
+	r, m := adjustedBy(t,
+		map[contract.Factor]any{contract.O: cannotTell},
+		map[string]any{"reasoning": "r", "opportunity": "special_access_or_resources_required", "confidentiality": "affected", "integrity": "affected", "availability": "affected"})
+	assert.Contains(t, m.calls[len(m.calls)-1].req.Human, `"answers":{"opportunity":"cannot_tell",`)
+	assert.Equal(t, 4, vectorLevel(t, r.Rating.Vector, "O"))
+	assert.Equal(t, int64(1), runSummary(t, logs).attrs["counters.opportunity_cannot_tell"])
+}
+
 // An axis answered not_affected takes its floor, confidentiality's taking
 // Privacy violation's too; affected and cannot_tell leave the baselines.
 func TestGenerator_AdjustmentFloorsAnAxisNotAffected(t *testing.T) {

@@ -560,7 +560,8 @@ func TestGenerator_ClaimReasoningKeepsOneLinePerAnswer(t *testing.T) {
 // Outside a strict run, a CVE no row describes is not asked Motive,
 // Opportunity and Ease of exploit, its vector holding cannot_tell's level for
 // each: its claim says so in their place, with no answer, and the lines of
-// the questions it is asked and of its adjustment read as ever.
+// the questions it is asked read as ever. Its adjustment asks the axes
+// alone.
 func TestGenerator_ClaimSaysWhatAnUndescribedCVEIsNotAsked(t *testing.T) {
 	at := attestation.NewBuilder(attestation.Opts{Provider: "mock", Model: "mock"})
 	g := newGen(t, Opts{LLM: &fakeLLM{}})
@@ -589,7 +590,7 @@ func TestGenerator_ClaimSaysWhatAnUndescribedCVEIsNotAsked(t *testing.T) {
 	for _, line := range lines[3:] {
 		assert.NotContains(t, line, "not asked")
 	}
-	assert.True(t, strings.HasPrefix(lines[len(lines)-1], "adjustment (opportunity: keep, "), lines[len(lines)-1])
+	assert.Equal(t, "adjustment (confidentiality: affected, integrity: affected, availability: affected): the evidence", lines[len(lines)-1])
 	assert.NotContains(t, got[1].Reasoning, "not asked", "a described CVE is asked them")
 }
 

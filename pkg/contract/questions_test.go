@@ -379,11 +379,16 @@ func TestNoDescriptionReadsTheLikelihoodAnswersAsCannotTell(t *testing.T) {
 	if got := levels(computeFor(t, base(), c, [3]bool{}, answers, nil).Vector); got["M"] != 1 || got["O"] != 0 {
 		t.Errorf("one row described: M %d, O %d, want 1 and 0", got["M"], got["O"])
 	}
-	// The adjustment can still lower Opportunity from there.
+	// Nor can the adjustment lower Opportunity from there, whatever the call
+	// asked: a description is a prerequisite of that answer too. Its axes
+	// still take the adjustment.
 	l := computeFor(t, base(), CVE{ID: "CVE-N", Rows: []Row{{PkgName: "liba"}}}, [3]bool{}, answers,
-		&Adjusted{Opportunity: "special_access_or_resources_required"})
-	if l.Vector.O != 4 || l.Sources[O] != SourceAdjustment {
-		t.Errorf("adjusted with no description: O %d from %v, want 4 from the adjustment", l.Vector.O, l.Sources[O])
+		&Adjusted{Opportunity: "special_access_or_resources_required", Integrity: notAffected})
+	if l.Vector.O != 9 || l.Sources[O] != SourceAnswer || l.Readings[O] != NoDescription {
+		t.Errorf("adjusted with no description: O %d from %v read %v, want 9 from no description", l.Vector.O, l.Sources[O], l.Readings[O])
+	}
+	if l.Vector.LI != 1 || l.Sources[LI] != SourceAdjustment {
+		t.Errorf("adjusted with no description: LI %d from %v, want the floor from the adjustment", l.Vector.LI, l.Sources[LI])
 	}
 }
 

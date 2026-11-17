@@ -26,6 +26,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/venslabs/vens/pkg/attestation"
 	"github.com/venslabs/vens/pkg/contract"
+	"github.com/venslabs/vens/pkg/cvss"
 	"github.com/venslabs/vens/pkg/outputhandler"
 )
 
@@ -159,4 +160,86 @@ func TestGenerator_StrictRefusesAnUndescribedCVEFirst(t *testing.T) {
 			"CVE-2024-0000: no description in the scanner's report, so Motive, Opportunity and Ease of exploit read cannot_tell")
 	assert.Empty(t, m.calls)
 	assert.Empty(t, logs.find(slog.LevelWarn, undescribedWarning))
+}
+
+// contestedUndescribed is a CVE no row describes that its severity sources
+// flag, the one flag such a CVE can raise: the scanner rates it LOW from
+// debian, NVD CRITICAL. No vector floors an axis.
+func contestedUndescribed() Vulnerability {
+	v := testVulns(1)[0]
+	v.Title, v.Description = "[Privilege escalation possible to other user than root]", ""
+	v.Severity, v.SeveritySource = "LOW", "debian"
+	v.VendorSeverities = []VendorSeverity{{Source: "debian", Severity: "LOW"}, {Source: "nvd", Severity: "CRITICAL"}}
+	v.Flags = Flags{SeverityContested: true}
+	return v
+}
+
+// The adjustment of a CVE no row describes asks its axes alone: a
+// description is a prerequisite of any Opportunity answer. Its request shows
+// no Opportunity question, baseline or reply field, and its schema has none.
+// An Opportunity the reply gives all the same is ignored, counted and
+// logged, O staying at 9 with no adjusted answer recorded; an axis answered
+// not_affected still takes its floor.
+func TestGenerator_AdjustmentOfAnUndescribedCVELeavesOpportunityOut(t *testing.T) {
+	logs := withCapturedLogs(t)
+	parent := t.TempDir()
+	at := attestation.NewBuilder(attestation.Opts{Provider: "mock", Model: "mock"})
+	m := &fakeLLM{adjust: func(fakeCall) map[string]any {
+		return map[string]any{"reasoning": "r", "opportunity": "full_access_or_expensive_resources_required",
+			"confidentiality": "not_affected", "integrity": "affected", "availability": "affected"}
+	}}
+	g := newGen(t, Opts{LLM: m, DebugDir: parent})
+	g.SetAttestor(at)
+	var emitted []outputhandler.VulnRating
+	require.NoError(t, g.GenerateRiskScore(context.Background(), []Vulnerability{contestedUndescribed()}, collect(&emitted)))
+
+	adjustment := m.calls[len(m.calls)-1]
+	require.True(t, adjustment.adjustment())
+	axis := []string{"affected", "not_affected", cannotTell}
+	assert.Equal(t, map[string][]string{"confidentiality": axis, "integrity": axis, "availability": axis}, adjustment.fields)
+	assert.NotContains(t, strings.ToLower(adjustment.req.Human), "opportunit")
+	assert.Contains(t, adjustment.req.Human, `"answers":{"confidentiality":"minimal","integrity":"minimal_slightly_corrupt","availability":"minimal_secondary_interrupted"}`)
+
+	vector := emitted[0].Rating.Vector
+	for f, want := range map[string]int{"O": 9, "LC": 2, "PV": 3, "LI": 1} {
+		assert.Equal(t, want, vectorLevel(t, vector, f), f)
+	}
+	warned := logs.find(slog.LevelWarn, "Adjustment reply gives a field the call did not ask; ignoring it")
+	require.Len(t, warned, 1)
+	assert.Equal(t, "opportunity", warned[0].attrs["field"])
+	assert.Equal(t, int64(1), runSummary(t, logs).attrs["defects.adjustment_field_not_asked"])
+
+	lines := strings.Split(claims(t, at)[0].Reasoning, "\n")
+	assert.Equal(t, "adjustment (confidentiality: not_affected, integrity: affected, availability: affected): r", lines[len(lines)-1])
+	answers, _ := readAnswers(t, parent)
+	o := answers.Vulnerabilities[0].Factors[2]
+	assert.Equal(t, []any{"O", nil, "no_description", "", 9, "answer"}, []any{o.Factor, o.Answer, o.Reading, o.Adjusted, *o.Level, o.Source})
+	assert.Equal(t, "answered", answers.Vulnerabilities[0].Adjustment)
+}
+
+// An adjustment with nothing left to ask makes no call: a flagged CVE no row
+// describes whose vectors floor every axis keeps the levels it has, its
+// adjustment not_asked and its claim without an adjustment line.
+func TestGenerator_NoAdjustmentWithNothingLeftToAsk(t *testing.T) {
+	logs := withCapturedLogs(t)
+	parent := t.TempDir()
+	at := attestation.NewBuilder(attestation.Opts{Provider: "mock", Model: "mock"})
+	m := &fakeLLM{}
+	g := newGen(t, Opts{LLM: m, DebugDir: parent})
+	g.SetAttestor(at)
+	v := contestedUndescribed()
+	v.CVSS = []cvss.Vector{v31("nvd", noImpact)}
+	var emitted []outputhandler.VulnRating
+	require.NoError(t, g.GenerateRiskScore(context.Background(), []Vulnerability{v}, collect(&emitted)))
+
+	assert.Equal(t, []string{"LAC", "FD", "RD"}, m.log(), "no Motive, Opportunity, Ease of exploit or adjustment")
+	assert.NotContains(t, runSummary(t, logs).attrs, "calls."+adjustmentCall)
+	for f, want := range map[string]int{"O": 9, "LC": 2, "LI": 1, "LAV": 1, "PV": 3} {
+		assert.Equal(t, want, vectorLevel(t, emitted[0].Rating.Vector, f), f)
+	}
+	answers, _ := readAnswers(t, parent)
+	assert.Equal(t, "not_asked", answers.Vulnerabilities[0].Adjustment)
+	for _, line := range strings.Split(claims(t, at)[0].Reasoning, "\n") {
+		assert.False(t, strings.HasPrefix(line, adjustmentCall), line)
+	}
 }
