@@ -23,6 +23,16 @@ exists out.cdx.json
 exists out.attestation.cdx.json
 json-contains out.cdx.json '"CVE-2024-2222"'
 
+# A strict run stopped at its last call leaves the VEX and the attestation a
+# previous run wrote byte for byte.
+cp out.cdx.json prev.cdx.json
+cp out.attestation.cdx.json prev.attestation.cdx.json
+! exec vens generate --strict --llm=mock --llm-batch-size=1 --attest --config-file=config.yaml --sbom-serial-number=urn:uuid:22222222-2222-2222-2222-222222222222 report.json out.cdx.json
+stderr 'strict: the answer to Privacy violation \(PV\) for CVE-2024-2222 reads as cannot_tell'
+cmp out.cdx.json prev.cdx.json
+cmp out.attestation.cdx.json prev.attestation.cdx.json
+! exec sh -c 'ls $VENS_TEMP_GLOB'
+
 -- config.yaml --
 schema_version: 2
 project:
