@@ -175,7 +175,7 @@ controls:
   zero_trust: false      # Zero-trust architecture
 ```
 
-**Only set `true` for controls that are actually active in production.** The Ease of exploit question shows each of the five controls the Ease of exploit question shows (`waf`, `ddos_protection`, `segmentation`, `zero_trust`, `antivirus`) set to `true`, with its documented scope, and the model judges whether it stands in the way of this exploit in this deployment. vens applies no fixed reduction. Lying here produces false confidence.
+**Only set `true` for controls that are actually active in production.** The Ease of exploit question shows five controls (`waf`, `ddos_protection`, `segmentation`, `zero_trust`, `antivirus`) when they are set to `true`, each with its documented scope, and the model judges whether it stands in the way of this exploit in this deployment. vens applies no fixed reduction. Lying here produces false confidence.
 
 `ids`, `siem` and `edr` still load but move no score and are not sent: declare [`detection`](#detection-what-records-an-attack-attempt-channel-by-channel) instead.
 

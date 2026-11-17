@@ -68,7 +68,7 @@ A question is asked only when the factor's contract requires it: at most 12 ques
 | Opportunity (O) | likelihood | answer | the access or resources an exploit needs; shows the CVSS AV, AT, PR and UI metrics |
 | Size (S) | likelihood | set by vens | `exposure`: `internal` 4, `private` 6, `internet` 9 |
 | Ease of discovery (ED) | likelihood | set by vens | always 9 |
-| Ease of exploit (EE) | likelihood | answer | how easy the exploit is here; shows the CVSS AC, AT, PR and UI metrics and the five shown controls set to `true` |
+| Ease of exploit (EE) | likelihood | answer | how easy the exploit is here; shows the CVSS AC, AT, PR and UI metrics and five of the controls, when set to `true` |
 | Awareness (A) | likelihood | set by vens | always 9 |
 | Intrusion detection (ID) | likelihood | answer and `detection` | the lowest declared level among the channels the model picks; 9 when `detection` is left out |
 | Loss of confidentiality (LC) | technical impact | answer and `data_sensitivity` | how much data an exploit could read, crossed with the sensitivity; 2 when the CVSS vectors floor it |
