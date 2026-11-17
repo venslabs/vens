@@ -125,7 +125,7 @@ This explains the mechanism; it is not a measurement of accuracy.
 | Compliance frameworks | the model was told to add 2 for a compliance violation | the Non-compliance question names them and the model judges the violation |
 | `audit_requirement`, `ids`, `siem`, `edr` | shown to the model | move no score; `traceability` and `detection` replace them |
 
-Every score changes, whatever your `config.yaml` declares. Your file also needs `schema_version: 2`: see **[Migrating from vens v0.6](../reference/config-schema.md#migrating)**.
+Expect ratings to change, whatever your `config.yaml` declares. Your file also needs `schema_version: 2`: see **[Migrating from vens v0.6](../reference/config-schema.md#migrating)**.
 
 ---
 
@@ -139,7 +139,7 @@ The most common case. A CVE has a base score of 7.5 but:
 - The affected data is public, or the declared `data_subjects` caps Privacy violation
 - The service has low business criticality
 
-A generic 7.5 can come out `low` or `medium`. **You should not patch it urgently.**
+A generic 7.5 can come out `low` or `medium`. That rating is an input to your review, not a verdict: how well it matches real risk is not measured, and vens runs no reachability check of its own (see [Limitations](limitations.md)).
 
 ---
 

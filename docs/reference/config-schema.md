@@ -486,7 +486,7 @@ What each schema-1 key does once `schema_version: 2` is added and nothing else:
 
 Declaring the worst case (`traceability: none`, every channel `not_logged`, `data_subjects: millions`) gives the same levels as leaving the field out, without the warning or the counter, and passes the config check of `--strict`.
 
-Every score changes with v0.7.0, whatever the file declares: see **[CVSS vs OWASP contextual](../concepts/cvss-vs-owasp.md#what-changed-in-v070)**.
+Expect ratings to change with v0.7.0, whatever the file declares: see **[CVSS vs OWASP contextual](../concepts/cvss-vs-owasp.md#what-changed-in-v070)**.
 
 !!! warning "Upgrade every runner first"
     vens v0.6 and earlier ignore unknown keys, so they load a schema-2 file without an error and score it the old way. Upgrade every runner that reads the file, CI included, before you migrate it.

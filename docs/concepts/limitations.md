@@ -75,15 +75,15 @@ See [Privacy and data flow](privacy-and-data-flow.md) for the full list of what 
 
 ## 6. No HIPAA BAA or similar legal agreements
 
-Vens itself is an MIT-ish Apache 2.0 Go binary — it holds no data and signs no agreements. If you need a BAA, DPA, or equivalent for a cloud LLM provider, negotiate it directly with the provider on your provider account. For regulated workloads, the safest path is to deploy with Ollama on infrastructure you already have compliance coverage for, accepting the local-model quality tradeoff in limitation 7.
+Vens itself is an MIT-ish Apache 2.0 Go binary — it holds no data and signs no agreements. If you need a BAA, DPA, or equivalent for a cloud LLM provider, negotiate it directly with the provider on your provider account. For regulated workloads, the safest path is to deploy with Ollama on infrastructure you already have compliance coverage for; read limitation 7 on local models first.
 
 ---
 
-## 7. Local models underperform on this task today
+## 7. Local models did poorly on the earlier scoring
 
-Vens asks the LLM for structured JSON: for each question, one named answer per CVE from a closed list. Small local models (under ~7B parameters) frequently emit malformed JSON or give the same answer regardless of input. Smaller batches (`--llm-batch-size 3–5`) cut down the malformed JSON, but they do not fix the quality gap.
+Up to v0.6, vens asked the LLM for four component scores per CVE in structured JSON. Small local models (under ~7B parameters) frequently emitted malformed JSON or flat, uniform scores regardless of input. Smaller batches (`--llm-batch-size 3–5`) cut down the malformed JSON, but did not fix the quality gap. Larger local models were not a safe fix either: in the [benchmark](https://github.com/venslabs/vens-benchmark), which ran that scoring (limitation 2), the local models tried through Ollama all scored at or below a constant-guess baseline on the context task.
 
-Larger local models are not a safe fix either: in the [benchmark](https://github.com/venslabs/vens-benchmark), the local models tried through Ollama all scored at or below a constant-guess baseline on the context task. If you need air-gapped **and** high quality, that is a real gap right now.
+Since v0.7.0 the model picks, for each question, one named answer per CVE from a closed list. How local models do on these questions has not been measured. If you need an air-gapped setup, read a local model's answers on your own scans (`--debug-dir`) before you rely on its ratings.
 
 On cloud, the benchmark-backed picks are `claude-sonnet-4-6` (most accurate and stable) and `gpt-5.4-mini` (best value, run it a few times); `gemini-2.5-flash-lite` is fine only for rough triage. These come from the benchmark of the earlier scoring (limitation 2). See [Choosing a model](choosing-a-model.md).
 
@@ -115,7 +115,7 @@ vens sets Skill level, Ease of discovery and Awareness to 9 for every finding: e
 
 ## 11. Impact is the larger of the technical and the business impact
 
-OWASP rates impact on the business impact when the assessor holds good business impact information, and on the technical impact otherwise. vens cannot establish per finding that its business answers are such information: they are a model's reading of your deployment's description. So vens takes the larger of the two, extending to this choice the caution OWASP advises when several attacker groups or business impacts are possible; Dependency-Track's own OWASP severity, on its vulnerability-mirror path, takes the same larger value. A business impact lower than the technical impact never lowers a vens severity. On OWASP's own worked example, vens says High where OWASP says Low. If you hold the business information OWASP asks for, re-rate the four business factors of the vector and apply OWASP's choice.
+OWASP rates impact on the business impact when the assessor holds good business impact information, and on the technical impact otherwise. vens cannot establish per finding that its business answers are such information: they are a model's reading of your deployment's description. So vens takes the larger of the two, extending to this choice the caution OWASP advises when several attacker groups or business impacts are possible. A business impact lower than the technical impact never lowers a vens severity. On OWASP's own worked example, vens says High where OWASP says Low. If you hold the business information OWASP asks for, re-rate the four business factors of the vector and apply OWASP's choice.
 
 ---
 

@@ -1,7 +1,7 @@
 # Prioritize a backlog of 300 CVEs
 
 **Who this is for:** security engineers staring at a massive CVE report and asking _"which ones do I patch first?"_.
-**By the end of this page:** you have a ranked list of the CVEs that actually matter for your system, and a way to defer the rest.
+**By the end of this page:** you have your CVEs ranked by their risk in your context, and the top of the list to review first.
 
 This is the most common use case for Vens. It takes ~3 minutes end to end.
 
@@ -134,7 +134,7 @@ Example output (illustrative):
 ]
 ```
 
-**These are the CVEs you patch first.** Everything in the low band can be deferred or suppressed.
+**Review these CVEs first.** The rating is an input to that review, not a verdict: how well it matches real risk on your systems is not measured, and vens runs no reachability check of its own (see [Limitations](../concepts/limitations.md)). A CVE in the low band still needs a look before you defer it.
 
 !!! tip "Where is the reasoning?"
     Pass `--attest` for a sidecar whose claims hold, per CVE, one line per question answered, or `--debug-dir ./debug` to dump every prompt and response to disk, with `answers.json`. The reasoning is intentionally not embedded in the VEX file — VEX stays a pure CycloneDX document.

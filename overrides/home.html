@@ -25,36 +25,6 @@
           <code>go install github.com/venslabs/vens/cmd/vens@latest</code>
         </div>
       </div>
-
-      <div class="vens-hero__visual">
-        <div class="vens-rescore">
-          <p class="vens-rescore__cap">Same scan, re-scored for your system</p>
-          <div class="vens-viz">
-            <div class="vens-viz__row">
-              <span class="vens-viz__label">By CVSS</span>
-              <div class="vens-viz__bar">
-                <span class="vens-seg vens-seg--crit" style="flex-grow:58"></span>
-                <span class="vens-seg vens-seg--high" style="flex-grow:34"></span>
-                <span class="vens-seg vens-seg--med" style="flex-grow:8"></span>
-              </div>
-              <span class="vens-viz__n">300</span>
-            </div>
-            <div class="vens-viz__row">
-              <span class="vens-viz__label">By vens</span>
-              <div class="vens-viz__bar">
-                <span class="vens-seg vens-seg--crit" style="flex-grow:3"></span>
-                <span class="vens-seg vens-seg--high" style="flex-grow:7"></span>
-                <span class="vens-seg vens-seg--low" style="flex-grow:90"></span>
-              </div>
-              <span class="vens-viz__n vens-viz__n--good">~30</span>
-            </div>
-          </div>
-          <div class="vens-legend">
-            <span><i class="crit"></i> Critical / High</span>
-            <span><i class="low"></i> Low, in your context</span>
-          </div>
-        </div>
-      </div>
     </div>
   </section>
 
@@ -109,14 +79,6 @@
             <span class="vens-badge vens-badge--high">OWASP CRITICAL 54.4</span>
           </div>
           <p class="vens-ba__d">Info leak in a handler that processes thousands of people's PII under GDPR. Higher risk for your system, not lower.</p>
-        </div>
-        <div class="vens-ba__card">
-          <div class="vens-ba__flip">
-            <span class="vens-badge vens-badge--from">300 CVEs</span>
-            <span class="vens-ba__arrow">&rarr;</span>
-            <span class="vens-badge vens-badge--low">~30 urgent</span>
-          </div>
-          <p class="vens-ba__d">Context filters the backlog down to what actually applies to you. Stop patching by severity alone.</p>
         </div>
       </div>
       <p class="vens-note">Scenarios are illustrative. Actual scores depend on your <code>config.yaml</code> and the model you run. See <a href="{{ 'concepts/cvss-vs-owasp/' | url }}">CVSS vs OWASP contextual</a>.</p>

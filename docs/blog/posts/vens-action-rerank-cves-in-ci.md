@@ -108,7 +108,7 @@ jobs:
 
 Each run gives you a CycloneDX VEX (`vex-file`), your original Trivy report annotated with `Custom.owasp_score` and `Custom.owasp_vector` (`enriched-report`, when `enrich: true`), and per-severity counts as step outputs (`count-critical`, `count-high`, ...). Pipe the counts into dashboards, PR comments, whatever you already do with scan metrics.
 
-`fail-on-severity: critical` makes the step fail if any CVE comes out CRITICAL by OWASP (score >= 60; since vens v0.7.0, a HIGH likelihood and a HIGH impact on OWASP's matrix, whatever the score). Drop the line if you just want artifacts and a manual review.
+`fail-on-severity: critical` makes the step fail if any CVE comes out CRITICAL by OWASP (up to vens v0.6, a score of 60 or more; since v0.7.0, a HIGH likelihood and a HIGH impact on OWASP's matrix, whatever the score). Drop the line if you just want artifacts and a manual review.
 
 ## Things you'll probably want to tweak
 
