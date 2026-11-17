@@ -1,4 +1,4 @@
-# Prioritize a backlog of 300 CVEs
+# Prioritize a CVE backlog
 
 **Who this is for:** security engineers staring at a massive CVE report and asking _"which ones do I patch first?"_.
 **By the end of this page:** you have your CVEs ranked by their risk in your context, and the top of the list to review first.
@@ -212,18 +212,7 @@ For a turnkey Action, see [GitHub Actions integration](github-actions.md). The m
 !!! tip "Air-gapped CI"
     Swap the `Install Vens` step for a prebuilt binary download (see [Installation](../getting-started/installation.md#option-3-prebuilt-binary)) and replace the OpenAI env vars with `OLLAMA_MODEL` + `OLLAMA_HOST` pointing at your internal Ollama server. Nothing else in the pipeline changes.
 
-This fails the build only when there is **real** risk, not when the scanner finds a CVSS 7 in a component you don't execute.
-
----
-
-## What this changes
-
-| | Without Vens | With Vens |
-|---|---|---|
-| Engineering time per release | hours triaging 300 CVEs | minutes reviewing top 10 |
-| CI failures | flaky (every new CVE blocks) | meaningful (only real risk blocks) |
-| Backlog | always growing | stays manageable |
-| Developer trust | "the scanner is noise" | "this score means something" |
+This step fails the build when at least one vulnerability in the VEX carries an OWASP rating of `high` or `critical`, the severities in the two `IN(...)` filters; edit both to gate on other severities. vens-action's `fail-on-severity` does the same for the level you set and every level above it: see the [GitHub Actions guide](github-actions.md).
 
 ---
 

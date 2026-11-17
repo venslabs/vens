@@ -7,7 +7,7 @@
 
 # vens — Prioritize vulnerabilities by real risk, not just the generic CVSS score
 
-**Your scanner found 300 CVEs. Which ones actually matter?** Vens takes a Trivy or Grype report, combines it with a description of _your_ system (exposure, data sensitivity, compliance, security controls), and scores every CVE based on its real risk to you — not just its generic severity.
+**Your scanner hands you a long list of CVEs. Which ones actually matter?** Vens takes a Trivy or Grype report, combines it with a description of _your_ system (exposure, data sensitivity, compliance, security controls), and scores every CVE based on its real risk to you — not just its generic severity.
 
 The output is a [CycloneDX VEX](https://www.ntia.gov/files/ntia/publications/vex_one-page_summary.pdf) file with [OWASP Risk Rating](https://owasp.org/www-community/OWASP_Risk_Rating_Methodology) scores.
 Your CI gate fails the build on it, and [Dependency-Track 5.1+](https://venslabs.github.io/vens/guides/dependency-track/) puts it on every matching finding.
