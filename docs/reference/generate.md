@@ -193,7 +193,7 @@ The JSON Schema of each reply is sent to the provider with the call, not written
 
 Numbers count LLM calls, not `--llm-batch-size` batches: each batch makes one call per question, a call the provider truncates is retried in two halves, and the CVEs a reply leaves out are asked again in one more call, each with its own number.
 
-Each run also writes **`answers.json`**: for each CVE, each of the 16 factors in the vector's order with the answer as the reply wrote it (when the question was asked), how vens read it (`answered`, `cannot_tell`, `invalid` for an answer off its list, `no_description`), the level, and where the level came from (`answer`, `constant`, `config`, `floor`, `adjustment`); whether the adjustment was made and how it read; the CVE's counters; and the run's counters summed. A run that fails also lists, without levels, the CVEs of the batch it failed in. It holds no reasoning and no CVE text, but keeps each answer verbatim.
+Each run also writes **`answers.json`**: for each CVE, each of the 16 factors in the vector's order with the answer as the reply wrote it (when the question was asked), how vens read it (`answered`, `cannot_tell`, `invalid` for an answer off its list, `no_description`), the level, and where the level came from (`answer`, `constant`, `config`, `floor`, `adjustment`); whether the adjustment was made and how it read; the CVE's counters; and the run's counters summed. A run that fails also lists, marked `unrated` and without levels, the CVEs of the batch it failed in that already had answers. It holds no reasoning and no CVE text, but keeps each answer verbatim.
 
 ```json
 {
