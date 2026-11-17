@@ -43,6 +43,17 @@ func countersOf(r capturedRecord) map[string]int64 {
 	return out
 }
 
+// defectsOf reads the summary's defects.
+func defectsOf(r capturedRecord) map[string]int {
+	out := map[string]int{}
+	for k, v := range r.attrs {
+		if kind, ok := strings.CutPrefix(k, "defects."); ok {
+			out[kind] = int(v.(int64))
+		}
+	}
+	return out
+}
+
 // Every batch logs its composition at debug level, and the run closes with an
 // INFO summary: rows, distinct CVEs, the calls, per question too, the
 // asks-again and splits, and each counter that is not zero.

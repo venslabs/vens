@@ -194,7 +194,7 @@ The JSON Schema of each reply is sent to the provider with the call, not written
 
 Numbers count LLM calls, not `--llm-batch-size` batches: each batch makes one call per question, a call the provider truncates is retried in two halves, and the CVEs a reply leaves out are asked again in one more call, each with its own number.
 
-Each run also writes **`answers.json`**: for each CVE, each of the 16 factors in the vector's order with the answer as the reply wrote it (when the question was asked), how vens read it (`answered`, `cannot_tell`, `invalid` for an answer off its list, and `no_description` for Motive, Opportunity and Ease of exploit of a CVE with no description, which are not asked and have no answer), the level, and where the level came from (`answer`, `constant`, `config`, `floor`, `adjustment`); whether the adjustment was made and how it read; the CVE's counters; and the run's counters summed. A run that fails also lists, marked `unrated` and without levels, the CVEs of the batch it failed in that already had answers. It holds no reasoning and no CVE text, but keeps each answer verbatim. From a mock run (`--llm=mock`) on `examples/quickstart`'s Trivy report with `data_subjects`, `detection` and `traceability` removed from its `config.yaml`, so their fallbacks are counted:
+Each run also writes **`answers.json`**: for each CVE, each of the 16 factors in the vector's order with the answer as the reply wrote it (when the question was asked), how vens read it (`answered`, `cannot_tell`, `invalid` for an answer off its list, and `no_description` for Motive, Opportunity and Ease of exploit of a CVE with no description, which are not asked and have no answer), the level, and where the level came from (`answer`, `constant`, `config`, `floor`, `adjustment`); whether the adjustment was made and how it read; the CVE's counters; the run's counters summed; and the run's `defects`: each kind the [run summary](#the-run-summary)'s `defects.*` counts, under the same name and with the same total, only those found (`{}` when the replies held none). A run that fails also lists, marked `unrated` and without levels, the CVEs of the batch it failed in that already had answers, and its `defects` are those counted before it stopped. It holds no reasoning and no CVE text, but keeps each answer verbatim. From a mock run (`--llm=mock`) on `examples/quickstart`'s Trivy report with `data_subjects`, `detection` and `traceability` removed from its `config.yaml`, so their fallbacks are counted:
 
 ```json
 {
@@ -211,7 +211,8 @@ Each run also writes **`answers.json`**: for each CVE, each of the 16 factors in
     },
     ...
   ],
-  "counters": { "applicability_missing": 5, "data_subjects_missing": 25, "detection_undeclared": 45, "ease_of_exploit_cannot_tell": 4, "motive_cannot_tell": 4, "opportunity_cannot_tell": 4, "traceability_missing": 45 }
+  "counters": { "applicability_missing": 5, "data_subjects_missing": 25, "detection_undeclared": 45, "ease_of_exploit_cannot_tell": 4, "motive_cannot_tell": 4, "opportunity_cannot_tell": 4, "traceability_missing": 45 },
+  "defects": {}
 }
 ```
 
@@ -337,7 +338,7 @@ level=INFO msg="Scoring run finished" rows=107 cves=45 llm_calls=61 asked_again=
 
 A run that fails `--strict`'s check before any LLM call (a CVE without a usable CVSS vector or without a description) logs it too, with `llm_calls=0`, no counters and `failed=true`. A run that stops earlier logs no summary, such as one whose config fails to load or fails `--strict`'s config check (`data_subjects`, `detection` or `traceability` left out); a report with no vulnerabilities logs none either.
 
-`--debug-dir` writes the same counters, per CVE, to `answers.json`.
+`--debug-dir` writes the same counters, per CVE, and the same defects to `answers.json`.
 
 ---
 
