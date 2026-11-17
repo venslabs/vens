@@ -34,7 +34,9 @@ import (
 // stays one line, and no malformed reply lowers a level: an answer Go does
 // not read as answered keeps cannot_tell's, and an entry, or a reply outside
 // its entries, that writes a key twice is read as off the list. A clean
-// entry is read as it writes its answer.
+// entry is read as it writes its answer. A reply that is no JSON object of
+// answers each an object reads with an error, only its object entries
+// answering.
 func FuzzReadReplies(f *testing.F) {
 	const (
 		a = `"vulnId":"CVE-2024-0000"`
@@ -64,6 +66,10 @@ func FuzzReadReplies(f *testing.F) {
 		{contract.M, `{"answers":[null]}`},
 		{contract.M, `{"answers":null}`},
 		{contract.M, `{"answers":[1]}`},
+		{contract.M, `{"answers":[{` + a + `,"answer":"high_reward","reasoning":"r"},"x",[{"a":1,"a":2}],{` + b + `,"answer":"low_or_no_reward","reasoning":"r"}]}`},
+		{contract.M, `{"answers":"x"}`},
+		{contract.M, `[{"answers":[{` + a + `,"answer":"high_reward","reasoning":"r"}]}]`},
+		{contract.M, `{"answers":[{` + a + `,"answer":"high_reward","reasoning":"r"},{` + b + `,"ans`},
 		{contract.M, `{"answer":1e400,"answer":2}`},
 		{contract.M, `not json`},
 	} {
@@ -74,9 +80,7 @@ func FuzzReadReplies(f *testing.F) {
 		order := contract.Order()
 		q := order[int(question)%len(order)]
 		got, err := readReplies(context.Background(), newScoringRun(), q, raw, "", h.cves)
-		if err != nil {
-			return
-		}
+		require.Equal(t, readable(raw), err == nil, "an error when the reply, or an answer of it, is not the JSON asked: %v", err)
 		items := replyItems(raw)
 		outside := dropped([]byte(raw))
 		for _, item := range items {
@@ -241,6 +245,38 @@ func replyItems(raw string) []json.RawMessage {
 		_ = json.Unmarshal(top["answers"], &items)
 	}
 	return items
+}
+
+// readable reports whether raw is a reply shaped as the schema writes it: a
+// JSON object whose answers, when it has them, are an array of objects.
+func readable(raw string) bool {
+	if !json.Valid([]byte(raw)) {
+		return false
+	}
+	dec := json.NewDecoder(strings.NewReader(raw))
+	dec.UseNumber()
+	var top any
+	if dec.Decode(&top) != nil {
+		return false
+	}
+	fields, ok := top.(map[string]any)
+	if !ok {
+		return false
+	}
+	list, ok := fields["answers"]
+	if !ok {
+		return true
+	}
+	items, ok := list.([]any)
+	if !ok {
+		return false
+	}
+	for _, item := range items {
+		if _, ok := item.(map[string]any); !ok {
+			return false
+		}
+	}
+	return true
 }
 
 // firstEntry is the first of items whose vulnId is id.

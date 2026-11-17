@@ -162,14 +162,20 @@ Or force a provider explicitly: `--llm ollama`.
 
 ## `unable to parse LLM output`
 
-The LLM returned text that is not valid JSON matching the expected schema. Possible causes:
+A reply to a question was not the JSON its schema asks for: text that is not JSON, JSON cut short, or JSON of another shape. Vens reads such a reply as no answer for the CVEs it should have carried, and skips an answer of it that is not a JSON object, keeping the others. It logs a `WARN` quoting the start of the reply, counts the reply in the run summary under `defects.reply_unreadable`, and asks again for the CVEs left without an answer, once, as for CVEs a reply leaves out. A CVE still without an answer stops the run, no VEX is written, and the error ends with what Vens could not read:
+
+```text
+failed to generate risk scores: model returned no answer to Motive (M) for CVE-2024-1234 after asking again; stopping the run: unable to parse LLM output: the reply is not JSON: unexpected end of JSON input: "{\"answers\":[{\"vulnId\":\"CVE-2024-1234\",\"reasoning\":\"The parser"
+```
+
+Possible causes:
 
 - **Small / local model with weak JSON compliance.** Vens asks for structured JSON: for each question, one named answer and one sentence of reasoning per CVE. On the scoring of earlier versions, which asked for four component scores per CVE, models under 7B parameters routinely failed on batches of 10. These recommendations for Ollama come from then and have not been rechecked on the v0.7.0 questions:
     - `llama3.1:70b` / `llama3.3:70b` — robust on the default batch size of 10.
     - `llama3.1:8b`, `mistral:7b` — work with `--llm-batch-size 3` to `5`.
     - Anything smaller (`phi3:mini`, `gemma:2b`, …) — expect frequent failures; use only for smoke tests.
 - **Prompt truncation on small context windows.** Reduce `--llm-batch-size`.
-- **Provider-side safety filter** trimmed the response. The reply that failed to parse is the last `batch-NNNNN.response` in the run's `vens-debug/run-*/` directory, next to the two prompts that produced it: inspect them and re-run the batch that failed.
+- **Provider-side safety filter** trimmed the response. Each reply Vens could not read is whole in its `batch-NNNNN.response`, in the run's `vens-debug/run-*/` directory, next to the two prompts that produced it: inspect them and re-run.
 
 ---
 
@@ -221,10 +227,10 @@ A row in the scanner report gives Vens nothing to point the VEX at: no usable PU
 Vens processes CVEs in batches (default 10, tunable via `--llm-batch-size`), one call per question per batch. Provider errors fail the whole run; a CVE the model leaves out or answers badly is handled CVE by CVE:
 
 - **Rate limit on a call** → Vens retries that call up to 10 times with a 10 s backoff (`pkg/llm`). If all retries fail, the whole `vens generate` run exits with a non-zero status and the output VEX file is not written. This is intentional — a partial VEX would be misleading.
-- **LLM returns malformed JSON that cannot be parsed** → Vens exits with `unable to parse LLM output: ...`. The failing reply is included in the error message; use `--debug-dir` to capture the exact prompt so you can reproduce or downgrade the batch size.
 - **Network error / provider outage mid-run** → same behaviour: exit non-zero, no partial VEX.
 - **The provider truncates a call** → Vens asks each half of its CVEs on its own, down to a single CVE.
 - **The LLM leaves CVEs out of its answer** → Vens asks for them again, together, in one more call. If one is still missing, the run stops there, names the question and the missing CVEs and writes no VEX.
+- **The LLM returns a reply that cannot be read** (not JSON, cut short without the provider flagging it, or JSON of another shape) → Vens reads it as no answer for the CVEs it should have carried, keeping any answer of it that is a JSON object, logs a `WARN` quoting the start of the reply and counts it under `defects.reply_unreadable`. Those CVEs are asked again with the ones left out; one still without an answer stops the run as above, and the error ends with `unable to parse LLM output: ...`, quoting the start of the reply. `--debug-dir` keeps each reply whole, beside its prompts, so you can reproduce it or lower the batch size.
 - **The LLM answers `cannot_tell`, or off the list** → Vens uses the question's worst answer and counts it in the run summary; under `--strict` the run stops instead.
 - **An adjustment reply cannot be read** → the CVE keeps the levels its questions gave; the run summary counts it under `defects`.
 
