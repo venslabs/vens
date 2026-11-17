@@ -163,7 +163,7 @@ You now have CVEs ranked by vens's computed rating, ready for review.
 ## What just happened
 
 1. Trivy found every known CVE in the image.
-2. You described _your_ system in 15 lines of YAML.
+2. You described _your_ system in 19 lines of YAML.
 3. Vens asked an LLM closed questions about each CVE in your context, one question per call, and computed the 16 OWASP levels, the severity and the score from the answers.
 4. You got a VEX file where a generic CVSS 7.5 may become a contextual `low` — or a generic CVSS 5.3 may become a `critical`.
 

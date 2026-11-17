@@ -42,7 +42,7 @@ Your `config.yaml` fields work in two ways. A field **shown to the model** is co
 | `traceability` | vens reads it alone, for Loss of accountability | An attacker who leaves no trace is worse. |
 | `detection` | vens reads it alone, for Intrusion detection | An attempt nobody records goes unseen. |
 | `data_subjects` | vens reads it alone, to cap Privacy violation | A leak of a hundred people's data is not a leak of millions. |
-| `listener` | shown in every call | A batch job accepts no connection. |
+| `listener` | shown in every call when `present` or `absent` | A batch job accepts no connection. |
 | `controls.*` | the Ease of exploit question shows five of them | A WAF makes some exploits harder. |
 | `notes` | shown in every call | What the other fields cannot say about your architecture. |
 

@@ -97,11 +97,13 @@ Since v0.7.0 each batch makes one call per question, so a run makes several call
 
 ---
 
-## 9. No reachability analysis
+## 9. No reachability analysis, and no applicability check
 
-Vens reasons from CVE metadata (id, title, description, package) plus your text-described context. It **does not** inspect your source code, build graph, call graph, or runtime. If a CVE lives in a code path your build never executes, Vens will only know about it if you mention it in `notes` or if the CVE description makes it obvious.
+Vens reasons from CVE metadata (id, title, description, severity, package) and the CVSS vectors in the scanner's report, plus your text-described context. It **does not** inspect your source code, build graph, call graph, or runtime. If a CVE lives in a code path your build never executes, Vens will only know about it if you mention it in `notes` or if the CVE description makes it obvious.
 
 vens has no reachability check of its own. A reachability verdict in `notes` reaches the rating only through the model's answers, chiefly Opportunity and Ease of exploit, and nothing guarantees that the model lowers them. The loss floors that come from the scan are the CVSS vectors': an axis every vector of the CVE rates as no impact takes its lowest level. Fixed rules and your config set other levels without asking the model, such as Non-compliance at 2 when no framework is declared and Privacy violation at 3 when `data_subjects` is `none` or `one_individual`. Even with Opportunity at 0 and Ease of exploit at 1, the likelihood stays at 4.25 or above (limitation 10), so an unreachable CVE is never published as `info`: it rates through OWASP's matrix like any other, `low` at best with a LOW impact.
+
+Nor does vens check whether a CVE applies to your image: no finding is set aside, and no loss floored, because its description names a platform, a runtime version or a package your image does not have, or because its path needs a listening service and `listener` is `absent`. `listener` is only shown to the model, and every CVE in the scanner's report is rated.
 
 For true reachability signals, chain a dedicated tool (Semgrep Code, Snyk Reachability, Endor Labs…) in front of Vens and paste its conclusions into `config.yaml` `notes`. See [Alternatives](alternatives.md).
 
@@ -123,7 +125,7 @@ OWASP rates impact on the business impact when the assessor holds good business 
 
 Vens is under active development and has not reached a 1.0 release yet. The CLI flags and `config.yaml` schema may evolve between minor versions. Pin a specific version in CI (`go install github.com/venslabs/vens/cmd/vens@vX.Y.Z`) and read the release notes before upgrading.
 
-`config.yaml` carries `schema_version`, and vens refuses a file written for another version instead of reading it differently. The version goes up only when a file valid today would change meaning or stop loading; a new optional field whose omission keeps today's behaviour, or a new value in a list, does not raise it. A field no factor reads any more stays in the schema, documented as moving nothing, as `audit_requirement` does. Since unknown keys are refused, an older vens fails on a file that uses a field it does not know, rather than scoring it differently.
+Since v0.7.0, `config.yaml` carries `schema_version`, and vens refuses a file written for another version instead of reading it differently. The version goes up only when a file valid today would change meaning or stop loading; a new optional field whose omission keeps today's behaviour, or a new value in a list, does not raise it. A field no factor reads any more stays in the schema, documented as moving nothing, as `audit_requirement` does. Unknown keys are refused too, so a vens from v0.7.0 on fails on a file that uses a field it does not know, rather than scoring it differently. vens v0.6 and earlier ignore unknown keys: they load a schema-2 file without an error and score it the old way, so upgrade every runner that reads the file before you migrate it.
 
 ---
 
