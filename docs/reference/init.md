@@ -37,6 +37,8 @@ Ask a short series of questions about the system being scored and write the answ
 
 Before traceability, listener, data subjects and detection, the wizard prints what the field and each value mean, in the words of the **[config.yaml reference](config-schema.md)**; each control is asked with its scope. An invalid answer is re-prompted instead of failing. The generated file starts with `schema_version: 2` and is validated before it is written: `vens init` parses the final file (header included) and refuses to write a config `vens generate` would reject.
 
+Traceability, data subjects or detection skipped with Enter is left out of the file. `vens generate` then warns at load and uses that field's worst case, and `--strict` refuses the file: see **[Load errors and warnings](config-schema.md#load-errors)**.
+
 ---
 
 ## Flags
