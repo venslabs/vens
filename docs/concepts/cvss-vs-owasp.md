@@ -152,7 +152,7 @@ Less common but critical. A CVE has a base score of 5.3, "medium", but:
 - The service is publicly exposed and accepts connections
 - Many people's personal data could be disclosed, within the declared `data_subjects`
 
-A generic 5.3 can come out `high` or `critical`. **This is the CVE you patch first, and it was buried in your scanner report.**
+A generic 5.3 can come out `high` or `critical`, which moves the CVE from deep in your scanner report to near the top of your review. That rating is an input to the review, not a patch decision.
 
 ---
 

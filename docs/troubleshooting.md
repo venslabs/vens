@@ -164,7 +164,7 @@ Or force a provider explicitly: `--llm ollama`.
 
 The LLM returned text that is not valid JSON matching the expected schema. Most common causes:
 
-- **Small / local model with weak JSON compliance.** Vens asks for structured JSON: for each question, one named answer and one sentence of reasoning per CVE. Models under 7B parameters routinely fail this on batches of 10. Concrete recommendations for Ollama:
+- **Small / local model with weak JSON compliance.** Vens asks for structured JSON: for each question, one named answer and one sentence of reasoning per CVE. On the scoring of earlier versions, which asked for four component scores per CVE, models under 7B parameters routinely failed on batches of 10. These recommendations for Ollama come from then and have not been rechecked on the v0.7.0 questions:
     - `llama3.1:70b` / `llama3.3:70b` — robust on the default batch size of 10.
     - `llama3.1:8b`, `mistral:7b` — work with `--llm-batch-size 3` to `5`.
     - Anything smaller (`phi3:mini`, `gemma:2b`, …) — expect frequent failures; use only for smoke tests.
@@ -253,7 +253,7 @@ Vens **does** score every CVE — that part is not broken. Some sameness is buil
 2. Are the three required fields in `config.yaml` actually representative of the production deployment? (Don't leave `exposure: internal` when it's public-facing.)
 3. Did you enable the **real** controls in `context.controls`? Not wishful ones.
 4. Did you fill `context.notes` with 2–3 sentences of architecture? Every question shows it.
-5. For local models: is your Ollama model large enough? (See [Ollama JSON compliance](#unable-to-parse-llm-output) above — small models sometimes give the same answer to every CVE even when they emit valid JSON.)
+5. For local models: is your Ollama model large enough? On the scoring of earlier versions, small models sometimes gave flat, uniform scores even when they emitted valid JSON (see [Ollama JSON compliance](#unable-to-parse-llm-output) above). Their answers to the v0.7.0 questions have not been measured, so read them in `--debug-dir`.
 
 See [Describe your system context](guides/configuration.md) for the checklist.
 

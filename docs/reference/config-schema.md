@@ -309,10 +309,10 @@ schema_version must be the integer 2, got "2"
 
 ### E3: unknown key
 
-A key that schema 2 does not have, with its line and where it sits. A misspelled key is refused rather than ignored:
+A key that schema 2 does not have, with its line and where it sits. A misspelled key is refused rather than ignored; for `tracability:` written on line 10 of the file:
 
 ```text
-config.yaml line 8: unknown key `tracability` under context
+config.yaml line 10: unknown key `tracability` under context
 ```
 
 A key outside `project` and `context` reads `at the top level` instead of `under context`.

@@ -48,7 +48,7 @@ Every model in the table above qualifies; older lines (GPT-3.5, GPT-4 Turbo, Cla
 
 ## Local models
 
-Not there yet. Every local model tested (via Ollama: `llama3.2`, `qwen2.5:7b`, `gemma2:9b`, `deepseek-r1:8b`) came out statistically indistinguishable from a constant-guess baseline — their confidence intervals overlap the 1.57 floor — and only the reasoning model engaged the context at all. For context-conditioned scoring today, a small local model is close to not using an LLM.
+In the benchmark, which ran the earlier four-number scoring, every local model tested (via Ollama: `llama3.2`, `qwen2.5:7b`, `gemma2:9b`, `deepseek-r1:8b`) came out statistically indistinguishable from a constant-guess baseline — their confidence intervals overlapped the 1.57 floor — and only the reasoning model engaged the context at all. On that task, a small local model was close to not using an LLM. How local models do on the closed questions of vens v0.7.0 has not been measured: read a local model's answers on your own scans (`--debug-dir`) before you rely on its ratings.
 
 See the [paper](../assets/vens-benchmark.pdf) for the method, the two showcases (a 10.0 that ends LOW, a 6.5 that ends HIGH), and where the models (and the test itself) break.
 
