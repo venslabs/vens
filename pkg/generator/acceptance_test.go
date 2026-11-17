@@ -138,6 +138,9 @@ func TestProviderAcceptanceGate(t *testing.T) {
 		"an adjustment answer off its list": {&fakeLLM{reply: adjustment(
 			`{"reasoning":"r","opportunity":"bogus",` + axes + `}`,
 		)}, "defects.adjustment_off_list: 1"},
+		"two adjustment answers off their lists, counted per field": {&fakeLLM{reply: adjustment(
+			`{"reasoning":"r","opportunity":"bogus","confidentiality":"bogus","integrity":"affected","availability":"affected"}`,
+		)}, "defects.adjustment_off_list: 2"},
 		"an adjustment field not asked": {&fakeLLM{reply: adjustment(
 			`{"reasoning":"r","opportunity":"keep",` + axes + `,"notes":"n"}`,
 		)}, "defects.adjustment_field_not_asked: 1"},
