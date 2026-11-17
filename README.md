@@ -177,7 +177,7 @@ vens enrich --vex output.vex.json --output enriched-report.json report.json
 
 - **[📖 Full Documentation](https://venslabs.github.io/vens/)** — installation, guides, reference
 - **[5-minute Quickstart](https://venslabs.github.io/vens/getting-started/quickstart/)** — your first VEX
-- **[Prioritize a CVE backlog](https://venslabs.github.io/vens/guides/prioritize-cves/)** — the common use case
+- **[Prioritize a CVE backlog](https://venslabs.github.io/vens/guides/prioritize-cves/)** — the main use case
 - **[CVSS vs OWASP contextual](https://venslabs.github.io/vens/concepts/cvss-vs-owasp/)** — why the scores move
 - **[Choosing an LLM](https://venslabs.github.io/vens/concepts/choosing-a-model/)** — which model to run, backed by a [benchmark](https://venslabs.github.io/vens/assets/vens-benchmark.pdf)
 - [Complete Example](examples/quickstart/) - 107 real CVEs comparison

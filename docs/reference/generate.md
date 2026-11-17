@@ -435,4 +435,4 @@ trivy vens generate --config-file vens.yaml --sbom-serial-number "$SBOM_UUID" re
 
 - **[config.yaml reference](config-schema.md)** — every field of the context file
 - **[Quickstart](../getting-started/quickstart.md)** — end-to-end walkthrough
-- **[Prioritize a CVE backlog](../guides/prioritize-cves.md)** — the common use case
+- **[Prioritize a CVE backlog](../guides/prioritize-cves.md)** — the main use case
