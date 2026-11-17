@@ -92,17 +92,17 @@ vens generate \
   output.vex.json
 ```
 
-You will see progress logs as Vens asks the LLM its questions, batch by batch:
+You will see progress logs as Vens asks the LLM its questions, batch by batch. With this config and the Trivy report in `examples/quickstart/reports/`:
 
 ```
 INFO Config loaded schema_version=2 project=my-python-api exposure=internet ... undeclared=""
-INFO Processing vulnerabilities count=47
+INFO Processing vulnerabilities count=107
 INFO Scored vulnerability vuln=CVE-... score=43.3125 severity=high vector=SL:9/M:4/O:9/S:9/...
 ...
-INFO Scoring run finished rows=47 cves=21 llm_calls=... calls.M=3 ... failed=false
+INFO Scoring run finished rows=107 cves=45 llm_calls=66 asked_again=0 splits=0 calls.M=5 ... calls.adjustment=6 ... failed=false
 ```
 
-Each batch of up to 10 CVEs makes one call per question, so runtime grows with the number of distinct CVEs and depends on the LLM provider. The last line counts the calls and any fallback the run used: see [The run summary](../reference/generate.md#the-run-summary).
+Your own scan gives other counts, and your model's answers set the scores. Each batch of up to 10 CVEs makes one call per question, so runtime grows with the number of distinct CVEs and depends on the LLM provider. The last line counts the calls and any fallback the run used: see [The run summary](../reference/generate.md#the-run-summary).
 
 !!! tip "Pin the UUID per service, not per run"
     For ad-hoc exploration it is fine to generate a fresh UUID on every run. In CI or for any service you will rescan regularly, **pin a single UUID per service** (as a repo/environment variable) and reuse it forever. BOM-Link references stay stable across scans, which is what downstream tools (Trivy, Dependency-Track, custom dashboards) expect when correlating VEX documents back to the same service over time.

@@ -60,7 +60,7 @@ The same applies to `schema_version 1 is not supported`. `schema_version must be
 ## `unknown key` in `config.yaml`
 
 ```text
-config.yaml line 8: unknown key `tracability` under context
+config.yaml line 10: unknown key `tracability` under context
 ```
 
 A key schema 2 does not have, usually a typo. vens v0.6 and earlier ignored it, so a misspelled `compliance_requirement:` silently dropped your frameworks; schema 2 refuses the file and names the line. This one fails:

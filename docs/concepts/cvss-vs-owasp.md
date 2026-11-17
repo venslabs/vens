@@ -21,7 +21,7 @@ CVSS does have environmental metrics for exactly this, and they are the right id
 
 Two services both contain `libfoo-1.2.3` with a hypothetical CVE `CVE-XXXX-YYYY`. The CVE is a denial-of-service in a CSV parsing function, and its CVSS vectors give no confidentiality or integrity impact.
 
-**CVSS says:** 8.8 HIGH. That is the base score, and it is the same wherever the component runs.
+**CVSS says:** 7.5 HIGH. That is the base score, and it is the same wherever the component runs.
 
 **Vens says, for service A (internal dashboard, no CSV parsing in production):**
 ```
@@ -117,7 +117,7 @@ This explains the mechanism; it is not a measurement of accuracy.
 | | Up to v0.6 | Since v0.7.0 |
 |---|---|---|
 | What the model returns | four numbers from 0 to 9 per CVE: threat agent, vulnerability, technical impact, business impact | one named answer per question, from a closed list; never a number |
-| Calls | one call per batch of CVEs | one call per question per batch, at most 12 per CVE, and one adjustment call per flagged CVE |
+| Calls | one call per batch of CVEs | one call per question per batch, at most 12 questions per CVE, and one adjustment call per flagged CVE |
 | The 16 levels in the vector | each of the four numbers repeated over its group's four factors | 4 set by vens, 8 read from an answer, 4 from an answer combined with a declared field or a CVSS floor |
 | Impact | the average of the technical and the business impact | the larger of the two |
 | Severity | bands of the score: 0–4 `info`, 5–19 `low`, 20–39 `medium`, 40–59 `high`, 60–81 `critical` | OWASP's matrix of the likelihood and impact levels; never `info` |
@@ -131,7 +131,7 @@ Every score changes, whatever your `config.yaml` declares. Your file also needs 
 
 ## Why scores go _down_ from CVSS
 
-The most common case. A CVE has a base score of 8.8 but:
+The most common case. A CVE has a base score of 7.5 but:
 
 - The vulnerable code path is not used in your build: the model reads it from the CVE description and your `notes`, and answers Opportunity and Ease of exploit accordingly
 - A control in front of the service stands in the way of this exploit, and the model judges it does
@@ -139,7 +139,7 @@ The most common case. A CVE has a base score of 8.8 but:
 - The affected data is public, or the declared `data_subjects` caps Privacy violation
 - The service has low business criticality
 
-A generic 8.8 can come out `low` or `medium`. **You should not patch it urgently.**
+A generic 7.5 can come out `low` or `medium`. **You should not patch it urgently.**
 
 ---
 

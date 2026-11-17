@@ -18,7 +18,7 @@ Your CI gate fails the build on it, and [Dependency-Track 5.1+](https://venslabs
 
 ## Why vens?
 
-OWASP Risk Rating reflects your system's exposure, data, records and controls — not just generic CVE severity. For each CVE, the LLM answers closed questions about the 16 OWASP factors in your context; vens computes every level, the severity from OWASP's likelihood × impact matrix, and a 0-81 score to sort CVEs within a severity:
+OWASP Risk Rating reflects your system's exposure, data, records and controls — not just generic CVE severity. For each CVE, the LLM answers closed questions about 12 of the 16 OWASP factors in your context; vens computes every level, the severity from OWASP's likelihood × impact matrix, and a 0-81 score to sort CVEs within a severity:
 
 | Scenario | CVSS base | OWASP (Contextual) | Why? |
 |-----|----------------|-------------------|------|
