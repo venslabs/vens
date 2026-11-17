@@ -15,18 +15,21 @@
 package ollama
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 
 	oapi "github.com/ollama/ollama/api"
 
 	"github.com/venslabs/vens/pkg/llm"
+	"github.com/venslabs/vens/pkg/llm/providers/internal/schematest"
 )
 
 // newFakeServer registers a POST /api/chat handler that records the decoded
@@ -248,6 +251,34 @@ func TestGenerate_Branches(t *testing.T) {
 			}
 			if out != tt.wantOut {
 				t.Errorf("out = %q, want %q", out, tt.wantOut)
+			}
+		})
+	}
+}
+
+// The schema goes out as format, as vens wrote it, its properties in the
+// frame's order rather than sorted.
+func TestGenerate_SchemaKeepsPropertyOrder(t *testing.T) {
+	for _, f := range schematest.Frames {
+		t.Run(f.Name, func(t *testing.T) {
+			frame := f.Read(t)
+			var got oapi.ChatRequest
+			srv := newFakeServer(t, http.StatusOK, `{"message":{"content":"{}"},"done":true,"done_reason":"stop"}`, &got)
+			t.Setenv("OLLAMA_HOST", srv.URL)
+			c, err := New("llama3.1")
+			if err != nil {
+				t.Fatalf("New: %v", err)
+			}
+
+			if _, err := c.Generate(context.Background(), llm.Request{System: "s", Human: "h", Schema: frame}); err != nil {
+				t.Fatalf("Generate: %v", err)
+			}
+			// Format is a json.RawMessage: it holds the bytes the request carried.
+			if names := schematest.PropertyNames(t, got.Format, f.Object...); !slices.Equal(names, f.Order) {
+				t.Errorf("properties sent in order %v, want %v", names, f.Order)
+			}
+			if !bytes.Equal(got.Format, frame) {
+				t.Errorf("format sent:\n%s\nwant the frame:\n%s", got.Format, frame)
 			}
 		})
 	}

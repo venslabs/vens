@@ -22,10 +22,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/venslabs/vens/pkg/llm"
+	"github.com/venslabs/vens/pkg/llm/providers/internal/schematest"
 )
 
 const testModel = "gemini-2.5-flash"
@@ -81,8 +83,9 @@ func firstPartText(content map[string]any) string {
 	return s
 }
 
-// The outgoing request carries the schema in responseJsonSchema, the system
-// instruction, an explicit temperature=0 and a non-zero seed.
+// The outgoing request carries the schema in responseJsonSchema, its property
+// order in propertyOrdering, the system instruction, an explicit temperature=0
+// and a non-zero seed.
 func TestGenerate_RequestShape(t *testing.T) {
 	var rec recordedReq
 	success := `{"candidates":[{"content":{"parts":[{"text":"{\"ok\":true}"}],"role":"model"},"finishReason":"STOP"}]}`
@@ -115,7 +118,7 @@ func TestGenerate_RequestShape(t *testing.T) {
 		t.Fatalf("responseMimeType = %v", gen["responseMimeType"])
 	}
 	var wantSchema any
-	_ = json.Unmarshal(schema, &wantSchema)
+	_ = json.Unmarshal([]byte(`{"type":"object","properties":{"ok":{"type":"boolean"}},"propertyOrdering":["ok"],"additionalProperties":false}`), &wantSchema)
 	if !reflect.DeepEqual(gen["responseJsonSchema"], wantSchema) {
 		t.Fatalf("responseJsonSchema = %#v", gen["responseJsonSchema"])
 	}
@@ -245,4 +248,67 @@ func TestGenerate_OtherBadRequestIsNotStructuredOutput(t *testing.T) {
 	if errors.Is(err, llm.ErrUnsupportedStructuredOutput) {
 		t.Errorf("err = %v, want it classified as a plain provider error", err)
 	}
+}
+
+// The SDK sends the schema through Go maps, which sort its keys, so the order
+// goes out as propertyOrdering lists: the answer object's names in the
+// frame's order, nested or at the root. Without the lists the schema is the
+// frame.
+func TestGenerate_SchemaKeepsPropertyOrder(t *testing.T) {
+	success := `{"candidates":[{"content":{"parts":[{"text":"{}"}],"role":"model"},"finishReason":"STOP"}]}`
+	for _, f := range schematest.Frames {
+		t.Run(f.Name, func(t *testing.T) {
+			frame := f.Read(t)
+			var rec recordedReq
+			c := newTestClient(t, newTestServer(t, http.StatusOK, success, &rec).URL)
+
+			if _, err := c.Generate(context.Background(), llm.Request{System: "s", Human: "h", Schema: frame}); err != nil {
+				t.Fatalf("Generate: %v", err)
+			}
+			gen, _ := rec.body["generationConfig"].(map[string]any)
+			sent := gen["responseJsonSchema"]
+			object, _ := sent.(map[string]any)
+			for _, name := range f.Object {
+				object, _ = object[name].(map[string]any)
+			}
+			list, _ := object["propertyOrdering"].([]any)
+			var order []string
+			for _, name := range list {
+				s, _ := name.(string)
+				order = append(order, s)
+			}
+			if !slices.Equal(order, f.Order) {
+				t.Errorf("propertyOrdering = %v, want %v", list, f.Order)
+			}
+
+			var want any
+			if err := json.Unmarshal(frame, &want); err != nil {
+				t.Fatal(err)
+			}
+			if got := withoutOrdering(sent); !reflect.DeepEqual(got, want) {
+				t.Errorf("schema sent, propertyOrdering aside:\n%v\nwant the frame:\n%v", got, want)
+			}
+		})
+	}
+}
+
+// withoutOrdering returns v with every propertyOrdering list left out.
+func withoutOrdering(v any) any {
+	switch v := v.(type) {
+	case map[string]any:
+		out := make(map[string]any, len(v))
+		for k, e := range v {
+			if k != "propertyOrdering" {
+				out[k] = withoutOrdering(e)
+			}
+		}
+		return out
+	case []any:
+		out := make([]any, len(v))
+		for i, e := range v {
+			out[i] = withoutOrdering(e)
+		}
+		return out
+	}
+	return v
 }

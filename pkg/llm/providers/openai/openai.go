@@ -73,8 +73,7 @@ func resolveBaseURL(env string) string {
 // Generate runs a chat completion with native strict structured output and
 // returns the model's raw JSON text.
 func (c *Client) Generate(ctx context.Context, req llm.Request) (string, error) {
-	var schema map[string]any
-	if err := json.Unmarshal(req.Schema, &schema); err != nil {
+	if err := json.Unmarshal(req.Schema, new(map[string]any)); err != nil {
 		return "", fmt.Errorf("openai: invalid schema: %w", err)
 	}
 
@@ -87,8 +86,11 @@ func (c *Client) Generate(ctx context.Context, req llm.Request) (string, error) 
 		ResponseFormat: openai.ChatCompletionNewParamsResponseFormatUnion{
 			OfJSONSchema: &openai.ResponseFormatJSONSchemaParam{
 				JSONSchema: openai.ResponseFormatJSONSchemaJSONSchemaParam{
-					Name:   "vens_response",
-					Schema: schema,
+					Name: "vens_response",
+					// The schema's own bytes rather than a decoded map, which would
+					// go out with its keys sorted: the model writes the properties
+					// in the order the schema lists them.
+					Schema: req.Schema,
 					Strict: openai.Bool(true),
 				},
 			},
