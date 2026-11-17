@@ -19,7 +19,6 @@ package google
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -66,8 +65,8 @@ func (c *Client) Generate(ctx context.Context, req llm.Request) (string, error) 
 	}
 
 	if len(req.Schema) > 0 {
-		var schema any
-		if err := json.Unmarshal(req.Schema, &schema); err != nil {
+		schema, err := orderedSchema(req.Schema)
+		if err != nil {
 			return "", fmt.Errorf("google: invalid schema: %w", err)
 		}
 		cfg.ResponseJsonSchema = schema
