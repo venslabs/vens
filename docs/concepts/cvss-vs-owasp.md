@@ -122,7 +122,7 @@ This explains the mechanism; it is not a measurement of accuracy.
 | | Up to v0.6 | Since v0.7.0 |
 |---|---|---|
 | What the model returns | four numbers from 0 to 9 per CVE: threat agent, vulnerability, technical impact, business impact | one named answer per question, from a closed list; never a number |
-| Calls | one call per batch of CVEs | one call per question per batch, at most 12 questions per CVE, and one adjustment call per flagged CVE |
+| Calls | one call per batch of CVEs | one call per question per batch, at most 12 questions per CVE, and one adjustment call per flagged CVE with a field left to ask |
 | The 16 levels in the vector | each of the four numbers repeated over its group's four factors | 4 set by vens, 8 read from an answer, 4 from an answer combined with a declared field |
 | Impact | the average of the technical and the business impact | the larger of the two |
 | Severity | bands of the score: 0–4 `info`, 5–19 `low`, 20–39 `medium`, 40–59 `high`, 60–81 `critical` | OWASP's matrix of the likelihood and impact levels; never `info` |

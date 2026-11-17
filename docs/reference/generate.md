@@ -77,7 +77,7 @@ vens generate --llm openai --config-file c.yaml --sbom-serial-number "$SBOM_UUID
 
 Number of distinct CVEs in a batch. Default: `10`. A CVE found in several packages counts once.
 
-Each batch gets one call per question, in a fixed order, about the batch's CVEs that get that question: up to 12 calls per batch. Each flagged CVE then gets one more call of its own, the adjustment. So a CVE is sent once per question asked about it, and the batch size sets how many CVEs share each call, not how many calls a CVE gets.
+Each batch gets one call per question, in a fixed order, about the batch's CVEs that get that question: up to 12 calls per batch. Each flagged CVE then gets one more call of its own, the adjustment, when it has a field left to ask. So a CVE is sent once per question asked about it, and the batch size sets how many CVEs share each call, not how many calls a CVE gets.
 
 - Lower values (e.g. `5`) — fewer CVEs per call, more calls, safer for small context windows.
 - Higher values (e.g. `20`) — fewer calls, more tokens per call.
