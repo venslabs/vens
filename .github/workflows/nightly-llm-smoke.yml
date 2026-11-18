@@ -1,0 +1,103 @@
+name: Nightly LLM smoke test
+
+# Runs `vens generate` against each real LLM provider with a small committed
+# report and asserts the VEX is valid and scored. Tracked in
+# https://github.com/venslabs/vens/issues/175.
+#
+# A provider's API key is only present in the env of the Generate step of
+# its own leg (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`
+# / `GEMINI_API_KEY`). On a `schedule` run in `venslabs/vens` a missing key
+# fails the run, so the job can never stay green with zero coverage (the
+# secrets don't exist yet). Everywhere else (forks, PRs, manual runs) a
+# missing key just skips that leg with a notice. Configure the secrets under
+# Settings > Secrets and variables > Actions.
+
+on:
+  schedule:
+    - cron: "0 5 * * *" # nightly, 05:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: smoke (${{ matrix.provider }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - provider: openai
+            key_env: OPENAI_API_KEY
+          - provider: anthropic
+            key_env: ANTHROPIC_API_KEY
+          - provider: googleai
+            key_env: GOOGLE_API_KEY
+    env:
+      VENS_PROVIDER: ${{ matrix.provider }}
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: "go.mod"
+
+      # A missing key fails a scheduled run in venslabs/vens so the workflow
+      # can never stay green with zero coverage; everywhere else (forks,
+      # PRs, manual dispatches) the leg skips with a notice instead.
+      - name: Provider key present?
+        id: key
+        env:
+          KEY: ${{ secrets[matrix.key_env] }}
+          GEMINI_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          # googleai falls back to GEMINI_API_KEY (pkg/llm/providers/google/google.go)
+          if [ -n "$KEY" ] || { [ "$VENS_PROVIDER" = "googleai" ] && [ -n "$GEMINI_KEY" ]; }; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "${{ github.event_name }}" = "schedule" ] && [ "${{ github.repository }}" = "venslabs/vens" ]; then
+            echo "::error::secret '${{ matrix.key_env }}' is not set for a scheduled run in venslabs/vens"
+            exit 1
+          fi
+          echo "present=false" >> "$GITHUB_OUTPUT"
+
+      - name: No key configured, skipping
+        if: steps.key.outputs.present != 'true'
+        run: echo "No API key secret for provider '$VENS_PROVIDER'; skipping smoke test."
+
+      - name: Build vens
+        if: steps.key.outputs.present == 'true'
+        run: go build -o vens ./cmd/vens
+
+      - name: Generate VEX
+        if: steps.key.outputs.present == 'true'
+        env:
+          KEY: ${{ secrets[matrix.key_env] }}
+          GEMINI_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          # The key lives only in this step's env, under the name vens reads.
+          case "$VENS_PROVIDER" in
+            openai)    export OPENAI_API_KEY="$KEY" ;;
+            anthropic) export ANTHROPIC_API_KEY="$KEY" ;;
+            googleai)  export GOOGLE_API_KEY="$KEY" GEMINI_API_KEY="$GEMINI_KEY" ;;
+          esac
+          ./vens generate --config-file examples/quickstart/config.yaml --llm "$VENS_PROVIDER" --sbom-serial-number=urn:uuid:7d1c3f9e-4b2a-4c8e-9d6f-2a1b3c4d5e6f .github/smoke/report.trivy.json "smoke-$VENS_PROVIDER.cdx.json"
+
+      - name: Assert valid scored VEX
+        if: steps.key.outputs.present == 'true'
+        run: |
+          jq -e '
+            .bomFormat == "CycloneDX"
+            and ((.vulnerabilities // []) | length == 3)
+            and ([.vulnerabilities[] | select(((.ratings // []) | length) == 0)] | length == 0)
+            and ([.vulnerabilities[].ratings[] | select(.method != "OWASP" or ((.vector // "") | length) == 0)] | length == 0)
+            and ([.vulnerabilities[].ratings[] | select((.score | type) != "number")] | length == 0)
+          ' "smoke-$VENS_PROVIDER.cdx.json" > /dev/null
