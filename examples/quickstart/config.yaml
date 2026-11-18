@@ -104,29 +104,19 @@ context:
     - "GDPR"
     - "SOC2"
 
-  # AUDIT REQUIREMENT: How critical is audit logging? (optional)
-  # Values: low | medium | high
-  # Impact: None since v0.7.0: it states a requirement, not what is recorded.
-  #         Kept as information; traceability above is what vens reads.
-  audit_requirement: "high"
-
   # SECURITY CONTROLS: What defenses are in place? (optional)
   # Default: All false (no controls assumed)
   # When to use: You have active security controls in front of this service
   # Impact: waf, ddos_protection, segmentation, zero_trust and antivirus, when true, are shown
   #         with their scope to the Ease of exploit question; the LLM judges whether one stands
-  #         in the way of each exploit. ids, siem and edr move no score: detection above does.
+  #         in the way of each exploit. Declare what an IDS, a SIEM or an EDR records
+  #         in detection above.
   controls:
     # Perimeter controls
     waf: true                    # Web Application Firewall (SQL injection, XSS, path traversal)
     ddos_protection: true        # DDoS mitigation (Availability / DoS CVEs)
 
-    # Detection controls: no score, see detection above
-    ids: true                    # Intrusion Detection System
-    siem: true                   # Security Information & Event Management
-
     # Endpoint controls
-    edr: false                   # Endpoint Detection & Response (no score)
     antivirus: false             # Antivirus/Anti-malware (Known malware signatures)
 
     # Network controls

@@ -41,7 +41,7 @@ trivy image python:3.11-slim --format json --output report.json
 
 ### 3. Describe your system in a [`config.yaml`](https://github.com/venslabs/vens/blob/main/examples/quickstart/config.yaml)
 
-*Updated for schema 2: since vens v0.7.0 the file starts with `schema_version: 2`, and `ids` moves no score; see [Migrating from vens v0.6](../../reference/config-schema.md#migrating).*
+*Updated for schema 2: since vens v0.7.0 the file starts with `schema_version: 2`, and `detection` replaces `ids`, which moves no score; see [Migrating from vens v0.6](../../reference/config-schema.md#migrating).*
 
 ```yaml
 schema_version: 2
@@ -55,9 +55,12 @@ context:
   data_sensitivity: "high"                # customer PII
   business_criticality: "high"            # business-critical service
   compliance_requirements: ["GDPR", "SOC2"]
+  detection:                              # not_logged | logged | logged_and_reviewed
+    network: "logged"                     # the IDS
+    host: "not_logged"
+    application: "not_logged"
   controls:
     waf: true
-    ids: true
 ```
 
 ### 4. Run the contextual analysis
