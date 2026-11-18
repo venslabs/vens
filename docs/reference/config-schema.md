@@ -214,7 +214,7 @@ Security controls currently active in production. All fields are booleans, defau
 
 `waf`, `ddos_protection`, `segmentation`, `zero_trust` and `antivirus`, when `true`, are shown with their scope to the Ease of exploit question only. The model judges whether the control stands in the way of this exploit in this deployment; vens applies no fixed reduction.
 
-Since v0.7.0, `ids`, `siem` and `edr` move no score and no call sends them: a tool being present says neither that an attempt on this service is recorded nor that someone reviews it. Declare [`detection`](#contextdetection) instead. Set to `true` while `detection` is left out, they get a warning at load (W2).
+Since v0.7.0, `ids`, `siem` and `edr` move no score and no call sends them: a tool being present says neither that an attempt on this service is recorded nor that someone reviews it. Declare [`detection`](#contextdetection) instead. They still load, so existing files keep working, until a future schema version removes them ([#427](https://github.com/venslabs/vens/issues/427)). Set to `true` while `detection` is left out, they get a warning at load (W2).
 
 | Field | Description | Scope |
 |---|---|---|
@@ -253,7 +253,7 @@ Shown to the model in every call, with the rest of the deployment. A reachabilit
 
 ### `context.audit_requirement`
 
-Since v0.7.0, moves no score and no call sends it. It states a requirement, not what is in place: Loss of accountability reads [`traceability`](#contexttraceability) instead. The key still loads, so existing files keep working. Set while `traceability` is left out, it gets a warning at load (W1).
+Since v0.7.0, moves no score and no call sends it. It states a requirement, not what is in place: Loss of accountability reads [`traceability`](#contexttraceability) instead. The key still loads, so existing files keep working, until a future schema version removes it ([#427](https://github.com/venslabs/vens/issues/427)). Set while `traceability` is left out, it gets a warning at load (W1).
 
 | Value | Meaning |
 |---|---|
