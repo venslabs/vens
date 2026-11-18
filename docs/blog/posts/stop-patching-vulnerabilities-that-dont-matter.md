@@ -56,7 +56,7 @@ context:
   business_criticality: "high"            # business-critical service
   compliance_requirements: ["GDPR", "SOC2"]
   detection:                              # not_logged | logged | logged_and_reviewed
-    network: "logged"                     # the IDS
+    network: "not_logged"
     host: "not_logged"
     application: "not_logged"
   controls:
