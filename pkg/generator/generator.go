@@ -104,6 +104,10 @@ type Opts struct {
 	// DebugDir gets one run-* directory per Generator, holding the prompts
 	// and the raw response of every LLM call.
 	DebugDir string
+	// DebugDirKeep caps the number of run-* directories kept under
+	// DebugDir, deleting the oldest first once this run's directory
+	// exists. 0 (the default) keeps every run, so nothing is deleted.
+	DebugDirKeep int
 
 	// Config carries user-provided context hints loaded from config.yaml.
 	Config *riskconfig.Config
@@ -141,6 +145,9 @@ func New(o Opts) (*Generator, error) {
 	}
 	if g.o.DebugDir != "" {
 		g.debugRunDir = newDebugRunDir(g.o.DebugDir)
+		if g.debugRunDir != "" && g.o.DebugDirKeep > 0 {
+			pruneDebugRunDirs(g.o.DebugDir, g.debugRunDir, g.o.DebugDirKeep)
+		}
 	}
 	return g, nil
 }
@@ -160,6 +167,49 @@ func newDebugRunDir(parent string) string {
 	}
 	slog.Info("Writing debug files", "dir", dir)
 	return dir
+}
+
+// pruneDebugRunDirs deletes the oldest run-* directories under parent
+// until at most keep remain, counting keepDir (this run's directory, never
+// deleted). Anything that is not a run-* directory is left alone, and a
+// failure to list or delete is logged, never fatal: pruning must not stop
+// a run, and a run whose directory is deleted mid-flight only loses its
+// debug files, since writeDebugFile failures are logged and ignored.
+func pruneDebugRunDirs(parent, keepDir string, keep int) {
+	entries, err := os.ReadDir(parent)
+	if err != nil {
+		slog.Error("failed to list the debug dir for pruning", "dir", parent, "error", err)
+		return
+	}
+	// keepDir is this run's directory: it counts toward keep but is never
+	// a deletion candidate, so a stale mtime on it cannot leave more
+	// than keep directories behind.
+	var dirs []os.DirEntry
+	for _, e := range entries {
+		if e.IsDir() && strings.HasPrefix(e.Name(), "run-") && filepath.Join(parent, e.Name()) != keepDir {
+			dirs = append(dirs, e)
+		}
+	}
+	sort.Slice(dirs, func(i, j int) bool {
+		ii, errI := dirs[i].Info()
+		ij, errJ := dirs[j].Info()
+		if errI == nil && errJ == nil {
+			if !ii.ModTime().Equal(ij.ModTime()) {
+				return ii.ModTime().Before(ij.ModTime())
+			}
+		}
+		return dirs[i].Name() < dirs[j].Name()
+	})
+	for len(dirs)+1 > keep {
+		oldest := dirs[0]
+		dirs = dirs[1:]
+		path := filepath.Join(parent, oldest.Name())
+		if err := os.RemoveAll(path); err != nil {
+			slog.Error("failed to prune an old debug run directory", "dir", path, "error", err)
+			continue
+		}
+		slog.Info("Pruned old debug run directory", "dir", path)
+	}
 }
 
 // writeDebugFile writes one file of the run's debug directory, readable by the

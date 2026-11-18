@@ -144,7 +144,7 @@ ls vens-debug/run-3787846641/
 # ...
 ```
 
-Each run adds a new `run-*` directory, and nothing deletes the old ones. Remove them when you are done, for example with `rm -rf vens-debug/run-*`.
+Each run adds a new `run-*` directory. By default nothing deletes the old ones — remove them when you are done, for example with `rm -rf vens-debug/run-*`, or cap them with `--debug-dir-keep` (below).
 
 **What you get**, for each LLM call, numbered from `00001` in call order:
 
@@ -199,6 +199,21 @@ Per-CVE component scores and the LLM's reasoning are also logged to stderr at `I
 
 !!! note "Retention for compliance workloads"
     If you need the debug output as audit evidence (HIPAA-style 6-year retention, SOC 2 change log, PCI-DSS risk decisions), store it in the same encrypted, access-controlled system you use for other security audit logs. Treat each `run-*` directory as one entry in your vulnerability-triage evidence chain, indexed by scan date and by the Git SHA of the `config.yaml` that produced it. Reasoning can only be reconstructed later if **both** the `config.yaml` version and the debug files are preserved — a copy of the VEX alone is not enough.
+
+### `--debug-dir-keep <n>`
+
+Keep at most `n` `run-*` directories under `--debug-dir`: once the new run's directory exists, the oldest ones are deleted first until `n` remain (the new run's directory itself is never deleted). `0` (the default) keeps every run. Only `run-*` directories are touched — anything else in the directory is left alone. A pruning failure is logged and never fails the run.
+
+This is the option for leaving `--debug-dir` on in CI without filling the disk:
+
+```bash
+vens generate \
+  --debug-dir ./vens-debug \
+  --debug-dir-keep 5 \
+  --config-file c.yaml \
+  --sbom-serial-number "$SBOM_UUID" \
+  report.json out.json
+```
 
 ### `--attest`
 
