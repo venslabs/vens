@@ -98,7 +98,7 @@ These three fields are optional, but each one left out has a fallback: without `
 | `per_request` | each request is recorded with its time and origin (source address, client), not with the individual who made it |
 | `per_individual` | as `per_request`, and each action of an authenticated user is recorded with that user's identity |
 
-A gateway or proxy log counts when it covers every request to the service. Where only part of the service records this, declare the weaker value. vens crosses the value with the model's answer on whether the attacker must authenticate and could defeat attribution, for Loss of accountability. `audit_requirement` does not stand in for it.
+A gateway or proxy log counts when it covers every request to the service. Where only part of the service records this, declare the weaker value. vens crosses the value with the model's answer on whether the attacker must authenticate and could defeat attribution, for Loss of accountability. `audit_requirement` does not stand in for it and moves no score.
 
 ### `detection` — what records an attack attempt, channel by channel?
 
@@ -159,10 +159,6 @@ How strict is your uptime target?
 | `critical` | Zero downtime tolerance |
 
 The Loss of availability question shows it; if omitted, that question shows `business_criticality` instead. Set it explicitly only when availability needs differ from business criticality (e.g. an internal tool that absolutely cannot go down during trading hours).
-
-### `audit_requirement`
-
-Values: `low`, `medium`, `high`. Since v0.7.0 it moves no score and is not sent: it states a requirement, not what is recorded. Declare [`traceability`](#traceability-does-the-service-record-who-did-what) instead. The key still loads, and vens warns when it is set without `traceability`.
 
 ### `controls` — what defenses are already in place?
 
