@@ -1,0 +1,76 @@
+# --attest --attest-signing-key emits a BOM-level JSF signature (signers/ES256)
+
+gen-ec-key attest.key attest.pub.pem
+gen-ec-key other.key other.pub.pem
+
+exec vens generate --llm=mock --attest --attest-signing-key=attest.key --attest-signing-key-id=vens-test-key --llm-seed=7 --config-file=config.yaml --sbom-serial-number=urn:uuid:11111111-2222-3333-4444-555555555555 report.json output.cdx.json
+stderr 'Processing vulnerabilities'
+stderr 'Attestation written'
+
+exists output.cdx.json
+exists output.attestation.cdx.json
+
+json-contains output.attestation.cdx.json '"signature"'
+json-contains output.attestation.cdx.json '"signers"'
+json-contains output.attestation.cdx.json '"algorithm": "ES256"'
+json-contains output.attestation.cdx.json '"keyId": "vens-test-key"'
+json-contains output.attestation.cdx.json '"kty": "EC"'
+json-contains output.attestation.cdx.json '"crv": "P-256"'
+json-contains output.attestation.cdx.json '"value"'
+
+# the signature verifies against the pinned public key (independent JCS + ES256
+# check; the purl in the report has an & so JCS unescaping is exercised), the
+# embedded publicKey is that key, and the keyId is the one we passed
+jsf-verify output.attestation.cdx.json attest.pub.pem vens-test-key
+
+# a different (attacker) public key must not verify
+! jsf-verify output.attestation.cdx.json other.pub.pem
+
+# evidence still present alongside the signature
+json-contains output.attestation.cdx.json '"name": "prompt_hash"'
+json-contains output.attestation.cdx.json '"claims"'
+
+-- config.yaml --
+project:
+  name: "attest-signed-test"
+  description: "Test project for signed attestation"
+context:
+  exposure: "internet"
+  data_sensitivity: "high"
+  business_criticality: "critical"
+-- report.json --
+{
+  "SchemaVersion": 2,
+  "CreatedAt": "2024-01-15T10:00:00Z",
+  "ArtifactName": "nginx:1.25",
+  "ArtifactType": "container_image",
+  "Results": [
+    {
+      "Target": "nginx:1.25 (debian 12.4)",
+      "Class": "os-pkgs",
+      "Type": "debian",
+      "Vulnerabilities": [
+        {
+          "VulnerabilityID": "CVE-2024-1234",
+          "PkgID": "openssl@3.0.11-1~deb12u2",
+          "PkgName": "openssl",
+          "PkgIdentifier": {
+            "PURL": "pkg:deb/debian/openssl@3.0.11-1~deb12u2?arch=amd64&distro=debian-12.4"
+          },
+          "InstalledVersion": "3.0.11-1~deb12u2",
+          "FixedVersion": "3.0.13-1~deb12u1",
+          "Status": "fixed",
+          "Title": "OpenSSL: Buffer overflow in SSL_select_next_proto",
+          "Description": "A buffer overflow vulnerability in OpenSSL.",
+          "Severity": "HIGH",
+          "DataSource": {
+            "ID": "debian",
+            "Name": "Debian Security Tracker",
+            "URL": "https://security-tracker.debian.org/tracker/CVE-2024-1234"
+          }
+        }
+      ]
+    }
+  ]
+}
+

@@ -1,0 +1,52 @@
+# --attest-signing-key without --attest fails closed before writing output
+
+! exec vens generate --llm=mock --attest-signing-key=placeholder.key --config-file=config.yaml --sbom-serial-number=urn:uuid:11111111-2222-3333-4444-555555555555 report.json output.cdx.json
+stderr '--attest-signing-key requires --attest'
+! exists output.cdx.json
+! exists output.attestation.cdx.json
+
+-- placeholder.key --
+vens fails before it reads this file
+-- config.yaml --
+project:
+  name: "attest-key-requires-attest"
+  description: "Fail-closed signing key without --attest"
+context:
+  exposure: "internet"
+  data_sensitivity: "high"
+  business_criticality: "critical"
+-- report.json --
+{
+  "SchemaVersion": 2,
+  "CreatedAt": "2024-01-15T10:00:00Z",
+  "ArtifactName": "nginx:1.25",
+  "ArtifactType": "container_image",
+  "Results": [
+    {
+      "Target": "nginx:1.25 (debian 12.4)",
+      "Class": "os-pkgs",
+      "Type": "debian",
+      "Vulnerabilities": [
+        {
+          "VulnerabilityID": "CVE-2024-1234",
+          "PkgID": "openssl@3.0.11-1~deb12u2",
+          "PkgName": "openssl",
+          "PkgIdentifier": {
+            "PURL": "pkg:deb/debian/openssl@3.0.11-1~deb12u2?arch=amd64&distro=debian-12.4"
+          },
+          "InstalledVersion": "3.0.11-1~deb12u2",
+          "FixedVersion": "3.0.13-1~deb12u1",
+          "Status": "fixed",
+          "Title": "OpenSSL: Buffer overflow in SSL_select_next_proto",
+          "Description": "A buffer overflow vulnerability in OpenSSL.",
+          "Severity": "HIGH",
+          "DataSource": {
+            "ID": "debian",
+            "Name": "Debian Security Tracker",
+            "URL": "https://security-tracker.debian.org/tracker/CVE-2024-1234"
+          }
+        }
+      ]
+    }
+  ]
+}
