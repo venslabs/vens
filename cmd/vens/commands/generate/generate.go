@@ -88,6 +88,8 @@ adjustment's cannot_tell keeps the baseline: it is not counted and does not fail
 	flags.String("sbom-serial-number", "", "SBOM serial number for BOM-Link (format: urn:uuid:...)")
 	flags.Int("sbom-version", 1, "SBOM version for BOM-Link (default: 1)")
 	flags.Bool("attest", false, "Emit a CycloneDX Attestations (CDXA) sibling file with prompt hash, input hash, model, seed, raw LLM response")
+	flags.String("attest-signing-key", "", "Path to an unencrypted PKCS#8 PEM P-256 private key used to sign the --attest file (requires --attest)")
+	flags.String("attest-signing-key-id", "", "Optional key id label recorded in the signature (requires --attest-signing-key; default: SHA-256 fingerprint of the public key)")
 	flags.Bool("strict", false, "Fail a run that would use a worst-case fallback, and write no VEX or attestation: an undeclared data_subjects, detection or traceability; a CVE with no description, or with no CVSS vector or one that does not parse, lacks an axis metric or gives one a value off its scale; or an answer to a question read as cannot_tell (the adjustment's cannot_tell keeps the baseline)")
 
 	return cmd
@@ -210,6 +212,21 @@ func action(cmd *cobra.Command, args []string) error {
 	}
 
 	attestEnabled, err := flags.GetBool("attest")
+	if err != nil {
+		return err
+	}
+	attestSigningKeyPath, err := flags.GetString("attest-signing-key")
+	if err != nil {
+		return err
+	}
+	attestSigningKeyID, err := flags.GetString("attest-signing-key-id")
+	if err != nil {
+		return err
+	}
+	if flags.Changed("attest-signing-key") && attestSigningKeyPath == "" {
+		return fmt.Errorf("--attest-signing-key is empty")
+	}
+	attestSigner, err := resolveAttestSigner(attestEnabled, attestSigningKeyPath, attestSigningKeyID)
 	if err != nil {
 		return err
 	}
@@ -355,6 +372,7 @@ func action(cmd *cobra.Command, args []string) error {
 			VEXUUID:     vexUUID,
 			VEXVersion:  sbomVersion,
 			SpecVersion: specVersion,
+			Signer:      attestSigner,
 		})
 		g.SetAttestor(attestor)
 	}
@@ -411,6 +429,29 @@ func checkBOMRefs(vulns []generator.Vulnerability) error {
 		}
 	}
 	return outputhandler.UnreferencedError("cannot generate VEX", ids)
+}
+
+// resolveAttestSigner validates --attest-signing-key / --attest-signing-key-id
+// fail-closed: a key without --attest, a key-id without a key, or an unreadable
+// / unsupported key is an error before any output is written.
+func resolveAttestSigner(attestEnabled bool, keyPath, keyID string) (*attestation.Signer, error) {
+	if keyID != "" && keyPath == "" {
+		return nil, fmt.Errorf("--attest-signing-key-id requires --attest-signing-key")
+	}
+	if keyPath == "" {
+		return nil, nil
+	}
+	if !attestEnabled {
+		return nil, fmt.Errorf("--attest-signing-key requires --attest")
+	}
+	key, err := attestation.LoadSigningKey(keyPath)
+	if err != nil {
+		return nil, err
+	}
+	if keyID == "" {
+		keyID = attestation.DefaultKeyID(&key.PublicKey)
+	}
+	return &attestation.Signer{Key: key, KeyID: keyID}, nil
 }
 
 // TempPattern is the os.CreateTemp pattern of the temp file each output is
