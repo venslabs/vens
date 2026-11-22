@@ -156,7 +156,8 @@ func TestGenerator_NotReachableAdjustmentAsksConfidentialityAlone(t *testing.T) 
 	assert.Equal(t, map[string][]string{"confidentiality": {"affected", "not_affected", cannotTell}}, unreached.fields)
 	for _, part := range []string{
 		`"vulnId":"CVE-2024-0000"`, `"answers":{"reachability":"not_reachable"}}`,
-		"and the answer it was given without that evidence: not reachable here, as reachability is defined above.",
+		"and the answer it was given without that evidence: not reachable here, as reachability is defined above. That answer stands and is not asked again.",
+		"Unreachability alone does not justify `not_affected`.\n\nQUESTIONS\n",
 		"QUESTIONS\nconfidentiality: Given this evidence, can exploiting it here affect confidentiality at all?",
 	} {
 		assert.Contains(t, unreached.req.Human, part)

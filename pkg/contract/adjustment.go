@@ -34,7 +34,7 @@ import (
 const adjustmentTemplate = `FLAGGED VULNERABILITY
 {entry}
 
-This vulnerability is flagged: its maintainers dispute it, or its severity sources disagree. Its entry carries the evidence: every CVSS vector published for it with its source, every vendor severity, the flag's quoted evidence, and {given}. Reconsider it from that evidence.
+This vulnerability is flagged: its maintainers dispute it, or its severity sources disagree. Its entry carries the evidence: every CVSS vector published for it with its source, every vendor severity, the flag's quoted evidence, and {given}
 
 QUESTIONS
 {questions}
@@ -42,12 +42,15 @@ QUESTIONS
 Choose cannot_tell only when the evidence does not decide.
 Reply with {"reasoning": "...", {fields}}.`
 
-// What the entry's answers are, as the adjustment's text names them: the
-// answers of the questions it may lower, or, for a CVE not reachable here,
-// reachability's.
+// What the entry's answers are, as the adjustment's text names them, and how
+// to read them: the answers of the questions it may lower, to reconsider; or,
+// for a CVE not reachable here, reachability's, which stands, so that the
+// question is answered from the evidence and not from unreachability.
 const (
-	givenAnswers      = "the answers it was given without that evidence"
-	givenNotReachable = "the answer it was given without that evidence: not reachable here, as reachability is defined above"
+	givenAnswers      = "the answers it was given without that evidence. Reconsider it from that evidence."
+	givenNotReachable = "the answer it was given without that evidence: not reachable here, as reachability is defined above. " +
+		"That answer stands and is not asked again. Assuming exploitation were possible here, with every other deployment fact unchanged, " +
+		"answer the question below from the supplied evidence alone. Unreachability alone does not justify `not_affected`."
 )
 
 const (

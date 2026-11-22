@@ -516,7 +516,9 @@ func TestAdjustmentOfANotReachableCVE(t *testing.T) {
 				request := text(t)(AdjustmentRequest(d, c, floored, adjustFlags, given))
 				for _, part := range []string{
 					`"answers":{"reachability":"not_reachable"}}`,
-					"the flag's quoted evidence, and the answer it was given without that evidence: not reachable here, as reachability is defined above. Reconsider it from that evidence.",
+					"the flag's quoted evidence, and the answer it was given without that evidence: not reachable here, as reachability is defined above. " +
+						"That answer stands and is not asked again. Assuming exploitation were possible here, with every other deployment fact unchanged, " +
+						"answer the question below from the supplied evidence alone. Unreachability alone does not justify `not_affected`.\n\nQUESTIONS\n",
 					"\nQUESTIONS\nconfidentiality: Given this evidence, can exploiting it here affect confidentiality at all? Answer with affected, not_affected or cannot_tell.\n\n",
 					`Reply with {"reasoning": "...", "confidentiality": "..."}.`,
 				} {
