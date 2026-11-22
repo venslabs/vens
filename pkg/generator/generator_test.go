@@ -518,10 +518,10 @@ func TestGenerator_ClaimReasoningJoinsEachAnswer(t *testing.T) {
 		"O (no_access_or_resources_required): because of CVE-2024-0000",
 		"EE (theoretical): because of CVE-2024-0000",
 		"ID (network, host): because of CVE-2024-0000",
-		"LC (minimal): because of CVE-2024-0000",
-		"LI (minimal_slightly_corrupt): because of CVE-2024-0000",
-		"LAV (minimal_secondary_interrupted): because of CVE-2024-0000",
-		"LAC (identified): because of CVE-2024-0000",
+		"LC (not_reachable): because of CVE-2024-0000",
+		"LI (not_reachable): because of CVE-2024-0000",
+		"LAV (not_reachable): because of CVE-2024-0000",
+		"LAC (not_reachable): because of CVE-2024-0000",
 		"FD (less_than_cost_to_fix): because of CVE-2024-0000",
 		"RD (minimal_damage): because of CVE-2024-0000",
 		"PV (none): because of CVE-2024-0000",
@@ -585,7 +585,7 @@ func TestGenerator_ClaimSaysWhatAnUndescribedCVEIsNotAsked(t *testing.T) {
 		"M (not asked: no description)",
 		"O (not asked: no description)",
 		"EE (not asked: no description)",
-		"LC (minimal): because of CVE-2024-0000",
+		"LC (not_reachable): because of CVE-2024-0000",
 	}, lines[:4])
 	for _, line := range lines[3:] {
 		assert.NotContains(t, line, "not asked")

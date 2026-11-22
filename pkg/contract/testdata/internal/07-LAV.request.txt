@@ -2,18 +2,20 @@ VULNERABILITIES
 [entries]
 
 QUESTION
-If intranet users exploited this vulnerability in this deployment, how much of this service could they interrupt, and how vital is what they would interrupt?
+If intranet users exploited this vulnerability in this deployment, how much of this service could they interrupt, and how vital is what they would interrupt? Primary is what the deployment's description and notes say this service exists to do, and any part it cannot do that without; secondary is anything else it runs, such as a tool in the image, an optional feature, an admin or debug function, or a background task.
 
 FOR THIS QUESTION
 Availability requirement: low (Best-effort uptime)
 
 ANSWERS
-- minimal_secondary_interrupted: Minimal, secondary: a brief or partial interruption of something the service can do without for a while.
-- minimal_primary_interrupted: Minimal, primary: a brief or partial interruption of what the service exists to do.
-- extensive_secondary_interrupted: Extensive, secondary: a lasting or broad interruption of things the service can do without for a while.
-- extensive_primary_interrupted: Extensive, primary: a lasting or broad interruption of what the service exists to do.
-- all_services_completely_lost: All services completely lost: the service and what runs with it, completely.
-- cannot_tell: The facts given do not say.
+- not_reachable: Not reachable here: the facts given show that the vulnerable code is not reachable in this deployment, as defined above.
+- no_impact: Nothing interrupted: it is reachable, but exploiting it here interrupts nothing this service does, as when its only effect is a disclosure or a change of data.
+- minimal_secondary_interrupted: Minimal, secondary: a brief or partial interruption of something secondary, such as one request, process or worker failing and being restarted.
+- minimal_primary_interrupted: Minimal, primary: a brief or partial interruption of something primary, such as one request, process or worker failing and being restarted.
+- extensive_secondary_interrupted: Extensive, secondary: a lasting or broad interruption of something secondary: it stays down until someone acts, or fails for everyone for as long as the attack goes on.
+- extensive_primary_interrupted: Extensive, primary: a lasting or broad interruption of something primary: it stays down until someone acts, or fails for everyone for as long as the attack goes on.
+- all_services_completely_lost: All services completely lost: the service and what runs with it, completely, as when the exploit takes down the host or every instance of the service.
+- cannot_tell: The facts given do not decide between the answers above.
 
 Answer every vulnerability listed above once, by its vulnId, with one answer id from ANSWERS.
 Reply with {"answers": [{"vulnId": "...", "reasoning": "...", "answer": "..."}]}.

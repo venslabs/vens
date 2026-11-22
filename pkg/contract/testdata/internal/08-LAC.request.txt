@@ -2,13 +2,15 @@ VULNERABILITIES
 [entries]
 
 QUESTION
-To exploit this vulnerability in this deployment, must intranet users authenticate to this service, and could the exploit let them act as someone else or erase, forge or bypass the records of who did what?
+If intranet users exploited this vulnerability in this deployment, could what they did be traced to them? Judge attribution apart from authentication: whether they must authenticate to this service under an identity of their own is one fact; whether the exploit lets them act as someone else, or erase, forge or bypass the records of who did what, is another.
 
 ANSWERS
-- identified: Identified: they must authenticate to this service, and the exploit does not let them act as someone else or tamper with the records of who did what.
-- unidentified: Unidentified: they need not authenticate to this service, and the exploit does not let them act as someone else or tamper with those records.
+- not_reachable: Not reachable here: the facts given show that the vulnerable code is not reachable in this deployment, as defined above.
+- no_impact: No accountability loss: they act only under an identity of their own that this service checks, and the exploit neither lets them act as someone else nor erases, forges or bypasses the records of who did what. Not having to authenticate, or there being no service to authenticate to, never makes this answer hold.
+- identified: Identified: they must authenticate to this service under an identity of their own, and the exploit does not let them act as someone else or tamper with the records of who did what.
+- unidentified: Unidentified: they need not authenticate to this service, or there is no service to authenticate to, and the exploit does not let them act as someone else or tamper with the records of who did what.
 - defeats_attribution: Defeats attribution: whether or not they authenticate, the exploit lets them act as someone else, or erase, forge or bypass the records of who did what.
-- cannot_tell: The facts given do not say.
+- cannot_tell: The facts given do not decide between the answers above.
 
 Answer every vulnerability listed above once, by its vulnId, with one answer id from ANSWERS.
 Reply with {"answers": [{"vulnId": "...", "reasoning": "...", "answer": "..."}]}.

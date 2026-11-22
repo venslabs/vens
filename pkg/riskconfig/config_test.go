@@ -606,7 +606,7 @@ func TestRoundTrip(t *testing.T) {
 
 func TestWarnings(t *testing.T) {
 	const (
-		w1 = "context.audit_requirement no longer moves any score, and context.traceability is not declared: Loss of accountability uses its `none` column, 7 when the attacker must authenticate and cannot act as someone else or tamper with the records, 9 otherwise."
+		w1 = "context.audit_requirement no longer moves any score, and context.traceability is not declared: Loss of accountability uses its `none` column, 7 when the vulnerable code is not reachable here, or when the attacker must authenticate and cannot act as someone else or tamper with the records, 9 otherwise."
 		w2 = "controls ids/siem/edr give no detection credit, and context.detection is not declared: every channel counts as not logged, so Intrusion detection is 9 on every finding."
 		w3 = "context.traceability is not declared: Loss of accountability uses its `none` column, 7 or 9 on every finding."
 		w4 = "context.detection is not declared: every channel counts as not logged, so Intrusion detection is 9 on every finding."

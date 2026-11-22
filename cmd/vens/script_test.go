@@ -99,6 +99,7 @@ func TestScript(t *testing.T) {
 			"json-eq":       jsonEqCmd,
 			"envsubst":      envsubstCmd,
 			"vex-vectors":   vexVectorsCmd,
+			"below-scale":   belowScaleCmd,
 		},
 	})
 }
@@ -308,6 +309,73 @@ func checkVEXVectors(data []byte, count int, sets [16][]int) error {
 		severity, score := owaspRate(sums[0]/8, max(sums[1], sums[2])/4)
 		if r.Severity != severity || r.Score != score {
 			return fmt.Errorf("%s: %s rated %s %v, its vector rates %s %v", v.ID, r.Vector, r.Severity, r.Score, severity, score)
+		}
+	}
+	return nil
+}
+
+// belowScaleCmd reads the answers.json of the one run under a --debug-dir
+// and checks every not_reachable and no_impact answer of the four technical
+// impact questions: read as answered, from the answer, at the level given
+// per factor; and each of the eight pairs answered at least once.
+func belowScaleCmd(ts *testscript.TestScript, neg bool, args []string) {
+	if neg || len(args) != 5 {
+		ts.Fatalf("usage: below-scale debug-dir LC=level LI=level LAV=level LAC=level")
+	}
+	want := map[string]int{}
+	for _, arg := range args[1:] {
+		factor, digit, _ := strings.Cut(arg, "=")
+		level, err := strconv.Atoi(digit)
+		ts.Check(err)
+		want[factor] = level
+	}
+	runs, err := filepath.Glob(filepath.Join(ts.MkAbs(args[0]), "run-*", "answers.json"))
+	ts.Check(err)
+	if len(runs) != 1 {
+		ts.Fatalf("%s holds %d answers.json, want one", args[0], len(runs))
+	}
+	data, err := os.ReadFile(runs[0])
+	ts.Check(err)
+	ts.Check(checkBelowScale(data, want))
+}
+
+func checkBelowScale(data []byte, want map[string]int) error {
+	var answers struct {
+		Vulnerabilities []struct {
+			VulnID  string `json:"vulnId"`
+			Factors []struct {
+				Factor  string `json:"factor"`
+				Answer  any    `json:"answer"`
+				Reading string `json:"reading"`
+				Level   int    `json:"level"`
+				Source  string `json:"source"`
+			} `json:"factors"`
+		} `json:"vulnerabilities"`
+	}
+	if err := json.Unmarshal(data, &answers); err != nil {
+		return err
+	}
+	seen := map[string]int{}
+	for _, v := range answers.Vulnerabilities {
+		for _, f := range v.Factors {
+			if f.Answer != "not_reachable" && f.Answer != "no_impact" {
+				continue
+			}
+			level, impact := want[f.Factor]
+			if !impact {
+				return fmt.Errorf("%s: %s answered %v, which only the technical impact questions list", v.VulnID, f.Factor, f.Answer)
+			}
+			if f.Reading != "answered" || f.Source != "answer" || f.Level != level {
+				return fmt.Errorf("%s: %s %v read %s from %s at %d, want answered from the answer at %d", v.VulnID, f.Factor, f.Answer, f.Reading, f.Source, f.Level, level)
+			}
+			seen[f.Factor+" "+f.Answer.(string)]++
+		}
+	}
+	for factor := range want {
+		for _, id := range []string{"not_reachable", "no_impact"} {
+			if seen[factor+" "+id] == 0 {
+				return fmt.Errorf("no %s answered %s: the run exercises nothing", factor, id)
+			}
 		}
 	}
 	return nil

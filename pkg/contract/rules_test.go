@@ -123,8 +123,15 @@ func channelSets() [][]string {
 // the levels reached and the number of inputs walked.
 func walk(t *testing.T) (reached map[string]map[int]bool, inputs map[string]int) {
 	reached, inputs = map[string]map[int]bool{}, map[string]int{}
+	sets := owaspLevelSets(t)
 	add := func(factor string, d Deployment, floored [3]bool, a Answers, adjusted *Adjusted) {
-		level := levels(compute(t, d, floored, a, adjusted).Vector)[factor]
+		l := compute(t, d, floored, a, adjusted)
+		rating, err := l.Vector.Rate()
+		if err != nil {
+			t.Fatalf("the calculator refuses %+v: %v", l.Vector, err)
+		}
+		checkRating(t, rating, levels(l.Vector), sets)
+		level := levels(l.Vector)[factor]
 		if reached[factor] == nil {
 			reached[factor] = map[int]bool{}
 		}
@@ -270,9 +277,11 @@ func owaspLevelSets(t testing.TB) map[string][]int {
 	return sets
 }
 
-// Every rule is a total function over a finite domain. Walked whole, each
-// reaches exactly the level set the calculator's JAR ran: a rule that
-// reaches another level fails here until the JAR is run over the new sets.
+// Every rule is a total function over a finite domain. Walked whole, every
+// answer, cannot_tell and the answers below the scale included, each input
+// writes a vector the calculator parses and scores, and each rule reaches
+// exactly the level set the calculator's JAR ran: a rule that reaches
+// another level fails here until the JAR is run over the new sets.
 func TestRulesReachTheLevelSetsTheJARRan(t *testing.T) {
 	reached, inputs := walk(t)
 	sets := owaspLevelSets(t)
@@ -285,7 +294,7 @@ func TestRulesReachTheLevelSetsTheJARRan(t *testing.T) {
 	// and the adjustment where the rule reads them.
 	want := map[string]int{
 		"SL": 1, "M": 4, "O": 35, "S": 3, "ED": 1, "EE": 5, "A": 1, "ID": 703,
-		"LC": 128, "LI": 48, "LAV": 48, "LAC": 16, "FD": 5, "RD": 5, "NC": 8, "PV": 288,
+		"LC": 192, "LI": 64, "LAV": 64, "LAC": 24, "FD": 5, "RD": 5, "NC": 8, "PV": 288,
 	}
 	if !maps.Equal(inputs, want) {
 		t.Errorf("inputs walked per rule %v, want %v", inputs, want)

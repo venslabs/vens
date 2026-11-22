@@ -38,8 +38,9 @@ var exposures = map[string]struct {
 var critical = map[string]bool{"low": false, "medium": false, "high": true, "critical": true}
 
 // confidentialityLevels crosses the answer's extent with the column,
-// non-sensitive then critical.
+// non-sensitive then critical. Nothing disclosed is the floor in both.
 var confidentialityLevels = [...][2]owasp.LossOfConfidentiality{
+	extentNone:      {confidentialityFloor, confidentialityFloor},
 	extentMinimal:   {owasp.LossOfConfidentialityMinimalNonSensitiveDataDisclosed, owasp.LossOfConfidentialityMinimalCriticalDataDisclosed},
 	extentExtensive: {owasp.LossOfConfidentialityExtensiveNonSensitiveDataDisclosed, owasp.LossOfConfidentialityExtensiveCriticalDataDisclosed},
 	extentAll:       {owasp.LossOfConfidentialityAllDataDisclosed, owasp.LossOfConfidentialityAllDataDisclosed},
@@ -50,8 +51,11 @@ var traceabilities = [...]string{"none", "per_request", "per_individual"}
 
 // accountabilityLevels crosses the answer with traceability, in
 // traceabilities' order. What is in place, not what is required, sets the
-// level: an identified attacker leaves a trace only under per_individual.
+// level: an identified attacker leaves a trace only under per_individual. An
+// exploit that takes no accountability away gets the lowest level the column
+// gives, never one the records in place cannot back.
 var accountabilityLevels = [...][len(traceabilities)]owasp.LossOfAccountability{
+	actorNoLoss:             {owasp.LossOfAccountabilityPossiblyTraceable, owasp.LossOfAccountabilityPossiblyTraceable, owasp.LossOfAccountabilityFullyTraceable},
 	actorIdentified:         {owasp.LossOfAccountabilityPossiblyTraceable, owasp.LossOfAccountabilityPossiblyTraceable, owasp.LossOfAccountabilityFullyTraceable},
 	actorUnidentified:       {owasp.LossOfAccountabilityCompletelyAnonymous, owasp.LossOfAccountabilityPossiblyTraceable, owasp.LossOfAccountabilityPossiblyTraceable},
 	actorDefeatsAttribution: {owasp.LossOfAccountabilityCompletelyAnonymous, owasp.LossOfAccountabilityCompletelyAnonymous, owasp.LossOfAccountabilityCompletelyAnonymous},
@@ -69,9 +73,10 @@ var detectionLevels = map[string]owasp.IntrusionDetection{
 	activeInApplication:   owasp.IntrusionDetectionActiveDetectionInApplication,
 }
 
-// The floors: an axis every CVSS vector gives N, or the adjustment answers
-// not_affected, takes its factor's lowest level, and Privacy violation
-// follows confidentiality.
+// The floors: an axis every CVSS vector gives N, the adjustment answers
+// not_affected, or the answer says not reachable or no impact takes its
+// factor's lowest level; Privacy violation follows confidentiality only for
+// the first two, which are Go's.
 const (
 	confidentialityFloor = owasp.LossOfConfidentialityMinimalNonSensitiveDataDisclosed
 	integrityFloor       = owasp.LossOfIntegrityMinimalSlightlyCorruptData

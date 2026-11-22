@@ -83,11 +83,13 @@ Type of data handled by the system. vens uses it to pick the column of Loss of c
 
 | Answer to the Loss of confidentiality question | non-sensitive | critical |
 |---|---|---|
+| `not_reachable` | 2 | 2 |
+| `no_impact` | 2 | 2 |
 | `minimal` | 2 | 6 |
 | `extensive` | 6 | 7 |
 | `all` | 9 | 9 |
 
-`cannot_tell` reads as `all`.
+`not_reachable` and `no_impact` say that the vulnerable code is not reachable here, or that exploiting it discloses nothing: both take the lowest level. `cannot_tell`, which says only that the facts given do not decide, reads as `all`.
 
 ### `context.business_criticality`
 
@@ -198,15 +200,17 @@ New in v0.7.0. What is in place, not what is required. Records kept in front of 
 | `per_request` | each request is recorded with its time and origin (source address, client), not with the individual who made it |
 | `per_individual` | as `per_request`, and each action of an authenticated user is recorded with that user's identity |
 
-vens reads this field alone; no call sends it. The Loss of accountability question asks whether the attacker must authenticate and whether the exploit lets them act as someone else or tamper with the records; vens crosses the answer with this field:
+vens reads this field alone; no call sends it. The Loss of accountability question asks, as two separate facts, whether the attacker must authenticate and whether the exploit lets them act as someone else or tamper with the records; vens crosses the answer with this field:
 
 | Answer to the Loss of accountability question | `none` | `per_request` | `per_individual` |
 |---|---|---|---|
+| `not_reachable` | 7 | 7 | 1 |
+| `no_impact` | 7 | 7 | 1 |
 | `identified` | 7 | 7 | 1 |
 | `unidentified` | 9 | 7 | 7 |
 | `defeats_attribution` | 9 | 9 | 9 |
 
-`cannot_tell` reads as `defeats_attribution`. Left out, vens uses the `none` column: each CVE adds one to the `traceability_missing` counter, vens warns at load (W1 or W3), and `--strict` refuses the run.
+`not_reachable` (the vulnerable code is not reachable here) and `no_impact` (no accountability loss: the attacker acts under an identity of their own that the service checks, and the exploit leaves the records intact; not having to authenticate never counts) take the lowest level the column gives. `cannot_tell` reads as `defeats_attribution`. Left out, vens uses the `none` column: each CVE adds one to the `traceability_missing` counter, vens warns at load (W1 or W3), and `--strict` refuses the run.
 
 ### `context.controls`
 
@@ -372,7 +376,7 @@ A warning does not stop the run. vens logs it at load, before any LLM call, at t
 **W1**: `audit_requirement` set, `traceability` left out.
 
 ```text
-context.audit_requirement no longer moves any score, and context.traceability is not declared: Loss of accountability uses its `none` column, 7 when the attacker must authenticate and cannot act as someone else or tamper with the records, 9 otherwise.
+context.audit_requirement no longer moves any score, and context.traceability is not declared: Loss of accountability uses its `none` column, 7 when the vulnerable code is not reachable here, or when the attacker must authenticate and cannot act as someone else or tamper with the records, 9 otherwise.
 ```
 
 **W2**: `ids`, `siem` or `edr` set to `true`, `detection` left out.

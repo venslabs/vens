@@ -98,7 +98,7 @@ These three fields are optional, but each one left out has a fallback: without `
 | `per_request` | each request is recorded with its time and origin (source address, client), not with the individual who made it |
 | `per_individual` | as `per_request`, and each action of an authenticated user is recorded with that user's identity |
 
-A gateway or proxy log counts when it covers every request to the service. Where only part of the service records this, declare the weaker value. vens crosses the value with the model's answer on whether the attacker must authenticate and could defeat attribution, for Loss of accountability. `audit_requirement` does not stand in for it and moves no score.
+A gateway or proxy log counts when it covers every request to the service. Where only part of the service records this, declare the weaker value. vens crosses the value with the model's answer on whether the attacker must authenticate and, apart, whether the exploit could defeat attribution, for Loss of accountability. `audit_requirement` does not stand in for it and moves no score.
 
 ### `detection` — what records an attack attempt, channel by channel?
 

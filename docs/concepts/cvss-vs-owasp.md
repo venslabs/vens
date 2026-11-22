@@ -59,6 +59,8 @@ OWASP's Risk Rating Methodology rates a vulnerability from 16 factors, each with
 
 Four factors also have a CVSS floor: when every CVSS vector of the CVE rates the axis as no impact, vens asks no question and sets Loss of confidentiality to 2, Loss of integrity to 1 and Loss of availability to 1, and Privacy violation, which follows confidentiality, to 3.
 
+The four technical impact questions also list two answers below their scale: `not_reachable`, when the facts given show that the vulnerable code is not reachable in this deployment, and `no_impact`, when exploiting it has no such impact. Both take the factor's lowest level, 2, 1 and 1, and for Loss of accountability the lowest level your `traceability` gives. They are answers, not `cannot_tell`, which says only that the facts given do not decide and still takes the worst case. Opportunity and Ease of exploit read "not reachable here" the same way, as their lowest answer.
+
 A description is a prerequisite of three answers: when no row of the scanner's report describes the CVE, a title alone included, vens does not ask Motive, Opportunity and Ease of exploit, and sets each to its worst level, 9, counted as `cannot_tell`.
 
 A question is asked only when the factor's contract requires it: at most 12 questions per CVE. A CVE whose description says it is disputed or not a security issue, or that the scanner rates low while NVD rates it high or critical, is flagged: it gets one more call, the adjustment, when it has a field left to ask, which can lower Opportunity (not for a CVE with no description), a loss the CVSS vectors did not floor, and Privacy violation, and never raises a level.
@@ -73,10 +75,10 @@ A question is asked only when the factor's contract requires it: at most 12 ques
 | Ease of exploit (EE) | likelihood | answer | how easy the exploit is here; shows the CVSS AC, AT, PR and UI metrics and five of the controls, when set to `true`; 9, not asked, when the CVE has no description |
 | Awareness (A) | likelihood | set by vens | always 9 |
 | Intrusion detection (ID) | likelihood | answer and `detection` | the lowest declared level among the channels the model picks; 9 when `detection` is left out |
-| Loss of confidentiality (LC) | technical impact | answer and `data_sensitivity` | how much data an exploit could read, crossed with the sensitivity; 2 when the CVSS vectors floor it |
-| Loss of integrity (LI) | technical impact | answer | how much data an exploit could corrupt; 1 when the CVSS vectors floor it |
-| Loss of availability (LAV) | technical impact | answer | how much of the service an exploit could interrupt; 1 when the CVSS vectors floor it |
-| Loss of accountability (LAC) | technical impact | answer and `traceability` | whether the attacker must authenticate or can defeat attribution, crossed with what is recorded |
+| Loss of confidentiality (LC) | technical impact | answer and `data_sensitivity` | how much data an exploit could read, crossed with the sensitivity; 2 when the CVSS vectors floor it or the answer is not reachable or no impact |
+| Loss of integrity (LI) | technical impact | answer | how much data an exploit could corrupt; 1 when the CVSS vectors floor it or the answer is not reachable or no impact |
+| Loss of availability (LAV) | technical impact | answer | how much of the service an exploit could interrupt; 1 when the CVSS vectors floor it or the answer is not reachable or no impact |
+| Loss of accountability (LAC) | technical impact | answer and `traceability` | whether the attacker must authenticate, and, apart, whether the exploit defeats attribution, crossed with what is recorded |
 | Financial damage (FD) | business impact | answer | shows `business_criticality` |
 | Reputation damage (RD) | business impact | answer | shows `business_criticality` |
 | Non-compliance (NC) | business impact | answer | how serious a violation of the declared frameworks; 2, not asked, when none is declared |

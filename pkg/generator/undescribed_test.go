@@ -118,7 +118,7 @@ func TestGenerator_UndescribedCVEIsNotAskedTheLikelihoodQuestions(t *testing.T) 
 		lines := reasonings[target]
 		require.Len(t, lines, len(questionsUndeclared), target)
 		assert.Equal(t, []string{"M (not asked: no description)", "O (not asked: no description)", "EE (not asked: no description)"}, lines[:3], target)
-		assert.True(t, strings.HasPrefix(lines[3], "LC (minimal): because of CVE-2024-000"), lines[3])
+		assert.True(t, strings.HasPrefix(lines[3], "LC (not_reachable): because of CVE-2024-000"), lines[3])
 	}
 	for _, target := range []string{"a", "d1", "d2"} {
 		assert.NotContains(t, strings.Join(reasonings[target], "\n"), "not asked", target)
@@ -198,7 +198,7 @@ func TestGenerator_AdjustmentOfAnUndescribedCVELeavesOpportunityOut(t *testing.T
 	axis := []string{"affected", "not_affected", cannotTell}
 	assert.Equal(t, map[string][]string{"confidentiality": axis, "integrity": axis, "availability": axis}, adjustment.fields)
 	assert.NotContains(t, strings.ToLower(adjustment.req.Human), "opportunit")
-	assert.Contains(t, adjustment.req.Human, `"answers":{"confidentiality":"minimal","integrity":"minimal_slightly_corrupt","availability":"minimal_secondary_interrupted"}`)
+	assert.Contains(t, adjustment.req.Human, `"answers":{"confidentiality":"not_reachable","integrity":"not_reachable","availability":"not_reachable"}`)
 
 	vector := emitted[0].Rating.Vector
 	for f, want := range map[string]int{"O": 9, "LC": 2, "PV": 3, "LI": 1} {
