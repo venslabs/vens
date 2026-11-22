@@ -294,7 +294,7 @@ func TestRulesReachTheLevelSetsTheJARRan(t *testing.T) {
 	// and the adjustment where the rule reads them.
 	want := map[string]int{
 		"SL": 1, "M": 4, "O": 35, "S": 3, "ED": 1, "EE": 5, "A": 1, "ID": 703,
-		"LC": 192, "LI": 64, "LAV": 64, "LAC": 24, "FD": 5, "RD": 5, "NC": 8, "PV": 288,
+		"LC": 192, "LI": 64, "LAV": 64, "LAC": 20, "FD": 5, "RD": 5, "NC": 8, "PV": 288,
 	}
 	if !maps.Equal(inputs, want) {
 		t.Errorf("inputs walked per rule %v, want %v", inputs, want)

@@ -1,9 +1,9 @@
-# The four technical impact questions list not_reachable and no_impact below
-# their scale, and the system prompt defines reachability once. Read as
-# answers, never as cannot_tell, they land on the factor's lowest level: LC 2,
-# LI 1, LAV 1, and LAC the lowest of its traceability column, 7 under the
-# quickstart's per_request and 1 under per_individual. Every vector stays one
-# the calculator takes.
+# The four technical impact questions list not_reachable below their scale,
+# and all but Loss of accountability no_impact, and the system prompt defines
+# reachability once. Read as answers, never as cannot_tell, they land on the
+# factor's lowest level: LC 2, LI 1, LAV 1, and LAC the lowest of its
+# traceability column, 7 under the quickstart's per_request and 1 under
+# per_individual. Every vector stays one the calculator takes.
 exec vens generate --llm=mock --debug-dir=dbg --config-file=$QUICKSTART/config.yaml --sbom-serial-number=urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79 $QUICKSTART/reports/python-slim.trivy.json out.cdx.json
 stderr 'Scoring run finished'
 vex-vectors out.cdx.json 45

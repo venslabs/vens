@@ -51,12 +51,11 @@ var traceabilities = [...]string{"none", "per_request", "per_individual"}
 
 // accountabilityLevels crosses the answer with traceability, in
 // traceabilities' order. What is in place, not what is required, sets the
-// level: an identified attacker leaves a trace only under per_individual. An
-// exploit that takes no accountability away gets the lowest level the column
-// gives, never one the records in place cannot back.
+// level: an identified attacker leaves a trace only under per_individual. No
+// accountability loss gets the lowest level the column gives, never one the
+// records in place cannot back.
 var accountabilityLevels = [...][len(traceabilities)]owasp.LossOfAccountability{
 	actorNoLoss:             {owasp.LossOfAccountabilityPossiblyTraceable, owasp.LossOfAccountabilityPossiblyTraceable, owasp.LossOfAccountabilityFullyTraceable},
-	actorIdentified:         {owasp.LossOfAccountabilityPossiblyTraceable, owasp.LossOfAccountabilityPossiblyTraceable, owasp.LossOfAccountabilityFullyTraceable},
 	actorUnidentified:       {owasp.LossOfAccountabilityCompletelyAnonymous, owasp.LossOfAccountabilityPossiblyTraceable, owasp.LossOfAccountabilityPossiblyTraceable},
 	actorDefeatsAttribution: {owasp.LossOfAccountabilityCompletelyAnonymous, owasp.LossOfAccountabilityCompletelyAnonymous, owasp.LossOfAccountabilityCompletelyAnonymous},
 }

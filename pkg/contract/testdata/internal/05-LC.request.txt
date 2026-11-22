@@ -2,13 +2,13 @@ VULNERABILITIES
 [entries]
 
 QUESTION
-If intranet users exploited this vulnerability in this deployment, how much of the data this service handles could they read? The data it handles is what the deployment's description and notes say it holds or processes.
+If intranet users exploited this vulnerability in this deployment, how much of the data this service handles could they read? The data it handles is what the deployment's description and notes say it holds or processes. Where they do not say, it handles whatever the service can read. Count all the distinct data they could read by exploiting it as often as they can.
 
 ANSWERS
 - not_reachable: Not reachable here: the facts given show that the vulnerable code is not reachable in this deployment, as defined above.
 - no_impact: No data disclosed: it is reachable, but exploiting it here discloses none of the data this service handles, as when its only effect is a crash, a slowdown or a change that reveals nothing.
-- minimal: Minimal: a small, bounded amount that the attacker cannot choose or keep reading, such as a few values, one record, a file path, a version string, or a fragment of memory or metadata.
-- extensive: Extensive: a large amount, or data the attacker can choose or keep reading, such as many records, whole files or tables, the data of many users, or memory read again and again, but not all the data this service can read.
+- minimal: Minimal: a small, bounded amount, such as a few values, one record, a file path, a version string, or a fragment of memory or metadata.
+- extensive: Extensive: a large amount, such as many records, whole files or tables, or the data of many users, but not all the data this service can read.
 - all: All: all the data this service can read, as when the exploit runs code as the service or yields the credentials or keys that open every store it reads.
 - cannot_tell: The facts given do not decide between the answers above.
 

@@ -36,10 +36,12 @@ const impactCannotTellText = "The facts given do not decide between the answers 
 // reachability as the system prompt defines it once.
 const notReachable = "the facts given show that the vulnerable code is not reachable in this deployment, as defined above"
 
-// The ids of the four technical impact questions' two answers below their
-// scale. Each lands on the factor's floor, Loss of accountability's on the
-// lowest level its traceability column gives, so neither raises a level any
-// other answer would give.
+// The ids of the answers below the technical impact scales: not_reachable on
+// all four, no_impact on Loss of confidentiality, integrity and availability.
+// Each lands on the factor's floor, Loss of accountability's on the lowest
+// level its traceability column gives, so neither raises a level any other
+// answer would give. Loss of accountability's identified answer is its no
+// accountability loss.
 const (
 	notReachableID = "not_reachable"
 	noImpactID     = "no_impact"
@@ -74,7 +76,7 @@ var opportunity = contract[owasp.Opportunity]{
 
 var easeOfExploit = contract[owasp.EaseOfExploit]{
 	factor:   EE,
-	question: "How easy is it for {group}, from where they already are, to actually exploit this vulnerability in this deployment, as it is deployed and with the controls in front of it? The access control of the exposure itself, such as the corporate network or the VPN or authenticated tunnel it requires, is not one of those controls: {group} are already past it. Choose the one answer that holds here.",
+	question: "How easy is it for {group}, from where they already are, to actually exploit this vulnerability in this deployment, as it is deployed and with the controls in front of it? Any access control the exposure itself requires, such as the corporate network or the VPN or authenticated tunnel, is not one of those controls: {group} are already past it. Choose the one answer that holds here.",
 	answers: []answer[owasp.EaseOfExploit]{
 		{"theoretical", "Theoretical: no practical way to exploit it in this deployment is known; also when " + notReachable + ".", owasp.EaseOfExploitTheoretical},
 		{"difficult", "Difficult: a practical way exists, but here it needs expert work, rare conditions, chaining with another flaw, or getting through a control in front of this deployment that they have not already passed, even where a public exploit exists elsewhere.", owasp.EaseOfExploitDifficult},
@@ -124,12 +126,12 @@ const (
 
 var confidentiality = contract[extent]{
 	factor:   LC,
-	question: "If {group} exploited this vulnerability in this deployment, how much of the data this service handles could they read? The data it handles is what the deployment's description and notes say it holds or processes.",
+	question: "If {group} exploited this vulnerability in this deployment, how much of the data this service handles could they read? The data it handles is what the deployment's description and notes say it holds or processes. Where they do not say, it handles whatever the service can read. Count all the distinct data they could read by exploiting it as often as they can.",
 	answers: []answer[extent]{
 		{notReachableID, notReachableText, extentNone},
 		{noImpactID, "No data disclosed: it is reachable, but exploiting it here discloses none of the data this service handles, as when its only effect is a crash, a slowdown or a change that reveals nothing.", extentNone},
-		{"minimal", "Minimal: a small, bounded amount that the attacker cannot choose or keep reading, such as a few values, one record, a file path, a version string, or a fragment of memory or metadata.", extentMinimal},
-		{"extensive", "Extensive: a large amount, or data the attacker can choose or keep reading, such as many records, whole files or tables, the data of many users, or memory read again and again, but not all the data this service can read.", extentExtensive},
+		{"minimal", "Minimal: a small, bounded amount, such as a few values, one record, a file path, a version string, or a fragment of memory or metadata.", extentMinimal},
+		{"extensive", "Extensive: a large amount, such as many records, whole files or tables, or the data of many users, but not all the data this service can read.", extentExtensive},
 		{"all", "All: all the data this service can read, as when the exploit runs code as the service or yields the credentials or keys that open every store it reads.", extentAll},
 		{cannotTell, impactCannotTellText, extentAll},
 	},
@@ -138,14 +140,14 @@ var confidentiality = contract[extent]{
 
 var integrity = contract[owasp.LossOfIntegrity]{
 	factor:   LI,
-	question: "If {group} exploited this vulnerability in this deployment, how much of the data this service handles could they corrupt, and how badly?",
+	question: "If {group} exploited this vulnerability in this deployment, how much of the data this service handles could they corrupt, and how badly? Count all the distinct data they could corrupt by exploiting it as often as they can.",
 	answers: []answer[owasp.LossOfIntegrity]{
 		{notReachableID, notReachableText, integrityFloor},
 		{noImpactID, "No data corrupted: it is reachable, but exploiting it here changes none of the data this service handles, as when its only effect is a crash, a slowdown or a disclosure.", integrityFloor},
 		{"minimal_slightly_corrupt", "Minimal, slightly corrupt: a little of the data, such as one record, file, setting or message, changed in ways that are easy to notice or undo, such as a malformed value, a log line or a cache entry that is rebuilt.", owasp.LossOfIntegrityMinimalSlightlyCorruptData},
 		{"minimal_seriously_corrupt", "Minimal, seriously corrupt: a little of the data, changed in ways that matter, such as an altered record, credential, setting or file that the service or its users will trust and act on.", owasp.LossOfIntegrityMinimalSeriouslyCorruptData},
-		{"extensive_slightly_corrupt", "Extensive, slightly corrupt: much of the data, or any part of it the attacker chooses, changed in ways that are easy to notice or undo.", owasp.LossOfIntegrityExtensiveSlightlyCorruptData},
-		{"extensive_seriously_corrupt", "Extensive, seriously corrupt: much of the data, or any part of it the attacker chooses, changed in ways that matter, but not everything this service holds.", owasp.LossOfIntegrityExtensiveSeriouslyCorruptData},
+		{"extensive_slightly_corrupt", "Extensive, slightly corrupt: much of the data, changed in ways that are easy to notice or undo.", owasp.LossOfIntegrityExtensiveSlightlyCorruptData},
+		{"extensive_seriously_corrupt", "Extensive, seriously corrupt: much of the data, changed in ways that matter, but not everything this service holds.", owasp.LossOfIntegrityExtensiveSeriouslyCorruptData},
 		{"all_data_totally_corrupt", "All data totally corrupt: everything this service holds can be overwritten or destroyed, as when the exploit runs code as the service.", owasp.LossOfIntegrityAllDataTotallyCorrupt},
 		{cannotTell, impactCannotTellText, owasp.LossOfIntegrityAllDataTotallyCorrupt},
 	},
@@ -154,7 +156,7 @@ var integrity = contract[owasp.LossOfIntegrity]{
 
 var availability = contract[owasp.LossOfAvailability]{
 	factor:   LAV,
-	question: "If {group} exploited this vulnerability in this deployment, how much of this service could they interrupt, and how vital is what they would interrupt? Primary is what the deployment's description and notes say this service exists to do, and any part it cannot do that without; secondary is anything else it runs, such as a tool in the image, an optional feature, an admin or debug function, or a background task.",
+	question: "If {group} exploited this vulnerability in this deployment, how much of this service could they interrupt, and how vital is what they would interrupt? Primary is what the deployment's description and notes say this service exists to do, and any part it cannot do that without; secondary is anything else it runs, such as a tool in the image, an optional feature, an admin or debug function, or a background task. Where they do not say, count what is interrupted as primary.",
 	answers: []answer[owasp.LossOfAvailability]{
 		{notReachableID, notReachableText, availabilityFloor},
 		{noImpactID, "Nothing interrupted: it is reachable, but exploiting it here interrupts nothing this service does, as when its only effect is a disclosure or a change of data.", availabilityFloor},
@@ -169,26 +171,24 @@ var availability = contract[owasp.LossOfAvailability]{
 }
 
 // actor is what Loss of accountability's answer says of the attacker's
-// traces, which Go crosses with traceability. actorNoLoss is the two answers
-// that say the exploit takes no accountability away here.
+// traces, which Go crosses with traceability. actorNoLoss is not_reachable's
+// and identified's: no accountability loss.
 type actor int
 
 const (
 	actorNoLoss actor = iota
-	actorIdentified
 	actorUnidentified
 	actorDefeatsAttribution
 )
 
-// Attribution and authentication are asked apart, and not having to
-// authenticate never counts as an exploit that takes no accountability away.
+// Authentication and attribution are asked apart, and not having to
+// authenticate never counts as no accountability loss.
 var accountability = contract[actor]{
 	factor:   LAC,
-	question: "If {group} exploited this vulnerability in this deployment, could what they did be traced to them? Judge attribution apart from authentication: whether they must authenticate to this service under an identity of their own is one fact; whether the exploit lets them act as someone else, or erase, forge or bypass the records of who did what, is another.",
+	question: "To exploit this vulnerability in this deployment, must {group} authenticate to this service under an identity of their own? Apart from that, could the exploit let them act as someone else, or erase, forge or bypass the records of who did what? Answer the two facts separately; whether records exist is not asked.",
 	answers: []answer[actor]{
 		{notReachableID, notReachableText, actorNoLoss},
-		{noImpactID, "No accountability loss: they act only under an identity of their own that this service checks, and the exploit neither lets them act as someone else nor erases, forges or bypasses the records of who did what. Not having to authenticate, or there being no service to authenticate to, never makes this answer hold.", actorNoLoss},
-		{"identified", "Identified: they must authenticate to this service under an identity of their own, and the exploit does not let them act as someone else or tamper with the records of who did what.", actorIdentified},
+		{"identified", "Identified, no accountability loss: they must authenticate to this service under an identity of their own, and the exploit does not let them act as someone else or tamper with the records of who did what.", actorNoLoss},
 		{"unidentified", "Unidentified: they need not authenticate to this service, or there is no service to authenticate to, and the exploit does not let them act as someone else or tamper with the records of who did what.", actorUnidentified},
 		{"defeats_attribution", "Defeats attribution: whether or not they authenticate, the exploit lets them act as someone else, or erase, forge or bypass the records of who did what.", actorDefeatsAttribution},
 		{cannotTell, impactCannotTellText, actorDefeatsAttribution},

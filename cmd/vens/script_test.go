@@ -315,9 +315,10 @@ func checkVEXVectors(data []byte, count int, sets [16][]int) error {
 }
 
 // belowScaleCmd reads the answers.json of the one run under a --debug-dir
-// and checks every not_reachable and no_impact answer of the four technical
+// and checks every not_reachable and no_impact answer of the technical
 // impact questions: read as answered, from the answer, at the level given
-// per factor; and each of the eight pairs answered at least once.
+// per factor; not_reachable answered at least once on each of the four, and
+// no_impact on each but Loss of accountability, which does not list it.
 func belowScaleCmd(ts *testscript.TestScript, neg bool, args []string) {
 	if neg || len(args) != 5 {
 		ts.Fatalf("usage: below-scale debug-dir LC=level LI=level LAV=level LAC=level")
@@ -373,6 +374,9 @@ func checkBelowScale(data []byte, want map[string]int) error {
 	}
 	for factor := range want {
 		for _, id := range []string{"not_reachable", "no_impact"} {
+			if factor == "LAC" && id == "no_impact" {
+				continue
+			}
 			if seen[factor+" "+id] == 0 {
 				return fmt.Errorf("no %s answered %s: the run exercises nothing", factor, id)
 			}

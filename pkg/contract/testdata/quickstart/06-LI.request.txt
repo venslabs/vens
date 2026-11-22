@@ -2,7 +2,7 @@ VULNERABILITIES
 [entries]
 
 QUESTION
-If anonymous Internet users exploited this vulnerability in this deployment, how much of the data this service handles could they corrupt, and how badly?
+If anonymous Internet users exploited this vulnerability in this deployment, how much of the data this service handles could they corrupt, and how badly? Count all the distinct data they could corrupt by exploiting it as often as they can.
 
 FOR THIS QUESTION
 Data sensitivity: high (PII, financial data, customer info)
@@ -12,8 +12,8 @@ ANSWERS
 - no_impact: No data corrupted: it is reachable, but exploiting it here changes none of the data this service handles, as when its only effect is a crash, a slowdown or a disclosure.
 - minimal_slightly_corrupt: Minimal, slightly corrupt: a little of the data, such as one record, file, setting or message, changed in ways that are easy to notice or undo, such as a malformed value, a log line or a cache entry that is rebuilt.
 - minimal_seriously_corrupt: Minimal, seriously corrupt: a little of the data, changed in ways that matter, such as an altered record, credential, setting or file that the service or its users will trust and act on.
-- extensive_slightly_corrupt: Extensive, slightly corrupt: much of the data, or any part of it the attacker chooses, changed in ways that are easy to notice or undo.
-- extensive_seriously_corrupt: Extensive, seriously corrupt: much of the data, or any part of it the attacker chooses, changed in ways that matter, but not everything this service holds.
+- extensive_slightly_corrupt: Extensive, slightly corrupt: much of the data, changed in ways that are easy to notice or undo.
+- extensive_seriously_corrupt: Extensive, seriously corrupt: much of the data, changed in ways that matter, but not everything this service holds.
 - all_data_totally_corrupt: All data totally corrupt: everything this service holds can be overwritten or destroyed, as when the exploit runs code as the service.
 - cannot_tell: The facts given do not decide between the answers above.
 

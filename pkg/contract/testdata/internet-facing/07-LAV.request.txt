@@ -2,7 +2,7 @@ VULNERABILITIES
 [entries]
 
 QUESTION
-If anonymous Internet users exploited this vulnerability in this deployment, how much of this service could they interrupt, and how vital is what they would interrupt? Primary is what the deployment's description and notes say this service exists to do, and any part it cannot do that without; secondary is anything else it runs, such as a tool in the image, an optional feature, an admin or debug function, or a background task.
+If anonymous Internet users exploited this vulnerability in this deployment, how much of this service could they interrupt, and how vital is what they would interrupt? Primary is what the deployment's description and notes say this service exists to do, and any part it cannot do that without; secondary is anything else it runs, such as a tool in the image, an optional feature, an admin or debug function, or a background task. Where they do not say, count what is interrupted as primary.
 
 FOR THIS QUESTION
 Availability requirement: critical (Zero downtime tolerance)

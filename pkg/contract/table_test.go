@@ -46,7 +46,7 @@ func TestTableAnswersAndLevels(t *testing.T) {
 		LC:  "not_reachable no_impact minimal extensive all cannot_tell",
 		LI:  "not_reachable=1 no_impact=1 minimal_slightly_corrupt=1 minimal_seriously_corrupt=3 extensive_slightly_corrupt=5 extensive_seriously_corrupt=7 all_data_totally_corrupt=9 cannot_tell=9",
 		LAV: "not_reachable=1 no_impact=1 minimal_secondary_interrupted=1 minimal_primary_interrupted=5 extensive_secondary_interrupted=5 extensive_primary_interrupted=7 all_services_completely_lost=9 cannot_tell=9",
-		LAC: "not_reachable no_impact identified unidentified defeats_attribution cannot_tell",
+		LAC: "not_reachable identified unidentified defeats_attribution cannot_tell",
 		FD:  "less_than_cost_to_fix=1 minor_effect_on_annual_profit=3 significant_effect_on_annual_profit=7 bankruptcy=9 cannot_tell=9",
 		RD:  "minimal_damage=1 loss_of_major_accounts=4 loss_of_goodwill=5 brand_damage=9 cannot_tell=9",
 		NC:  "minor_violation=2 clear_violation=5 high_profile_violation=7 cannot_tell=7",
@@ -136,7 +136,7 @@ func TestCrossedLevels(t *testing.T) {
 			}
 		}
 	}
-	lac := map[string][3]int{notReachableID: {7, 7, 1}, noImpactID: {7, 7, 1}, "identified": {7, 7, 1}, "unidentified": {9, 7, 7}, "defeats_attribution": {9, 9, 9}, cannotTell: {9, 9, 9}}
+	lac := map[string][3]int{notReachableID: {7, 7, 1}, "identified": {7, 7, 1}, "unidentified": {9, 7, 7}, "defeats_attribution": {9, 9, 9}, cannotTell: {9, 9, 9}}
 	for id, want := range lac {
 		for i, tr := range traceabilities {
 			d := base()
@@ -178,12 +178,13 @@ func TestCrossedLevels(t *testing.T) {
 	}
 }
 
-// belowScale is one technical impact question and the config states its
-// rule reads.
+// belowScale is one technical impact question, its answers at the lowest
+// level, and the config states its rule reads.
 type belowScale struct {
 	factor  Factor
 	set     func(*Answers, string)
 	list    []string
+	lowest  []string
 	configs []Deployment
 }
 
@@ -201,18 +202,20 @@ func belowScaleCases() []belowScale {
 	}
 	required := base()
 	required.AvailabilityRequirement = &Setting{"critical", "Zero downtime tolerance"}
+	below := []string{notReachableID, noImpactID}
 	return []belowScale{
-		{LC, func(a *Answers, id string) { a.LC = id }, ids(confidentiality), sensitive},
-		{LI, func(a *Answers, id string) { a.LI = id }, ids(integrity), []Deployment{base()}},
-		{LAV, func(a *Answers, id string) { a.LAV = id }, ids(availability), []Deployment{base(), required}},
-		{LAC, func(a *Answers, id string) { a.LAC = id }, ids(accountability), traced},
+		{LC, func(a *Answers, id string) { a.LC = id }, ids(confidentiality), below, sensitive},
+		{LI, func(a *Answers, id string) { a.LI = id }, ids(integrity), below, []Deployment{base()}},
+		{LAV, func(a *Answers, id string) { a.LAV = id }, ids(availability), below, []Deployment{base(), required}},
+		{LAC, func(a *Answers, id string) { a.LAC = id }, ids(accountability), []string{notReachableID, "identified"}, traced},
 	}
 }
 
-// Not reachable and no impact are answers, not cannot_tell: read as
-// answered and counted as nothing, they take the factor's floor, Loss of
-// accountability's the lowest level its traceability column gives, under
-// every config state and adjustment. They keep or lower: no other answer,
+// Not reachable and no impact, and Loss of accountability's identified, its
+// no accountability loss, are answers, not cannot_tell: read as answered and
+// counted as nothing, they take the factor's floor, Loss of accountability's
+// the lowest level its traceability column gives, under every config state
+// and adjustment. They keep or lower: no other answer,
 // an id off the list or cannot_tell gives a lower level, and cannot_tell
 // still gives the worst.
 func TestBelowTheScaleAnswersTakeTheLowestLevel(t *testing.T) {
@@ -229,7 +232,7 @@ func TestBelowTheScaleAnswersTakeTheLowestLevel(t *testing.T) {
 				all = append(all, level(t, string(c.factor), d, [3]bool{}, a, nil))
 			}
 			lowest, worst := slices.Min(all), slices.Max(all)
-			for _, id := range []string{notReachableID, noImpactID} {
+			for _, id := range c.lowest {
 				for _, adjusted := range adjustments {
 					var a Answers
 					c.set(&a, id)
@@ -257,7 +260,7 @@ func TestBelowTheScaleAnswersTakeTheLowestLevel(t *testing.T) {
 	want := map[Factor][]int{LC: {2, 2, 2, 2}, LI: {1}, LAV: {1, 1}, LAC: {7, 7, 7, 1}}
 	for _, c := range belowScaleCases() {
 		for i, d := range c.configs {
-			for _, id := range []string{notReachableID, noImpactID} {
+			for _, id := range c.lowest {
 				var a Answers
 				c.set(&a, id)
 				if got := level(t, string(c.factor), d, [3]bool{}, a, nil); got != want[c.factor][i] {
@@ -316,9 +319,16 @@ func TestReachabilityIsDefinedOnceAndReadTheSameWay(t *testing.T) {
 		}
 	}
 	for _, f := range []Factor{LC, LI, LAV, LAC} {
-		if q := table[f]; q.ids[0] != notReachableID || q.texts[0] != notReachableText || q.ids[1] != noImpactID {
-			t.Errorf("%s lists %v, want not_reachable then no_impact first", f, q.ids)
+		second := noImpactID
+		if f == LAC {
+			second = "identified"
 		}
+		if q := table[f]; q.ids[0] != notReachableID || q.texts[0] != notReachableText || q.ids[1] != second {
+			t.Errorf("%s lists %v, want not_reachable then %s first", f, q.ids, second)
+		}
+	}
+	if slices.Contains(table[LAC].ids, noImpactID) {
+		t.Error("Loss of accountability lists no_impact: identified is its no accountability loss")
 	}
 	if level, _ := opportunity.read(saying[O]); level != owasp.OpportunityFullAccessOrExpensiveResourcesRequired {
 		t.Errorf("Opportunity's not-reachable answer maps to %d, want its lowest", level)
@@ -350,33 +360,30 @@ func TestImpactCannotTellOnlyMeansTheFactsDoNotDecide(t *testing.T) {
 	}
 }
 
-// Loss of accountability asks attribution apart from authentication, and not
-// having to authenticate never takes the no-loss level: under none, an
-// attacker who need not authenticate is completely anonymous, 9, where no
-// loss is 7.
-func TestAccountabilityAsksAttributionApartFromAuthentication(t *testing.T) {
+// Loss of accountability asks authentication and attribution as two facts,
+// not whether records exist, and its identified answer, no accountability
+// loss, needs the attacker to authenticate: under none, an attacker who need
+// not authenticate is completely anonymous, 9, where identified is 7.
+func TestAccountabilityAsksAuthenticationAndAttributionApart(t *testing.T) {
 	q := table[LAC]
-	for _, part := range []string{"apart from authentication", "must authenticate", "records of who did what"} {
+	for _, part := range []string{"must {group} authenticate to this service under an identity of their own?", "Apart from that,", "records of who did what", "Answer the two facts separately; whether records exist is not asked."} {
 		if !strings.Contains(q.question, part) {
 			t.Errorf("Loss of accountability's question lacks %q: %q", part, q.question)
 		}
 	}
-	noLoss := q.texts[slices.Index(q.ids, noImpactID)]
-	for _, part := range []string{"Not having to authenticate", "no service to authenticate to", "never makes this answer hold"} {
-		if !strings.Contains(noLoss, part) {
-			t.Errorf("no_impact lacks %q: %q", part, noLoss)
-		}
+	if identified := q.texts[slices.Index(q.ids, "identified")]; !strings.HasPrefix(identified, "Identified, no accountability loss: they must authenticate") {
+		t.Errorf("identified: %q", identified)
 	}
 	if unidentified := q.texts[slices.Index(q.ids, "unidentified")]; !strings.Contains(unidentified, "no service to authenticate to") {
 		t.Errorf("unidentified does not cover a deployment with no service to authenticate to: %q", unidentified)
 	}
 	for column, tr := range traceabilities {
 		if accountabilityLevels[actorUnidentified][column] < accountabilityLevels[actorNoLoss][column] {
-			t.Errorf("under %s, unidentified is below no loss", tr)
+			t.Errorf("under %s, unidentified is below identified", tr)
 		}
 	}
 	if accountabilityLevels[actorUnidentified][0] <= accountabilityLevels[actorNoLoss][0] {
-		t.Error("under none, not having to authenticate gives no-loss's level")
+		t.Error("under none, not having to authenticate gives identified's level")
 	}
 }
 
@@ -386,7 +393,7 @@ func TestAccountabilityAsksAttributionApartFromAuthentication(t *testing.T) {
 // of the deployment.
 func TestEaseOfExploitStartsFromWhereTheGroupAlreadyIs(t *testing.T) {
 	if q := table[EE].question; !strings.Contains(q, "{group}, from where they already are,") ||
-		!strings.Contains(q, "The access control of the exposure itself") || !strings.Contains(q, "{group} are already past it") {
+		!strings.Contains(q, "Any access control the exposure itself requires") || !strings.Contains(q, "{group} are already past it") {
 		t.Errorf("Ease of exploit's question: %q", q)
 	}
 	if q := table[O].question; !strings.Contains(q, "beyond what they already have") {
@@ -439,6 +446,35 @@ func TestEaseOfDiscoveryAndAwarenessStayConstant(t *testing.T) {
 				l := compute(t, d, [3]bool{}, a, nil)
 				if l.Vector.ED != 9 || l.Vector.A != 9 || l.Sources[ED] != SourceConstant || l.Sources[A] != SourceConstant {
 					t.Errorf("%s: ED %d from %v, A %d from %v; want 9 from the constant", e, l.Vector.ED, l.Sources[ED], l.Vector.A, l.Sources[A])
+				}
+			}
+		}
+	}
+}
+
+// Loss of confidentiality and integrity count everything an exploit repeated
+// as often as it can reaches, so no answer weighs whether the attacker
+// chooses or repeats; where the deployment's description and notes are
+// silent, LC counts whatever the service can read and LAV counts what is
+// interrupted as primary.
+func TestExtentIsWhatRepeatedExploitsReach(t *testing.T) {
+	for f, part := range map[Factor]string{
+		LC:  "Count all the distinct data they could read by exploiting it as often as they can.",
+		LI:  "Count all the distinct data they could corrupt by exploiting it as often as they can.",
+		LAV: "Where they do not say, count what is interrupted as primary.",
+	} {
+		if !strings.HasSuffix(table[f].question, part) {
+			t.Errorf("%s's question does not end with %q: %q", f, part, table[f].question)
+		}
+	}
+	if q := table[LC].question; !strings.Contains(q, "Where they do not say, it handles whatever the service can read.") {
+		t.Errorf("LC's question: %q", q)
+	}
+	for _, f := range []Factor{LC, LI} {
+		for i, text := range table[f].texts {
+			for _, word := range []string{"choose", "keep reading", "again and again"} {
+				if strings.Contains(text, word) {
+					t.Errorf("%s %s weighs the attacker's choice or repetition: %q", f, table[f].ids[i], text)
 				}
 			}
 		}

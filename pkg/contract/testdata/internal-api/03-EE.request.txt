@@ -2,7 +2,7 @@ VULNERABILITIES
 [entries]
 
 QUESTION
-How easy is it for intranet users, from where they already are, to actually exploit this vulnerability in this deployment, as it is deployed and with the controls in front of it? The access control of the exposure itself, such as the corporate network or the VPN or authenticated tunnel it requires, is not one of those controls: intranet users are already past it. Choose the one answer that holds here.
+How easy is it for intranet users, from where they already are, to actually exploit this vulnerability in this deployment, as it is deployed and with the controls in front of it? Any access control the exposure itself requires, such as the corporate network or the VPN or authenticated tunnel, is not one of those controls: intranet users are already past it. Choose the one answer that holds here.
 
 FOR THIS QUESTION
 Controls in front of this deployment: segmentation (Network micro-segmentation; scope: Lateral movement)
