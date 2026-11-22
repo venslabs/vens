@@ -16,6 +16,7 @@ package contract
 
 import (
 	"encoding/json"
+	"fmt"
 	"regexp"
 	"slices"
 	"strings"
@@ -442,7 +443,7 @@ func TestAdjustmentAsksTheAxesNotFloored(t *testing.T) {
 					want = append(want, name)
 				}
 			}
-			if got := AdjustmentFields(c, floored); !slices.Equal(got, want) {
+			if got := AdjustmentFields(base(), c, floored, "reachable"); !slices.Equal(got, want) {
 				t.Errorf("%s, floored %v: fields %v, want %v", c.ID, floored, got, want)
 			}
 			given := baselines(adjustGiven, floored)
@@ -453,7 +454,7 @@ func TestAdjustmentAsksTheAxesNotFloored(t *testing.T) {
 				if _, err := AdjustmentRequest(base(), c, floored, adjustFlags, given); err == nil {
 					t.Errorf("%s, floored %v: a request with nothing to ask", c.ID, floored)
 				}
-				if _, err := AdjustmentSchema(c, floored); err == nil {
+				if _, err := AdjustmentSchema(base(), c, floored, given.R); err == nil {
 					t.Errorf("%s, floored %v: a schema with nothing to ask", c.ID, floored)
 				}
 				continue
@@ -466,7 +467,7 @@ func TestAdjustmentAsksTheAxesNotFloored(t *testing.T) {
 				asked = append(asked, name)
 			}
 			var s struct{ Required []string }
-			if err := json.Unmarshal([]byte(data(t)(AdjustmentSchema(c, floored))), &s); err != nil {
+			if err := json.Unmarshal([]byte(data(t)(AdjustmentSchema(base(), c, floored, given.R))), &s); err != nil {
 				t.Fatal(err)
 			}
 			reply := `Reply with {"reasoning": "...", "` + strings.Join(want, `": "...", "`) + `": "..."}.`
@@ -476,6 +477,81 @@ func TestAdjustmentAsksTheAxesNotFloored(t *testing.T) {
 			if !c.Described() && strings.Contains(strings.ToLower(request), "opportunit") {
 				t.Errorf("%s, floored %v: the request shows Opportunity:\n%s", c.ID, floored, request)
 			}
+		}
+	}
+}
+
+// A CVE not reachable here was asked neither Opportunity nor the axes, which
+// are at their lowest: its adjustment shows reachability's answer as the one
+// given and asks confidentiality alone, which Privacy violation follows, and
+// only when it was asked Privacy violation; otherwise there is nothing to
+// adjust and the request and the schema are refused. The rest of the request
+// is a reachable CVE's.
+func TestAdjustmentOfANotReachableCVE(t *testing.T) {
+	undescribed := CVE{ID: "CVE-N", Rows: []Row{{PkgName: "libfoo", Title: "Overflow in libfoo", Severity: "LOW"}}}
+	given := Answers{R: notReachableID}
+	for _, c := range []CVE{conflicting, undescribed} {
+		for _, subjects := range []*string{nil, ptr("none"), ptr("one_individual"), ptr("hundreds")} {
+			for mask := range 8 {
+				floored := [3]bool{mask&1 != 0, mask&2 != 0, mask&4 != 0}
+				d := base()
+				d.DataSubjects = subjects
+				name := fmt.Sprintf("%s, data_subjects %q, floored %v", c.ID, deref(subjects), floored)
+				var want []string
+				if asked(PV, d, floored, c.Described()) {
+					want = []string{"confidentiality"}
+				}
+				if got := AdjustmentFields(d, c, floored, notReachableID); !slices.Equal(got, want) {
+					t.Errorf("%s: fields %v, want %v", name, got, want)
+				}
+				if want == nil {
+					if _, err := AdjustmentRequest(d, c, floored, adjustFlags, given); err == nil {
+						t.Errorf("%s: a request with nothing to ask", name)
+					}
+					if _, err := AdjustmentSchema(d, c, floored, notReachableID); err == nil {
+						t.Errorf("%s: a schema with nothing to ask", name)
+					}
+					continue
+				}
+				request := text(t)(AdjustmentRequest(d, c, floored, adjustFlags, given))
+				for _, part := range []string{
+					`"answers":{"reachability":"not_reachable"}}`,
+					"the flag's quoted evidence, and the answer it was given without that evidence: not reachable here, as reachability is defined above. Reconsider it from that evidence.",
+					"\nQUESTIONS\nconfidentiality: Given this evidence, can exploiting it here affect confidentiality at all? Answer with affected, not_affected or cannot_tell.\n\n",
+					`Reply with {"reasoning": "...", "confidentiality": "..."}.`,
+				} {
+					if !strings.Contains(request, part) {
+						t.Errorf("%s: the request lacks %q:\n%s", name, part, request)
+					}
+				}
+				if strings.Contains(strings.ToLower(request), "opportunit") || strings.Contains(request, "integrity") || strings.Contains(request, "availability") {
+					t.Errorf("%s: the request shows what was not asked:\n%s", name, request)
+				}
+				var s struct{ Required []string }
+				if err := json.Unmarshal([]byte(data(t)(AdjustmentSchema(d, c, floored, notReachableID))), &s); err != nil {
+					t.Fatal(err)
+				}
+				if !slices.Equal(s.Required, []string{"reasoning", "confidentiality"}) {
+					t.Errorf("%s: the schema requires %v", name, s.Required)
+				}
+			}
+		}
+	}
+	reached := text(t)(AdjustmentRequest(base(), conflicting, [3]bool{}, adjustFlags, adjustGiven))
+	unreached := text(t)(AdjustmentRequest(base(), conflicting, [3]bool{}, adjustFlags, given))
+	cut := func(s string) string {
+		head, _, _ := strings.Cut(s, `"answers":`)
+		_, tail, _ := strings.Cut(s, "\n\nThis vulnerability is flagged")
+		return head + tail[:strings.Index(tail, ", and the answer")]
+	}
+	if cut(reached) != cut(unreached) {
+		t.Errorf("the entry or the text before the answers differ:\n%s\n%s", reached, unreached)
+	}
+	for _, answer := range []string{"reachable", cannotTell, "", "bogus"} {
+		a := adjustGiven
+		a.R = answer
+		if got := text(t)(AdjustmentRequest(base(), conflicting, [3]bool{}, adjustFlags, a)); got != reached {
+			t.Errorf("reachability %q read as reachable changed the request:\n%s", answer, got)
 		}
 	}
 }
@@ -592,6 +668,9 @@ func TestAdjustmentRefusesWhatItCannotShow(t *testing.T) {
 		"a flag quoting nothing":         {flags: []Flag{{MaintainerDisputed, "  ", "libfoo"}}, given: adjustGiven},
 		"a flag naming no package":       {flags: []Flag{{MaintainerDisputed, "disputed", ""}}, given: adjustGiven},
 		"a flag on another package":      {flags: []Flag{{MaintainerDisputed, "disputed", "libother"}}, given: adjustGiven},
+		"not reachable, an answer given": {given: with(func(a *Answers) { a.R = notReachableID })},
+		"not reachable, Opportunity's":   {given: Answers{R: notReachableID, O: cannotTell}},
+		"not reachable, an axis's":       {given: Answers{R: notReachableID, LAV: cannotTell}},
 	} {
 		flags := c.flags
 		if flags == nil {

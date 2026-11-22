@@ -57,24 +57,26 @@ type adjustmentReply struct {
 // adjust makes a flagged CVE's adjustment call, after its ordinary
 // questions: it shows every row's evidence, the flags and the answers given,
 // and may lower Opportunity, when a row describes the CVE, and each axis
-// Applicability did not floor, never raise them. With none of them left, or
-// for a CVE not reachable here, whose Opportunity and axes are at their
-// lowest, it makes no call. A reply Go cannot read leaves the baselines.
+// Applicability did not floor, never raise them. A CVE not reachable here,
+// whose Opportunity and axes are at their lowest, is shown reachability's
+// answer and asked confidentiality alone, when it was asked Privacy
+// violation. With nothing left to ask, it makes no call. A reply Go cannot
+// read leaves the baselines.
 func (g *Generator) adjust(ctx context.Context, run *scoringRun, c *cve, a *assessment) error {
-	if !contract.Reachable(a.answers.R) {
-		slog.DebugContext(ctx, "no adjustment call: not reachable", "vuln", c.id())
-		return nil
-	}
 	floored := c.applicability.Floored
-	if len(contract.AdjustmentFields(c.in, floored)) == 0 {
-		slog.DebugContext(ctx, "no adjustment call: no description and every axis floored", "vuln", c.id())
+	if len(contract.AdjustmentFields(g.deployment, c.in, floored, a.answers.R)) == 0 {
+		reason := "no description and every axis floored"
+		if !contract.Reachable(a.answers.R) {
+			reason = "not reachable and Privacy violation not asked"
+		}
+		slog.DebugContext(ctx, "no adjustment call: "+reason, "vuln", c.id())
 		return nil
 	}
 	request, err := contract.AdjustmentRequest(g.deployment, c.in, floored, c.flags, baselines(c.in, a.answers, floored))
 	if err != nil {
 		return err
 	}
-	schema, err := contract.AdjustmentSchema(c.in, floored)
+	schema, err := contract.AdjustmentSchema(g.deployment, c.in, floored, a.answers.R)
 	if err != nil {
 		return err
 	}
@@ -94,10 +96,14 @@ func (g *Generator) adjust(ctx context.Context, run *scoringRun, c *cve, a *asse
 
 // baselines are the answers the adjustment shows as given: Opportunity's,
 // when a row describes the CVE, and each axis's that Applicability did not
-// floor. An answer Go reads as cannot_tell is shown as cannot_tell, so that
-// a reply keeping it keeps what Go keeps.
+// floor; for a CVE not reachable here, reachability's alone. An answer Go
+// reads as cannot_tell is shown as cannot_tell, so that a reply keeping it
+// keeps what Go keeps.
 func baselines(c contract.CVE, given contract.Answers, floored [3]bool) contract.Answers {
-	var b contract.Answers
+	b := contract.Answers{R: given.R}
+	if !contract.Reachable(given.R) {
+		return b
+	}
 	if c.Described() {
 		b.O = shownAs(contract.O, given.O)
 	}

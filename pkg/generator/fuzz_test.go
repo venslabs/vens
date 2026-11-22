@@ -127,8 +127,9 @@ func FuzzReadReplies(f *testing.F) {
 }
 
 // FuzzReadAdjustment reads an adjustment reply as Go reads one, with any of
-// the axes floored, for a CVE a row describes or one none does, then rates
-// the CVE with it, every question answered cannot_tell. Nothing panics, the
+// the axes floored, for a CVE a row describes or one none does, reachable or
+// not, then rates the CVE with it, every other question answered
+// cannot_tell. Nothing panics, the
 // vector rates, no level rises, and none lowers but through a JSON object
 // that writes no key twice, by a field the call asked, written as a string
 // on its list. With no field left to ask, there is no schema.
@@ -158,6 +159,8 @@ func FuzzReadAdjustment(f *testing.F) {
 		{0, `[]`},
 		{0, `{"reasoning":"r","opportunity":"keep"} {}`},
 		{8, `{"reasoning":"r",` + lower + `,` + notAffected + `}`},
+		{16, `{"reasoning":"r",` + lower + `,` + notAffected + `}`},
+		{17, `{"reasoning":"r","confidentiality":"not_affected"}`},
 		{14, `{"reasoning":"r",` + lower + `,"confidentiality":"not_affected"}`},
 		{15, `{"reasoning":"r",` + lower + `}`},
 	} {
@@ -182,8 +185,12 @@ func FuzzReadAdjustment(f *testing.F) {
 			}
 			c = &bare
 		}
-		schema, err := contract.AdjustmentSchema(c.in, axes)
-		if len(contract.AdjustmentFields(c.in, axes)) == 0 {
+		answers := cannotTellToAll()
+		if floored&16 != 0 {
+			answers.R = "not_reachable"
+		}
+		schema, err := contract.AdjustmentSchema(h.d, c.in, axes, answers.R)
+		if len(contract.AdjustmentFields(h.d, c.in, axes, answers.R)) == 0 {
 			require.Error(t, err, "a schema with no field to ask")
 			return
 		}
@@ -191,8 +198,8 @@ func FuzzReadAdjustment(f *testing.F) {
 		lists, err := propertyEnums(schema)
 		require.NoError(t, err)
 		got := readAdjustment(context.Background(), newScoringRun(), "CVE-2024-0000", raw, lists)
-		base := vectorLevels(h.levels(t, c, axes, cannotTellToAll(), nil).Vector)
-		adjusted := vectorLevels(h.levels(t, c, axes, cannotTellToAll(), &got.adjusted).Vector)
+		base := vectorLevels(h.levels(t, c, axes, answers, nil).Vector)
+		adjusted := vectorLevels(h.levels(t, c, axes, answers, &got.adjusted).Vector)
 
 		var fields map[string]json.RawMessage
 		clean := json.Unmarshal([]byte(raw), &fields) == nil && fields != nil && dropped([]byte(raw)) == 0

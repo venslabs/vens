@@ -137,7 +137,8 @@ func elide(t *testing.T, text, part, placeholder string) string {
 // frames renders what one deployment sends, file by file: the system prompt,
 // each question's request and schema over the two CVEs, reachability's
 // first, Non-compliance's only with a framework, and a flagged CVE's
-// adjustment. The CVE entries are elided.
+// adjustment, then that CVE's when it is not reachable here, if it is asked
+// Privacy violation. The CVE entries are elided.
 func frames(t *testing.T, d Deployment, adjustFloored [3]bool) map[string]string {
 	t.Helper()
 	text, data := text(t), data(t)
@@ -160,7 +161,18 @@ func frames(t *testing.T, d Deployment, adjustFloored [3]bool) map[string]string
 	}
 	entry := data(json.Marshal(e))
 	out["13-adjustment.request.txt"] = elide(t, request, entry, "[entry]")
-	out["13-adjustment.schema.json"] = data(AdjustmentSchema(frameFlagged, adjustFloored))
+	out["13-adjustment.schema.json"] = data(AdjustmentSchema(d, frameFlagged, adjustFloored, given.R))
+	if len(AdjustmentFields(d, frameFlagged, adjustFloored, notReachableID)) == 0 {
+		return out
+	}
+	unreached := Answers{R: notReachableID}
+	request = text(AdjustmentRequest(d, frameFlagged, adjustFloored, frameFlags, unreached))
+	e, err = newAdjustmentEntry(frameFlagged, adjustFloored, frameFlags, unreached)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out["13-adjustment-not-reachable.request.txt"] = elide(t, request, data(json.Marshal(e)), "[entry]")
+	out["13-adjustment-not-reachable.schema.json"] = data(AdjustmentSchema(d, frameFlagged, adjustFloored, notReachableID))
 	return out
 }
 
@@ -246,7 +258,7 @@ func TestGoldenFrames(t *testing.T) {
 
 // The parts the reference frames elide, written out: a batch's entries, its
 // first CVE's rows disagreeing, with the CVSS lines of each version, and the
-// adjustment's entry of that CVE.
+// adjustment's entry of that CVE, reached and not reachable here.
 func TestGoldenEntries(t *testing.T) {
 	var d Deployment
 	for _, c := range frameConfigs {
@@ -256,8 +268,9 @@ func TestGoldenEntries(t *testing.T) {
 	}
 	flags := []Flag{{Name: MaintainerDisputed, Evidence: "the maintainer disputes it", Package: "libfoo-dev"}}
 	checkGoldenDir(t, filepath.Join("testdata", "conflicting-rows"), map[string]string{
-		"02-O.request.txt":          text(t)(Request(O, d, cvssBatch)),
-		"13-adjustment.request.txt": text(t)(AdjustmentRequest(d, conflicting, [3]bool{cvss.Availability: true}, flags, baselines(frameGiven, [3]bool{cvss.Availability: true}))),
+		"02-O.request.txt":                        text(t)(Request(O, d, cvssBatch)),
+		"13-adjustment.request.txt":               text(t)(AdjustmentRequest(d, conflicting, [3]bool{cvss.Availability: true}, flags, baselines(frameGiven, [3]bool{cvss.Availability: true}))),
+		"13-adjustment-not-reachable.request.txt": text(t)(AdjustmentRequest(d, conflicting, [3]bool{cvss.Availability: true}, flags, Answers{R: notReachableID})),
 	})
 }
 

@@ -34,7 +34,7 @@ import (
 // the last two only when reachability's answer is read as reachable, and no
 // adjustment lowers the Opportunity of one no row describes; a CVE not
 // reachable has the six factors reachability decides at their lowest and
-// takes no adjustment; and the readings are the questions asked, and for a
+// takes its adjustment's confidentiality answer alone; and the readings are the questions asked, and for a
 // CVE no row describes the likelihood questions it is not asked for want of a
 // description.
 func FuzzCompute(f *testing.F) {
@@ -135,12 +135,16 @@ func FuzzCompute(f *testing.F) {
 			t.Errorf("no description, adjusted by %+v: O %d from %v, want cannot_tell's 9", adjusted, l.Vector.O, l.Sources[O])
 		}
 		if !reached {
-			unadjusted, err := Compute(d, c, floored, a, nil)
+			var confidentiality *Adjusted
+			if adjusted != nil {
+				confidentiality = &Adjusted{Confidentiality: adjusted.Confidentiality}
+			}
+			alone, err := Compute(d, c, floored, a, confidentiality)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if unadjusted.Vector != l.Vector {
-				t.Errorf("not reachable, adjusted by %+v: %+v, unadjusted %+v", adjusted, l.Vector, unadjusted.Vector)
+			if alone.Vector != l.Vector {
+				t.Errorf("not reachable, adjusted by %+v: %+v, by its confidentiality alone %+v", adjusted, l.Vector, alone.Vector)
 			}
 			if l.Vector.O != 0 || l.Vector.EE != 1 || l.Vector.LC != 2 || l.Vector.LI != 1 || l.Vector.LAV != 1 ||
 				l.Vector.LAC != accountabilityLevels[actorNoLoss][max(0, slices.Index(traceabilities[:], deref(d.Traceability)))] {

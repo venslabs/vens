@@ -63,7 +63,7 @@ Before any factor, every CVE gets one question of its own: whether the vulnerabl
 
 A description is a prerequisite of three answers: when no row of the scanner's report describes the CVE, a title alone included, vens does not ask Motive, Opportunity and Ease of exploit, and sets each to its worst level, 9, counted as `cannot_tell`; Opportunity and Ease of exploit still take their lowest levels when the CVE is answered not reachable.
 
-A question is asked only when the factor's contract requires it: at most 13 questions per CVE, reachability's included. A CVE whose description says it is disputed or not a security issue, or that the scanner rates low while NVD rates it high or critical, is flagged: unless it is answered not reachable, it gets one more call, the adjustment, when it has a field left to ask, which can lower Opportunity (not for a CVE with no description), a loss the CVSS vectors did not floor, and Privacy violation, and never raises a level.
+A question is asked only when the factor's contract requires it: at most 13 questions per CVE, reachability's included. A CVE whose description says it is disputed or not a security issue, or that the scanner rates low while NVD rates it high or critical, is flagged: it gets one more call, the adjustment, when it has a field left to ask, which can lower Opportunity (not for a CVE with no description), a loss the CVSS vectors did not floor, and Privacy violation, and never raises a level. A flagged CVE answered not reachable has Opportunity and the losses at their lowest already: its adjustment shows that answer and asks only whether confidentiality can be affected, when it was asked Privacy violation, which `not_affected` lowers to its floor.
 
 | Factor | Group | Way | What sets the level |
 |---|---|---|---|
@@ -124,7 +124,7 @@ This explains the mechanism; it is not a measurement of accuracy.
 | | Up to v0.6 | Since v0.7.0 |
 |---|---|---|
 | What the model returns | four numbers from 0 to 9 per CVE: threat agent, vulnerability, technical impact, business impact | one named answer per question, from a closed list; never a number |
-| Calls | one call per batch of CVEs | one call per question per batch, at most 13 questions per CVE, reachability's first, and one adjustment call per flagged CVE not answered not reachable with a field left to ask |
+| Calls | one call per batch of CVEs | one call per question per batch, at most 13 questions per CVE, reachability's first, and one adjustment call per flagged CVE with a field left to ask |
 | The 16 levels in the vector | each of the four numbers repeated over its group's four factors | 4 set by vens, 8 read from an answer, 4 from an answer combined with a declared field |
 | Impact | the average of the technical and the business impact | the larger of the two |
 | Severity | bands of the score: 0–4 `info`, 5–19 `low`, 20–39 `medium`, 40–59 `high`, 60–81 `critical` | OWASP's matrix of the likelihood and impact levels; never `info` |

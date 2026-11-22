@@ -120,7 +120,7 @@ func TestMockSkipsAndForcesCannotTell(t *testing.T) {
 // asks, an answer from that field's list.
 func TestMockAnswersTheAdjustment(t *testing.T) {
 	described := contract.CVE{ID: "CVE-X", Rows: []contract.Row{{Description: "A described vulnerability."}}}
-	schema, err := contract.AdjustmentSchema(described, [3]bool{true, false, false})
+	schema, err := contract.AdjustmentSchema(contract.Deployment{}, described, [3]bool{true, false, false}, "")
 	if err != nil {
 		t.Fatal(err)
 	}

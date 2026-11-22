@@ -77,7 +77,7 @@ vens generate --llm openai --config-file c.yaml --sbom-serial-number "$SBOM_UUID
 
 Number of distinct CVEs in a batch. Default: `10`. A CVE found in several packages counts once.
 
-Each batch gets one call per question, in a fixed order, about the batch's CVEs that get that question: up to 13 calls per batch. The first asks whether each CVE is reachable here; a CVE answered not reachable is left out of Opportunity's, Ease of exploit's and the four technical impacts' calls, each at its lowest level. Each flagged CVE then gets one more call of its own, the adjustment, when it has a field left to ask and is not answered not reachable. So a CVE is sent once per question asked about it, and the batch size sets how many CVEs share each call, not how many calls a CVE gets.
+Each batch gets one call per question, in a fixed order, about the batch's CVEs that get that question: up to 13 calls per batch. The first asks whether each CVE is reachable here; a CVE answered not reachable is left out of Opportunity's, Ease of exploit's and the four technical impacts' calls, each at its lowest level. Each flagged CVE then gets one more call of its own, the adjustment, when it has a field left to ask; answered not reachable, it is asked only whether confidentiality can be affected, and only when it was asked Privacy violation. So a CVE is sent once per question asked about it, and the batch size sets how many CVEs share each call, not how many calls a CVE gets.
 
 - Lower values (e.g. `5`) — fewer CVEs per call, more calls, safer for small context windows.
 - Higher values (e.g. `20`) — fewer calls, more tokens per call.
@@ -322,7 +322,7 @@ BOM-Link `version` number used alongside `--sbom-serial-number`. Default: `1`.
 A run that reaches scoring ends with one `INFO` line, `Scoring run finished`, also when it fails during scoring. From a mock run (`--llm=mock`) on `examples/quickstart`'s Trivy report with `data_subjects`, `detection` and `traceability` removed from its `config.yaml`, so their fallbacks are counted:
 
 ```text
-level=INFO msg="Scoring run finished" rows=107 cves=45 llm_calls=62 asked_again=0 splits=0 calls.R=5 calls.M=5 calls.O=5 ... calls.adjustment=2 counters.applicability_missing=5 counters.data_subjects_missing=25 counters.detection_undeclared=45 counters.ease_of_exploit_cannot_tell=4 counters.motive_cannot_tell=4 counters.opportunity_cannot_tell=4 counters.traceability_missing=45 failed=false
+level=INFO msg="Scoring run finished" rows=107 cves=45 llm_calls=64 asked_again=0 splits=0 calls.R=5 calls.M=5 calls.O=5 ... calls.adjustment=4 counters.applicability_missing=5 counters.data_subjects_missing=25 counters.detection_undeclared=45 counters.ease_of_exploit_cannot_tell=4 counters.motive_cannot_tell=4 counters.opportunity_cannot_tell=4 counters.traceability_missing=45 failed=false
 ```
 
 - `rows` and `cves` — the scanner's findings, and the distinct CVEs among them.

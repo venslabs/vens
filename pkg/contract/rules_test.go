@@ -123,10 +123,14 @@ func channelSets() [][]string {
 // names them.
 var decided = []string{"O", "EE", "LC", "LI", "LAV", "LAC"}
 
+// reachabilityMoves adds Privacy violation, which a not reachable CVE's
+// adjustment still lowers through confidentiality.
+var reachabilityMoves = append(slices.Clone(decided), "PV")
+
 // walk calls each rule over its whole input domain and returns, per factor,
 // the levels reached and the number of inputs walked. Reachability, no
 // factor, is walked as "R": each input adds the levels of the six factors it
-// decides.
+// decides, and Privacy violation's.
 func walk(t *testing.T) (reached map[string]map[int]bool, inputs map[string]int) {
 	reached, inputs = map[string]map[int]bool{}, map[string]int{}
 	sets := owaspLevelSets(t)
@@ -140,7 +144,7 @@ func walk(t *testing.T) (reached map[string]map[int]bool, inputs map[string]int)
 		inputs[factor]++
 		factors := []string{factor}
 		if factor == "R" {
-			factors = decided
+			factors = reachabilityMoves
 		}
 		for _, f := range factors {
 			if reached[f] == nil {
@@ -204,8 +208,8 @@ func walk(t *testing.T) (reached map[string]map[int]bool, inputs map[string]int)
 // walkReachability walks reachability's answers, an id off the list
 // included, over what the six factors it decides read: the data's
 // sensitivity, traceability, the axes floored and an adjustment lowering all
-// it can. Their own answers sit at the worst case, so a not reachable answer
-// has everything to lower.
+// it can, Privacy violation's included. Their own answers sit at the worst
+// case, so a not reachable answer has everything to lower.
 func walkReachability(add func(string, Deployment, [3]bool, Answers, *Adjusted)) {
 	worst := Answers{O: cannotTell, EE: cannotTell, LC: cannotTell, LI: cannotTell, LAV: cannotTell, LAC: cannotTell}
 	lowering := &Adjusted{Opportunity: "full_access_or_expensive_resources_required", Confidentiality: notAffected,

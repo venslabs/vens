@@ -463,8 +463,9 @@ func TestReachedNarrowsTheQuestionsOnce(t *testing.T) {
 // of exploit 1, LC 2, LI 1, LAV 1 and LAC the lowest of its traceability
 // column. Each comes from reachability, an axis Applicability floored from
 // the floor, none is read or counted, a CVE no row describes included, and
-// the adjustment moves nothing, Privacy violation included. The rest is
-// computed as for a reachable CVE.
+// the adjustment moves none of them: its confidentiality not_affected lowers
+// Privacy violation alone, to its floor. The rest is computed as for a
+// reachable CVE.
 func TestNotReachableSetsTheSixToTheirLowest(t *testing.T) {
 	worst := Answers{R: notReachableID, M: "high_reward", O: cannotTell, EE: "bogus", ID: []string{cannotTell},
 		LC: cannotTell, LI: "all_data_totally_corrupt", LAV: cannotTell, LAC: "defeats_attribution",
@@ -487,8 +488,15 @@ func TestNotReachableSetsTheSixToTheirLowest(t *testing.T) {
 					l := computeFor(t, d, c, floored, worst, adjusted)
 					got := levels(l.Vector)
 					want := map[string]int{"O": 0, "EE": 1, "LC": 2, "LI": 1, "LAV": 1, "LAC": wantLAC, "PV": 9}
-					if floored[0] {
-						want["PV"] = 3
+					pv := SourceAnswer
+					switch {
+					case floored[0]:
+						want["PV"], pv = 3, SourceFloor
+					case adjusted != nil:
+						want["PV"], pv = 3, SourceAdjustment
+					}
+					if l.Sources[PV] != pv {
+						t.Errorf("traceability %q, %s, floored %v, adjusted %v: PV from %v, want %v", tr, c.ID, floored, adjusted != nil, l.Sources[PV], pv)
 					}
 					for f, w := range want {
 						if got[f] != w {

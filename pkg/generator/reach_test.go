@@ -23,6 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/venslabs/vens/pkg/attestation"
 	"github.com/venslabs/vens/pkg/contract"
+	"github.com/venslabs/vens/pkg/cvss"
 	"github.com/venslabs/vens/pkg/outputhandler"
 )
 
@@ -112,27 +113,113 @@ func TestGenerator_NotReachableIsNotAskedTheSixQuestions(t *testing.T) {
 	assert.Len(t, reasonings["ref-0"], len(questionsUndeclared))
 }
 
-// A flagged CVE answered not_reachable gets no adjustment call: the levels
-// the adjustment could lower but Privacy violation's are at their lowest. A
-// flagged CVE read as reachable still gets its own.
-func TestGenerator_NoAdjustmentForANotReachableCVE(t *testing.T) {
+// A flagged CVE answered not_reachable, whose Privacy violation was asked,
+// gets an adjustment call that shows reachability's answer as the one given
+// and asks confidentiality alone; not_affected lowers Privacy violation to its
+// floor, from the adjustment, and the six factors reachability decides stay
+// at their lowest, from reachability. A flagged CVE read as reachable still
+// gets its own call, unchanged.
+func TestGenerator_NotReachableAdjustmentAsksConfidentialityAlone(t *testing.T) {
 	parent := t.TempDir()
+	at := attestation.NewBuilder(attestation.Opts{Provider: "mock", Model: "mock"})
 	vulns := []Vulnerability{disputedRow(testVulns(2)[0]), disputedRow(testVulns(2)[1])}
-	m := &fakeLLM{answer: unreachableAnswers("CVE-2024-0000")}
+	m := &fakeLLM{
+		answer: func(c fakeCall, id string) any {
+			switch {
+			case c.factor == contract.R && id == "CVE-2024-0000":
+				return "not_reachable"
+			case c.factor == contract.PV:
+				return "millions"
+			}
+			return nil
+		},
+		adjust: func(c fakeCall) map[string]any {
+			if _, reachable := c.fields["opportunity"]; reachable {
+				return map[string]any{"reasoning": "r", "opportunity": "keep", "confidentiality": "affected", "integrity": "affected", "availability": "affected"}
+			}
+			return map[string]any{"reasoning": "no data reached", "confidentiality": "not_affected"}
+		},
+	}
 	g := newGen(t, Opts{LLM: m, DebugDir: parent})
-	require.NoError(t, g.GenerateRiskScore(context.Background(), vulns, nil))
+	g.SetAttestor(at)
+	var emitted []outputhandler.VulnRating
+	require.NoError(t, g.GenerateRiskScore(context.Background(), vulns, collect(&emitted)))
 
-	adjustments := 0
+	var adjustments []fakeCall
 	for _, c := range m.calls {
 		if c.adjustment() {
-			adjustments++
-			assert.Contains(t, c.req.Human, `"vulnId":"CVE-2024-0001"`)
+			adjustments = append(adjustments, c)
 		}
 	}
-	assert.Equal(t, 1, adjustments, "the reachable CVE's alone")
+	require.Len(t, adjustments, 2)
+	unreached, reached := adjustments[0], adjustments[1]
+	assert.Equal(t, map[string][]string{"confidentiality": {"affected", "not_affected", cannotTell}}, unreached.fields)
+	for _, part := range []string{
+		`"vulnId":"CVE-2024-0000"`, `"answers":{"reachability":"not_reachable"}}`,
+		"and the answer it was given without that evidence: not reachable here, as reachability is defined above.",
+		"QUESTIONS\nconfidentiality: Given this evidence, can exploiting it here affect confidentiality at all?",
+	} {
+		assert.Contains(t, unreached.req.Human, part)
+	}
+	assert.NotContains(t, unreached.req.Human, "opportunity")
+	assert.Contains(t, reached.req.Human, `"vulnId":"CVE-2024-0001"`)
+	assert.Contains(t, reached.req.Human, `"answers":{"opportunity":`)
+	assert.Contains(t, reached.req.Human, "and the answers it was given without that evidence. Reconsider it")
+
+	got := byID(emitted)
+	for f, want := range map[string]int{"O": 0, "EE": 1, "LC": 2, "LI": 1, "LAV": 1, "LAC": 7, "PV": 3} {
+		assert.Equal(t, want, vectorLevel(t, got["CVE-2024-0000"].Rating.Vector, f), f)
+	}
+	assert.Equal(t, 9, vectorLevel(t, got["CVE-2024-0001"].Rating.Vector, "PV"), "affected leaves the answer's level")
+
 	answers, _ := readAnswers(t, parent)
-	assert.Equal(t, "not_asked", answers.Vulnerabilities[0].Adjustment)
-	assert.Equal(t, "answered", answers.Vulnerabilities[1].Adjustment)
+	v := answers.Vulnerabilities[0]
+	require.Equal(t, "CVE-2024-0000", v.VulnID)
+	assert.Equal(t, "answered", v.Adjustment)
+	for _, f := range v.Factors {
+		switch {
+		case f.Factor == "PV":
+			assert.Equal(t, []any{"millions", "adjustment"}, []any{f.Answer, f.Source})
+		case strings.Contains(" O EE LC LI LAV LAC ", " "+f.Factor+" "):
+			assert.Equal(t, "reachability", f.Source, f.Factor)
+		}
+	}
+	reasonings := map[string]string{}
+	for _, c := range claims(t, at) {
+		reasonings[c.Target] = c.Reasoning
+	}
+	assert.True(t, strings.HasSuffix(reasonings["ref-0"], "\nadjustment (confidentiality: not_affected): no data reached"), reasonings["ref-0"])
+}
+
+// A flagged CVE answered not_reachable whose Privacy violation was not asked,
+// data_subjects capping it at its floor or Applicability flooring
+// confidentiality, has nothing left to adjust: no call.
+func TestGenerator_NotReachableWithoutPrivacyViolationGetsNoAdjustment(t *testing.T) {
+	for name, tc := range map[string]struct {
+		subjects *string
+		vector   string
+	}{
+		"one individual":        {subjects: ptr("one_individual")},
+		"confidentiality floor": {vector: "AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:H"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			parent := t.TempDir()
+			cfg := testConfig()
+			cfg.Context.DataSubjects = tc.subjects
+			v := disputedRow(testVulns(1)[0])
+			if tc.vector != "" {
+				v.CVSS = []cvss.Vector{v31("nvd", tc.vector)}
+			}
+			m := &fakeLLM{answer: unreachableAnswers("CVE-2024-0000")}
+			g := newGen(t, Opts{LLM: m, Config: cfg, DebugDir: parent})
+			require.NoError(t, g.GenerateRiskScore(context.Background(), []Vulnerability{v}, nil))
+
+			assert.NotContains(t, m.log(), adjustmentCall)
+			assert.NotContains(t, m.log(), "PV")
+			answers, _ := readAnswers(t, parent)
+			assert.Equal(t, "not_asked", answers.Vulnerabilities[0].Adjustment)
+		})
+	}
 }
 
 // cannot_tell on reachability is read as reachable, the worst case: the six

@@ -228,8 +228,9 @@ type Levels struct {
 // business factors as computed, and leaves the Opportunity of a CVE no row
 // describes at cannot_tell's level, whatever it answers. A CVE whose
 // reachability answer says not reachable takes the lowest level of the six
-// factors it decides, whatever their answers, and no adjustment: every level
-// it could lower but Privacy violation's is already at its lowest.
+// factors it decides, whatever their answers; every level its adjustment
+// could lower but Privacy violation's is already there, so only its
+// confidentiality answer is read, which Privacy violation follows.
 func Compute(d Deployment, c CVE, floored [3]bool, a Answers, adjusted *Adjusted) (Levels, error) {
 	if err := d.Check(); err != nil {
 		return Levels{}, err
@@ -243,8 +244,11 @@ func Compute(d Deployment, c CVE, floored [3]bool, a Answers, adjusted *Adjusted
 	reached, r := reachability.read(a.R)
 	s.note(R, r)
 	s.reached = reached
-	if adjusted == nil || !s.reached {
+	switch {
+	case adjusted == nil:
 		adjusted = &Adjusted{}
+	case !s.reached:
+		adjusted = &Adjusted{Confidentiality: adjusted.Confidentiality}
 	}
 	var v owasp.Vector
 	// Every finding is a published CVE a scanner matched: OWASP's worst case
