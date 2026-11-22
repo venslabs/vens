@@ -135,9 +135,9 @@ func elide(t *testing.T, text, part, placeholder string) string {
 }
 
 // frames renders what one deployment sends, file by file: the system prompt,
-// each question's request and schema over the two CVEs, Non-compliance's
-// only with a framework, and a flagged CVE's adjustment. The CVE entries are
-// elided.
+// each question's request and schema over the two CVEs, reachability's
+// first, Non-compliance's only with a framework, and a flagged CVE's
+// adjustment. The CVE entries are elided.
 func frames(t *testing.T, d Deployment, adjustFloored [3]bool) map[string]string {
 	t.Helper()
 	text, data := text(t), data(t)
@@ -147,7 +147,8 @@ func frames(t *testing.T, d Deployment, adjustFloored [3]bool) map[string]string
 		if f == NC && len(d.Frameworks) == 0 {
 			continue
 		}
-		name := fmt.Sprintf("%02d-%s", i+1, f)
+		// Reachability, asked first, is 00: the factors keep their numbers.
+		name := fmt.Sprintf("%02d-%s", i, f)
 		out[name+".request.txt"] = elide(t, text(Request(f, d, frameBatch)), entries, "[entries]")
 		out[name+".schema.json"] = data(Schema(f, []string{"CVE-A", "CVE-B"}))
 	}

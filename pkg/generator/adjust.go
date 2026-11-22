@@ -57,9 +57,14 @@ type adjustmentReply struct {
 // adjust makes a flagged CVE's adjustment call, after its ordinary
 // questions: it shows every row's evidence, the flags and the answers given,
 // and may lower Opportunity, when a row describes the CVE, and each axis
-// Applicability did not floor, never raise them. With none of them left, it
-// makes no call. A reply Go cannot read leaves the baselines.
+// Applicability did not floor, never raise them. With none of them left, or
+// for a CVE not reachable here, whose Opportunity and axes are at their
+// lowest, it makes no call. A reply Go cannot read leaves the baselines.
 func (g *Generator) adjust(ctx context.Context, run *scoringRun, c *cve, a *assessment) error {
+	if !contract.Reachable(a.answers.R) {
+		slog.DebugContext(ctx, "no adjustment call: not reachable", "vuln", c.id())
+		return nil
+	}
 	floored := c.applicability.Floored
 	if len(contract.AdjustmentFields(c.in, floored)) == 0 {
 		slog.DebugContext(ctx, "no adjustment call: no description and every axis floored", "vuln", c.id())

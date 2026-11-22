@@ -8,7 +8,6 @@ FOR THIS QUESTION
 Data sensitivity: low (Public data)
 
 ANSWERS
-- not_reachable: Not reachable here: the facts given show that the vulnerable code is not reachable in this deployment, as defined above.
 - no_impact: No data corrupted: it is reachable, but exploiting it here changes none of the data this service handles, as when its only effect is a crash, a slowdown or a disclosure.
 - minimal_slightly_corrupt: Minimal, slightly corrupt: a little of the data, such as one record, file, setting or message, changed in ways that are easy to notice or undo, such as a malformed value, a log line or a cache entry that is rebuilt.
 - minimal_seriously_corrupt: Minimal, seriously corrupt: a little of the data, changed in ways that matter, such as an altered record, credential, setting or file that the service or its users will trust and act on.

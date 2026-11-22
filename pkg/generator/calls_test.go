@@ -37,7 +37,7 @@ import (
 func ptr(s string) *string { return &s }
 
 // fullConfig declares a framework and detection at levels that differ, so
-// that a CVE no vector floors gets all twelve questions.
+// that a CVE no vector floors gets all thirteen questions.
 func fullConfig() *riskconfig.Config {
 	cfg := testConfig()
 	cfg.Context.ComplianceRequirements = []string{"GDPR"}
@@ -64,6 +64,7 @@ func TestGenerator_AsksInTheDeclaredOrder(t *testing.T) {
 		factor string
 		ids    []string
 	}{
+		{"R", []string{"CVE-2024-0000", "CVE-2024-0001"}},
 		{"M", []string{"CVE-2024-0000", "CVE-2024-0001"}},
 		{"O", []string{"CVE-2024-0000", "CVE-2024-0001"}},
 		{"EE", []string{"CVE-2024-0000", "CVE-2024-0001"}},
@@ -338,7 +339,7 @@ func TestGenerator_ConflictingRows(t *testing.T) {
 	assert.Equal(t, "The parser overflows.", packages[0].(map[string]any)["description"])
 	assert.Equal(t, "MEDIUM", packages[1].(map[string]any)["severity"])
 
-	assert.Equal(t, []string{"M", "O", "EE", "LC", "LAV", "LAC", "FD", "RD", "PV", adjustmentCall}, m.log(),
+	assert.Equal(t, []string{"R", "M", "O", "EE", "LC", "LAV", "LAC", "FD", "RD", "PV", adjustmentCall}, m.log(),
 		"I is N on every vector; C and A are not")
 	for _, line := range []string{
 		"- CVE-2024-0007: CVSS 3.1, nvd: AV:N PR:N UI:N",
@@ -444,7 +445,7 @@ func TestGenerator_KeyWrittenTwiceReadsCannotTell(t *testing.T) {
 		"CVE-2024-0001": {[]any{"low_or_no_reward"}, "invalid"},
 		"CVE-2024-0002": {"low_or_no_reward", "answered"},
 	}, written)
-	assert.Equal(t, `M (["cannot_tell","low_or_no_reward"]): r0`, strings.Split(claims(t, at)[0].Reasoning, "\n")[0])
+	assert.Equal(t, `M (["cannot_tell","low_or_no_reward"]): r0`, strings.Split(claims(t, at)[0].Reasoning, "\n")[1])
 }
 
 // A key written twice outside every answer leaves them all in doubt. Here
@@ -455,7 +456,7 @@ func TestGenerator_KeyWrittenTwiceOutsideTheAnswers(t *testing.T) {
 	const reply = `{"answers":[{"vulnId":"CVE-2024-0001","answer":"high_reward","reasoning":"r"}],` +
 		`"answers":[{"vulnId":"CVE-2024-0000","answer":"low_or_no_reward","reasoning":"r"}]}`
 	logs := withCapturedLogs(t)
-	m := &fakeLLM{reply: func(c fakeCall) (string, bool) { return reply, c.factor == contract.M && c.n == 1 }}
+	m := &fakeLLM{reply: func(c fakeCall) (string, bool) { return reply, c.factor == contract.M && len(c.ids) > 1 }}
 	g := newGen(t, Opts{LLM: m})
 	var emitted []outputhandler.VulnRating
 	require.NoError(t, g.GenerateRiskScore(context.Background(), testVulns(2), collect(&emitted)))

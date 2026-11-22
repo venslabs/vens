@@ -18,7 +18,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"slices"
 	"strings"
 	"testing"
 
@@ -118,7 +117,8 @@ func TestGenerator_UndescribedCVEIsNotAskedTheLikelihoodQuestions(t *testing.T) 
 		lines := reasonings[target]
 		require.Len(t, lines, len(questionsUndeclared), target)
 		assert.Equal(t, []string{"M (not asked: no description)", "O (not asked: no description)", "EE (not asked: no description)"}, lines[:3], target)
-		assert.True(t, strings.HasPrefix(lines[3], "LC (not_reachable): because of CVE-2024-000"), lines[3])
+		assert.True(t, strings.HasPrefix(lines[3], "R (reachable): because of CVE-2024-000"), lines[3])
+		assert.True(t, strings.HasPrefix(lines[4], "LC (no_impact): because of CVE-2024-000"), lines[4])
 	}
 	for _, target := range []string{"a", "d1", "d2"} {
 		assert.NotContains(t, strings.Join(reasonings[target], "\n"), "not asked", target)
@@ -135,8 +135,8 @@ func TestGenerator_UndescribedBatchSendsNoLikelihoodCall(t *testing.T) {
 	vulns := testVulns(3)
 	vulns[0].Description, vulns[1].Description = "", ""
 	require.NoError(t, g.GenerateRiskScore(context.Background(), vulns, nil))
-	want := append(slices.Clone(questionsUndeclared[3:]), questionsUndeclared...)
-	assert.Equal(t, want, m.log(), "the first batch from LC on, then the second's every question")
+	want := append(append([]string{"R"}, questionsUndeclared[4:]...), questionsUndeclared...)
+	assert.Equal(t, want, m.log(), "the first batch's reachability then from LC on, then the second's every question")
 	summary := runSummary(t, logs)
 	assert.Equal(t, int64(1), summary.attrs["calls.M"])
 	assert.Equal(t, int64(2), summary.attrs["calls.LC"])
@@ -198,7 +198,7 @@ func TestGenerator_AdjustmentOfAnUndescribedCVELeavesOpportunityOut(t *testing.T
 	axis := []string{"affected", "not_affected", cannotTell}
 	assert.Equal(t, map[string][]string{"confidentiality": axis, "integrity": axis, "availability": axis}, adjustment.fields)
 	assert.NotContains(t, strings.ToLower(adjustment.req.Human), "opportunit")
-	assert.Contains(t, adjustment.req.Human, `"answers":{"confidentiality":"not_reachable","integrity":"not_reachable","availability":"not_reachable"}`)
+	assert.Contains(t, adjustment.req.Human, `"answers":{"confidentiality":"no_impact","integrity":"no_impact","availability":"no_impact"}`)
 
 	vector := emitted[0].Rating.Vector
 	for f, want := range map[string]int{"O": 9, "LC": 2, "PV": 3, "LI": 1} {
@@ -232,7 +232,7 @@ func TestGenerator_NoAdjustmentWithNothingLeftToAsk(t *testing.T) {
 	var emitted []outputhandler.VulnRating
 	require.NoError(t, g.GenerateRiskScore(context.Background(), []Vulnerability{v}, collect(&emitted)))
 
-	assert.Equal(t, []string{"LAC", "FD", "RD"}, m.log(), "no Motive, Opportunity, Ease of exploit or adjustment")
+	assert.Equal(t, []string{"R", "LAC", "FD", "RD"}, m.log(), "no Motive, Opportunity, Ease of exploit or adjustment")
 	assert.NotContains(t, runSummary(t, logs).attrs, "calls."+adjustmentCall)
 	for f, want := range map[string]int{"O": 9, "LC": 2, "LI": 1, "LAV": 1, "PV": 3} {
 		assert.Equal(t, want, vectorLevel(t, emitted[0].Rating.Vector, f), f)

@@ -11,7 +11,7 @@ CVSS metrics AC, AT, PR, UI of the newest CVSS version published for each vulner
 - CVE-B: CVSS 3.1, redhat: AC:L PR:L UI:N
 
 ANSWERS
-- theoretical: Theoretical: no practical way to exploit it in this deployment is known; also when the facts given show that the vulnerable code is not reachable in this deployment, as defined above.
+- theoretical: Theoretical: no practical way to exploit it in this deployment is known.
 - difficult: Difficult: a practical way exists, but here it needs expert work, rare conditions, chaining with another flaw, or getting through a control in front of this deployment that they have not already passed, even where a public exploit exists elsewhere.
 - easy: Easy: a practical way exists here that needs none of that, and no public exploit or tool performs it.
 - automated_tools_available: Automated tools available: none of that is needed here, and a public exploit or tool performs it.

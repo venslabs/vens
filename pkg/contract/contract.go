@@ -27,7 +27,9 @@ import "slices"
 
 // Factor is one of the 16 factors, named by the abbreviation the vector
 // writes. Twelve are model-answered, each through a question of its own;
-// Skill level, Size, Ease of discovery and Awareness are Go's alone.
+// Skill level, Size, Ease of discovery and Awareness are Go's alone. R names
+// the reachability question, asked of every CVE before them, which is no
+// factor: its answer decides for six of them.
 type Factor string
 
 const (
@@ -47,14 +49,16 @@ const (
 	RD  Factor = "RD"
 	NC  Factor = "NC"
 	PV  Factor = "PV"
+	R   Factor = "R"
 )
 
-// order is the order the calls of a batch ask the questions in. It never
+// order is the order the calls of a batch ask the questions in, reachability
+// first, since its answer decides which CVEs the others ask about. It never
 // depends on which questions the batch's first CVE gets.
-var order = [...]Factor{M, O, EE, ID, LC, LI, LAV, LAC, FD, RD, NC, PV}
+var order = [...]Factor{R, M, O, EE, ID, LC, LI, LAV, LAC, FD, RD, NC, PV}
 
-// Order returns the 12 model-answered factors in the order the calls of a
-// batch ask them.
+// Order returns the 13 questions, reachability then the 12 model-answered
+// factors, in the order the calls of a batch ask them.
 func Order() []Factor {
 	return slices.Clone(order[:])
 }
@@ -64,15 +68,17 @@ var factorNames = map[Factor]string{
 	ED: "Ease of discovery", EE: "Ease of exploit", A: "Awareness", ID: "Intrusion detection",
 	LC: "Loss of confidentiality", LI: "Loss of integrity", LAV: "Loss of availability", LAC: "Loss of accountability",
 	FD: "Financial damage", RD: "Reputation damage", NC: "Non-compliance", PV: "Privacy violation",
+	R: "Reachability",
 }
 
-// Name returns the factor's name as OWASP's methodology writes it.
+// Name returns the factor's name as OWASP's methodology writes it, and
+// reachability's.
 func (f Factor) Name() string {
 	return factorNames[f]
 }
 
-// Counter returns the counter a model-answered factor's cannot_tell adds
-// to, "" for a factor Go sets alone.
+// Counter returns the counter a question's cannot_tell adds to, "" for a
+// factor Go sets alone.
 func (f Factor) Counter() string {
 	return table[f].counter
 }
@@ -128,11 +134,14 @@ const (
 	SourceFloor
 	// SourceAdjustment: a flagged CVE's adjustment, which lowered the level.
 	SourceAdjustment
+	// SourceReachability: the reachability answer said not reachable, so the
+	// factor's question was not asked and it takes its lowest level.
+	SourceReachability
 )
 
 var sourceNames = [...]string{
 	SourceAnswer: "answer", SourceConstant: "constant", SourceConfig: "config",
-	SourceFloor: "floor", SourceAdjustment: "adjustment",
+	SourceFloor: "floor", SourceAdjustment: "adjustment", SourceReachability: "reachability",
 }
 
 func (s Source) String() string {

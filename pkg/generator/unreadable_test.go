@@ -40,9 +40,10 @@ const (
 	highReward = `{"vulnId":"CVE-2024-0000","answer":"high_reward","reasoning":"r"}`
 )
 
-// replyOnce replaces the run's first reply with raw.
+// replyOnce replaces the reply to the run's first Motive call, its second
+// call after reachability's, with raw.
 func replyOnce(raw string) func(fakeCall) (string, bool) {
-	return func(c fakeCall) (string, bool) { return raw, c.n == 1 }
+	return func(c fakeCall) (string, bool) { return raw, c.factor == contract.M && c.n == 2 }
 }
 
 // An ordinary reply Go cannot read, whole or one answer, is no answer for the
@@ -105,11 +106,11 @@ func TestGenerator_Attestor_UnreadableReplyAskedAgain(t *testing.T) {
 	for name, tc := range map[string]struct {
 		reply string
 		// motive is the call each claim, in claim order, cites for Motive:
-		// 1 the reply, 2 its ask-again.
+		// 2 the reply, 3 its ask-again.
 		motive []int
 	}{
-		"whole reply unreadable": {`Here are the answers: high_reward for both.`, []int{2, 2}},
-		"one answer unreadable":  {`{"answers":[` + highReward + `,"CVE-2024-0001: high_reward"]}`, []int{1, 2}},
+		"whole reply unreadable": {`Here are the answers: high_reward for both.`, []int{3, 3}},
+		"one answer unreadable":  {`{"answers":[` + highReward + `,"CVE-2024-0001: high_reward"]}`, []int{2, 3}},
 	} {
 		t.Run(name, func(t *testing.T) {
 			at := attestation.NewBuilder(attestation.Opts{Provider: "mock", Model: "mock"})
@@ -117,7 +118,7 @@ func TestGenerator_Attestor_UnreadableReplyAskedAgain(t *testing.T) {
 			g := newGen(t, Opts{LLM: m})
 			g.SetAttestor(at)
 			require.NoError(t, g.GenerateRiskScore(context.Background(), testVulns(2), nil))
-			require.Equal(t, append([]string{"M"}, questionsUndeclared...), m.log(), "Motive, its ask-again, then each other question")
+			require.Equal(t, append([]string{"R", "M"}, questionsUndeclared[1:]...), m.log(), "reachability, Motive, its ask-again, then each other question")
 
 			evidence := attestedCalls(t, at)
 			require.Len(t, evidence, len(m.calls), "one per call that returned a reply, the unreadable one included")
@@ -125,13 +126,13 @@ func TestGenerator_Attestor_UnreadableReplyAskedAgain(t *testing.T) {
 				sum := sha256.Sum256([]byte(c.req.System + "\n\n" + c.req.Human))
 				assert.Equal(t, hex.EncodeToString(sum[:]), evidence[i].promptHash, "evidence-batch-%d is call %d", i+1, i+1)
 			}
-			assert.Equal(t, tc.reply, evidence[0].rawResponse, "the unreadable reply, as the model wrote it")
+			assert.Equal(t, tc.reply, evidence[1].rawResponse, "the unreadable reply, as the model wrote it")
 
 			cited := claims(t, at)
 			require.Len(t, cited, len(tc.motive))
 			for i, c := range cited {
-				want := []string{fmt.Sprintf("evidence-batch-%d", tc.motive[i])}
-				for n := 3; n <= len(m.calls); n++ {
+				want := []string{"evidence-batch-1", fmt.Sprintf("evidence-batch-%d", tc.motive[i])}
+				for n := 4; n <= len(m.calls); n++ {
 					want = append(want, fmt.Sprintf("evidence-batch-%d", n))
 				}
 				assert.Equal(t, want, c.Evidence, "the claim on %s", c.Target)
@@ -144,7 +145,7 @@ func TestGenerator_Attestor_UnreadableReplyAskedAgain(t *testing.T) {
 // cut short with no flag from the provider is not split again: its CVEs are
 // asked again once, together, and the other half's answers are kept. The
 // halves answer high_reward, an M of 9, and the ask-again the fake's default,
-// an M of 1.
+// an M of 1. Call 1 is reachability's.
 func TestGenerator_TruncatedCallSplitsThenAsksAgainForAnUnreadableHalf(t *testing.T) {
 	all := []string{"CVE-2024-0000", "CVE-2024-0001", "CVE-2024-0002", "CVE-2024-0003"}
 	first, second := all[:2], all[2:]
@@ -152,21 +153,21 @@ func TestGenerator_TruncatedCallSplitsThenAsksAgainForAnUnreadableHalf(t *testin
 		cut         int
 		again, kept []string
 	}{
-		"first half unreadable":  {2, first, second},
-		"second half unreadable": {3, second, first},
+		"first half unreadable":  {3, first, second},
+		"second half unreadable": {4, second, first},
 	} {
 		t.Run(name, func(t *testing.T) {
 			logs := withCapturedLogs(t)
 			m := &fakeLLM{
 				fail: func(c fakeCall) error {
-					if c.n == 1 {
+					if c.n == 2 {
 						return fmt.Errorf("mock truncated: %w", llm.ErrTruncated)
 					}
 					return nil
 				},
 				reply: func(c fakeCall) (string, bool) { return `{"answers":[{"vulnId":"CVE-2024-00`, c.n == tc.cut },
 				answer: func(c fakeCall, _ string) any {
-					if c.factor == contract.M && c.n <= 3 {
+					if c.factor == contract.M && c.n <= 4 {
 						return "high_reward"
 					}
 					return nil
@@ -226,7 +227,7 @@ func TestGenerator_UnreadableTwiceStopsTheRun(t *testing.T) {
 	require.EqualError(t, err, "model returned no answer to Opportunity (O) for CVE-2024-0000, CVE-2024-0001 after asking again; "+
 		`stopping the run: unable to parse LLM output: the reply is not JSON: invalid character 'o' in literal null (expecting 'u'): "not json"`)
 	assert.Empty(t, emitted)
-	assert.Equal(t, []string{"M", "O", "O"}, m.log())
+	assert.Equal(t, []string{"R", "M", "O", "O"}, m.log())
 	summary := runSummary(t, logs)
 	assert.Equal(t, int64(2), summary.attrs["defects.reply_unreadable"])
 	assert.Equal(t, true, summary.attrs["failed"])
@@ -254,20 +255,20 @@ func TestGenerator_OmissionAndUnreadableReplyMixed(t *testing.T) {
 		},
 		"unreadable, then left out": {
 			reply: replyOnce("not json"),
-			skip:  func(c fakeCall, id string) bool { return c.n == 2 && id == "CVE-2024-0001" },
+			skip:  func(c fakeCall, id string) bool { return c.n == 3 && id == "CVE-2024-0001" },
 			sizes: []int{3, 3},
 			err:   "model returned no answer to Motive (M) for CVE-2024-0001 after asking again; stopping the run: " + notJSON,
 		},
 		"left out, then unreadable": {
-			reply: func(c fakeCall) (string, bool) { return `[]`, c.n == 2 },
-			skip:  func(c fakeCall, id string) bool { return c.n == 1 && id != "CVE-2024-0000" },
+			reply: func(c fakeCall) (string, bool) { return `[]`, c.n == 3 },
+			skip:  func(c fakeCall, id string) bool { return c.n == 2 && id != "CVE-2024-0000" },
 			sizes: []int{3, 2},
 			err: "model returned no answer to Motive (M) for CVE-2024-0001, CVE-2024-0002 after asking again; stopping the run: " +
 				`unable to parse LLM output: the reply is an array, not a JSON object: "[]"`,
 		},
 		"left out, then an answer unreadable": {
-			reply: func(c fakeCall) (string, bool) { return `{"answers":[` + answered2 + `,1]}`, c.n == 2 },
-			skip:  func(c fakeCall, id string) bool { return c.n == 1 && id != "CVE-2024-0000" },
+			reply: func(c fakeCall) (string, bool) { return `{"answers":[` + answered2 + `,1]}`, c.n == 3 },
+			skip:  func(c fakeCall, id string) bool { return c.n == 2 && id != "CVE-2024-0000" },
 			sizes: []int{3, 2},
 			err: "model returned no answer to Motive (M) for CVE-2024-0001 after asking again; stopping the run: " +
 				`unable to parse LLM output: answer 2 of 2 is a number, not an object: "{\"answers\":[` +

@@ -72,6 +72,8 @@ func FuzzReadReplies(f *testing.F) {
 		{contract.M, `{"answers":[{` + a + `,"answer":"high_reward","reasoning":"r"},{` + b + `,"ans`},
 		{contract.M, `{"answer":1e400,"answer":2}`},
 		{contract.M, `not json`},
+		{contract.R, `{"answers":[{` + a + `,"answer":"not_reachable","reasoning":"r"},{` + b + `,"answer":"reachable","reasoning":"r"}]}`},
+		{contract.R, `{"answers":[{` + a + `,"answer":"not_reachable","answer":"reachable","reasoning":"r"},{` + b + `,"answer":"Not_Reachable","reasoning":"r"}]}`},
 	} {
 		f.Add(uint8(slices.Index(contract.Order(), seed.q)), seed.reply)
 	}
@@ -113,6 +115,9 @@ func FuzzReadReplies(f *testing.F) {
 			l := h.levels(t, c, c.applicability.Floored, a.answers, nil)
 			if reading != contract.Answered {
 				require.Equal(t, vectorLevels(worst.Vector)[q], vectorLevels(l.Vector)[q], "%s: %s lowered by an answer Go does not read", c.id(), q)
+				if q == contract.R {
+					require.Equal(t, worst.Vector, l.Vector, "%s: a reachability answer Go does not read lowered the vector", c.id())
+				}
 			}
 			lines := strings.Split(a.reasoning(l.Readings), "\n")
 			require.Len(t, lines, 1)

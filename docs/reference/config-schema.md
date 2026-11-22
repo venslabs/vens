@@ -83,13 +83,12 @@ Type of data handled by the system. vens uses it to pick the column of Loss of c
 
 | Answer to the Loss of confidentiality question | non-sensitive | critical |
 |---|---|---|
-| `not_reachable` | 2 | 2 |
 | `no_impact` | 2 | 2 |
 | `minimal` | 2 | 6 |
 | `extensive` | 6 | 7 |
 | `all` | 9 | 9 |
 
-`not_reachable` and `no_impact` say that the vulnerable code is not reachable here, or that exploiting it discloses nothing: both take the lowest level. `cannot_tell`, which says only that the facts given do not decide, reads as `all`.
+`no_impact` says that exploiting it discloses nothing: it takes the lowest level, as a CVE answered not reachable does, which is not asked this question. `cannot_tell`, which says only that the facts given do not decide, reads as `all`.
 
 ### `context.business_criticality`
 
@@ -204,12 +203,11 @@ vens reads this field alone; no call sends it. The Loss of accountability questi
 
 | Answer to the Loss of accountability question | `none` | `per_request` | `per_individual` |
 |---|---|---|---|
-| `not_reachable` | 7 | 7 | 1 |
 | `identified` | 7 | 7 | 1 |
 | `unidentified` | 9 | 7 | 7 |
 | `defeats_attribution` | 9 | 9 | 9 |
 
-`not_reachable` (the vulnerable code is not reachable here) and `identified` (no accountability loss: the attacker must authenticate under an identity of their own, and the exploit leaves the records intact; not having to authenticate never counts) take the lowest level the column gives. `cannot_tell` reads as `defeats_attribution`. Left out, vens uses the `none` column: each CVE adds one to the `traceability_missing` counter, vens warns at load (W1 or W3), and `--strict` refuses the run.
+`identified` (no accountability loss: the attacker must authenticate under an identity of their own, and the exploit leaves the records intact; not having to authenticate never counts) takes the lowest level the column gives, as a CVE answered not reachable does, which is not asked this question. `cannot_tell` reads as `defeats_attribution`. Left out, vens uses the `none` column: each CVE adds one to the `traceability_missing` counter, vens warns at load (W1 or W3), and `--strict` refuses the run.
 
 ### `context.controls`
 

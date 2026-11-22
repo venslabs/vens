@@ -51,12 +51,12 @@ func TestQuestionsInTheDeclaredOrder(t *testing.T) {
 	if got := questions(t, declared(), [3]bool{}); !slices.Equal(got, Order()) {
 		t.Errorf("every field declared, nothing floored: %v, want %v", got, Order())
 	}
-	if got, want := questions(t, base(), allFloored), []Factor{M, O, EE, LAC, FD, RD}; !slices.Equal(got, want) {
+	if got, want := questions(t, base(), allFloored), []Factor{R, M, O, EE, LAC, FD, RD}; !slices.Equal(got, want) {
 		t.Errorf("nothing declared, every axis floored: %v, want %v", got, want)
 	}
 	order := Order()
 	order[0] = PV
-	if Order()[0] != M {
+	if Order()[0] != R {
 		t.Error("Order shares its slice with the package")
 	}
 }
@@ -245,7 +245,7 @@ func TestIntrusionDetectionSets(t *testing.T) {
 // An undeclared field a rule falls back on is counted once per CVE, and only
 // where the rule reads it.
 func TestUndeclaredFieldsCounted(t *testing.T) {
-	answered := Answers{M: "possible_reward", O: "some_access_or_resources_required", EE: "easy", ID: []string{"network"},
+	answered := Answers{R: "reachable", M: "possible_reward", O: "some_access_or_resources_required", EE: "easy", ID: []string{"network"},
 		LC: "minimal", LI: "minimal_slightly_corrupt", LAV: "minimal_primary_interrupted", LAC: "identified",
 		FD: "bankruptcy", RD: "minimal_damage", NC: "clear_violation", PV: "hundreds"}
 	if got := compute(t, declared(), [3]bool{}, answered, nil).Counters; len(got) != 0 {
@@ -409,7 +409,7 @@ func TestSkippedQuestionsIgnoreJunkAndTheAdjustment(t *testing.T) {
 	d := declared()
 	d.Detection = &Detection{Network: "logged_and_reviewed", Host: "logged_and_reviewed", Application: "logged_and_reviewed"}
 	d.DataSubjects = ptr("none")
-	a := Answers{M: "high_reward", O: "no_access_or_resources_required", EE: "easy", ID: []string{"bogus"},
+	a := Answers{R: "reachable", M: "high_reward", O: "no_access_or_resources_required", EE: "easy", ID: []string{"bogus"},
 		LC: "all", LI: "all_data_totally_corrupt", LAV: "all_services_completely_lost", LAC: "unidentified",
 		FD: "bankruptcy", RD: "brand_damage", NC: "high_profile_violation", PV: "bogus"}
 	adjusted := &Adjusted{Opportunity: "special_access_or_resources_required", Confidentiality: notAffected,
@@ -433,5 +433,134 @@ func TestSkippedQuestionsIgnoreJunkAndTheAdjustment(t *testing.T) {
 	}
 	if len(l.Counters) != 0 {
 		t.Errorf("counters %v", l.Counters)
+	}
+}
+
+// Reached drops the six questions reachability decides only when its answer
+// says not reachable; cannot_tell, an empty answer and one off the list keep
+// them, the worst case. It never changes the slice it is given.
+func TestReachedNarrowsTheQuestionsOnce(t *testing.T) {
+	all := questions(t, declared(), [3]bool{})
+	kept := slices.Clone(all)
+	for answer, want := range map[string][]Factor{
+		"reachable":    all,
+		cannotTell:     all,
+		"":             all,
+		"bogus":        all,
+		notReachableID: {R, M, ID, FD, RD, NC, PV},
+	} {
+		if got := Reached(all, answer); !slices.Equal(got, want) {
+			t.Errorf("%q: %v, want %v", answer, got, want)
+		}
+	}
+	if !slices.Equal(all, kept) {
+		t.Errorf("Reached changed its input: %v", all)
+	}
+}
+
+// Not reachable sets the six factors it decides to their lowest levels,
+// whatever their answers, the config and the adjustment: Opportunity 0, Ease
+// of exploit 1, LC 2, LI 1, LAV 1 and LAC the lowest of its traceability
+// column. Each comes from reachability, an axis Applicability floored from
+// the floor, none is read or counted, a CVE no row describes included, and
+// the adjustment moves nothing, Privacy violation included. The rest is
+// computed as for a reachable CVE.
+func TestNotReachableSetsTheSixToTheirLowest(t *testing.T) {
+	worst := Answers{R: notReachableID, M: "high_reward", O: cannotTell, EE: "bogus", ID: []string{cannotTell},
+		LC: cannotTell, LI: "all_data_totally_corrupt", LAV: cannotTell, LAC: "defeats_attribution",
+		FD: "bankruptcy", RD: "brand_damage", NC: "high_profile_violation", PV: "millions"}
+	lowering := &Adjusted{Opportunity: "special_access_or_resources_required", Confidentiality: notAffected,
+		Integrity: notAffected, Availability: notAffected}
+	undescribed := CVE{ID: "CVE-N", Rows: []Row{{PkgName: "liba"}}}
+	lac := map[string]int{"": 7, "none": 7, "per_request": 7, "per_individual": 1}
+	for tr, wantLAC := range lac {
+		for _, c := range []CVE{describedCVE, undescribed} {
+			for _, floored := range [][3]bool{{}, allFloored} {
+				for _, adjusted := range []*Adjusted{nil, lowering} {
+					d := declared()
+					d.DataSensitivity.Value = "critical"
+					d.DataSubjects = ptr("millions")
+					d.Traceability = nil
+					if tr != "" {
+						d.Traceability = ptr(tr)
+					}
+					l := computeFor(t, d, c, floored, worst, adjusted)
+					got := levels(l.Vector)
+					want := map[string]int{"O": 0, "EE": 1, "LC": 2, "LI": 1, "LAV": 1, "LAC": wantLAC, "PV": 9}
+					if floored[0] {
+						want["PV"] = 3
+					}
+					for f, w := range want {
+						if got[f] != w {
+							t.Errorf("traceability %q, %s, floored %v, adjusted %v: %s = %d, want %d", tr, c.ID, floored, adjusted != nil, f, got[f], w)
+						}
+					}
+					for _, f := range []Factor{O, EE, LC, LI, LAV, LAC} {
+						source := SourceReachability
+						if floored[0] && (f == LC || f == LI || f == LAV) {
+							source = SourceFloor
+						}
+						if l.Sources[f] != source {
+							t.Errorf("%s from %v, want %v", f, l.Sources[f], source)
+						}
+						if _, read := l.Readings[f]; read {
+							t.Errorf("%s not asked, yet read %v", f, l.Readings[f])
+						}
+						if slices.Contains(l.Counters, f.Counter()) {
+							t.Errorf("%s not asked, yet counted: %v", f, l.Counters)
+						}
+					}
+					if l.Readings[R] != Answered {
+						t.Errorf("not_reachable read %v", l.Readings[R])
+					}
+				}
+			}
+		}
+	}
+}
+
+// Every answer reachability does not read as not reachable leaves the six
+// factors to their own answers, as computed for a reachable CVE; cannot_tell,
+// an empty answer and one off the list are counted. Not reachable never
+// raises a level: whatever the six answer, each is at least its level then.
+func TestReachableKeepsTheAnswersAndNotReachableNeverRaises(t *testing.T) {
+	d := declared()
+	reachable := compute(t, d, [3]bool{}, Answers{R: "reachable", LC: "extensive", LAC: "unidentified"}, nil)
+	for answer, reading := range map[string]Reading{cannotTell: CannotTell, "": Invalid, "bogus": Invalid} {
+		l := compute(t, d, [3]bool{}, Answers{R: answer, LC: "extensive", LAC: "unidentified"}, nil)
+		if l.Vector != reachable.Vector || l.Readings[R] != reading || !slices.Contains(l.Counters, "reachability_cannot_tell") {
+			t.Errorf("%q: %+v read %v counted %v, want reachable's %+v", answer, l.Vector, l.Readings[R], l.Counters, reachable.Vector)
+		}
+	}
+	if slices.Contains(reachable.Counters, "reachability_cannot_tell") {
+		t.Errorf("reachable counted: %v", reachable.Counters)
+	}
+	cases := []struct {
+		set func(*Answers, string)
+		ids []string
+	}{
+		{func(a *Answers, id string) { a.O = id }, ids(opportunity)},
+		{func(a *Answers, id string) { a.EE = id }, ids(easeOfExploit)},
+		{func(a *Answers, id string) { a.LC = id }, ids(confidentiality)},
+		{func(a *Answers, id string) { a.LI = id }, ids(integrity)},
+		{func(a *Answers, id string) { a.LAV = id }, ids(availability)},
+		{func(a *Answers, id string) { a.LAC = id }, ids(accountability)},
+	}
+	for _, tr := range traceabilities {
+		d.Traceability = ptr(tr)
+		for _, c := range cases {
+			for _, id := range c.ids {
+				a := Answers{R: "reachable"}
+				c.set(&a, id)
+				before := levels(compute(t, d, [3]bool{}, a, nil).Vector)
+				a.R = notReachableID
+				after := levels(compute(t, d, [3]bool{}, a, nil).Vector)
+				for _, f := range decided {
+					if after[f] > before[f] {
+						t.Errorf("%s %s under %s: not reachable raised %s from %d to %d", c.ids[0], id, tr, f, before[f], after[f])
+					}
+				}
+			}
+		}
 	}
 }

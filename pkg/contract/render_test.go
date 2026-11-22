@@ -334,7 +334,7 @@ func TestNoLevelIsShown(t *testing.T) {
 // map Go reads are the same ids in the same order.
 func TestOneTable(t *testing.T) {
 	maps := map[Factor][]string{
-		M: ids(motive), O: ids(opportunity), EE: ids(easeOfExploit), ID: ids(intrusionDetection),
+		R: ids(reachability), M: ids(motive), O: ids(opportunity), EE: ids(easeOfExploit), ID: ids(intrusionDetection),
 		LC: ids(confidentiality), LI: ids(integrity), LAV: ids(availability), LAC: ids(accountability),
 		FD: ids(financialDamage), RD: ids(reputationDamage), NC: ids(nonCompliance), PV: ids(privacyViolation),
 	}

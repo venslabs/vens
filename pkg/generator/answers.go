@@ -49,8 +49,11 @@ type answersEntry struct {
 	// Adjustment is how the adjustment reply read: not_asked, answered,
 	// unreadable or key_written_twice.
 	Adjustment adjustmentReading `json:"adjustment"`
+	// Reachability is the reachability question's answer and how Go read it,
+	// absent from an unrated entry that has none.
+	Reachability *factorRecord `json:"reachability,omitempty"`
 	// Factors holds the 16 in the vector's order; an unrated entry, only the
-	// questions answered, in call order.
+	// questions answered, in call order, reachability's apart.
 	Factors  []factorRecord `json:"factors"`
 	Counters []string       `json:"counters,omitempty"`
 }
@@ -79,7 +82,8 @@ func (run *scoringRun) rated(c *cve, a *assessment, l contract.Levels) {
 		run.counters[name]++
 	}
 	levels := vectorLevels(l.Vector)
-	e := answersEntry{VulnID: c.id(), Adjustment: cmp.Or(a.adjustment, adjustmentNotAsked), Counters: counters}
+	e := answersEntry{VulnID: c.id(), Adjustment: cmp.Or(a.adjustment, adjustmentNotAsked), Counters: counters,
+		Reachability: &factorRecord{Factor: contract.R, Answer: rawAnswer(a, contract.R), Reading: l.Readings[contract.R]}}
 	for _, f := range vectorOrder {
 		level := levels[f]
 		r := factorRecord{Factor: f, Reading: l.Readings[f], Level: &level, Source: l.Sources[f]}
@@ -109,7 +113,11 @@ func (run *scoringRun) unrated(c *cve, a *assessment) {
 		if a.adjusted != nil {
 			r.Adjusted = adjustedAnswer(*a.adjusted, f)
 		}
-		e.Factors = append(e.Factors, r)
+		if f == contract.R {
+			e.Reachability = &r
+		} else {
+			e.Factors = append(e.Factors, r)
+		}
 		if reading == contract.CannotTell || reading == contract.Invalid {
 			e.Counters = append(e.Counters, f.Counter())
 		}

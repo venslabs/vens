@@ -8,7 +8,6 @@ FOR THIS QUESTION
 Availability requirement: high (24/7 required)
 
 ANSWERS
-- not_reachable: Not reachable here: the facts given show that the vulnerable code is not reachable in this deployment, as defined above.
 - no_impact: Nothing interrupted: it is reachable, but exploiting it here interrupts nothing this service does, as when its only effect is a disclosure or a change of data.
 - minimal_secondary_interrupted: Minimal, secondary: a brief or partial interruption of something secondary, such as one request, process or worker failing and being restarted.
 - minimal_primary_interrupted: Minimal, primary: a brief or partial interruption of something primary, such as one request, process or worker failing and being restarted.

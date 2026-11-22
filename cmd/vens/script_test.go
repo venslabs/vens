@@ -16,6 +16,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"go/ast"
 	"go/parser"
@@ -315,10 +316,14 @@ func checkVEXVectors(data []byte, count int, sets [16][]int) error {
 }
 
 // belowScaleCmd reads the answers.json of the one run under a --debug-dir
-// and checks every not_reachable and no_impact answer of the technical
-// impact questions: read as answered, from the answer, at the level given
-// per factor; not_reachable answered at least once on each of the four, and
-// no_impact on each but Loss of accountability, which does not list it.
+// and checks the answers below the technical impact scales. A CVE whose
+// reachability answer is not_reachable has Opportunity at 0, Ease of exploit
+// at 1 and the four technical impacts at the levels given, none answered,
+// each from reachability or, for an axis its vectors floor, the floor. Every
+// no_impact answer of Loss of confidentiality, integrity and availability is
+// read as answered, from the answer, at the level given. The run must answer
+// not_reachable at least once, and no_impact at least once: which of the
+// three gets it is the mock's hash.
 func belowScaleCmd(ts *testscript.TestScript, neg bool, args []string) {
 	if neg || len(args) != 5 {
 		ts.Fatalf("usage: below-scale debug-dir LC=level LI=level LAV=level LAC=level")
@@ -340,47 +345,64 @@ func belowScaleCmd(ts *testscript.TestScript, neg bool, args []string) {
 	ts.Check(checkBelowScale(data, want))
 }
 
+type factorRecord struct {
+	Factor  string `json:"factor"`
+	Answer  any    `json:"answer"`
+	Reading string `json:"reading"`
+	Level   int    `json:"level"`
+	Source  string `json:"source"`
+}
+
 func checkBelowScale(data []byte, want map[string]int) error {
 	var answers struct {
 		Vulnerabilities []struct {
-			VulnID  string `json:"vulnId"`
-			Factors []struct {
-				Factor  string `json:"factor"`
-				Answer  any    `json:"answer"`
-				Reading string `json:"reading"`
-				Level   int    `json:"level"`
-				Source  string `json:"source"`
-			} `json:"factors"`
+			VulnID       string         `json:"vulnId"`
+			Reachability *factorRecord  `json:"reachability"`
+			Factors      []factorRecord `json:"factors"`
 		} `json:"vulnerabilities"`
 	}
 	if err := json.Unmarshal(data, &answers); err != nil {
 		return err
 	}
+	lowest := map[string]int{"O": 0, "EE": 1}
+	for f, level := range want {
+		lowest[f] = level
+	}
 	seen := map[string]int{}
 	for _, v := range answers.Vulnerabilities {
+		if v.Reachability == nil {
+			return fmt.Errorf("%s has no reachability answer", v.VulnID)
+		}
+		unreachable := v.Reachability.Answer == "not_reachable"
+		if unreachable {
+			seen["R not_reachable"]++
+		}
 		for _, f := range v.Factors {
-			if f.Answer != "not_reachable" && f.Answer != "no_impact" {
+			level, decided := lowest[f.Factor]
+			if unreachable && decided {
+				floored := f.Source == "floor" && f.Factor != "O" && f.Factor != "EE" && f.Factor != "LAC"
+				if f.Answer != nil || f.Level != level || (f.Source != "reachability" && !floored) {
+					return fmt.Errorf("%s not reachable: %s %v at %d from %s, want no answer at %d from reachability", v.VulnID, f.Factor, f.Answer, f.Level, f.Source, level)
+				}
 				continue
 			}
-			level, impact := want[f.Factor]
-			if !impact {
-				return fmt.Errorf("%s: %s answered %v, which only the technical impact questions list", v.VulnID, f.Factor, f.Answer)
+			if f.Answer != "no_impact" {
+				continue
+			}
+			if _, impact := want[f.Factor]; !impact || f.Factor == "LAC" {
+				return fmt.Errorf("%s: %s answered no_impact, which only LC, LI and LAV list", v.VulnID, f.Factor)
 			}
 			if f.Reading != "answered" || f.Source != "answer" || f.Level != level {
-				return fmt.Errorf("%s: %s %v read %s from %s at %d, want answered from the answer at %d", v.VulnID, f.Factor, f.Answer, f.Reading, f.Source, f.Level, level)
+				return fmt.Errorf("%s: %s no_impact read %s from %s at %d, want answered from the answer at %d", v.VulnID, f.Factor, f.Reading, f.Source, f.Level, level)
 			}
-			seen[f.Factor+" "+f.Answer.(string)]++
+			seen[f.Factor+" no_impact"]++
 		}
 	}
-	for factor := range want {
-		for _, id := range []string{"not_reachable", "no_impact"} {
-			if factor == "LAC" && id == "no_impact" {
-				continue
-			}
-			if seen[factor+" "+id] == 0 {
-				return fmt.Errorf("no %s answered %s: the run exercises nothing", factor, id)
-			}
-		}
+	if seen["R not_reachable"] == 0 {
+		return errors.New("no reachability answered not_reachable: the run exercises nothing")
+	}
+	if seen["LC no_impact"]+seen["LI no_impact"]+seen["LAV no_impact"] == 0 {
+		return errors.New("no technical impact answered no_impact: the run exercises nothing")
 	}
 	return nil
 }

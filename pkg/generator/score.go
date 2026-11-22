@@ -152,11 +152,11 @@ func (a *assessment) reasoning(readings map[contract.Factor]contract.Reading) st
 	return strings.Join(lines, "\n")
 }
 
-// answerField is the field of a that holds factor f's answer, f one of the
-// model-answered factors whose answer is one id.
+// answerField is the field of a that holds question f's answer, f
+// reachability or one of the model-answered factors whose answer is one id.
 func answerField(a *contract.Answers, f contract.Factor) *string {
 	return map[contract.Factor]*string{
-		contract.M: &a.M, contract.O: &a.O, contract.EE: &a.EE, contract.LC: &a.LC, contract.LI: &a.LI,
+		contract.R: &a.R, contract.M: &a.M, contract.O: &a.O, contract.EE: &a.EE, contract.LC: &a.LC, contract.LI: &a.LI,
 		contract.LAV: &a.LAV, contract.LAC: &a.LAC, contract.FD: &a.FD, contract.RD: &a.RD,
 		contract.NC: &a.NC, contract.PV: &a.PV,
 	}[f]
@@ -195,7 +195,8 @@ func (g *Generator) scoreBatch(ctx context.Context, run *scoringRun, batch []*cv
 // askBatch asks the batch's questions, one call per question in the declared
 // order, each about the batch's CVEs that get it, so that the order never
 // depends on which questions the first CVE gets; then makes each flagged
-// CVE's adjustment call.
+// CVE's adjustment call. Reachability comes first: a CVE whose answer says
+// not reachable is not asked the six questions it decides.
 func (g *Generator) askBatch(ctx context.Context, run *scoringRun, batch []*cve, assessed map[string]*assessment) error {
 	for _, f := range contract.Order() {
 		var asked []*cve
@@ -210,6 +211,9 @@ func (g *Generator) askBatch(ctx context.Context, run *scoringRun, batch []*cve,
 		if err := g.ask(ctx, run, f, asked, assessed); err != nil {
 			return err
 		}
+		if f == contract.R {
+			reached(ctx, batch, assessed)
+		}
 	}
 	for _, c := range batch {
 		if len(c.flags) > 0 {
@@ -219,6 +223,19 @@ func (g *Generator) askBatch(ctx context.Context, run *scoringRun, batch []*cve,
 		}
 	}
 	return nil
+}
+
+// reached narrows each CVE's questions to those it still gets once its
+// reachability answer is read.
+func reached(ctx context.Context, batch []*cve, assessed map[string]*assessment) {
+	for _, c := range batch {
+		answer := assessed[c.id()].answers.R
+		c.questions = contract.Reached(c.questions, answer)
+		if !contract.Reachable(answer) {
+			slog.DebugContext(ctx, "not reachable: Opportunity, Ease of exploit and the technical impacts not asked",
+				"vuln", c.id(), "questions", joinFactors(c.questions))
+		}
+	}
 }
 
 // rate computes a CVE's 16 levels and their rating, records them for the run,

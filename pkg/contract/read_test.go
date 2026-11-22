@@ -26,6 +26,8 @@ func answersFor(f Factor, answer []string) Answers {
 		one = answer[0]
 	}
 	switch f {
+	case R:
+		a.R = one
 	case M:
 		a.M = one
 	case O:
@@ -107,7 +109,7 @@ func TestReadAnswerShapes(t *testing.T) {
 }
 
 func TestFactorNamesAndCounters(t *testing.T) {
-	for _, f := range []Factor{SL, M, O, S, ED, EE, A, ID, LC, LI, LAV, LAC, FD, RD, NC, PV} {
+	for _, f := range []Factor{R, SL, M, O, S, ED, EE, A, ID, LC, LI, LAV, LAC, FD, RD, NC, PV} {
 		if f.Name() == "" {
 			t.Errorf("%s has no name", f)
 		}
@@ -117,6 +119,9 @@ func TestFactorNamesAndCounters(t *testing.T) {
 	}
 	if got := PV.Name(); got != "Privacy violation" {
 		t.Errorf("PV is named %q", got)
+	}
+	if got := R.Name(); got != "Reachability" {
+		t.Errorf("R is named %q", got)
 	}
 	for r, want := range map[Reading]string{Answered: "answered", CannotTell: "cannot_tell", Invalid: "invalid", NoDescription: "no_description", 0: "unknown"} {
 		if text, _ := r.MarshalText(); r.String() != want || string(text) != want {

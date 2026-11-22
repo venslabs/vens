@@ -73,9 +73,9 @@ var detectionLevels = map[string]owasp.IntrusionDetection{
 }
 
 // The floors: an axis every CVSS vector gives N, the adjustment answers
-// not_affected, or the answer says not reachable or no impact takes its
-// factor's lowest level; Privacy violation follows confidentiality only for
-// the first two, which are Go's.
+// not_affected, the answer says no impact, or reachability's says not
+// reachable takes its factor's lowest level; Privacy violation follows
+// confidentiality only for the first two, which are Go's.
 const (
 	confidentialityFloor = owasp.LossOfConfidentialityMinimalNonSensitiveDataDisclosed
 	integrityFloor       = owasp.LossOfIntegrityMinimalSlightlyCorruptData
@@ -96,9 +96,35 @@ func band(s string) owasp.PrivacyViolation {
 	return level
 }
 
-// asked reports whether a CVE gets factor f's question. A question is not
-// asked where Go has decided the level, so the model cannot contradict Go,
-// nor where no answer could move it.
+// reachedOnly lists the factors whose questions a CVE gets only when its
+// reachability answer is read as reachable. Not reachable, each takes its
+// lowest level, Loss of accountability the lowest its traceability column
+// gives, so that six questions cannot each judge reachability apart.
+var reachedOnly = [...]Factor{O, EE, LC, LI, LAV, LAC}
+
+// Reachable reports whether Go reads a reachability answer as reachable:
+// every answer but not_reachable, cannot_tell and one off the list taking the
+// worst case.
+func Reachable(id string) bool {
+	reached, _ := reachability.read(id)
+	return reached
+}
+
+// Reached returns the questions a CVE still gets once its reachability
+// answer is read: all of them when it is read as reachable, otherwise all
+// but the six it decides.
+func Reached(questions []Factor, reachabilityAnswer string) []Factor {
+	out := slices.Clone(questions)
+	if Reachable(reachabilityAnswer) {
+		return out
+	}
+	return slices.DeleteFunc(out, func(f Factor) bool { return slices.Contains(reachedOnly[:], f) })
+}
+
+// asked reports whether a CVE gets factor f's question, its reachability
+// answer read as reachable. A question is not asked where Go has decided the
+// level, so the model cannot contradict Go, nor where no answer could move
+// it.
 func asked(f Factor, d Deployment, floored [3]bool, described bool) bool {
 	switch f {
 	case M, O, EE:
@@ -131,7 +157,9 @@ func asked(f Factor, d Deployment, floored [3]bool, described bool) bool {
 
 // Questions returns the questions a CVE gets, in the order the calls ask
 // them, from the deployment, whether a row describes the CVE, and the axes
-// Applicability floored over its vectors, indexed as cvss's axes.
+// Applicability floored over its vectors, indexed as cvss's axes: reachability
+// first, then those it gets when its answer is read as reachable, which
+// Reached narrows once the answer is known.
 func Questions(d Deployment, c CVE, floored [3]bool) ([]Factor, error) {
 	if err := d.Check(); err != nil {
 		return nil, err
@@ -148,11 +176,11 @@ func Questions(d Deployment, c CVE, floored [3]bool) ([]Factor, error) {
 	return questions, nil
 }
 
-// Answers holds a CVE's answers as the replies gave them. Go reads a
-// factor's answer only when the CVE was asked its question; any other value
-// is read as cannot_tell.
+// Answers holds a CVE's answers as the replies gave them, R its reachability
+// answer. Go reads a factor's answer only when the CVE was asked its
+// question; any other value is read as cannot_tell.
 type Answers struct {
-	M, O, EE, LC, LI, LAV, LAC, FD, RD, NC, PV string
+	R, M, O, EE, LC, LI, LAV, LAC, FD, RD, NC, PV string
 	// ID is the set of channels Intrusion detection's answer chose.
 	ID []string
 }
@@ -183,12 +211,13 @@ type Levels struct {
 	// Sources says where each of the 16 levels came from.
 	Sources map[Factor]Source
 	// Readings holds how the answer to each question the CVE was asked was
-	// read, and NoDescription for Motive, Opportunity and Ease of exploit
-	// when no row describes the CVE, which is not asked them.
+	// read, reachability's included, and NoDescription for Motive,
+	// Opportunity and Ease of exploit when no row describes the CVE, which is
+	// not asked them, the last two only when it is read as reachable.
 	Readings map[Factor]Reading
-	// Counters names, in factor order, each counter the CVE adds one to: a
-	// cannot_tell, or an answer read as one, and each undeclared field a
-	// rule fell back on.
+	// Counters names, reachability's first then in factor order, each
+	// counter the CVE adds one to: a cannot_tell, or an answer read as one,
+	// and each undeclared field a rule fell back on.
 	Counters []string
 }
 
@@ -197,7 +226,10 @@ type Levels struct {
 // its answers, and for a flagged CVE its adjustment, nil otherwise. The
 // adjustment never raises a level, leaves Loss of accountability and the
 // business factors as computed, and leaves the Opportunity of a CVE no row
-// describes at cannot_tell's level, whatever it answers.
+// describes at cannot_tell's level, whatever it answers. A CVE whose
+// reachability answer says not reachable takes the lowest level of the six
+// factors it decides, whatever their answers, and no adjustment: every level
+// it could lower but Privacy violation's is already at its lowest.
 func Compute(d Deployment, c CVE, floored [3]bool, a Answers, adjusted *Adjusted) (Levels, error) {
 	if err := d.Check(); err != nil {
 		return Levels{}, err
@@ -205,26 +237,24 @@ func Compute(d Deployment, c CVE, floored [3]bool, a Answers, adjusted *Adjusted
 	if err := checkCVE(c); err != nil {
 		return Levels{}, err
 	}
-	if adjusted == nil {
-		adjusted = &Adjusted{}
-	}
 	s := &scorer{d: d, floored: floored, described: c.Described(), levels: Levels{
 		Sources: map[Factor]Source{}, Readings: map[Factor]Reading{},
 	}}
+	reached, r := reachability.read(a.R)
+	s.note(R, r)
+	s.reached = reached
+	if adjusted == nil || !s.reached {
+		adjusted = &Adjusted{}
+	}
 	var v owasp.Vector
 	// Every finding is a published CVE a scanner matched: OWASP's worst case
 	// holds for the skill of the group, its discovery and awareness.
 	v.SL = from(s, SL, SourceConstant, owasp.SkillLevelSecurityPenetrationSkills)
 	v.M = likelihood(s, motive, a.M)
-	v.O = likelihood(s, opportunity, a.O)
-	// A description is a prerequisite of any Opportunity answer, the
-	// adjustment's too, whether or not the call asked it.
-	if level, r := opportunity.read(adjusted.Opportunity); r == Answered && asked(O, d, floored, s.described) {
-		v.O = lowered(s, O, v.O, level)
-	}
+	v.O = s.opportunity(a.O, adjusted.Opportunity)
 	v.S = from(s, S, SourceConfig, exposures[d.Exposure.Value].size)
 	v.ED = from(s, ED, SourceConstant, owasp.EaseOfDiscoveryAutomatedToolsAvailable)
-	v.EE = likelihood(s, easeOfExploit, a.EE)
+	v.EE = s.easeOfExploit(a.EE)
 	v.A = from(s, A, SourceConstant, owasp.AwarenessPublicKnowledge)
 	v.ID = s.intrusionDetection(a.ID)
 	v.LC = s.confidentiality(a.LC, adjusted.Confidentiality)
@@ -243,7 +273,9 @@ type scorer struct {
 	d         Deployment
 	floored   [3]bool
 	described bool
-	levels    Levels
+	// reached is how Go read the reachability answer.
+	reached bool
+	levels  Levels
 }
 
 func (s *scorer) count(counter string) {
@@ -270,6 +302,12 @@ func answered[V any](s *scorer, c contract[V], id string) V {
 	return from(s, c.factor, SourceAnswer, value)
 }
 
+// unreached is the lowest level of a factor reachability decides, for a CVE
+// not reachable here, which is not asked its question.
+func unreached[L any](s *scorer, f Factor, lowest L) L {
+	return from(s, f, SourceReachability, lowest)
+}
+
 // likelihood reads Motive's, Opportunity's or Ease of exploit's answer. A CVE
 // no row describes is not asked them, a description being a prerequisite of
 // their answers: each takes cannot_tell's level, counted, whatever id holds.
@@ -292,17 +330,45 @@ func lowered[L ~int](s *scorer, f Factor, baseline, adjusted L) L {
 }
 
 // axis is Loss of integrity's or of availability's level: the floor when
-// Applicability floored the axis, which is then not asked, or when the
-// adjustment answered not_affected; the answer's level otherwise.
+// Applicability floored the axis or the CVE is not reachable here, the
+// question then not asked, or when the adjustment answered not_affected; the
+// answer's level otherwise.
 func axis[L owasp.LossOfIntegrity | owasp.LossOfAvailability](s *scorer, c contract[L], id, adjusted string, floor L) L {
-	if !asked(c.factor, s.d, s.floored, s.described) {
+	switch {
+	case !asked(c.factor, s.d, s.floored, s.described):
 		return from(s, c.factor, SourceFloor, floor)
+	case !s.reached:
+		return unreached(s, c.factor, floor)
 	}
 	level := answered(s, c, id)
 	if adjusted == notAffected {
 		return lowered(s, c.factor, level, floor)
 	}
 	return level
+}
+
+// opportunity is Opportunity's level: its lowest for a CVE not reachable
+// here; otherwise the answer's, lowered by the adjustment's answer for a CVE
+// a row describes, a description being a prerequisite of any Opportunity
+// answer, the adjustment's too, whether or not the call asked it.
+func (s *scorer) opportunity(id, adjusted string) owasp.Opportunity {
+	if !s.reached {
+		return unreached(s, O, owasp.OpportunityFullAccessOrExpensiveResourcesRequired)
+	}
+	level := likelihood(s, opportunity, id)
+	if lower, r := opportunity.read(adjusted); r == Answered && asked(O, s.d, s.floored, s.described) {
+		return lowered(s, O, level, lower)
+	}
+	return level
+}
+
+// easeOfExploit is Ease of exploit's level: its lowest for a CVE not
+// reachable here, the answer's otherwise.
+func (s *scorer) easeOfExploit(id string) owasp.EaseOfExploit {
+	if !s.reached {
+		return unreached(s, EE, owasp.EaseOfExploitTheoretical)
+	}
+	return likelihood(s, easeOfExploit, id)
 }
 
 func (s *scorer) intrusionDetection(chosen []string) owasp.IntrusionDetection {
@@ -385,8 +451,11 @@ func ReadAnswer(f Factor, answer ...string) (Reading, error) {
 }
 
 func (s *scorer) confidentiality(id, adjusted string) owasp.LossOfConfidentiality {
-	if !asked(LC, s.d, s.floored, s.described) {
+	switch {
+	case !asked(LC, s.d, s.floored, s.described):
 		return from(s, LC, SourceFloor, confidentialityFloor)
+	case !s.reached:
+		return unreached(s, LC, confidentialityFloor)
 	}
 	e := answered(s, confidentiality, id)
 	column := 0
@@ -400,8 +469,13 @@ func (s *scorer) confidentiality(id, adjusted string) owasp.LossOfConfidentialit
 	return level
 }
 
+// accountability crosses the answer with traceability; a CVE not reachable
+// here takes no accountability loss's level, the lowest its column gives.
 func (s *scorer) accountability(id string) owasp.LossOfAccountability {
-	a := answered(s, accountability, id)
+	a, source := actorNoLoss, SourceReachability
+	if s.reached {
+		a, source = answered(s, accountability, id), SourceAnswer
+	}
 	// Undeclared, nothing is known to record the requests: the worst case.
 	t := 0
 	if s.d.Traceability == nil {
@@ -409,7 +483,7 @@ func (s *scorer) accountability(id string) owasp.LossOfAccountability {
 	} else {
 		t = slices.Index(traceabilities[:], *s.d.Traceability)
 	}
-	return accountabilityLevels[a][t]
+	return from(s, LAC, source, accountabilityLevels[a][t])
 }
 
 // nonCompliance is OWASP's lowest level, a floor, when no framework applies.

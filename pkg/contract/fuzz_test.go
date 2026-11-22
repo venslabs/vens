@@ -31,9 +31,12 @@ import (
 // its JAR ran, each with its source; its severity and score are OWASP's
 // matrix and likelihood × impact recomputed from the vector alone; Motive,
 // Opportunity and Ease of exploit are asked only of a CVE a row describes,
-// and no adjustment lowers the Opportunity of one none does; and the
-// readings are the questions asked, and those three for a CVE no row
-// describes.
+// the last two only when reachability's answer is read as reachable, and no
+// adjustment lowers the Opportunity of one no row describes; a CVE not
+// reachable has the six factors reachability decides at their lowest and
+// takes no adjustment; and the readings are the questions asked, and for a
+// CVE no row describes the likelihood questions it is not asked for want of a
+// description.
 func FuzzCompute(f *testing.F) {
 	sets := owaspLevelSets(f)
 	f.Add([]byte{}, "")
@@ -79,7 +82,7 @@ func FuzzCompute(f *testing.F) {
 		}
 		floored := [3]bool{next()%2 == 1, next()%2 == 1, next()%2 == 1}
 		a := Answers{
-			M: pick(ids(motive)), O: pick(ids(opportunity)), EE: pick(ids(easeOfExploit)),
+			R: pick(ids(reachability)), M: pick(ids(motive)), O: pick(ids(opportunity)), EE: pick(ids(easeOfExploit)),
 			LC: pick(ids(confidentiality)), LI: pick(ids(integrity)), LAV: pick(ids(availability)),
 			LAC: pick(ids(accountability)), FD: pick(ids(financialDamage)), RD: pick(ids(reputationDamage)),
 			NC: pick(ids(nonCompliance)), PV: pick(ids(privacyViolation)),
@@ -107,26 +110,51 @@ func FuzzCompute(f *testing.F) {
 		if len(l.Sources) != len(vectorOrder) || slices.Contains(slices.Collect(maps.Values(l.Sources)), 0) {
 			t.Errorf("sources %v, want one for each of the 16 levels", l.Sources)
 		}
-		asked, err := Questions(d, c, floored)
+		planned, err := Questions(d, c, floored)
 		if err != nil {
 			t.Fatal(err)
 		}
+		reached := Reachable(a.R)
+		asked := Reached(planned, a.R)
 		read := slices.Clone(asked)
 		if !c.Described() {
-			read = append(read, M, O, EE)
+			read = append(read, M)
+			if reached {
+				read = append(read, O, EE)
+			}
 		}
 		if got := slices.Sorted(maps.Keys(l.Readings)); !slices.Equal(got, slices.Sorted(slices.Values(read))) {
 			t.Errorf("readings for %v, questions %v", got, asked)
 		}
 		for _, f := range []Factor{M, O, EE} {
-			if slices.Contains(asked, f) == !c.Described() {
-				t.Errorf("%s asked: %v, described: %v", f, slices.Contains(asked, f), c.Described())
+			if want := c.Described() && (f == M || reached); slices.Contains(asked, f) != want {
+				t.Errorf("%s asked: %v, described: %v, reachable: %v", f, slices.Contains(asked, f), c.Described(), reached)
 			}
 		}
-		if !c.Described() && (l.Vector.O != 9 || l.Sources[O] != SourceAnswer) {
+		if !c.Described() && reached && (l.Vector.O != 9 || l.Sources[O] != SourceAnswer) {
 			t.Errorf("no description, adjusted by %+v: O %d from %v, want cannot_tell's 9", adjusted, l.Vector.O, l.Sources[O])
 		}
+		if !reached {
+			unadjusted, err := Compute(d, c, floored, a, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if unadjusted.Vector != l.Vector {
+				t.Errorf("not reachable, adjusted by %+v: %+v, unadjusted %+v", adjusted, l.Vector, unadjusted.Vector)
+			}
+			if l.Vector.O != 0 || l.Vector.EE != 1 || l.Vector.LC != 2 || l.Vector.LI != 1 || l.Vector.LAV != 1 ||
+				l.Vector.LAC != accountabilityLevels[actorNoLoss][max(0, slices.Index(traceabilities[:], deref(d.Traceability)))] {
+				t.Errorf("not reachable: %+v, want the six at their lowest", l.Vector)
+			}
+		}
 	})
+}
+
+func deref(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }
 
 // checkRating reads the levels back from the written vector, each in the set

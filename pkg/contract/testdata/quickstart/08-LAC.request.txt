@@ -5,7 +5,6 @@ QUESTION
 To exploit this vulnerability in this deployment, must anonymous Internet users authenticate to this service under an identity of their own? Apart from that, could the exploit let them act as someone else, or erase, forge or bypass the records of who did what? Answer the two facts separately; whether records exist is not asked.
 
 ANSWERS
-- not_reachable: Not reachable here: the facts given show that the vulnerable code is not reachable in this deployment, as defined above.
 - identified: Identified, no accountability loss: they must authenticate to this service under an identity of their own, and the exploit does not let them act as someone else or tamper with the records of who did what.
 - unidentified: Unidentified: they need not authenticate to this service, or there is no service to authenticate to, and the exploit does not let them act as someone else or tamper with the records of who did what.
 - defeats_attribution: Defeats attribution: whether or not they authenticate, the exploit lets them act as someone else, or erase, forge or bypass the records of who did what.

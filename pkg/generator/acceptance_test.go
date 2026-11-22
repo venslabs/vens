@@ -132,7 +132,7 @@ func TestProviderAcceptanceGate(t *testing.T) {
 			`1,{"vulnId":"`+first+`","answer":"low_or_no_reward","reasoning":"r"}`, "",
 		)}, "defects.reply_unreadable: 1"},
 		"a CVE left out": {&fakeLLM{skip: func(c fakeCall, id string) bool {
-			return motive(c, id) && c.n == 1
+			return motive(c, id) && len(c.ids) > 1
 		}}, "calls.M: 2, want 1"},
 		"an unreadable adjustment": {&fakeLLM{reply: adjustment(`not json`)}, "defects.adjustment_unreadable: 1"},
 		"an adjustment key written twice": {&fakeLLM{reply: adjustment(

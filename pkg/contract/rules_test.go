@@ -119,8 +119,14 @@ func channelSets() [][]string {
 	return out
 }
 
+// decided are the six factors reachability's answer decides, as the vector
+// names them.
+var decided = []string{"O", "EE", "LC", "LI", "LAV", "LAC"}
+
 // walk calls each rule over its whole input domain and returns, per factor,
-// the levels reached and the number of inputs walked.
+// the levels reached and the number of inputs walked. Reachability, no
+// factor, is walked as "R": each input adds the levels of the six factors it
+// decides.
 func walk(t *testing.T) (reached map[string]map[int]bool, inputs map[string]int) {
 	reached, inputs = map[string]map[int]bool{}, map[string]int{}
 	sets := owaspLevelSets(t)
@@ -131,12 +137,17 @@ func walk(t *testing.T) (reached map[string]map[int]bool, inputs map[string]int)
 			t.Fatalf("the calculator refuses %+v: %v", l.Vector, err)
 		}
 		checkRating(t, rating, levels(l.Vector), sets)
-		level := levels(l.Vector)[factor]
-		if reached[factor] == nil {
-			reached[factor] = map[int]bool{}
-		}
-		reached[factor][level] = true
 		inputs[factor]++
+		factors := []string{factor}
+		if factor == "R" {
+			factors = decided
+		}
+		for _, f := range factors {
+			if reached[f] == nil {
+				reached[f] = map[int]bool{}
+			}
+			reached[f][levels(l.Vector)[f]] = true
+		}
 	}
 	for _, f := range []string{"SL", "ED", "A"} {
 		add(f, base(), [3]bool{}, Answers{}, nil)
@@ -186,7 +197,34 @@ func walk(t *testing.T) (reached map[string]map[int]bool, inputs map[string]int)
 			add("ID", d, [3]bool{}, Answers{ID: set}, nil)
 		}
 	}
+	walkReachability(add)
 	return reached, inputs
+}
+
+// walkReachability walks reachability's answers, an id off the list
+// included, over what the six factors it decides read: the data's
+// sensitivity, traceability, the axes floored and an adjustment lowering all
+// it can. Their own answers sit at the worst case, so a not reachable answer
+// has everything to lower.
+func walkReachability(add func(string, Deployment, [3]bool, Answers, *Adjusted)) {
+	worst := Answers{O: cannotTell, EE: cannotTell, LC: cannotTell, LI: cannotTell, LAV: cannotTell, LAC: cannotTell}
+	lowering := &Adjusted{Opportunity: "full_access_or_expensive_resources_required", Confidentiality: notAffected,
+		Integrity: notAffected, Availability: notAffected}
+	for _, id := range append(ids(reachability), "bogus") {
+		for _, ds := range []string{"low", "critical"} {
+			for _, tr := range []*string{nil, ptr("none"), ptr("per_request"), ptr("per_individual")} {
+				for _, floored := range [][3]bool{{}, allFloored} {
+					for _, adjusted := range []*Adjusted{nil, lowering} {
+						d := base()
+						d.DataSensitivity.Value, d.Traceability = ds, tr
+						a := worst
+						a.R = id
+						add("R", d, floored, a, adjusted)
+					}
+				}
+			}
+		}
+	}
 }
 
 // walkAxes walks the rules Applicability and the adjustment's axes reach.
@@ -294,7 +332,7 @@ func TestRulesReachTheLevelSetsTheJARRan(t *testing.T) {
 	// and the adjustment where the rule reads them.
 	want := map[string]int{
 		"SL": 1, "M": 4, "O": 35, "S": 3, "ED": 1, "EE": 5, "A": 1, "ID": 703,
-		"LC": 192, "LI": 64, "LAV": 64, "LAC": 20, "FD": 5, "RD": 5, "NC": 8, "PV": 288,
+		"LC": 160, "LI": 56, "LAV": 56, "LAC": 16, "FD": 5, "RD": 5, "NC": 8, "PV": 288, "R": 128,
 	}
 	if !maps.Equal(inputs, want) {
 		t.Errorf("inputs walked per rule %v, want %v", inputs, want)

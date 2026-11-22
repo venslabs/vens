@@ -1,0 +1,13 @@
+VULNERABILITIES
+[entries]
+
+QUESTION
+Can anonymous Internet users reach the vulnerable code of this vulnerability in this deployment, whatever access or effort that takes, as reachability is defined above?
+
+ANSWERS
+- reachable: Reachable here: the vulnerable code is reachable in this deployment, as defined above.
+- not_reachable: Not reachable here: the facts given show that the vulnerable code is not reachable in this deployment, as defined above.
+- cannot_tell: The facts given do not decide between the answers above.
+
+Answer every vulnerability listed above once, by its vulnId, with one answer id from ANSWERS.
+Reply with {"answers": [{"vulnId": "...", "reasoning": "...", "answer": "..."}]}.

@@ -244,7 +244,7 @@ func testConfig() *riskconfig.Config {
 
 // questionsUndeclared are the questions testConfig asks a CVE no vector
 // floors, in the declared order.
-var questionsUndeclared = []string{"M", "O", "EE", "LC", "LI", "LAV", "LAC", "FD", "RD", "PV"}
+var questionsUndeclared = []string{"R", "M", "O", "EE", "LC", "LI", "LAV", "LAC", "FD", "RD", "PV"}
 
 func newGen(t *testing.T, o Opts) *Generator {
 	t.Helper()

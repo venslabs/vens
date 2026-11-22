@@ -352,7 +352,7 @@ func TestGenerator_AdjustmentShowsAnInvalidBaselineAsCannotTell(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(strings.Split(adjustment.req.Human, "\n")[1]), &entry))
 	assert.Equal(t, map[string]string{
 		"opportunity": cannotTell, "confidentiality": cannotTell,
-		"integrity": "minimal_seriously_corrupt", "availability": "not_reachable",
+		"integrity": "minimal_seriously_corrupt", "availability": "no_impact",
 	}, entry.Answers)
 }
 

@@ -8,17 +8,17 @@ env VENS_MOCK_LLM_CANNOT_TELL=one_individual
 stderr 'strict: the answer to Privacy violation \(PV\) for CVE-2024-2222 reads as cannot_tell, counted as privacy_cannot_tell; stopping the run'
 stderr 'Scored vulnerability.*CVE-2024-1111'
 ! stderr 'Scored vulnerability.*CVE-2024-2222'
-stderr 'Scoring run finished.* llm_calls=17 .* calls.PV=1 .*counters.privacy_cannot_tell=1 .*failed=true'
+stderr 'Scoring run finished.* llm_calls=19 .* calls.PV=1 .*counters.privacy_cannot_tell=1 .*failed=true'
 ! stderr 'calls.adjustment'
 ! exists out.cdx.json
 ! exists out.attestation.cdx.json
 ! exec sh -c 'ls $VENS_TEMP_GLOB'
 
 # The same answers without --strict take Privacy violation's worst case,
-# counted, and write both files: the run makes the same 17 calls, so the
+# counted, and write both files: the run makes the same 19 calls, so the
 # strict run stopped at its last.
 exec vens generate --llm=mock --llm-batch-size=1 --attest --config-file=config.yaml --sbom-serial-number=urn:uuid:22222222-2222-2222-2222-222222222222 report.json out.cdx.json
-stderr 'Scoring run finished.* llm_calls=17 .*counters.privacy_cannot_tell=1 .*failed=false'
+stderr 'Scoring run finished.* llm_calls=19 .*counters.privacy_cannot_tell=1 .*failed=false'
 exists out.cdx.json
 exists out.attestation.cdx.json
 json-contains out.cdx.json '"CVE-2024-2222"'

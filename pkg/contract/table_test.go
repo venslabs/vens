@@ -36,24 +36,30 @@ func leveled[V ~int](c contract[V]) string {
 // Each question's answers in the order shown and the level Go maps each to,
 // cannot_tell last at the factor's worst case. Intrusion detection, Loss of
 // confidentiality and Loss of accountability map to no level of their own:
-// Go crosses them with the config.
+// Go crosses them with the config. Reachability's answers map to whether Go
+// reads them as reachable, its cannot_tell to the worst case, reachable.
 func TestTableAnswersAndLevels(t *testing.T) {
 	want := map[Factor]string{
+		R:   "reachable=true not_reachable=false cannot_tell=true",
 		M:   "low_or_no_reward=1 possible_reward=4 high_reward=9 cannot_tell=9",
 		O:   "no_access_or_resources_required=9 some_access_or_resources_required=7 special_access_or_resources_required=4 full_access_or_expensive_resources_required=0 cannot_tell=9",
 		EE:  "theoretical=1 difficult=3 easy=5 automated_tools_available=9 cannot_tell=9",
 		ID:  "network host application cannot_tell",
-		LC:  "not_reachable no_impact minimal extensive all cannot_tell",
-		LI:  "not_reachable=1 no_impact=1 minimal_slightly_corrupt=1 minimal_seriously_corrupt=3 extensive_slightly_corrupt=5 extensive_seriously_corrupt=7 all_data_totally_corrupt=9 cannot_tell=9",
-		LAV: "not_reachable=1 no_impact=1 minimal_secondary_interrupted=1 minimal_primary_interrupted=5 extensive_secondary_interrupted=5 extensive_primary_interrupted=7 all_services_completely_lost=9 cannot_tell=9",
-		LAC: "not_reachable identified unidentified defeats_attribution cannot_tell",
+		LC:  "no_impact minimal extensive all cannot_tell",
+		LI:  "no_impact=1 minimal_slightly_corrupt=1 minimal_seriously_corrupt=3 extensive_slightly_corrupt=5 extensive_seriously_corrupt=7 all_data_totally_corrupt=9 cannot_tell=9",
+		LAV: "no_impact=1 minimal_secondary_interrupted=1 minimal_primary_interrupted=5 extensive_secondary_interrupted=5 extensive_primary_interrupted=7 all_services_completely_lost=9 cannot_tell=9",
+		LAC: "identified unidentified defeats_attribution cannot_tell",
 		FD:  "less_than_cost_to_fix=1 minor_effect_on_annual_profit=3 significant_effect_on_annual_profit=7 bankruptcy=9 cannot_tell=9",
 		RD:  "minimal_damage=1 loss_of_major_accounts=4 loss_of_goodwill=5 brand_damage=9 cannot_tell=9",
 		NC:  "minor_violation=2 clear_violation=5 high_profile_violation=7 cannot_tell=7",
 		PV:  "none=3 one_individual=3 hundreds=5 thousands=7 millions=9 cannot_tell=9",
 	}
+	var reached []string
+	for _, a := range reachability.answers {
+		reached = append(reached, fmt.Sprintf("%s=%t", a.id, a.value))
+	}
 	got := map[Factor]string{
-		M: leveled(motive), O: leveled(opportunity), EE: leveled(easeOfExploit),
+		R: strings.Join(reached, " "), M: leveled(motive), O: leveled(opportunity), EE: leveled(easeOfExploit),
 		ID: strings.Join(ids(intrusionDetection), " "), LC: strings.Join(ids(confidentiality), " "),
 		LI: leveled(integrity), LAV: leveled(availability), LAC: strings.Join(ids(accountability), " "),
 		FD: leveled(financialDamage), RD: leveled(reputationDamage), NC: leveled(nonCompliance), PV: leveled(privacyViolation),
@@ -65,11 +71,11 @@ func TestTableAnswersAndLevels(t *testing.T) {
 	}
 }
 
-// The table holds the 12 questions, each under its own factor, with its
+// The table holds the 13 questions, each under its own factor, with its
 // counter, distinct ids and cannot_tell last.
-func TestTableHoldsTheTwelveQuestions(t *testing.T) {
+func TestTableHoldsTheThirteenQuestions(t *testing.T) {
 	counters := map[Factor]string{
-		M: "motive_cannot_tell", O: "opportunity_cannot_tell", EE: "ease_of_exploit_cannot_tell",
+		R: "reachability_cannot_tell", M: "motive_cannot_tell", O: "opportunity_cannot_tell", EE: "ease_of_exploit_cannot_tell",
 		ID: "intrusion_detection_cannot_tell", LC: "confidentiality_cannot_tell", LI: "integrity_cannot_tell",
 		LAV: "availability_cannot_tell", LAC: "accountability_cannot_tell", FD: "financial_damage_cannot_tell",
 		RD: "reputation_cannot_tell", NC: "non_compliance_cannot_tell", PV: "privacy_cannot_tell",
@@ -126,7 +132,7 @@ func TestPrivacyAnswersAreTheConfigsBands(t *testing.T) {
 // The tables Go crosses the split factors' answers with, and the levels it
 // sets alone.
 func TestCrossedLevels(t *testing.T) {
-	lc := map[string][2]int{notReachableID: {2, 2}, noImpactID: {2, 2}, "minimal": {2, 6}, "extensive": {6, 7}, "all": {9, 9}, cannotTell: {9, 9}}
+	lc := map[string][2]int{noImpactID: {2, 2}, "minimal": {2, 6}, "extensive": {6, 7}, "all": {9, 9}, cannotTell: {9, 9}}
 	for id, want := range lc {
 		for column, ds := range []string{"medium", "high"} {
 			d := base()
@@ -136,7 +142,7 @@ func TestCrossedLevels(t *testing.T) {
 			}
 		}
 	}
-	lac := map[string][3]int{notReachableID: {7, 7, 1}, "identified": {7, 7, 1}, "unidentified": {9, 7, 7}, "defeats_attribution": {9, 9, 9}, cannotTell: {9, 9, 9}}
+	lac := map[string][3]int{"identified": {7, 7, 1}, "unidentified": {9, 7, 7}, "defeats_attribution": {9, 9, 9}, cannotTell: {9, 9, 9}}
 	for id, want := range lac {
 		for i, tr := range traceabilities {
 			d := base()
@@ -202,22 +208,21 @@ func belowScaleCases() []belowScale {
 	}
 	required := base()
 	required.AvailabilityRequirement = &Setting{"critical", "Zero downtime tolerance"}
-	below := []string{notReachableID, noImpactID}
+	below := []string{noImpactID}
 	return []belowScale{
 		{LC, func(a *Answers, id string) { a.LC = id }, ids(confidentiality), below, sensitive},
 		{LI, func(a *Answers, id string) { a.LI = id }, ids(integrity), below, []Deployment{base()}},
 		{LAV, func(a *Answers, id string) { a.LAV = id }, ids(availability), below, []Deployment{base(), required}},
-		{LAC, func(a *Answers, id string) { a.LAC = id }, ids(accountability), []string{notReachableID, "identified"}, traced},
+		{LAC, func(a *Answers, id string) { a.LAC = id }, ids(accountability), []string{"identified"}, traced},
 	}
 }
 
-// Not reachable and no impact, and Loss of accountability's identified, its
-// no accountability loss, are answers, not cannot_tell: read as answered and
-// counted as nothing, they take the factor's floor, Loss of accountability's
-// the lowest level its traceability column gives, under every config state
-// and adjustment. They keep or lower: no other answer,
-// an id off the list or cannot_tell gives a lower level, and cannot_tell
-// still gives the worst.
+// No impact, and Loss of accountability's identified, its no accountability
+// loss, are answers, not cannot_tell: read as answered and counted as
+// nothing, they take the factor's floor, Loss of accountability's the lowest
+// level its traceability column gives, under every config state and
+// adjustment. They keep or lower: no other answer, an id off the list or
+// cannot_tell gives a lower level, and cannot_tell still gives the worst.
 func TestBelowTheScaleAnswersTakeTheLowestLevel(t *testing.T) {
 	adjustments := []*Adjusted{nil}
 	for _, adj := range adjustedAxis {
@@ -286,10 +291,11 @@ func TestNoAccountabilityLossIsTheLowestOfItsColumn(t *testing.T) {
 }
 
 // Reachability is defined once, in the system prompt every call shares, and
-// every answer that can say the vulnerable code is not reachable says it in
-// the same words: the four technical impact questions, Opportunity and Ease
-// of exploit, each at the factor's lowest level. No question defines it
-// again.
+// asked once, by its own question, which refers to that definition: only its
+// not_reachable answer says the vulnerable code is not reachable, in the
+// definition's words. No other question or answer judges reachability, so
+// none can contradict that answer. Loss of confidentiality, integrity and
+// availability list no_impact first, Loss of accountability identified.
 func TestReachabilityIsDefinedOnceAndReadTheSameWay(t *testing.T) {
 	system, err := SystemPrompt(base())
 	if err != nil {
@@ -300,53 +306,54 @@ func TestReachabilityIsDefinedOnceAndReadTheSameWay(t *testing.T) {
 			t.Errorf("the system prompt says %q %d times, want once", part, n)
 		}
 	}
-	saying := map[Factor]string{
-		LC: notReachableID, LI: notReachableID, LAV: notReachableID, LAC: notReachableID,
-		O: "full_access_or_expensive_resources_required", EE: "theoretical",
+	if q := table[R]; !strings.HasSuffix(q.question, "as reachability is defined above?") || !strings.Contains(q.question, "{group}") {
+		t.Errorf("reachability's question: %q", q.question)
+	}
+	if got := ids(reachability); !slices.Equal(got, []string{"reachable", notReachableID, cannotTell}) {
+		t.Errorf("reachability lists %v", got)
 	}
 	for f, q := range table {
-		if strings.Contains(q.question, "reachable") {
-			t.Errorf("%s's question speaks of reachability, which the system prompt defines", f)
+		if f != R && strings.Contains(q.question, "reachab") {
+			t.Errorf("%s's question speaks of reachability, which its own question asks", f)
 		}
 		for i, text := range q.texts {
 			says := strings.Contains(text, "not reachable")
-			if says != (q.ids[i] == saying[f]) {
+			if says != (f == R && q.ids[i] == notReachableID) {
 				t.Errorf("%s %s: says not reachable: %t", f, q.ids[i], says)
 			}
-			if says && !strings.Contains(text, notReachable) {
+			if says && text != notReachableText {
 				t.Errorf("%s %s says not reachable in its own words: %q", f, q.ids[i], text)
 			}
 		}
 	}
 	for _, f := range []Factor{LC, LI, LAV, LAC} {
-		second := noImpactID
+		first := noImpactID
 		if f == LAC {
-			second = "identified"
+			first = "identified"
 		}
-		if q := table[f]; q.ids[0] != notReachableID || q.texts[0] != notReachableText || q.ids[1] != second {
-			t.Errorf("%s lists %v, want not_reachable then %s first", f, q.ids, second)
+		if q := table[f]; q.ids[0] != first || slices.Contains(q.ids, notReachableID) {
+			t.Errorf("%s lists %v, want %s first and no not_reachable", f, q.ids, first)
 		}
 	}
 	if slices.Contains(table[LAC].ids, noImpactID) {
 		t.Error("Loss of accountability lists no_impact: identified is its no accountability loss")
 	}
-	if level, _ := opportunity.read(saying[O]); level != owasp.OpportunityFullAccessOrExpensiveResourcesRequired {
-		t.Errorf("Opportunity's not-reachable answer maps to %d, want its lowest", level)
-	}
-	if level, _ := easeOfExploit.read(saying[EE]); level != owasp.EaseOfExploitTheoretical {
-		t.Errorf("Ease of exploit's not-reachable answer maps to %d, want its lowest", level)
+	for answer, want := range map[string]bool{"reachable": true, notReachableID: false, cannotTell: true, "": true, "bogus": true} {
+		if got := Reachable(answer); got != want {
+			t.Errorf("Reachable(%q) = %t, want %t", answer, got, want)
+		}
 	}
 }
 
-// cannot_tell on the four technical impact questions says only that the
-// facts do not decide between the answers listed, the two below the scale
-// included.
+// cannot_tell on reachability and the four technical impact questions says
+// only that the facts do not decide between the answers listed, not
+// reachable and no impact included.
 func TestImpactCannotTellOnlyMeansTheFactsDoNotDecide(t *testing.T) {
 	for _, f := range Order() {
 		q := table[f]
 		want := cannotTellText
 		switch f {
-		case LC, LI, LAV, LAC:
+		case R, LC, LI, LAV, LAC:
 			want = impactCannotTellText
 		case ID:
 			continue

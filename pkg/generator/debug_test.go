@@ -165,11 +165,11 @@ func TestDebugDir_OneDirectoryPerRun(t *testing.T) {
 	require.Equal(t, map[string]bool{"CVE-2024-1111": true, "CVE-2024-2222": true}, got, "each run kept its own prompts")
 }
 
-// Files are numbered per call: Motive's two-CVE call truncates and keeps its
-// prompts without a response, its halves are calls of their own, and so is
-// the ask-again for the CVE one half left out. The attestation records only
-// the calls that returned, so batch-00002 is evidence-batch-1, each found by
-// its prompt_hash.
+// Files are numbered per call: reachability's is batch-00001, then Motive's
+// two-CVE call truncates and keeps its prompts without a response, its halves
+// are calls of their own, and so is the ask-again for the CVE one half left
+// out. The attestation records only the calls that returned, so batch-00003
+// is evidence-batch-2, each found by its prompt_hash.
 func TestDebugDir_WritesOneFileSetPerCall(t *testing.T) {
 	parent := t.TempDir()
 	m := &fakeLLM{
@@ -179,7 +179,7 @@ func TestDebugDir_WritesOneFileSetPerCall(t *testing.T) {
 			}
 			return nil
 		},
-		skip: func(c fakeCall, id string) bool { return c.n == 3 && id == "CVE-2024-0001" },
+		skip: func(c fakeCall, id string) bool { return c.n == 4 && id == "CVE-2024-0001" },
 	}
 	g := newGen(t, Opts{LLM: m, BatchSize: 2, DebugDir: parent})
 	at := attestation.NewBuilder(attestation.Opts{Provider: "mock", Model: "mock"})
@@ -190,7 +190,7 @@ func TestDebugDir_WritesOneFileSetPerCall(t *testing.T) {
 	require.Len(t, dirs, 1)
 	dir := dirs[0]
 	calls := 4 + len(questionsUndeclared) - 1
-	require.Equal(t, fileSets(calls, 1), fileNames(t, dir), "the truncated call returned nothing, so it has no response")
+	require.Equal(t, fileSets(calls, 2), fileNames(t, dir), "the truncated call returned nothing, so it has no response")
 
 	asked := func(call int) []any {
 		var ids []any
@@ -199,17 +199,21 @@ func TestDebugDir_WritesOneFileSetPerCall(t *testing.T) {
 		}
 		return ids
 	}
-	require.Equal(t, []any{"CVE-2024-0000", "CVE-2024-0001"}, asked(1), "the call the provider truncated")
-	require.Equal(t, []any{"CVE-2024-0000"}, asked(2))
-	require.Equal(t, []any{"CVE-2024-0001"}, asked(3))
-	require.NotContains(t, debugFile(t, dir, 3, "response"), "CVE-2024-0001", "the model skipped it")
-	require.Equal(t, []any{"CVE-2024-0001"}, asked(4), "asked again on its own")
-	require.Equal(t, debugFile(t, dir, 3, "human.prompt"), debugFile(t, dir, 4, "human.prompt"), "the ask-again repeats its prompt word for word")
+	require.Equal(t, []any{"CVE-2024-0000", "CVE-2024-0001"}, asked(1), "reachability's call")
+	require.Equal(t, []any{"CVE-2024-0000", "CVE-2024-0001"}, asked(2), "the call the provider truncated")
+	require.Equal(t, []any{"CVE-2024-0000"}, asked(3))
+	require.Equal(t, []any{"CVE-2024-0001"}, asked(4))
+	require.NotContains(t, debugFile(t, dir, 4, "response"), "CVE-2024-0001", "the model skipped it")
+	require.Equal(t, []any{"CVE-2024-0001"}, asked(5), "asked again on its own")
+	require.Equal(t, debugFile(t, dir, 4, "human.prompt"), debugFile(t, dir, 5, "human.prompt"), "the ask-again repeats its prompt word for word")
 
 	evidence := attestedCalls(t, at)
 	require.Len(t, evidence, calls-1, "the truncated call is not attested")
 	for i := range evidence {
-		call := i + 2
+		call := i + 1
+		if i > 0 {
+			call++
+		}
 		sum := sha256.Sum256([]byte(debugFile(t, dir, call, "system.prompt") + "\n\n" + debugFile(t, dir, call, "human.prompt")))
 		require.Equalf(t, hex.EncodeToString(sum[:]), evidence[i].promptHash, "%s is evidence-batch-%d", debugName(call), i+1)
 		require.Equalf(t, debugFile(t, dir, call, "response"), evidence[i].rawResponse, "%s.response is the raw reply", debugName(call))
@@ -289,10 +293,17 @@ func TestDebugDir_WriteFailureLogsTheFile(t *testing.T) {
 
 type answersJSON struct {
 	Vulnerabilities []struct {
-		VulnID     string `json:"vulnId"`
-		Unrated    bool   `json:"unrated"`
-		Adjustment string `json:"adjustment"`
-		Factors    []struct {
+		VulnID       string `json:"vulnId"`
+		Unrated      bool   `json:"unrated"`
+		Adjustment   string `json:"adjustment"`
+		Reachability *struct {
+			Factor  string `json:"factor"`
+			Answer  any    `json:"answer"`
+			Reading string `json:"reading"`
+			Level   *int   `json:"level"`
+			Source  string `json:"source"`
+		} `json:"reachability"`
+		Factors []struct {
 			Factor   string `json:"factor"`
 			Answer   any    `json:"answer"`
 			Reading  string `json:"reading"`
@@ -317,10 +328,11 @@ func readAnswers(t *testing.T, parent string) (answersJSON, string) {
 	return got, string(b)
 }
 
-// answers.json holds, per CVE and factor in the vector's order, the answer as
-// replied, how Go read it, the adjustment's answer, the level and where it
-// came from; the counters per CVE and summed; and no reasoning, nor CVE text
-// but what an answer off its list holds, kept verbatim.
+// answers.json holds, per CVE, its reachability answer and how Go read it,
+// and per factor in the vector's order, the answer as replied, how Go read
+// it, the adjustment's answer, the level and where it came from; the counters
+// per CVE and summed; and no reasoning, nor CVE text but what an answer off
+// its list holds, kept verbatim.
 func TestDebugDir_AnswersJSON(t *testing.T) {
 	parent := t.TempDir()
 	cfg := fullConfig()
@@ -370,15 +382,20 @@ func TestDebugDir_AnswersJSON(t *testing.T) {
 		"A":   "<nil>|||9|constant",
 		"ID":  "[network]|answered||8|answer",
 		"LC":  "<nil>|||2|floor",
-		"LI":  "not_reachable|answered|affected|1|answer",
+		"LI":  "no_impact|answered|affected|1|answer",
 		"LAV": "extensive_primary_interrupted|answered|not_affected|1|adjustment",
-		"LAC": "not_reachable|answered||1|answer",
+		"LAC": "identified|answered||1|answer",
 		"FD":  "less_than_cost_to_fix|answered||1|answer",
 		"RD":  "minimal_damage|answered||1|answer",
 		"NC":  "minor_violation|answered||2|answer",
 		"PV":  "<nil>|||3|floor",
 	}, first)
 	assert.Empty(t, got.Vulnerabilities[0].Counters)
+	r := got.Vulnerabilities[0].Reachability
+	require.NotNil(t, r)
+	assert.Equal(t, []any{"R", "reachable", "answered"}, []any{r.Factor, r.Answer, r.Reading})
+	assert.Nil(t, r.Level, "reachability is no factor: no level")
+	assert.Empty(t, r.Source)
 
 	second := got.Vulnerabilities[1]
 	for _, f := range second.Factors {
@@ -400,7 +417,7 @@ func TestDebugDir_AnswersJSON(t *testing.T) {
 
 // A failed run writes answers.json too: the CVEs rated before it stopped,
 // and, unrated, each CVE of the failing batch it read an answer for, with the
-// answers it read and the cannot_tell they count.
+// answers it read, reachability's apart, and the cannot_tell they count.
 func TestDebugDir_AnswersJSONOnAFailedRun(t *testing.T) {
 	parent := t.TempDir()
 	m := &fakeLLM{
@@ -410,7 +427,7 @@ func TestDebugDir_AnswersJSONOnAFailedRun(t *testing.T) {
 			}
 			return nil
 		},
-		skip: func(_ fakeCall, id string) bool { return id == "CVE-2024-0003" },
+		skip: func(c fakeCall, id string) bool { return c.factor == contract.M && id == "CVE-2024-0003" },
 	}
 	g := newGen(t, Opts{LLM: m, BatchSize: 2, DebugDir: parent})
 	logs := withCapturedLogs(t)
@@ -421,10 +438,15 @@ func TestDebugDir_AnswersJSONOnAFailedRun(t *testing.T) {
 	for _, v := range got.Vulnerabilities {
 		ids = append(ids, fmt.Sprintf("%s unrated:%t", v.VulnID, v.Unrated))
 	}
-	assert.Equal(t, []string{"CVE-2024-0000 unrated:false", "CVE-2024-0001 unrated:false", "CVE-2024-0002 unrated:true"}, ids,
-		"CVE-2024-0003, never answered, has no entry")
+	assert.Equal(t, []string{"CVE-2024-0000 unrated:false", "CVE-2024-0001 unrated:false", "CVE-2024-0002 unrated:true",
+		"CVE-2024-0003 unrated:true"}, ids)
+	never := got.Vulnerabilities[3]
+	assert.Empty(t, never.Factors, "CVE-2024-0003 was answered reachability alone")
+	require.NotNil(t, never.Reachability)
+	assert.Equal(t, []any{"R", "reachable", "answered"}, []any{never.Reachability.Factor, never.Reachability.Answer, never.Reachability.Reading})
 	unrated := got.Vulnerabilities[2]
-	require.Len(t, unrated.Factors, 1, "Motive, the one question the failing batch was answered")
+	require.NotNil(t, unrated.Reachability)
+	require.Len(t, unrated.Factors, 1, "Motive, the one factor's question the failing batch was answered")
 	f := unrated.Factors[0]
 	assert.Equal(t, []any{"M", cannotTell, "cannot_tell"}, []any{f.Factor, f.Answer, f.Reading})
 	assert.Nil(t, f.Level, "an unrated CVE has no level")

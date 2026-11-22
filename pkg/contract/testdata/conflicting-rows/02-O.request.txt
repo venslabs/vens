@@ -17,7 +17,7 @@ ANSWERS
 - no_access_or_resources_required: No access or resources required: from where they already are, they can reach and trigger the vulnerable code in this deployment.
 - some_access_or_resources_required: Some access or resources required: something most of them can obtain, such as an ordinary account, an action by a user of the service, or a common setting.
 - special_access_or_resources_required: Special access or resources required: something few of them have, such as a privileged account, a foothold on the host, or a feature or role this deployment does not have by default.
-- full_access_or_expensive_resources_required: Full access or expensive resources required: full control of the host, physical access, or resources few attackers have; also when the facts given show that the vulnerable code is not reachable in this deployment, as defined above.
+- full_access_or_expensive_resources_required: Full access or expensive resources required: full control of the host, physical access, or resources few attackers have.
 - cannot_tell: The facts given do not say.
 
 Answer every vulnerability listed above once, by its vulnId, with one answer id from ANSWERS.
