@@ -37,11 +37,6 @@ context:
   controls: {...}
   notes: string
   audit_requirement: string  # moves no score
-
-reachability:                # optional, publishes a VEX status
-  - cve: string              # or component: string
-    reachable: boolean
-    provenance: string
 ```
 
 `data_subjects`, `detection` and `traceability` are optional, but each one left out takes the fallback its section states: vens warns at load, counts each use in the run summary, and `--strict` refuses the run. Declare them. See the **[fully declared file](#fully-declared-file)**.
@@ -255,7 +250,7 @@ notes: |
   runs as non-root. Secrets from AWS Secrets Manager.
 ```
 
-Shown to the model in every call, with the rest of the deployment. A reachability verdict written here publishes no VEX status, and no question asks whether a CVE is reachable: declare it under [`reachability`](#reachability).
+Shown to the model in every call, with the rest of the deployment. vens does not handle reachability: no question asks whether a CVE is reachable and vens publishes no VEX status, so a verdict written here reaches the rating only through the model's other answers.
 
 ### `context.audit_requirement`
 
@@ -266,43 +261,6 @@ Since v0.7.0, moves no score and no call sends it. It states a requirement, not 
 | `low` | Basic logging |
 | `medium` | Audit trail required |
 | `high` | Forensic-grade, immutable logging |
-
----
-
-## `reachability`
-
-Optional. Declarations of whether a CVE's vulnerable code is reachable in this deployment, each with where it comes from. vens carries them into the VEX; it does not judge them, they move no score, and no question asks the model whether a CVE is reachable.
-
-| Field | Type | Required | Description |
-|---|---|:---:|---|
-| `cve` | string | one of the two | A vulnerability id, matched without regard to case. |
-| `component` | string | one of the two | A package name as the scanner names it, matched without regard to case; never a package id or a BOM-Ref. |
-| `reachable` | boolean | ✅ | `false` declares the code not reachable; `true` declares it reachable. |
-| `provenance` | string | for `reachable: false` | Where the declaration comes from, such as a tool run or a review. The VEX's `detail` cites it. An entry declaring `reachable: true` without one still vetoes, and vens reports it unresolved. |
-
-An entry declaring a CVE not reachable hits it when its `cve` is the CVE's id, or when its `component` is the package name of every row the scan lists for that CVE: a component on one package of a CVE found on two does not hit it, nor does any component when a row has no package name. Hit, and with no entry declaring the CVE reachable, by its id or by any of its packages, the VEX gives the CVE:
-
-```json
-"analysis": {
-  "state": "not_affected",
-  "justification": "code_not_reachable",
-  "detail": "Declared not reachable by config.yaml reachability[0] (cve: CVE-2024-24790). Provenance: govulncheck run of 2026-11-20, no call path from main"
-}
-```
-
-The rating stays the one the answers give: no level is lowered and no severity capped. An entry declaring the CVE reachable vetoes the status: none is published, and vens warns. Silence publishes nothing. vens reads no upstream VEX.
-
-```yaml
-reachability:
-  - cve: CVE-2024-24790
-    reachable: false
-    provenance: "govulncheck run of 2026-11-20, no call path from main"
-  - component: libssl3
-    reachable: true
-    provenance: "pentest report 2026-10, TLS handshake reaches it"
-```
-
-Each entry gives exactly one selector, `cve` or `component`, `reachable` written `true` or `false`, and, declaring `reachable: false`, a `provenance` that is not blank; anything else is refused (E6), and a key other than the four is refused as unknown (E3).
 
 ---
 
@@ -320,9 +278,9 @@ The file is refused when:
 - `project.name` is empty;
 - `context.exposure`, `context.data_sensitivity` or `context.business_criticality` is missing or not one of its values;
 - an optional field has a value off its list, or `compliance_requirements` names an unknown framework;
-- one of E1 to E6 below applies. vens checks `schema_version` first, so a file written for another schema gets E1 or E2 and no other error.
+- one of E1 to E5 below applies. vens checks `schema_version` first, so a file written for another schema gets E1 or E2 and no other error.
 
-E1 to E6 and W1 to W5 are labels on this page; the messages do not print them.
+E1 to E5 and W1 to W5 are labels on this page; the messages do not print them.
 
 ### E1: no schema_version
 
@@ -358,7 +316,7 @@ A key that schema 2 does not have, with its line and where it sits. A misspelled
 config.yaml line 10: unknown key `tracability` under context
 ```
 
-A key outside `project`, `context` and `reachability` reads `at the top level` instead of `under context`; a key of a `reachability` entry other than its four reads `under reachability[0]`, with the entry's place.
+A key outside `project` and `context` reads `at the top level` instead of `under context`. `reachability:` is one: vens reads no reachability declaration.
 
 ### E4: listener, data_subjects or traceability
 
@@ -407,36 +365,6 @@ context.detection.network: active_in_application applies to application only
 ```
 
 A channel's value off its list, or a channel written as a list or a mapping, gets E4's form for `context.detection.network`, `host` or `application`.
-
-### E6: reachability
-
-Written with no value, or as anything but a list:
-
-```text
-reachability must be a list of entries, got a mapping
-```
-
-An entry with no selector, or with both:
-
-```text
-reachability[0] gives no selector: write cve or component
-```
-
-```text
-reachability[1] gives both cve and component: an entry has one selector
-```
-
-`reachable` left out, or written as anything but `true` or `false`:
-
-```text
-reachability[0].reachable must be true or false, got no
-```
-
-`provenance` left out or blank on an entry declaring `reachable: false`, or a selector or provenance that is not a string:
-
-```text
-reachability[0].provenance is required: say where the assertion comes from
-```
 
 ### Warnings
 
@@ -557,7 +485,6 @@ What each schema-1 key does once `schema_version: 2` is added and nothing else:
 | `data_subjects` (new) | left out, nothing caps Privacy violation; W5 | declare the band |
 | `detection` (new) | left out, Intrusion detection is 9 on every finding; W2 or W4 | declare the three channels |
 | `traceability` (new) | left out, Loss of accountability takes the `none` column, 7 or 9; W1 or W3 | declare it |
-| `reachability` (new) | left out, no VEX status is published | declare a CVE not reachable, with its provenance, where a tool or a review shows it |
 
 Declaring the worst case (`traceability: none`, every channel `not_logged`, `data_subjects: millions`) gives the same levels as leaving the field out, without the warning or the counter, and passes the config check of `--strict`.
 

@@ -1,0 +1,48 @@
+# vens reads no reachability declaration: a config with a top-level
+# reachability key is refused at load as an unknown key (E3), naming the key
+# and its line, before any LLM call, so that no run, debug file or VEX is
+# written.
+! exec vens generate --llm=mock --debug-dir=dbg --config-file=config.yaml --sbom-serial-number=urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79 report.json out.cdx.json
+stderr 'config.yaml line 8: unknown key `reachability` at the top level'
+! stderr 'Scoring run finished'
+! exists dbg
+! exists out.cdx.json
+
+-- config.yaml --
+schema_version: 2
+project:
+  name: "reachability-refused"
+context:
+  exposure: "internet"
+  data_sensitivity: "high"
+  business_criticality: "critical"
+reachability:
+  - cve: CVE-2024-1111
+    reachable: false
+    provenance: "call graph review"
+-- report.json --
+{
+  "SchemaVersion": 2,
+  "CreatedAt": "2026-06-11T10:00:00Z",
+  "ArtifactName": "demo",
+  "ArtifactType": "container_image",
+  "Results": [
+    {
+      "Target": "demo (debian 12)",
+      "Class": "os-pkgs",
+      "Type": "debian",
+      "Vulnerabilities": [
+        {
+          "VulnerabilityID": "CVE-2024-1111",
+          "PkgName": "openssl",
+          "InstalledVersion": "3.0.11",
+          "Severity": "HIGH",
+          "Title": "openssl: heap corruption on a crafted request",
+          "Description": "A crafted request corrupts the heap of the server that parses it.",
+          "CVSS": { "nvd": { "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H", "V3Score": 9.8 } },
+          "PkgIdentifier": { "PURL": "pkg:deb/debian/openssl@3.0.11" }
+        }
+      ]
+    }
+  ]
+}

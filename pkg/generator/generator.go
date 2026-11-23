@@ -104,10 +104,7 @@ type Generator struct {
 	// system prompt every call of the run shares.
 	deployment contract.Deployment
 	system     string
-	// reachability is the config's reachability entries, checked and
-	// trimmed.
-	reachability []riskconfig.ReachabilityEntry
-	attestor     *attestation.Builder
+	attestor   *attestation.Builder
 	// debugRunDir is this run's own directory under Opts.DebugDir, empty
 	// when debug files are off.
 	debugRunDir string
@@ -117,10 +114,8 @@ type Generator struct {
 }
 
 // New creates a Generator. It refuses a config the questions cannot be
-// asked in, a reachability entry with no selector or two, or asserting
-// unreachability without a provenance, and, for a strict run, a config that
-// leaves a field Go reads undeclared, so that nothing is spent on a run that
-// cannot finish.
+// asked in and, for a strict run, one that leaves a field Go reads
+// undeclared, so that nothing is spent on a run that cannot finish.
 func New(o Opts) (*Generator, error) {
 	if o.LLM == nil {
 		return nil, errors.New("no model")
@@ -130,10 +125,6 @@ func New(o Opts) (*Generator, error) {
 	}
 	d := deploymentOf(o.Config)
 	system, err := contract.SystemPrompt(d)
-	if err != nil {
-		return nil, fmt.Errorf("config: %w", err)
-	}
-	reachability, err := riskconfig.CheckReachability(o.Config.Reachability)
 	if err != nil {
 		return nil, fmt.Errorf("config: %w", err)
 	}
@@ -151,7 +142,7 @@ func New(o Opts) (*Generator, error) {
 	if o.RetryOnRateLimit == 0 {
 		o.RetryOnRateLimit = DefaultRetryOnRateLimit
 	}
-	g := &Generator{o: o, deployment: d, system: system, reachability: reachability}
+	g := &Generator{o: o, deployment: d, system: system}
 	if o.DebugDir != "" {
 		g.debugRunDir = newDebugRunDir(o.DebugDir)
 	}

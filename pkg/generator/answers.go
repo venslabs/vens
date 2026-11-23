@@ -20,22 +20,20 @@ import (
 	"encoding/json"
 	"log/slog"
 
-	"github.com/CycloneDX/cyclonedx-go"
 	"github.com/venslabs/vens/pkg/contract"
 	"github.com/venslabs/vens/pkg/cvss"
 	"github.com/venslabs/vens/pkg/owasp"
 )
 
 // answersFile is answers.json, which --debug-dir gets once per run: per CVE,
-// how its adjustment read, what the config's reachability entries declare of
-// it, and per factor, the answer as the reply gave it and how Go read it, the
-// level and where it came from; the counters, per CVE and summed over the
-// run; and the run summary's defects, each kind found with its total, {} when
-// the replies held none. A failed run also lists, unrated, the CVEs of its
-// failing batch it read answers for, and the defects counted before it
-// stopped. It holds no reasoning and no CVE text Go sent, but keeps each
-// answer verbatim: one off its list is the model's own text, which may quote
-// the CVE's.
+// how its adjustment read, and per factor, the answer as the reply gave it
+// and how Go read it, the level and where it came from; the counters, per
+// CVE and summed over the run; and the run summary's defects, each kind found
+// with its total, {} when the replies held none. A failed run also lists,
+// unrated, the CVEs of its failing batch it read answers for, and the defects
+// counted before it stopped. It holds no reasoning and no CVE text Go sent,
+// but keeps each answer verbatim: one off its list is the model's own text,
+// which may quote the CVE's.
 type answersFile struct {
 	Vulnerabilities []answersEntry `json:"vulnerabilities"`
 	Counters        map[string]int `json:"counters"`
@@ -52,25 +50,10 @@ type answersEntry struct {
 	// Adjustment is how the adjustment reply read: not_asked, answered,
 	// unreadable or key_written_twice.
 	Adjustment adjustmentReading `json:"adjustment"`
-	// Declared is what the config's reachability entries declare of a rated
-	// CVE, absent when none hits it.
-	Declared *declaredRecord `json:"declared,omitempty"`
 	// Factors holds the 16 in the vector's order; an unrated entry, only the
 	// questions answered, in call order.
 	Factors  []factorRecord `json:"factors"`
 	Counters []string       `json:"counters,omitempty"`
-}
-
-// declaredRecord lists, by their index in the config, the reachability
-// entries that hit a CVE, those asserting it unreachable and those asserting
-// it reachable apart, those of the second without a provenance, which leave
-// the declaration unresolved, and the VEX status they publish, absent when
-// an entry asserting reachability vetoes it.
-type declaredRecord struct {
-	Unreachable []int                            `json:"unreachable,omitempty"`
-	Reachable   []int                            `json:"reachable,omitempty"`
-	Unresolved  []int                            `json:"unresolved,omitempty"`
-	Analysis    *cyclonedx.VulnerabilityAnalysis `json:"analysis,omitempty"`
 }
 
 type factorRecord struct {
@@ -107,9 +90,6 @@ func (run *scoringRun) rated(c *cve, a *assessment, l contract.Levels) {
 	}
 	levels := vectorLevels(l.Vector)
 	e := answersEntry{VulnID: c.id(), Adjustment: cmp.Or(a.adjustment, adjustmentNotAsked), Counters: counters}
-	if d := c.declared; len(d.unreachable)+len(d.reachable) > 0 {
-		e.Declared = &declaredRecord{Unreachable: d.unreachable, Reachable: d.reachable, Unresolved: d.unresolved, Analysis: d.analysis()}
-	}
 	for _, f := range vectorOrder {
 		level := levels[f]
 		r := factorRecord{Factor: f, Reading: l.Readings[f], Level: &level, Source: l.Sources[f]}

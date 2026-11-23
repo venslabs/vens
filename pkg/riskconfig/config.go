@@ -49,9 +49,6 @@ type Config struct {
 	SchemaVersion int           `yaml:"schema_version"`
 	Project       ProjectConfig `yaml:"project"`
 	Context       ContextHints  `yaml:"context"`
-	// Reachability lists the declarations of reachability, in their order.
-	// They publish a VEX status and move no score.
-	Reachability []ReachabilityEntry `yaml:"reachability,omitempty"`
 }
 
 // ProjectConfig names the deployment in every question's deployment block.
@@ -184,9 +181,6 @@ func Parse(b []byte) (*Config, error) {
 	if err := checkKnownKeys(root, reflect.TypeFor[Config](), ""); err != nil {
 		return nil, err
 	}
-	if err := checkReachability(root); err != nil {
-		return nil, err
-	}
 	var decoded Config
 	dec := yaml.NewDecoder(bytes.NewReader(b))
 	dec.KnownFields(true)
@@ -228,11 +222,6 @@ func (c Config) validated() (Config, error) {
 	if err := n.Context.checkSchema2Values(); err != nil {
 		return Config{}, err
 	}
-	reachability, err := CheckReachability(c.Reachability)
-	if err != nil {
-		return Config{}, err
-	}
-	n.Reachability = reachability
 	return n, nil
 }
 

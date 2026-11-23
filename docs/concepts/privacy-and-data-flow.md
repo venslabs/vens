@@ -16,7 +16,7 @@
 | CVSS vectors | ✅ Some metrics: `AV`, `AT`, `PR`, `UI` to the Opportunity question, `AC`, `AT`, `PR`, `UI` to Ease of exploit; the full vectors, with each source's severity, only in a flagged CVE's adjustment | ❌ No |
 | `config.yaml` fields shown in every call: `project.name`, `project.description`, `exposure`, `listener` (when `present` or `absent`), `notes` | ✅ Yes — **including the `notes` field verbatim** | ❌ No |
 | `config.yaml` fields shown to the questions they concern: `business_criticality`, `data_sensitivity`, `compliance_requirements`, and the `waf`, `ddos_protection`, `segmentation`, `zero_trust` and `antivirus` controls set to `true` | ✅ Yes | ❌ No |
-| `config.yaml` fields vens reads alone: `data_subjects`, `detection`, `traceability`, `reachability`; and `audit_requirement`, `availability_requirement` and the `ids`, `siem`, `edr` controls, which move no score | ❌ Never | ❌ No |
+| `config.yaml` fields vens reads alone: `data_subjects`, `detection`, `traceability`; and `audit_requirement`, `availability_requirement` and the `ids`, `siem`, `edr` controls, which move no score | ❌ Never | ❌ No |
 | Your scanner report file as a whole | ❌ No — only the fields above are extracted | ❌ No |
 | SBOM contents beyond vulnerability metadata | ❌ No | ❌ No |
 | Source code, credentials, filesystem contents | ❌ Never | ❌ Never |

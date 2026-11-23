@@ -154,11 +154,10 @@ func (c *cycloneDxVexWriter) Close() error {
 		}
 
 		vulnMap[g.VulnID] = &cyclonedx.Vulnerability{
-			ID:       g.VulnID,
-			Source:   g.Source,
-			Ratings:  &[]cyclonedx.VulnerabilityRating{g.Rating},
-			Analysis: g.Analysis,
-			Affects:  &[]cyclonedx.Affects{{Ref: bomLink}},
+			ID:      g.VulnID,
+			Source:  g.Source,
+			Ratings: &[]cyclonedx.VulnerabilityRating{g.Rating},
+			Affects: &[]cyclonedx.Affects{{Ref: bomLink}},
 		}
 		affectsSet[g.VulnID] = map[string]bool{bomLink: true}
 	}

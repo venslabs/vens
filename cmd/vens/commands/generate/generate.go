@@ -70,12 +70,7 @@ A CVE whose description says it is disputed or not a security issue, or that the
 while NVD rates it high or critical, is flagged: one more call, the adjustment, when it has a field
 left to ask, may lower the Opportunity of a CVE with a description and, through a confidentiality
 question, Privacy violation, even below these fallbacks, and no other level. The adjustment's
-cannot_tell keeps the baseline: it is not counted and does not fail a --strict run.
-
-The config's reachability entries are the only source of a VEX status: an entry declaring a CVE not
-reachable, by its id or by a component naming every package the scan lists for it, publishes it
-not_affected, code_not_reachable, with a detail citing the entry, unless an entry declaring it
-reachable vetoes it. The rating is computed as for any other CVE.`,
+cannot_tell keeps the baseline: it is not counted and does not fail a --strict run.`,
 		Example:               Example(),
 		Args:                  cobra.ExactArgs(2),
 		RunE:                  action,

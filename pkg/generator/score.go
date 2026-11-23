@@ -221,10 +221,9 @@ func (g *Generator) askBatch(ctx context.Context, run *scoringRun, batch []*cve,
 }
 
 // rate computes a CVE's 16 levels and their rating, records them for the run,
-// and returns one rating per row, each with its attestation claim and the
-// VEX status the config declares, which leaves the rating as computed. A
-// vector off the calculator's levels stops the run: the rules' tests keep
-// that from happening.
+// and returns one rating per row, each with its attestation claim. A vector
+// off the calculator's levels stops the run: the rules' tests keep that from
+// happening.
 func (g *Generator) rate(ctx context.Context, run *scoringRun, c *cve, a *assessment) ([]outputhandler.VulnRating, error) {
 	levels, err := contract.Compute(g.deployment, c.in, a.answers, a.adjusted)
 	if err != nil {
@@ -236,11 +235,6 @@ func (g *Generator) rate(ctx context.Context, run *scoringRun, c *cve, a *assess
 	}
 	run.rated(c, a, levels)
 	reasoning := a.reasoning(levels.Readings)
-	analysis := c.declared.analysis()
-	if analysis != nil {
-		slog.InfoContext(ctx, "Declared not reachable; the VEX publishes it not_affected, code_not_reachable, with its rating",
-			"vuln", c.id(), "entries", c.declared.selectors(c.declared.unreachable))
-	}
 	out := make([]outputhandler.VulnRating, 0, len(c.rows))
 	for _, v := range c.rows {
 		slog.InfoContext(ctx, "Scored vulnerability",
@@ -250,7 +244,7 @@ func (g *Generator) rate(ctx context.Context, run *scoringRun, c *cve, a *assess
 			"severity", rating.Severity,
 			"vector", rating.Vector,
 		)
-		out = append(out, vulnRating(c.id(), v, rating, analysis))
+		out = append(out, vulnRating(c.id(), v, rating))
 		if g.attestor != nil {
 			g.attestor.AddClaim(a.evidence, attestation.ClaimInput{
 				VulnID:      c.id(),
@@ -267,7 +261,7 @@ func (g *Generator) rate(ctx context.Context, run *scoringRun, c *cve, a *assess
 	return out, nil
 }
 
-func vulnRating(id string, v Vulnerability, r owasp.Rating, analysis *cyclonedx.VulnerabilityAnalysis) outputhandler.VulnRating {
+func vulnRating(id string, v Vulnerability, r owasp.Rating) outputhandler.VulnRating {
 	source := vuln.Source(id)
 	if v.SourceName != "" {
 		source = &cyclonedx.Source{Name: v.SourceName, URL: v.SourceURL}
@@ -282,7 +276,6 @@ func vulnRating(id string, v Vulnerability, r owasp.Rating, analysis *cyclonedx.
 			Severity: cyclonedx.Severity(r.Severity),
 			Vector:   r.Vector,
 		},
-		Source:   source,
-		Analysis: analysis,
+		Source: source,
 	}
 }

@@ -31,8 +31,6 @@ type cve struct {
 	// in is the CVE as the questions read it, every row's evidence kept.
 	in     contract.CVE
 	impact cvss.Impact
-	// declared is what the config's reachability entries say of it.
-	declared declaration
 	// flags are the flags its rows raised, each with its evidence and its
 	// row's package; a CVE with none gets no adjustment.
 	flags []contract.Flag
@@ -57,8 +55,8 @@ func (c *cve) counters(l contract.Levels) []string {
 }
 
 // plan groups the rows by CVE and reads, for each CVE, what its CVSS v3
-// vectors give the three technical impacts, what the config's reachability
-// entries declare of it, the flags of every row, and the questions it gets.
+// vectors give the three technical impacts, the flags of every row, and the
+// questions it gets.
 // A flag the adjustment would refuse, such as one whose evidence its row
 // cannot quote, stops the run here, before any call is paid.
 func (g *Generator) plan(ctx context.Context, vulns []Vulnerability) ([]*cve, error) {
@@ -71,18 +69,6 @@ func (g *Generator) plan(ctx context.Context, vulns []Vulnerability) ([]*cve, er
 			impact:           CVEImpact(rows),
 			flags:            rowFlags(rows),
 			contestUnchecked: CVEFlags(rows).SeverityContestedUnavailable,
-		}
-		c.declared = declared(g.reachability, c.in)
-		if c.declared.vetoed() {
-			slog.WarnContext(ctx, "Reachability entries disagree; one asserting reachability vetoes the status, so none is published",
-				"vuln", c.id(),
-				"unreachable", c.declared.selectors(c.declared.unreachable),
-				"reachable", c.declared.selectors(c.declared.reachable),
-			)
-		}
-		if len(c.declared.unresolved) > 0 {
-			slog.WarnContext(ctx, "Reachability entry without provenance; it vetoes any status, and the declaration is unresolved",
-				"vuln", c.id(), "entries", c.declared.selectors(c.declared.unresolved))
 		}
 		if len(c.flags) > 0 {
 			if err := contract.CheckFlags(c.flags, c.in); err != nil {

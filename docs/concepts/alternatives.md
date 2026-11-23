@@ -28,7 +28,7 @@ Vens is **not** a scanner. It has no CVE database, no package detection, no SBOM
 - **Use vexctl when:** you have a small, known set of CVEs and a human security engineer ready to assert status per CVE. The decisions are authored by people and auditable by name.
 - **Use Vens when:** you have hundreds of CVEs per scan, no one has time to write one VEX entry per finding, and you want "prioritize by contextual risk" rather than "assert binary not_affected/affected".
 
-Vens decides no status on its own. It publishes `not_affected`, `code_not_reachable`, only where you declare a CVE not reachable as a [`reachability`](../reference/config-schema.md#reachability) entry of `config.yaml`, with where that comes from, and it keeps the CVE's rating beside the status; an entry declaring the CVE reachable vetoes it. The two are not mutually exclusive: you can use Vens to rank, triage the top N, and then hand-write vexctl assertions, or `reachability` entries, for the handful you decide to formally suppress.
+Vens publishes no status: no `not_affected`, from a config entry, an upstream VEX, a note or an answer. The two are not mutually exclusive: you can use Vens to rank, triage the top N, and then hand-write vexctl assertions for the handful you decide to formally suppress.
 
 ---
 
@@ -37,7 +37,7 @@ Vens decides no status on its own. It publishes `not_affected`, `code_not_reacha
 **[vexllm](https://github.com/AkihiroSuda/vexllm)** (now archived) — an LLM-based tool that marked CVEs as `not_affected` in OpenVEX format.
 
 - vexllm outputs a binary **affected / not_affected** per CVE — yes/no suppression.
-- Vens outputs an **OWASP Risk Rating** per CVE: the 16 factor levels, the severity from OWASP's likelihood × impact matrix, and a score on a 0–81 scale to rank CVEs within a severity. Its only status is the `not_affected` you declare in `config.yaml`; no model answer sets one.
+- Vens outputs an **OWASP Risk Rating** per CVE: the 16 factor levels, the severity from OWASP's likelihood × impact matrix, and a score on a 0–81 scale to rank CVEs within a severity, and no status.
 
 They answer different questions. vexllm answers "should I hide this CVE?"; Vens answers "how urgent is it compared to the others?". vexllm is now archived and unmaintained: for anything you set up today Vens is the maintained path, and if you need a prioritized patch queue and CI gating by contextual risk it is also the closer fit.
 
@@ -72,7 +72,7 @@ Use SSVC when you want a transparent, table-driven decision category. Use Vens w
 
 Trivy and Grype both accept `--vex <file>` on the command line. They use it to apply `not_affected` states from an OpenVEX document onto the scanner output.
 
-- **This is complementary to Vens**, not an alternative. It is also not the way to read Vens' output back: Vens emits a CycloneDX VEX with OWASP ratings, which `--vex` does not read, and an `analysis` state only for a CVE a `reachability` entry declares not reachable. Use `vens enrich` on the Trivy JSON, or Dependency-Track 5.1+. See [Prioritize a CVE backlog → Step 5](../guides/prioritize-cves.md#step-5-feed-the-scores-back-to-your-tools).
+- **This is complementary to Vens**, not an alternative. It is also not the way to read Vens' output back: Vens emits a CycloneDX VEX with OWASP ratings and no `analysis` state, so `--vex` has nothing to apply. Use `vens enrich` on the Trivy JSON, or Dependency-Track 5.1+. See [Prioritize a CVE backlog → Step 5](../guides/prioritize-cves.md#step-5-feed-the-scores-back-to-your-tools).
 
 ---
 
@@ -83,7 +83,7 @@ Trivy and Grype both accept `--vex <file>` on the command line. They use it to a
 - **Use reachability tools when:** you can afford them, you can run them on your codebase, and you need authoritative answers about whether a CVE is exploitable in *this* build.
 - **Use Vens when:** reachability analysis is out of reach (budget, closed source, polyglot stack, or early evaluation) and you still want a context-aware prioritization, different from raw CVSS.
 
-Record a reachability scan's conclusions as [`reachability`](../reference/config-schema.md#reachability) entries of `config.yaml`, each with its provenance: a CVE declared not reachable, by its id or by a component naming every package the scan lists for it, is published `not_affected`, `code_not_reachable`, with a `detail` citing the entry, and keeps its rating; an entry declaring it reachable vetoes that. Vens judges none of them. Pasted into `notes`, the same conclusions reach only the model's other answers and publish no status, and the likelihood never falls below MEDIUM (see [Limitations](limitations.md)).
+Vens does not handle reachability: no question asks it, and it publishes no status from a reachability scan's conclusions. Pasted into `config.yaml` `notes`, they reach only the model's other answers, nothing makes the model treat them as ground truth, and the likelihood never falls below MEDIUM (see [Limitations](limitations.md)).
 
 ---
 

@@ -32,7 +32,4 @@ type VulnRating struct {
 	BOMRef string
 	Rating cyclonedx.VulnerabilityRating
 	Source *cyclonedx.Source
-	// Analysis is the vulnerability's VEX status, nil when it publishes none.
-	// Every rating of one vulnerability carries the same.
-	Analysis *cyclonedx.VulnerabilityAnalysis
 }

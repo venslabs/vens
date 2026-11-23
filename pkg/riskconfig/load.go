@@ -37,8 +37,7 @@ const migrating = "https://venslabs.github.io/vens/reference/config-schema/#migr
 // loadError is a load error with its number, the one a docs block's
 // `<!-- docs-check: E<n> -->` marker names: 1 no schema_version, 2 another
 // version, 3 an unknown key, 4 a listener, data_subjects or traceability that
-// cannot load, 5 a detection that cannot, 6 a reachability declaration that
-// cannot.
+// cannot load, 5 a detection that cannot.
 type loadError struct {
 	code int
 	msg  string

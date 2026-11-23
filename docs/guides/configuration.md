@@ -187,7 +187,7 @@ notes: |
   Container runs as non-root. Secrets from AWS Secrets Manager.
 ```
 
-Anything an engineer would say in a threat modeling session. Every question shows it, with the rest of the deployment, and the model uses it on ambiguous CVEs. A reachability verdict written here publishes no VEX status, and no question asks whether a CVE is reachable: declare it under [`reachability`](../reference/config-schema.md#reachability), with where it comes from.
+Anything an engineer would say in a threat modeling session. Every question shows it, with the rest of the deployment, and the model uses it on ambiguous CVEs. vens does not handle reachability: no question asks whether a CVE is reachable and vens publishes no VEX status, so a verdict written here reaches the rating only through the model's other answers.
 
 !!! warning "What goes in notes leaves your network"
     When you use a cloud LLM provider, the `notes` field is sent **verbatim** to that provider in every call. Do not paste secrets, credentials, customer data, PHI, PII, or information your NDA/classification policy would forbid sharing with a third party. If any of that could reasonably appear in your `notes`, [use Ollama locally](../getting-started/installation.md#configure-an-llm-provider) — nothing leaves your network. See [Privacy and data flow](../concepts/privacy-and-data-flow.md) for the full list of what is (and isn't) sent to the LLM.

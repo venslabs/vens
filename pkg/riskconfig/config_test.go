@@ -467,6 +467,8 @@ func TestOneDocumentOnly(t *testing.T) {
 func TestUnknownKeys(t *testing.T) {
 	for _, tc := range []struct{ src, want string }{
 		{"versions: 2\n" + minimal, "config.yaml line 1: unknown key `versions` at the top level"},
+		// vens reads no reachability declaration.
+		{minimal + "reachability:\n  - cve: CVE-2024-0001\n    reachable: false\n", "config.yaml line 8: unknown key `reachability` at the top level"},
 		{strings.Replace(minimal, "  name: svc\n", "  name: svc\n  owner: me\n", 1), "config.yaml line 4: unknown key `owner` under project"},
 		{withContext("tracability: none"), "config.yaml line 8: unknown key `tracability` under context"},
 		{withContext(`compliance_requirement: ["PCI-DSS"]`), "config.yaml line 8: unknown key `compliance_requirement` under context"},
@@ -591,7 +593,6 @@ func TestRoundTrip(t *testing.T) {
 		minimal,
 		withContext(declaredAll, "availability_requirement: low", "compliance_requirements: [gdpr]",
 			"audit_requirement: high", "controls: {waf: true, siem: true}", "notes: n"),
-		withReachability("- cve: CVE-1", "  reachable: false", "  provenance: p", "- component: a", "  reachable: true", "  provenance: q"),
 	} {
 		cfg := mustParse(t, src)
 		out, err := yaml.Marshal(cfg)
@@ -773,125 +774,5 @@ func TestAccessorsReturnCopies(t *testing.T) {
 	if DataSubjectsBands()[0].Name != "none" || ControlScopes()[0].Scope == "x" || ComplianceFrameworks()[0] != "PCI-DSS" ||
 		Exposure.Values()[0] != "internal" {
 		t.Error("an accessor returned the package's own slice")
-	}
-}
-
-// withReachability returns the minimal config with lines added under a
-// top-level reachability key.
-func withReachability(lines ...string) string {
-	var b strings.Builder
-	b.WriteString(minimal)
-	b.WriteString("reachability:\n")
-	for _, l := range lines {
-		b.WriteString("  " + l + "\n")
-	}
-	return b.String()
-}
-
-func TestReachabilityEntriesLoad(t *testing.T) {
-	cfg := mustParse(t, withReachability(
-		"- cve: ' CVE-2024-24790 '",
-		"  reachable: false",
-		"  provenance: \" govulncheck, no call path \"",
-		"- component: libssl3",
-		"  reachable: true",
-		"  provenance: pentest",
-	))
-	want := []ReachabilityEntry{
-		{CVE: "CVE-2024-24790", Reachable: false, Provenance: "govulncheck, no call path"},
-		{Component: "libssl3", Reachable: true, Provenance: "pentest"},
-	}
-	if !reflect.DeepEqual(cfg.Reachability, want) {
-		t.Errorf("reachability = %+v, want %+v", cfg.Reachability, want)
-	}
-	if got := []string{want[0].Selector(), want[1].Selector()}; !slices.Equal(got, []string{"cve: CVE-2024-24790", "component: libssl3"}) {
-		t.Errorf("selectors %q", got)
-	}
-	if cfg := mustParse(t, minimal+"reachability: []\n"); cfg.Reachability != nil {
-		t.Errorf("an empty list: %+v", cfg.Reachability)
-	}
-	if cfg := mustParse(t, minimal); cfg.Reachability != nil {
-		t.Errorf("no key: %+v", cfg.Reachability)
-	}
-}
-
-// Each entry gives exactly one selector, reachable written true or false, and
-// a provenance that is not blank, all strings but reachable; a key other than
-// the four is unknown. Every refusal names the entry.
-func TestReachabilityEntriesRefused(t *testing.T) {
-	for _, tc := range []struct {
-		lines []string
-		code  int
-		want  string
-	}{
-		{[]string{"- reachable: false", "  provenance: p"}, 6, "reachability[0] gives no selector: write cve or component"},
-		{[]string{"- cve: CVE-1", "  component: a", "  reachable: false", "  provenance: p"}, 6,
-			"reachability[0] gives both cve and component: an entry has one selector"},
-		{[]string{"- cve: CVE-1", "  reachable: false", "  provenance: p", "- cve: CVE-2", "  component: a", "  reachable: true", "  provenance: p"}, 6,
-			"reachability[1] gives both cve and component: an entry has one selector"},
-		{[]string{"- cve: CVE-1", "  provenance: p"}, 6, "reachability[0].reachable is required: write true or false"},
-		{[]string{"- cve: CVE-1", "  reachable: no", "  provenance: p"}, 6, "reachability[0].reachable must be true or false, got no"},
-		{[]string{"- cve: CVE-1", "  reachable: \"false\"", "  provenance: p"}, 6, `reachability[0].reachable must be true or false, got "false"`},
-		{[]string{"- cve: CVE-1", "  reachable: false"}, 6, "reachability[0].provenance is required: say where the assertion comes from"},
-		{[]string{"- cve: CVE-1", "  reachable: false", "  provenance: '  '"}, 6, "reachability[0].provenance has no value: write one or remove the key"},
-		{[]string{"- cve: CVE-1", "  reachable: false", "  provenance:"}, 6, "reachability[0].provenance must be a string, got no value"},
-		{[]string{"- cve: [CVE-1]", "  reachable: false", "  provenance: p"}, 6, "reachability[0].cve must be a string, got a sequence"},
-		{[]string{"- cve: 2024", "  reachable: false", "  provenance: p"}, 6, "reachability[0].cve must be a string, got 2024"},
-		{[]string{"- cve: ''", "  component: a", "  reachable: false", "  provenance: p"}, 6, "reachability[0].cve has no value: write one or remove the key"},
-		{[]string{"- cve: CVE-1", "  reachable: false", "  provenance: p", "  scope: all"}, 3, "config.yaml line 12: unknown key `scope` under reachability[0]"},
-		{[]string{"- CVE-1"}, 6, "reachability[0] must be a mapping of cve or component, reachable and provenance, got CVE-1"},
-		{[]string{"- cve: CVE-1", "  reachable: true", "  provenance: [a]"}, 6, "reachability[0].provenance must be a string, got a sequence"},
-	} {
-		parseFails(t, withReachability(tc.lines...), tc.code, tc.want)
-	}
-	parseFails(t, minimal+"reachability:\n", 6, "reachability has no value: write a list of entries or remove the key")
-	parseFails(t, minimal+"reachability:\n  cve: CVE-1\n", 6, "reachability must be a list of entries, got a mapping")
-	parseFails(t, withContext("reachability: []"), 3, "config.yaml line 8: unknown key `reachability` under context")
-}
-
-// An entry asserting reachability needs no provenance: written without one,
-// or with a blank one, it loads, and vetoes as unresolved.
-func TestReachableEntryWithoutProvenanceLoads(t *testing.T) {
-	cfg := mustParse(t, withReachability(
-		"- cve: CVE-1", "  reachable: true",
-		"- component: a", "  reachable: true", "  provenance: '  '",
-		"- component: b", "  reachable: true", "  provenance:",
-	))
-	want := []ReachabilityEntry{{CVE: "CVE-1", Reachable: true}, {Component: "a", Reachable: true}, {Component: "b", Reachable: true}}
-	if !reflect.DeepEqual(cfg.Reachability, want) {
-		t.Errorf("reachability = %+v, want %+v", cfg.Reachability, want)
-	}
-}
-
-// CheckReachability trims the entries a config built in Go holds and refuses
-// what Parse refuses in the file, each refusal E6 naming the entry.
-func TestCheckReachability(t *testing.T) {
-	for _, tc := range []struct {
-		entries []ReachabilityEntry
-		want    string
-	}{
-		{[]ReachabilityEntry{{Provenance: "p"}}, "reachability[0] gives no selector: write cve or component"},
-		{[]ReachabilityEntry{{CVE: " ", Component: "\t", Provenance: "p"}}, "reachability[0] gives no selector: write cve or component"},
-		{[]ReachabilityEntry{{CVE: "CVE-1", Provenance: "p"}, {CVE: "CVE-1", Component: "a", Provenance: "p"}},
-			"reachability[1] gives both cve and component: an entry has one selector"},
-		{[]ReachabilityEntry{{CVE: "CVE-1"}}, "reachability[0].provenance is required: say where the assertion comes from"},
-		{[]ReachabilityEntry{{CVE: "CVE-1", Provenance: "  "}}, "reachability[0].provenance is required: say where the assertion comes from"},
-	} {
-		got, err := CheckReachability(tc.entries)
-		if err == nil || err.Error() != tc.want || errorCode(err) != 6 || got != nil {
-			t.Errorf("%+v: %v (E%d), %+v; want %q", tc.entries, err, errorCode(err), got, tc.want)
-		}
-		c := *mustParse(t, minimal)
-		c.Reachability = tc.entries
-		if _, err := c.validated(); err == nil || err.Error() != tc.want {
-			t.Errorf("validated %+v: %v, want %q", tc.entries, err, tc.want)
-		}
-	}
-	got, err := CheckReachability([]ReachabilityEntry{{CVE: " CVE-1 ", Provenance: " p "}, {Component: " a ", Reachable: true, Provenance: " "}})
-	if want := []ReachabilityEntry{{CVE: "CVE-1", Provenance: "p"}, {Component: "a", Reachable: true}}; err != nil || !reflect.DeepEqual(got, want) {
-		t.Errorf("CheckReachability = %+v, %v; want %+v", got, err, want)
-	}
-	if got, err := CheckReachability(nil); got != nil || err != nil {
-		t.Errorf("no entry: %+v, %v", got, err)
 	}
 }

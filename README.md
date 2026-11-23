@@ -25,7 +25,7 @@ OWASP Risk Rating reflects your system's exposure, data, records and controls �
 | Denial of service in a library function your internal service never calls | 7.5 HIGH | **low** (14.1) ⬇️ | Reaching it takes full access; the CVSS vectors rule out data loss |
 | Info leak in a PII handler running under GDPR | 5.3 MEDIUM | **critical** (54.4) ⬆️ | Thousands of people's data and a GDPR violation: the business impact is HIGH |
 
-*Ratings above are illustrative — actual ratings depend on your `config.yaml` and the LLM model. The model is not asked whether code runs: declare a CVE not reachable under `reachability` in `config.yaml`, with where that comes from, and the VEX publishes it `not_affected`, `code_not_reachable`, beside its unchanged rating; see [Limitations](https://venslabs.github.io/vens/concepts/limitations/).*
+*Ratings above are illustrative — actual ratings depend on your `config.yaml` and the LLM model. vens does not handle reachability: no question asks whether code runs, and an unreachable CVE keeps the rating its answers give; see [Limitations](https://venslabs.github.io/vens/concepts/limitations/).*
 
 ## Installation
 

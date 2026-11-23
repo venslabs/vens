@@ -292,17 +292,7 @@ type answersJSON struct {
 		VulnID     string `json:"vulnId"`
 		Unrated    bool   `json:"unrated"`
 		Adjustment string `json:"adjustment"`
-		Declared   *struct {
-			Unreachable []int `json:"unreachable"`
-			Reachable   []int `json:"reachable"`
-			Unresolved  []int `json:"unresolved"`
-			Analysis    *struct {
-				State         string `json:"state"`
-				Justification string `json:"justification"`
-				Detail        string `json:"detail"`
-			} `json:"analysis"`
-		} `json:"declared"`
-		Factors []struct {
+		Factors    []struct {
 			Factor   string `json:"factor"`
 			Answer   any    `json:"answer"`
 			Reading  string `json:"reading"`
@@ -332,10 +322,9 @@ func readAnswers(t *testing.T, parent string) (answersJSON, string) {
 // replied, how Go read it, the adjustment's answer, the level and where it
 // came from, for the three technical impacts the value the CVSS v3 vectors
 // give their axis, and for a Privacy violation they floor, C:N; the counters
-// per CVE and summed, cvss_v3_missing
-// for a CVE with no usable v3 vector; no declaration where no reachability
-// entry hits; and no reasoning, nor CVE text but what an answer off its list
-// holds, kept verbatim.
+// per CVE and summed, cvss_v3_missing for a CVE with no usable v3 vector; no
+// reachability declaration; and no reasoning, nor CVE text but what an
+// answer off its list holds, kept verbatim.
 func TestDebugDir_AnswersJSON(t *testing.T) {
 	parent := t.TempDir()
 	cfg := fullConfig()
@@ -391,7 +380,7 @@ func TestDebugDir_AnswersJSON(t *testing.T) {
 		"PV":  "<nil>|||3|floor|N",
 	}, first)
 	assert.Empty(t, got.Vulnerabilities[0].Counters)
-	assert.Nil(t, got.Vulnerabilities[0].Declared, "no reachability entry")
+	assert.NotContains(t, raw, `"declared"`, "no reachability declaration")
 
 	second := got.Vulnerabilities[1]
 	for _, f := range second.Factors {

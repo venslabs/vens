@@ -60,7 +60,7 @@ OWASP's Risk Rating Methodology rates a vulnerability from 16 factors, each with
 
 Privacy violation also has a CVSS floor: when the CVE's usable CVSS v3 vectors give `C:N`, vens asks no question and sets it to 3.
 
-No question asks whether a CVE is reachable. vens publishes a VEX status only from a `reachability` entry of `config.yaml`: an entry declaring the CVE not reachable, by its id or by a component naming every package the scan lists for it, gives the CVE `analysis.state: not_affected`, `justification: code_not_reachable` and a `detail` citing the entry, unless an entry declaring it reachable vetoes it. The rating stays the one the answers give: the status lowers no level and caps no severity. A reachability verdict in `notes` publishes nothing. On Loss of accountability, `identified`, its no accountability loss, takes the lowest level your `traceability` gives: it is an answer, not `cannot_tell`, which says only that the facts given do not decide and takes the worst case.
+vens does not handle reachability. No question asks whether a CVE is reachable, no level is set from it and no severity capped, and vens publishes no VEX status: a CVE whose vulnerable code never runs keeps the rating its answers give. On Loss of accountability, `identified`, its no accountability loss, takes the lowest level your `traceability` gives: it is an answer, not `cannot_tell`, which says only that the facts given do not decide and takes the worst case.
 
 A description is a prerequisite of three answers: when no row of the scanner's report describes the CVE, a title alone included, vens does not ask Motive, Opportunity and Ease of exploit, and sets each to its worst level, 9, counted as `cannot_tell`.
 
@@ -127,7 +127,6 @@ This explains the mechanism; it is not a measurement of accuracy.
 | What the model returns | four numbers from 0 to 9 per CVE: threat agent, vulnerability, technical impact, business impact | one named answer per question, from a closed list; never a number |
 | Calls | one call per batch of CVEs | one call per question per batch, at most 9 questions per CVE, and one adjustment call per flagged CVE with a field left to ask |
 | The 16 levels in the vector | each of the four numbers repeated over its group's four factors | 4 set by vens, 3 from the CVSS v3 vectors, 6 read from an answer, 3 from an answer combined with a declared field |
-| VEX status | none | `not_affected`, `code_not_reachable`, only where a `reachability` entry of `config.yaml` declares it, beside the rating |
 | Impact | the average of the technical and the business impact | the larger of the two |
 | Severity | bands of the score: 0–4 `info`, 5–19 `low`, 20–39 `medium`, 40–59 `high`, 60–81 `critical` | OWASP's matrix of the likelihood and impact levels; never `info` |
 | Score | likelihood × impact | the same product, which no longer sets the severity |
