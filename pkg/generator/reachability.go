@@ -26,28 +26,34 @@ import (
 
 // declaration is what the config's reachability entries say of one CVE: the
 // index of each entry that hits it, those asserting it unreachable and those
-// asserting it reachable apart. Only declared entries publish a status: no
-// model answer and no note does, and an upstream VEX is not read.
+// asserting it reachable apart, and among the second those without a
+// provenance, which veto all the same and leave the declaration unresolved.
+// Only declared entries publish a status: no model answer and no note does,
+// and an upstream VEX is not read.
 type declaration struct {
-	unreachable, reachable []int
-	entries                []riskconfig.ReachabilityEntry
+	unreachable, reachable, unresolved []int
+	entries                            []riskconfig.ReachabilityEntry
 }
 
 // declared reads the entries for a CVE. An entry asserting unreachability
 // hits it when its selector is the CVE's id, or a component every row of the
 // CVE names as its package, so that it covers every occurrence the scan
 // lists; one asserting reachability hits it when its selector is the CVE's
-// id or a component any row names. Both match without regard to case.
+// id or a component any row names. Both match without regard to case, and a
+// component matches the scanner's package name alone: a row with no name is
+// covered by no component.
 func declared(entries []riskconfig.ReachabilityEntry, c contract.CVE) declaration {
 	d := declaration{entries: entries}
 	for i, e := range entries {
-		if !hits(e, c) {
-			continue
-		}
-		if e.Reachable {
-			d.reachable = append(d.reachable, i)
-		} else {
+		switch {
+		case !hits(e, c):
+		case !e.Reachable:
 			d.unreachable = append(d.unreachable, i)
+		default:
+			d.reachable = append(d.reachable, i)
+			if e.Provenance == "" {
+				d.unresolved = append(d.unresolved, i)
+			}
 		}
 	}
 	return d
@@ -57,7 +63,7 @@ func hits(e riskconfig.ReachabilityEntry, c contract.CVE) bool {
 	if e.CVE != "" {
 		return strings.EqualFold(e.CVE, c.ID)
 	}
-	names := func(r contract.Row) bool { return strings.EqualFold(e.Component, r.Package()) }
+	names := func(r contract.Row) bool { return r.PkgName != "" && strings.EqualFold(e.Component, r.PkgName) }
 	if e.Reachable {
 		return slices.ContainsFunc(c.Rows, names)
 	}
@@ -95,11 +101,15 @@ func (d declaration) cite(n int) string {
 	return fmt.Sprintf("Declared not reachable by config.yaml reachability[%d] (%s). Provenance: %s", n, e.Selector(), e.Provenance)
 }
 
-// selectors names the entries listed, each as "reachability[n] (selector)".
+// selectors names the entries listed, each as "reachability[n] (selector)",
+// one without a provenance marked so.
 func (d declaration) selectors(list []int) string {
 	out := make([]string, len(list))
 	for i, n := range list {
 		out[i] = fmt.Sprintf("reachability[%d] (%s)", n, d.entries[n].Selector())
+		if d.entries[n].Provenance == "" {
+			out[i] += " without provenance"
+		}
 	}
 	return strings.Join(out, ", ")
 }

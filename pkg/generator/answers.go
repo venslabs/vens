@@ -63,11 +63,13 @@ type answersEntry struct {
 
 // declaredRecord lists, by their index in the config, the reachability
 // entries that hit a CVE, those asserting it unreachable and those asserting
-// it reachable apart, and the VEX status they publish, absent when an entry
-// asserting reachability vetoes it.
+// it reachable apart, those of the second without a provenance, which leave
+// the declaration unresolved, and the VEX status they publish, absent when
+// an entry asserting reachability vetoes it.
 type declaredRecord struct {
 	Unreachable []int                            `json:"unreachable,omitempty"`
 	Reachable   []int                            `json:"reachable,omitempty"`
+	Unresolved  []int                            `json:"unresolved,omitempty"`
 	Analysis    *cyclonedx.VulnerabilityAnalysis `json:"analysis,omitempty"`
 }
 
@@ -106,7 +108,7 @@ func (run *scoringRun) rated(c *cve, a *assessment, l contract.Levels) {
 	levels := vectorLevels(l.Vector)
 	e := answersEntry{VulnID: c.id(), Adjustment: cmp.Or(a.adjustment, adjustmentNotAsked), Counters: counters}
 	if d := c.declared; len(d.unreachable)+len(d.reachable) > 0 {
-		e.Declared = &declaredRecord{Unreachable: d.unreachable, Reachable: d.reachable, Analysis: d.analysis()}
+		e.Declared = &declaredRecord{Unreachable: d.unreachable, Reachable: d.reachable, Unresolved: d.unresolved, Analysis: d.analysis()}
 	}
 	for _, f := range vectorOrder {
 		level := levels[f]

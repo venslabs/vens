@@ -276,11 +276,11 @@ Optional. Declarations of whether a CVE's vulnerable code is reachable in this d
 | Field | Type | Required | Description |
 |---|---|:---:|---|
 | `cve` | string | one of the two | A vulnerability id, matched without regard to case. |
-| `component` | string | one of the two | A package name as the scanner names it, matched without regard to case. |
+| `component` | string | one of the two | A package name as the scanner names it, matched without regard to case; never a package id or a BOM-Ref. |
 | `reachable` | boolean | ✅ | `false` declares the code not reachable; `true` declares it reachable. |
-| `provenance` | string | ✅ | Where the declaration comes from, such as a tool run or a review. The VEX's `detail` cites it. |
+| `provenance` | string | for `reachable: false` | Where the declaration comes from, such as a tool run or a review. The VEX's `detail` cites it. An entry declaring `reachable: true` without one still vetoes, and vens reports it unresolved. |
 
-An entry declaring a CVE not reachable hits it when its `cve` is the CVE's id, or when its `component` is the package of every row the scan lists for that CVE: a component on one package of a CVE found on two does not hit it. Hit, and with no entry declaring the CVE reachable, by its id or by any of its packages, the VEX gives the CVE:
+An entry declaring a CVE not reachable hits it when its `cve` is the CVE's id, or when its `component` is the package name of every row the scan lists for that CVE: a component on one package of a CVE found on two does not hit it, nor does any component when a row has no package name. Hit, and with no entry declaring the CVE reachable, by its id or by any of its packages, the VEX gives the CVE:
 
 ```json
 "analysis": {
@@ -302,7 +302,7 @@ reachability:
     provenance: "pentest report 2026-10, TLS handshake reaches it"
 ```
 
-Each entry gives exactly one selector, `cve` or `component`, `reachable` written `true` or `false`, and a `provenance` that is not blank; anything else is refused (E6), and a key other than the four is refused as unknown (E3).
+Each entry gives exactly one selector, `cve` or `component`, `reachable` written `true` or `false`, and, declaring `reachable: false`, a `provenance` that is not blank; anything else is refused (E6), and a key other than the four is refused as unknown (E3).
 
 ---
 
@@ -432,7 +432,7 @@ reachability[1] gives both cve and component: an entry has one selector
 reachability[0].reachable must be true or false, got no
 ```
 
-`provenance` left out or blank, or a selector or provenance that is not a string:
+`provenance` left out or blank on an entry declaring `reachable: false`, or a selector or provenance that is not a string:
 
 ```text
 reachability[0].provenance is required: say where the assertion comes from

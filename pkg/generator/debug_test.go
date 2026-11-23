@@ -295,6 +295,7 @@ type answersJSON struct {
 		Declared   *struct {
 			Unreachable []int `json:"unreachable"`
 			Reachable   []int `json:"reachable"`
+			Unresolved  []int `json:"unresolved"`
 			Analysis    *struct {
 				State         string `json:"state"`
 				Justification string `json:"justification"`

@@ -17,6 +17,7 @@ package generator
 import (
 	"context"
 	"log/slog"
+	"slices"
 	"strings"
 	"testing"
 
@@ -52,6 +53,7 @@ var twoPackages = contract.CVE{ID: "CVE-2024-0001", Rows: []contract.Row{{PkgNam
 func TestDeclared_HitRules(t *testing.T) {
 	sameName := contract.CVE{ID: "CVE-2024-0001", Rows: []contract.Row{{PkgName: "openssl", PkgID: "openssl@1"}, {PkgName: "OpenSSL", PkgID: "openssl@2"}}}
 	nameless := contract.CVE{ID: "CVE-2024-0001", Rows: []contract.Row{{PkgName: "openssl"}, {PkgID: "openssl@3"}}}
+	byID := contract.CVE{ID: "CVE-2024-0001", Rows: []contract.Row{{PkgID: "openssl", BOMRef: "openssl"}}}
 	for name, tc := range map[string]struct {
 		entries                []riskconfig.ReachabilityEntry
 		cve                    contract.CVE
@@ -65,6 +67,8 @@ func TestDeclared_HitRules(t *testing.T) {
 		"one entry per package":             {[]riskconfig.ReachabilityEntry{unreachable("component", "libssl3"), unreachable("component", "libcrypto3")}, twoPackages, nil, nil, false},
 		"a component on every package":      {[]riskconfig.ReachabilityEntry{unreachable("component", "openssl")}, sameName, []int{0}, nil, true},
 		"a component past a nameless row":   {[]riskconfig.ReachabilityEntry{unreachable("component", "openssl")}, nameless, nil, nil, false},
+		"a component as a package id":       {[]riskconfig.ReachabilityEntry{unreachable("component", "openssl")}, byID, nil, nil, false},
+		"a reachable component as an id":    {[]riskconfig.ReachabilityEntry{unreachable("cve", "CVE-2024-0001"), reachabilityEntry("component", "openssl", true)}, byID, []int{0}, nil, true},
 		"a component another package names": {[]riskconfig.ReachabilityEntry{unreachable("component", "zlib")}, twoPackages, nil, nil, false},
 		"vetoed by the CVE id": {[]riskconfig.ReachabilityEntry{
 			unreachable("cve", "CVE-2024-0001"), reachabilityEntry("cve", "CVE-2024-0001", true),
@@ -240,4 +244,62 @@ func TestGenerator_DeclaredStatusVetoedOrPartial(t *testing.T) {
 		"CVE-2024-0001": {nil, {2}},
 		"CVE-2024-0002": {{1}, {2}},
 	}, declaredBy, "pkg-a covers one package of CVE-2024-0001's two; PKG-B names one of them")
+}
+
+// An entry asserting reachability without a provenance vetoes on a hit like
+// any other, and leaves the declaration unresolved: answers.json lists it,
+// and vens warns.
+func TestDeclared_UnresolvedVeto(t *testing.T) {
+	entries := []riskconfig.ReachabilityEntry{
+		{CVE: "CVE-2024-0001", Provenance: "call graph review"},
+		{Component: "libcrypto3", Reachable: true},
+		{Component: "zlib", Reachable: true},
+	}
+	d := declared(entries, twoPackages)
+	if d.analysis() != nil || !slices.Equal(d.reachable, []int{1}) || !slices.Equal(d.unresolved, []int{1}) {
+		t.Errorf("declaration %+v, want entry 1 vetoing, unresolved", d)
+	}
+	if got := d.selectors(d.unresolved); got != "reachability[1] (component: libcrypto3) without provenance" {
+		t.Errorf("selectors %q", got)
+	}
+
+	cfg := testConfig()
+	cfg.Reachability = []riskconfig.ReachabilityEntry{{CVE: "CVE-2024-0001", Provenance: "review"}, {CVE: "CVE-2024-0001", Reachable: true, Provenance: "  "}}
+	parent := t.TempDir()
+	logs := withCapturedLogs(t)
+	for _, r := range rated(t, cfg, &fakeLLM{}, parent, declaredVulns()) {
+		assert.Nil(t, r.Analysis, r.VulnID)
+	}
+	warned := logs.find(slog.LevelWarn, "Reachability entry without provenance; it vetoes any status, and the declaration is unresolved")
+	require.Len(t, warned, 1)
+	assert.Equal(t, "reachability[1] (cve: CVE-2024-0001) without provenance", warned[0].attrs["entries"])
+	got, _ := readAnswers(t, parent)
+	require.NotNil(t, got.Vulnerabilities[0].Declared)
+	assert.Equal(t, []int{1}, got.Vulnerabilities[0].Declared.Unresolved)
+}
+
+// New checks the config's reachability entries as Parse does: a config built
+// in Go with no selector, two, or an entry asserting unreachability without
+// a provenance is refused before anything is asked.
+func TestNew_RefusesReachabilityEntries(t *testing.T) {
+	for _, tc := range []struct {
+		entry riskconfig.ReachabilityEntry
+		want  string
+	}{
+		{riskconfig.ReachabilityEntry{Provenance: "p"}, "config: reachability[0] gives no selector: write cve or component"},
+		{riskconfig.ReachabilityEntry{CVE: "CVE-1", Component: "a", Provenance: "p"}, "config: reachability[0] gives both cve and component: an entry has one selector"},
+		{riskconfig.ReachabilityEntry{CVE: "CVE-1", Provenance: " "}, "config: reachability[0].provenance is required: say where the assertion comes from"},
+	} {
+		cfg := testConfig()
+		cfg.Reachability = []riskconfig.ReachabilityEntry{tc.entry}
+		m := &fakeLLM{}
+		_, err := New(Opts{LLM: m, Config: cfg})
+		require.EqualError(t, err, tc.want)
+		assert.Empty(t, m.calls)
+	}
+	cfg := testConfig()
+	cfg.Reachability = []riskconfig.ReachabilityEntry{{CVE: " CVE-2024-0001 ", Provenance: " review "}}
+	emitted := rated(t, cfg, &fakeLLM{}, "", declaredVulns())
+	require.NotNil(t, emitted[0].Analysis)
+	assert.Equal(t, "Declared not reachable by config.yaml reachability[0] (cve: CVE-2024-0001). Provenance: review", emitted[0].Analysis.Detail)
 }

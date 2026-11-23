@@ -72,13 +72,17 @@ func (g *Generator) plan(ctx context.Context, vulns []Vulnerability) ([]*cve, er
 			flags:            rowFlags(rows),
 			contestUnchecked: CVEFlags(rows).SeverityContestedUnavailable,
 		}
-		c.declared = declared(g.o.Config.Reachability, c.in)
+		c.declared = declared(g.reachability, c.in)
 		if c.declared.vetoed() {
 			slog.WarnContext(ctx, "Reachability entries disagree; one asserting reachability vetoes the status, so none is published",
 				"vuln", c.id(),
 				"unreachable", c.declared.selectors(c.declared.unreachable),
 				"reachable", c.declared.selectors(c.declared.reachable),
 			)
+		}
+		if len(c.declared.unresolved) > 0 {
+			slog.WarnContext(ctx, "Reachability entry without provenance; it vetoes any status, and the declaration is unresolved",
+				"vuln", c.id(), "entries", c.declared.selectors(c.declared.unresolved))
 		}
 		if len(c.flags) > 0 {
 			if err := contract.CheckFlags(c.flags, c.in); err != nil {

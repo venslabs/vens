@@ -73,7 +73,7 @@ question, Privacy violation, even below these fallbacks, and no other level. The
 cannot_tell keeps the baseline: it is not counted and does not fail a --strict run.
 
 The config's reachability entries are the only source of a VEX status: an entry declaring a CVE not
-reachable, by its id or by a component covering every package the scan lists for it, publishes it
+reachable, by its id or by a component naming every package the scan lists for it, publishes it
 not_affected, code_not_reachable, with a detail citing the entry, unless an entry declaring it
 reachable vetoes it. The rating is computed as for any other CVE.`,
 		Example:               Example(),

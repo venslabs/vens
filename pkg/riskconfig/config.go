@@ -228,14 +228,11 @@ func (c Config) validated() (Config, error) {
 	if err := n.Context.checkSchema2Values(); err != nil {
 		return Config{}, err
 	}
-	n.Reachability = nil
-	for i, e := range c.Reachability {
-		e = e.normalized()
-		if err := e.check(fmt.Sprintf("reachability[%d]", i)); err != nil {
-			return Config{}, err
-		}
-		n.Reachability = append(n.Reachability, e)
+	reachability, err := CheckReachability(c.Reachability)
+	if err != nil {
+		return Config{}, err
 	}
+	n.Reachability = reachability
 	return n, nil
 }
 

@@ -37,8 +37,10 @@ type ReachabilityEntry struct {
 	// the scan lists for it; true vetoes any such entry for the same CVE.
 	Reachable bool `yaml:"reachable"`
 	// Provenance says where the assertion comes from, such as a tool run or a
-	// review: the VEX's detail cites it.
-	Provenance string `yaml:"provenance"`
+	// review: the VEX's detail cites it. An entry asserting unreachability
+	// needs one; one asserting reachability without one still vetoes, and is
+	// unresolved.
+	Provenance string `yaml:"provenance,omitempty"`
 }
 
 // Selector returns the entry's selector as the reference writes it,
@@ -60,8 +62,9 @@ func reachabilityError(format string, args ...any) error {
 
 // checkReachability checks the shape of reachability before the decode: a
 // list of entries, each a mapping of the four keys alone, with exactly one
-// selector, reachable written true or false, and a provenance that is not
-// blank. Every value is read as written, so that no entry is guessed at.
+// selector, reachable written true or false, and, for an entry asserting
+// unreachability, a provenance that is not blank. Every value is read as
+// written, so that no entry is guessed at.
 func checkReachability(root *yaml.Node) error {
 	list, ok, err := lookup(root, "reachability")
 	switch {
@@ -114,17 +117,27 @@ func checkReachabilityEntry(e *yaml.Node, path string) error {
 	case 2:
 		return reachabilityError("%s gives both cve and component: an entry has one selector", path)
 	}
-	switch v, ok := values["reachable"]; {
+	reachable, ok := values["reachable"]
+	switch {
 	case !ok:
 		return reachabilityError("%s.reachable is required: write true or false", path)
-	case v.Kind != yaml.ScalarNode || v.ShortTag() != "!!bool":
-		return reachabilityError("%s.reachable must be true or false, got %s", path, asWritten(v))
+	case reachable.Kind != yaml.ScalarNode || reachable.ShortTag() != "!!bool":
+		return reachabilityError("%s.reachable must be true or false, got %s", path, asWritten(reachable))
+	}
+	var asserted bool
+	if err := reachable.Decode(&asserted); err != nil {
+		return err
 	}
 	v, ok := values["provenance"]
-	if !ok {
+	switch {
+	case !asserted && !ok:
 		return reachabilityError("%s.provenance is required: say where the assertion comes from", path)
+	case !asserted:
+		return checkText(v, path+".provenance")
+	case ok && !isNull(v) && (v.Kind != yaml.ScalarNode || v.ShortTag() != "!!str"):
+		return reachabilityError("%s.provenance must be a string, got %s", path, asWritten(v))
 	}
-	return checkText(v, path+".provenance")
+	return nil
 }
 
 // checkText refuses a value that is not a string, or one that is blank.
@@ -138,26 +151,29 @@ func checkText(v *yaml.Node, path string) error {
 	return nil
 }
 
-// normalized returns the entry with its values trimmed.
-func (e ReachabilityEntry) normalized() ReachabilityEntry {
-	return ReachabilityEntry{
-		CVE:        strings.TrimSpace(e.CVE),
-		Component:  strings.TrimSpace(e.Component),
-		Reachable:  e.Reachable,
-		Provenance: strings.TrimSpace(e.Provenance),
+// CheckReachability returns the entries with their values trimmed, or the
+// first that breaks the rules Parse reads in the file: one selector, and a
+// provenance for an entry asserting unreachability. A config built in Go
+// goes through it as one read from a file does.
+func CheckReachability(entries []ReachabilityEntry) ([]ReachabilityEntry, error) {
+	var out []ReachabilityEntry
+	for i, e := range entries {
+		e = ReachabilityEntry{
+			CVE:        strings.TrimSpace(e.CVE),
+			Component:  strings.TrimSpace(e.Component),
+			Reachable:  e.Reachable,
+			Provenance: strings.TrimSpace(e.Provenance),
+		}
+		path := fmt.Sprintf("reachability[%d]", i)
+		switch {
+		case e.CVE == "" && e.Component == "":
+			return nil, reachabilityError("%s gives no selector: write cve or component", path)
+		case e.CVE != "" && e.Component != "":
+			return nil, reachabilityError("%s gives both cve and component: an entry has one selector", path)
+		case !e.Reachable && e.Provenance == "":
+			return nil, reachabilityError("%s.provenance is required: say where the assertion comes from", path)
+		}
+		out = append(out, e)
 	}
-}
-
-// check applies, once trimmed, the rules Parse reads in the file: one
-// selector and a provenance.
-func (e ReachabilityEntry) check(path string) error {
-	switch {
-	case e.CVE == "" && e.Component == "":
-		return reachabilityError("%s gives no selector: write cve or component", path)
-	case e.CVE != "" && e.Component != "":
-		return reachabilityError("%s gives both cve and component: an entry has one selector", path)
-	case e.Provenance == "":
-		return reachabilityError("%s.provenance is required: say where the assertion comes from", path)
-	}
-	return nil
+	return out, nil
 }
