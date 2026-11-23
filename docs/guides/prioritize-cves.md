@@ -107,7 +107,7 @@ Each vulnerability of the VEX carries one `vens:impact-provenance` property. It 
 ```bash
 jq '[.vulnerabilities[] | {
        id,
-       impact: (.properties[]? | select(.name == "vens:impact-provenance") | .value),
+       impact: ([.properties[]? | select(.name == "vens:impact-provenance") | .value] | if length == 1 and (.[0] == "cvss-v3" or .[0] == "missing-cvss-v3-fallback") then .[0] else error("not exactly one valid vens:impact-provenance") end),
        score: .ratings[0].score,
        severity: .ratings[0].severity,
        vector: .ratings[0].vector
@@ -119,6 +119,8 @@ jq '[.vulnerabilities[] | {
         impact_unknown: [.[] | select(.impact == "missing-cvss-v3-fallback")] | sort_by(.id)
       }' output.vex.json
 ```
+
+A VEX from an older vens carries no marker; the filter fails on it instead of dropping the finding.
 
 A consumer implementing vens prioritisation must present separate lists: impact-assessed findings, and "impact unknown — manual triage required." Findings marked `missing-cvss-v3-fallback` belong in the latter. The lists have no cross-list urgency order. Unknown-impact findings retain their numerical ratings, worst-case severity, gate contributions and totals; their identifiers order presentation only. Legitimately vector-derived maximum-impact values remain impact-assessed.
 
