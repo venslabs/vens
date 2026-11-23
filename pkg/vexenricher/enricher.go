@@ -34,7 +34,14 @@ type VEXEnricher struct {
 	// The band is what downstream gates should read; the raw score is on a
 	// vens-internal scale.
 	OWASPSeverityPerVulnID map[string]string
+	// NotAffected holds the VulnerabilityIDs the VEX publishes not_affected,
+	// which count in no severity band.
+	NotAffected map[string]bool
 }
+
+// vexState is the field a not_affected finding carries in place of its
+// severity band.
+const vexState = "vex_state"
 
 // New creates a new VEXEnricher from VEX data
 func New(vexData []byte) (*VEXEnricher, error) {
@@ -47,11 +54,15 @@ func New(vexData []byte) (*VEXEnricher, error) {
 		OWASPScorePerVulnID:    make(map[string]float64),
 		OWASPVectorPerVulnID:   make(map[string]string),
 		OWASPSeverityPerVulnID: make(map[string]string),
+		NotAffected:            make(map[string]bool),
 	}
 
 	// Parse VEX vulnerabilities - extract OWASP ratings by Vulnerability ID
 	if vexDoc.Vulnerabilities != nil {
 		for _, vuln := range *vexDoc.Vulnerabilities {
+			if vuln.Analysis != nil && vuln.Analysis.State == cdx.IASNotAffected {
+				enricher.NotAffected[vuln.ID] = true
+			}
 			if vuln.Ratings == nil {
 				continue
 			}
@@ -94,7 +105,7 @@ func (e *VEXEnricher) EnrichReport(ctx context.Context, reportData []byte) (*tri
 			if score, ok := e.OWASPScorePerVulnID[vuln.VulnerabilityID]; ok {
 				vector := e.OWASPVectorPerVulnID[vuln.VulnerabilityID]
 				severity := e.OWASPSeverityPerVulnID[vuln.VulnerabilityID]
-				if e.applyRating(vuln, score, vector, severity) {
+				if e.applyRating(vuln, score, vector, severity, e.NotAffected[vuln.VulnerabilityID]) {
 					enrichedCount++
 				}
 			}
@@ -109,8 +120,10 @@ func (e *VEXEnricher) EnrichReport(ctx context.Context, reportData []byte) (*tri
 }
 
 // applyRating sets the OWASP score (and, if present, the OWASP Risk Rating
-// vector and severity band) in the vulnerability's Custom field
-func (e *VEXEnricher) applyRating(vuln *trivytypes.DetectedVulnerability, score float64, vector string, severity string) bool {
+// vector and severity band) in the vulnerability's Custom field. A finding the
+// VEX publishes not_affected keeps its score and vector, carries no severity
+// band, so that no gate counts it in one, and says vex_state: not_affected.
+func (e *VEXEnricher) applyRating(vuln *trivytypes.DetectedVulnerability, score float64, vector string, severity string, notAffected bool) bool {
 	if vuln.Custom == nil {
 		vuln.Custom = make(map[string]interface{})
 	}
@@ -132,10 +145,18 @@ func (e *VEXEnricher) applyRating(vuln *trivytypes.DetectedVulnerability, score 
 	}
 	// The severity band is the field vens commits to for downstream gates:
 	// the raw score lives on a vens-internal scale.
-	if severity != "" {
-		customMap["owasp_severity"] = severity
-	} else {
+	switch {
+	case notAffected:
 		delete(customMap, "owasp_severity")
+	case severity != "":
+		customMap["owasp_severity"] = severity
+	default:
+		delete(customMap, "owasp_severity")
+	}
+	if notAffected {
+		customMap[vexState] = string(cdx.IASNotAffected)
+	} else {
+		delete(customMap, vexState)
 	}
 	return true
 }

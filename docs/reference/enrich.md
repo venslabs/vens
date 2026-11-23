@@ -30,6 +30,8 @@ vens enrich --vex VEX_FILE [--output PATH] REPORT_FILE
 
 `Severity` still holds Trivy's value. Gate on `Custom.owasp_severity`, and sort by band rank then `Custom.owasp_score` — sorting on the band sorts strings alphabetically, so order the bands yourself and break ties by the score, likelihood × impact on a 0–81 scale. The band comes from OWASP's matrix, not from the score, so a `high` can score below a `medium`. If a CVE appears more than once in the VEX, the last OWASP rating wins.
 
+A CVE the VEX publishes `not_affected`, as a [`reachability`](config-schema.md#reachability) entry declares, keeps `owasp_score` and `owasp_vector` but carries no `owasp_severity`, so that it counts in no band: it gets `"vex_state": "not_affected"` instead, and a band an earlier enrichment wrote is removed.
+
 Use it when your downstream tooling reads Trivy JSON directly and does not know how to parse a separate CycloneDX VEX.
 
 ---

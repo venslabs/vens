@@ -426,3 +426,47 @@ func TestEnrichReport_SeverityDeleteBranch(t *testing.T) {
 	assert.NotContains(t, customMap, "owasp_severity")
 	assert.Equal(t, score, customMap["owasp_score"])
 }
+
+// A finding the VEX publishes not_affected keeps its OWASP score and vector,
+// loses any severity band an earlier enrichment wrote and gets none, and
+// says vex_state: not_affected; a finding with no status gets its band and
+// no vex_state, a stale one cleared.
+func TestEnrichReport_NotAffectedCountsInNoBand(t *testing.T) {
+	score := 30.0
+	rating := cdx.VulnerabilityRating{Method: cdx.ScoringMethodOWASP, Score: &score, Severity: cdx.SeverityHigh, Vector: "SL:9/M:9"}
+	vex := cdx.BOM{
+		SpecVersion: cdx.SpecVersion1_6,
+		Vulnerabilities: &[]cdx.Vulnerability{
+			{
+				ID: "CVE-2024-0001", Ratings: &[]cdx.VulnerabilityRating{rating},
+				Analysis: &cdx.VulnerabilityAnalysis{State: cdx.IASNotAffected, Justification: cdx.IAJCodeNotReachable, Detail: "declared"},
+			},
+			{ID: "CVE-2024-0002", Ratings: &[]cdx.VulnerabilityRating{rating}},
+		},
+	}
+	vexData, err := json.Marshal(vex)
+	require.NoError(t, err)
+	report := trivytypes.Report{
+		Results: trivytypes.Results{
+			{
+				Target: "test-target",
+				Vulnerabilities: []trivytypes.DetectedVulnerability{
+					{VulnerabilityID: "CVE-2024-0001", PkgName: "a", Custom: map[string]interface{}{"owasp_severity": "critical"}},
+					{VulnerabilityID: "CVE-2024-0002", PkgName: "b", Custom: map[string]interface{}{"vex_state": "not_affected"}},
+				},
+			},
+		},
+	}
+	reportData, err := json.Marshal(report)
+	require.NoError(t, err)
+
+	enricher, err := New(vexData)
+	require.NoError(t, err)
+	enriched, err := enricher.EnrichReport(context.Background(), reportData)
+	require.NoError(t, err)
+
+	declared := enriched.Results[0].Vulnerabilities[0].Custom.(map[string]interface{})
+	assert.Equal(t, map[string]interface{}{"owasp_score": score, "owasp_vector": "SL:9/M:9", "vex_state": "not_affected"}, declared)
+	plain := enriched.Results[0].Vulnerabilities[1].Custom.(map[string]interface{})
+	assert.Equal(t, map[string]interface{}{"owasp_score": score, "owasp_vector": "SL:9/M:9", "owasp_severity": "high"}, plain)
+}
