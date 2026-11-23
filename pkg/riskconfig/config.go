@@ -75,10 +75,10 @@ type ContextHints struct {
 	// Motive, Financial damage and Reputation damage.
 	BusinessCriticality string `yaml:"business_criticality"`
 
-	// AvailabilityRequirement is low, medium, high or critical. Loss of
-	// availability, which it was background to, is read from the CVSS v3
-	// vectors, so it moves no score and is sent nowhere; kept as
-	// information.
+	// AvailabilityRequirement is low, medium, high or critical: the column in
+	// which Go reads Loss of availability from the CVSS v3 vectors (low and
+	// medium secondary services, high and critical primary), never sent. nil:
+	// the primary column, counted.
 	AvailabilityRequirement *string `yaml:"availability_requirement,omitempty"`
 
 	// ComplianceRequirements are the frameworks Non-compliance asks about.

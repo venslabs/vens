@@ -24,6 +24,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/venslabs/vens/pkg/contract"
+	"github.com/venslabs/vens/pkg/cvss"
+	"github.com/venslabs/vens/pkg/outputhandler"
 	"github.com/venslabs/vens/pkg/riskconfig"
 )
 
@@ -83,6 +85,7 @@ func TestDeploymentOf(t *testing.T) {
 	assert.Equal(t, &contract.Detection{Network: "logged_and_reviewed", Host: "logged", Application: "not_logged"}, d.Detection)
 	assert.Equal(t, "per_individual", *d.Traceability)
 	assert.Equal(t, "thousands", *d.DataSubjects)
+	assert.Equal(t, "high", *d.AvailabilityRequirement)
 	assert.Equal(t, []string{"PCI-DSS", "GDPR"}, d.Frameworks)
 	assert.NoError(t, d.Check())
 }
@@ -153,14 +156,53 @@ func TestPromptComplianceConditional(t *testing.T) {
 	assert.Contains(t, nc[0].req.Human, "QUESTION\nThis service must comply with PCI-DSS, GDPR.")
 }
 
-// audit_requirement and availability_requirement move nothing and reach no
-// request, nor do the fields Go reads alone.
+// audit_requirement moves nothing and reaches no request, nor do the fields
+// Go reads alone, availability_requirement among them.
 func TestPromptAuditRequirementConditional(t *testing.T) {
 	for _, c := range sent(t, richConfig()) {
 		for _, hidden := range []string{"audit", "Availability requirement", "24/7", "traceability", "per_individual", "data_subjects", "detection", "logged_and_reviewed", "not_logged"} {
 			assert.NotContains(t, c.req.System, hidden)
 			assert.NotContains(t, c.req.Human, hidden)
 		}
+	}
+}
+
+// availability_requirement picks Loss of availability's column in Go alone:
+// under each of its values, unset included, the model receives the same
+// calls, system prompts, requests and schemas, while a CVE whose worst A is H
+// rates LAV 5 on low and medium, 7 on high, critical and unset.
+func TestPromptAvailabilityRequirementNeverSent(t *testing.T) {
+	run := func(value *string) ([]fakeCall, string) {
+		cfg := testConfig()
+		cfg.Context.AvailabilityRequirement = value
+		m := &fakeLLM{}
+		g := newGen(t, Opts{LLM: m, Config: cfg})
+		vulns := testVulns(2)
+		vulns[0] = disputedRow(vulns[0])
+		vulns[0].CVSS = []cvss.Vector{v31("nvd", "AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:H")}
+		var emitted []outputhandler.VulnRating
+		require.NoError(t, g.GenerateRiskScore(context.Background(), vulns, collect(&emitted)))
+		for _, r := range emitted {
+			if r.VulnID == vulns[0].VulnID {
+				for _, part := range strings.Split(r.Rating.Vector, "/") {
+					if level, ok := strings.CutPrefix(part, "LAV:"); ok {
+						return m.calls, level
+					}
+				}
+			}
+		}
+		t.Fatalf("no LAV rated for %s", vulns[0].VulnID)
+		return nil, ""
+	}
+	want, _ := run(nil)
+	for value, lav := range map[string]string{"": "7", "low": "5", "medium": "5", "high": "7", "critical": "7"} {
+		var v *string
+		if value != "" {
+			v = ptr(value)
+		}
+		calls, got := run(v)
+		assert.Equal(t, want, calls, "availability_requirement %q", value)
+		assert.Equal(t, lav, got, "availability_requirement %q", value)
 	}
 }
 

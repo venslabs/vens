@@ -63,8 +63,9 @@ answer to a question read as cannot_tell, and Motive, Opportunity and Ease of ex
 with no description, count as the worst answer; undeclared, detection makes Intrusion detection 9,
 traceability makes Loss of accountability 7 or 9, and data_subjects leaves Privacy violation at the
 model's band; a CVE with no usable CVSS v3 vector has Loss of confidentiality, integrity and
-availability at 9. A CVE whose usable CVSS v3 vectors give C:N has Privacy violation at 3, not
-asked.
+availability at 9. Unset, availability_requirement reads Loss of availability in the primary
+services column, counted as availability_requirement_missing, and --strict does not fail the run
+for it. A CVE whose usable CVSS v3 vectors give C:N has Privacy violation at 3, not asked.
 
 A CVE whose description says it is disputed or not a security issue, or that the report rates low
 while NVD rates it high or critical, is flagged: one more call, the adjustment, when it has a field

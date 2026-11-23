@@ -25,8 +25,8 @@ import (
 // Deployment is the config as the contracts read it. A value the model is
 // shown comes with its documented meaning, which the caller takes from the
 // config's documentation: this package writes no config wording of its own.
-// Traceability, DataSubjects and Detection are read by Go alone and never
-// shown.
+// Traceability, DataSubjects, Detection and AvailabilityRequirement are read
+// by Go alone and never shown.
 type Deployment struct {
 	Name        string
 	Description string
@@ -57,6 +57,9 @@ type Deployment struct {
 	DataSubjects *string
 	// Detection is each channel's declared level; nil when undeclared.
 	Detection *Detection
+	// AvailabilityRequirement is low, medium, high or critical, which picks
+	// Loss of availability's column; nil when undeclared.
+	AvailabilityRequirement *string
 }
 
 // Setting is a config value the model is shown, with its documented meaning.
@@ -144,6 +147,11 @@ func (d Deployment) Check() error {
 	}
 	if d.DataSubjects != nil && !isBand(*d.DataSubjects) {
 		fail("data_subjects %q is not none, one_individual, hundreds, thousands or millions", *d.DataSubjects)
+	}
+	if r := d.AvailabilityRequirement; r != nil {
+		if _, ok := primaryServices[*r]; !ok {
+			fail("availability_requirement %q is not low, medium, high or critical", *r)
+		}
 	}
 	if d.Detection != nil {
 		errs = append(errs, d.Detection.check()...)

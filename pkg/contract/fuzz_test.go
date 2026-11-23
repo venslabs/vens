@@ -76,6 +76,7 @@ func FuzzCompute(f *testing.F) {
 		if next()%2 == 1 {
 			d.Frameworks = []string{"PCI-DSS"}
 		}
+		d.AvailabilityRequirement = optional(availabilities)
 		// A first value of "" leaves the CVE with no vector.
 		c := impactCVE(impactValues[next()%4], impactValues[next()%3], impactValues[next()%3])
 		if next()%2 == 1 {

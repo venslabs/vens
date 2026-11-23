@@ -327,15 +327,18 @@ func checkVEXVectors(data []byte, count int, sets [16][]int) error {
 }
 
 // cvssImpactsCmd reads the answers.json of the one run under a --debug-dir
-// and checks C2 on every CVE rated: Loss of confidentiality, integrity and
+// and checks every CVE rated: Loss of confidentiality, integrity and
 // availability carry no answer, come from the CVSS v3 vectors, and take the
-// level C2's table gives the worst value recorded for their axis,
-// confidentiality's in the column the argument names; with no value recorded,
-// all three take 9 and the CVE counts cvss_v3_missing once. The run must
-// rate at least one CVE each way.
+// level the table gives the worst value recorded for their axis,
+// confidentiality's in the column the second argument names, availability's
+// in the one the third names, unset reading primary; with no value recorded,
+// all three take 9 and the CVE counts cvss_v3_missing once. Unset, each CVE
+// with a value recorded, and no other, counts availability_requirement_missing
+// once. The run must rate at least one CVE each way.
 func cvssImpactsCmd(ts *testscript.TestScript, neg bool, args []string) {
-	if neg || len(args) != 2 || (args[1] != "sensitive" && args[1] != "non-sensitive") {
-		ts.Fatalf("usage: cvss-impacts debug-dir sensitive|non-sensitive")
+	if neg || len(args) != 3 || (args[1] != "sensitive" && args[1] != "non-sensitive") ||
+		!slices.Contains([]string{"primary", "secondary", "unset"}, args[2]) {
+		ts.Fatalf("usage: cvss-impacts debug-dir sensitive|non-sensitive primary|secondary|unset")
 	}
 	runs, err := filepath.Glob(filepath.Join(ts.MkAbs(args[0]), "run-*", "answers.json"))
 	ts.Check(err)
@@ -344,10 +347,10 @@ func cvssImpactsCmd(ts *testscript.TestScript, neg bool, args []string) {
 	}
 	data, err := os.ReadFile(runs[0])
 	ts.Check(err)
-	ts.Check(checkCVSSImpacts(data, args[1] == "sensitive"))
+	ts.Check(checkCVSSImpacts(data, args[1] == "sensitive", args[2]))
 }
 
-func checkCVSSImpacts(data []byte, sensitive bool) error {
+func checkCVSSImpacts(data []byte, sensitive bool, availability string) error {
 	var answers struct {
 		Vulnerabilities []struct {
 			VulnID  string `json:"vulnId"`
@@ -368,10 +371,14 @@ func checkCVSSImpacts(data []byte, sensitive bool) error {
 	if sensitive {
 		column = 1
 	}
+	services := 1
+	if availability == "secondary" {
+		services = 0
+	}
 	table := map[string]map[string]int{
 		"LC":  {"N": 2, "L": [2]int{2, 6}[column], "H": [2]int{6, 7}[column], "": 9},
 		"LI":  {"N": 1, "L": 3, "H": 7, "": 9},
-		"LAV": {"N": 1, "L": 5, "H": 7, "": 9},
+		"LAV": {"N": 1, "L": [2]int{1, 5}[services], "H": [2]int{5, 7}[services], "": 9},
 	}
 	seen := map[bool]int{}
 	for _, v := range answers.Vulnerabilities {
@@ -391,6 +398,14 @@ func checkCVSSImpacts(data []byte, sensitive bool) error {
 		counted := slices.Contains(v.Counters, "cvss_v3_missing")
 		if (vectorless != 0 && vectorless != 3) || counted != (vectorless == 3) {
 			return fmt.Errorf("%s: %d of the three without a value, counted cvss_v3_missing %t", v.VulnID, vectorless, counted)
+		}
+		missing := len(slices.DeleteFunc(slices.Clone(v.Counters), func(c string) bool { return c != "availability_requirement_missing" }))
+		want := 0
+		if availability == "unset" && vectorless == 0 {
+			want = 1
+		}
+		if missing != want {
+			return fmt.Errorf("%s: counted availability_requirement_missing %d times, want %d (%s, %d of the three without a value)", v.VulnID, missing, want, availability, vectorless)
 		}
 		seen[vectorless == 3]++
 	}

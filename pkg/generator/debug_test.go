@@ -322,9 +322,11 @@ func readAnswers(t *testing.T, parent string) (answersJSON, string) {
 // replied, how Go read it, the adjustment's answer, the level and where it
 // came from, for the three technical impacts the value the CVSS v3 vectors
 // give their axis, and for a Privacy violation they floor, C:N; the counters
-// per CVE and summed, cvss_v3_missing for a CVE with no usable v3 vector; no
-// reachability declaration; and no reasoning, nor CVE text but what an
-// answer off its list holds, kept verbatim.
+// per CVE and summed, availability_requirement_missing for a CVE whose Loss
+// of availability an unset availability_requirement reads from a usable v3
+// vector, cvss_v3_missing for a CVE with none; no reachability declaration;
+// and no reasoning, nor CVE text but what an answer off its list holds, kept
+// verbatim.
 func TestDebugDir_AnswersJSON(t *testing.T) {
 	parent := t.TempDir()
 	cfg := fullConfig()
@@ -379,7 +381,7 @@ func TestDebugDir_AnswersJSON(t *testing.T) {
 		"NC":  "minor_violation|answered||2|answer|",
 		"PV":  "<nil>|||3|floor|N",
 	}, first)
-	assert.Empty(t, got.Vulnerabilities[0].Counters)
+	assert.Equal(t, []string{"availability_requirement_missing"}, got.Vulnerabilities[0].Counters)
 	assert.NotContains(t, raw, `"declared"`, "no reachability declaration")
 
 	second := got.Vulnerabilities[1]
@@ -394,7 +396,7 @@ func TestDebugDir_AnswersJSON(t *testing.T) {
 		}
 	}
 	assert.Equal(t, []string{"ease_of_exploit_cannot_tell", "cvss_v3_missing"}, second.Counters)
-	assert.Equal(t, map[string]int{"ease_of_exploit_cannot_tell": 1, "cvss_v3_missing": 1}, got.Counters)
+	assert.Equal(t, map[string]int{"availability_requirement_missing": 1, "ease_of_exploit_cannot_tell": 1, "cvss_v3_missing": 1}, got.Counters)
 
 	assert.NotContains(t, raw, "because of", "no reasoning")
 	assert.NotContains(t, raw, "the evidence", "no reasoning")

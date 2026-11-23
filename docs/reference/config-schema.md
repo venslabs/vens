@@ -83,12 +83,14 @@ Type of data handled by the system. vens uses it to pick the column of Loss of c
 
 Loss of confidentiality, integrity and availability come from the worst value, `H` over `L` over `N`, that the CVE's usable CVSS v3 vectors give `C`, `I` and `A`, across every row and source of the scanner's report. A v3 vector is usable when its version is 3.0 or 3.1, it parses, any `CVSS:` prefix stating 3.0 or 3.1, and it gives `C`, `I` and `A` each once on `H`, `L` or `N`; any other, another 3.x version included, is refused whole and named by `--strict`. v2 and v4 vectors are not read.
 
-| CVSS v3 | Loss of confidentiality, non-sensitive | Loss of confidentiality, critical | Loss of integrity | Loss of availability |
-|---|---|---|---|---|
-| `N` | 2 | 2 | 1 | 1 |
-| `L` | 2 | 6 | 3 | 5 |
-| `H` | 6 | 7 | 7 | 7 |
-| no usable v3 vector | 9 | 9 | 9 | 9 |
+Loss of availability is read in the column [`availability_requirement`](#contextavailability_requirement) picks.
+
+| CVSS v3 | Loss of confidentiality, non-sensitive | Loss of confidentiality, critical | Loss of integrity | Loss of availability, secondary | Loss of availability, primary |
+|---|---|---|---|---|---|
+| `N` | 2 | 2 | 1 | 1 | 1 |
+| `L` | 2 | 6 | 3 | 1 | 5 |
+| `H` | 6 | 7 | 7 | 5 | 7 |
+| no usable v3 vector | 9 | 9 | 9 | 9 | 9 |
 
 No default is documented for a CVE with no usable v3 vector: the three take 9, the CVE adds one to the `cvss_v3_missing` counter, and `--strict` refuses the run.
 
@@ -109,14 +111,16 @@ How critical the system is to the business. No level reads it directly. The Moti
 
 ### `context.availability_requirement`
 
-Strictness of uptime requirements. Moves no score and no call sends it: Loss of availability, which it described, is read from the CVE's CVSS v3 vectors (see [`data_sensitivity`](#contextdata_sensitivity)). The key still loads.
+Strictness of uptime requirements. vens reads it alone, and no call sends it, to pick the column of Loss of availability, which no question asks: vens reads it from the CVE's CVSS v3 vectors and crosses it with the column, OWASP's secondary or primary services (see the table under [`data_sensitivity`](#contextdata_sensitivity)).
 
-| Value | Meaning |
-|---|---|
-| `low` | Best-effort uptime |
-| `medium` | Business-hours SLA |
-| `high` | 24/7 required |
-| `critical` | Zero downtime tolerance |
+| Value | Meaning | Loss of availability column |
+|---|---|---|
+| `low` | Best-effort uptime | secondary |
+| `medium` | Business-hours SLA | secondary |
+| `high` | 24/7 required | primary |
+| `critical` | Zero downtime tolerance | primary |
+
+No default is documented: left out, unset reads primary, and each CVE whose Loss of availability is read from a usable v3 vector adds one to the `availability_requirement_missing` counter. vens does not warn at load and `--strict` does not refuse it.
 
 ### `context.compliance_requirements`
 
@@ -476,7 +480,7 @@ What each schema-1 key does once `schema_version: 2` is added and nothing else:
 | `exposure` | sets Size and the attacker group every question names | nothing |
 | `data_sensitivity` | picks the column in which Loss of confidentiality is read from the CVSS v3 vectors; shown to the Motive and Privacy violation questions | nothing |
 | `business_criticality` | shown to the questions it concerns | nothing |
-| `availability_requirement` | moves no score: Loss of availability is read from the CVSS v3 vectors | nothing |
+| `availability_requirement` | picks the column in which Loss of availability is read from the CVSS v3 vectors: `low` and `medium` secondary services, `high` and `critical` primary | nothing |
 | `compliance_requirements` | Non-compliance is asked only when the list is not empty; no fixed amount is added | nothing |
 | `audit_requirement` | moves no score; W1 while `traceability` is left out | declare `traceability` for what is recorded, not what is required: `audit_requirement: high` does not mean `per_individual` |
 | `controls.waf`, `ddos_protection`, `segmentation`, `zero_trust`, `antivirus` | shown with their scope to the Ease of exploit question | nothing |

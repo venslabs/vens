@@ -252,8 +252,8 @@ func TestFactsPerQuestion(t *testing.T) {
 	}
 }
 
-// traceability, data_subjects and detection are Go's: two deployments that
-// differ only in them send the same bytes.
+// traceability, data_subjects, detection and availability_requirement are
+// Go's: two deployments that differ only in them send the same bytes.
 func TestHiddenFieldsAreNeverSent(t *testing.T) {
 	render := func(d Deployment) []string {
 		out := []string{text(t)(SystemPrompt(d))}
@@ -265,11 +265,14 @@ func TestHiddenFieldsAreNeverSent(t *testing.T) {
 	plain := base()
 	plain.Frameworks = []string{"PCI-DSS"}
 	want := render(plain)
-	full := declared()
-	full.Traceability, full.DataSubjects = ptr("per_individual"), ptr("millions")
-	full.Detection = &Detection{Network: "logged_and_reviewed", Host: "logged", Application: activeInApplication}
-	if got := render(full); !slices.Equal(got, want) {
-		t.Error("declaring traceability, data_subjects and detection changed what is sent")
+	for _, availability := range []string{"low", "medium", "high", "critical"} {
+		full := declared()
+		full.Traceability, full.DataSubjects = ptr("per_individual"), ptr("millions")
+		full.Detection = &Detection{Network: "logged_and_reviewed", Host: "logged", Application: activeInApplication}
+		full.AvailabilityRequirement = ptr(availability)
+		if got := render(full); !slices.Equal(got, want) {
+			t.Errorf("declaring traceability, data_subjects, detection and availability_requirement %s changed what is sent", availability)
+		}
 	}
 }
 

@@ -32,13 +32,14 @@ func questions(t *testing.T, d Deployment) []Factor {
 }
 
 // declared declares every field the rules read, at values that leave every
-// question asked.
+// question asked, availability_requirement in the primary column.
 func declared() Deployment {
 	d := base()
 	d.Frameworks = []string{"PCI-DSS"}
 	d.Traceability = ptr("per_request")
 	d.DataSubjects = ptr("thousands")
 	d.Detection = &Detection{Network: "logged", Host: "not_logged", Application: "logged_and_reviewed"}
+	d.AvailabilityRequirement = ptr("high")
 	return d
 }
 
@@ -224,14 +225,20 @@ func TestUndeclaredFieldsCounted(t *testing.T) {
 		t.Errorf("every field declared and every answer listed: counters %v", got)
 	}
 	got := compute(t, base(), answered, nil).Counters
-	if want := []string{"detection_undeclared", "traceability_missing", "data_subjects_missing"}; !slices.Equal(got, want) {
+	if want := []string{"detection_undeclared", "availability_requirement_missing", "traceability_missing", "data_subjects_missing"}; !slices.Equal(got, want) {
 		t.Errorf("nothing declared: counters %v, want %v", got, want)
 	}
 	// With C at N Privacy violation is not asked, so data_subjects is not
 	// read.
 	l := computeFor(t, base(), impactCVE("N", "N", "N"), answered, nil)
-	if want := []string{"detection_undeclared", "traceability_missing"}; !slices.Equal(l.Counters, want) {
+	if want := []string{"detection_undeclared", "availability_requirement_missing", "traceability_missing"}; !slices.Equal(l.Counters, want) {
 		t.Errorf("nothing declared, C at N: counters %v, want %v", l.Counters, want)
+	}
+	// With no usable v3 vector Loss of availability is 9 in either column, so
+	// availability_requirement is not read.
+	l = computeFor(t, base(), impactCVE("", "", ""), answered, nil)
+	if want := []string{"detection_undeclared", vectorMissing, "traceability_missing", "data_subjects_missing"}; !slices.Equal(l.Counters, want) {
+		t.Errorf("nothing declared, no vector: counters %v, want %v", l.Counters, want)
 	}
 	if l := compute(t, base(), answered, nil); levels(l.Vector)["ID"] != 9 || levels(l.Vector)["LAC"] != 7 {
 		t.Errorf("undeclared detection and traceability: ID %d, LAC %d, want 9 and 7", l.Vector.ID, l.Vector.LAC)
@@ -443,6 +450,66 @@ func TestTechnicalImpactsFromCVSS(t *testing.T) {
 	}
 	if len(l.Counters) != 0 || l.Impact.Values != [3]string{"H", "L", "N"} {
 		t.Errorf("counters %v, impact %+v", l.Counters, l.Impact)
+	}
+}
+
+// Loss of availability is read from the worst A in availability_requirement's
+// column, OWASP's secondary or primary services: low and medium secondary,
+// high and critical primary. Unset, no default being documented, it reads
+// primary, and a CVE whose level it reads from a usable v3 vector counts
+// availability_requirement_missing once. With no usable v3 vector it is 9 in
+// either column, counted as cvss_v3_missing alone. Confidentiality and
+// integrity do not move with it.
+func TestLossOfAvailabilityCrossedWithTheRequirement(t *testing.T) {
+	const missing = "availability_requirement_missing"
+	unset := ""
+	want := map[string]map[string]int{
+		"N": {"low": 1, "medium": 1, "high": 1, "critical": 1, unset: 1},
+		"L": {"low": 1, "medium": 1, "high": 5, "critical": 5, unset: 5},
+		"H": {"low": 5, "medium": 5, "high": 7, "critical": 7, unset: 7},
+		"":  {"low": 9, "medium": 9, "high": 9, "critical": 9, unset: 9},
+	}
+	answered := Answers{M: "possible_reward", O: "some_access_or_resources_required", EE: "easy", ID: []string{"network"},
+		LAC: "identified", FD: "bankruptcy", RD: "minimal_damage", NC: "clear_violation", PV: "hundreds"}
+	for _, a := range impactValues {
+		c := impactCVE("L", "H", a)
+		if a == "" {
+			c = impactCVE("", "", "")
+		}
+		var first Levels
+		for _, r := range []string{unset, "low", "medium", "high", "critical"} {
+			d := declared()
+			d.AvailabilityRequirement = nil
+			if r != unset {
+				d.AvailabilityRequirement = ptr(r)
+			}
+			l := computeFor(t, d, c, answered, nil)
+			if got := int(l.Vector.LAV); got != want[a][r] {
+				t.Errorf("A:%q, availability_requirement %q: LAV = %d, want %d", a, r, got, want[a][r])
+			}
+			var counters []string
+			switch {
+			case a == "":
+				counters = []string{vectorMissing}
+			case r == unset:
+				counters = []string{missing}
+			}
+			if !slices.Equal(l.Counters, counters) {
+				t.Errorf("A:%q, availability_requirement %q: counters %v, want %v", a, r, l.Counters, counters)
+			}
+			if l.Sources[LAV] != SourceCVSS {
+				t.Errorf("A:%q, availability_requirement %q: LAV from %v, want cvss", a, r, l.Sources[LAV])
+			}
+			if _, read := l.Readings[LAV]; read {
+				t.Errorf("A:%q: LAV read %v: no question asks it", a, l.Readings[LAV])
+			}
+			if r == unset {
+				first = l
+			} else if l.Vector.LC != first.Vector.LC || l.Vector.LI != first.Vector.LI {
+				t.Errorf("A:%q, availability_requirement %q moved LC or LI: %d, %d against %d, %d", a, r,
+					l.Vector.LC, l.Vector.LI, first.Vector.LC, first.Vector.LI)
+			}
+		}
 	}
 }
 

@@ -42,8 +42,7 @@ context:
   #   - medium: Internal tools
   #   - high: Customer-facing, important operations
   #   - critical: Revenue-critical, compliance-required
-  # Impact: Shown to the Motive, Financial damage and Reputation damage questions,
-  #         and to Loss of availability when availability_requirement is not set
+  # Impact: Shown to the Motive, Financial damage and Reputation damage questions
   business_criticality: "high"
 
   # ============================================================================
@@ -89,9 +88,9 @@ context:
 
   # AVAILABILITY REQUIREMENT: How critical is uptime? (optional)
   # Values: low | medium | high | critical
-  # Default: The Loss of availability question shows business_criticality instead
-  # When to use: Set explicitly if availability needs differ from business criticality
-  # Impact: Shown to the Loss of availability question
+  # Unset: reads primary; availability_requirement_missing counts CVEs with a usable v3 vector.
+  # Impact: Picks the column of Loss of availability (low and medium secondary services,
+  #         high and critical primary); never sent to the LLM
   availability_requirement: "high"
 
   # COMPLIANCE REQUIREMENTS: What regulations apply? (optional)

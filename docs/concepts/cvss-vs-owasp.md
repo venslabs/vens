@@ -54,7 +54,7 @@ Same CVE, same base score, two different risks. The model answered the questions
 OWASP's Risk Rating Methodology rates a vulnerability from 16 factors, each with a few named levels from 0 to 9. vens sets each factor in one of three ways:
 
 1. **Set by vens (4 factors).** Skill level, Ease of discovery and Awareness are 9 for every finding: each finding is a published CVE that a scanner matched, so vens takes OWASP's worst case for them. Size comes from your declared `exposure`.
-2. **Read from the CVSS v3 vectors (3 factors).** Loss of confidentiality, integrity and availability come from the worst value, `H` over `L` over `N`, that the CVE's usable CVSS v3 vectors give `C`, `I` and `A`, across every row and source of the scanner's report; confidentiality is crossed with `data_sensitivity`. No question asks them. A CVE with no usable v3 vector takes 9 for each, counted as `cvss_v3_missing`.
+2. **Read from the CVSS v3 vectors (3 factors).** Loss of confidentiality, integrity and availability come from the worst value, `H` over `L` over `N`, that the CVE's usable CVSS v3 vectors give `C`, `I` and `A`, across every row and source of the scanner's report; confidentiality is crossed with `data_sensitivity`, availability with `availability_requirement`, unset reading primary. No question asks them. A CVE with no usable v3 vector takes 9 for each, counted as `cvss_v3_missing`.
 3. **Read from the model's answer (6 factors).** The model gets one question per call, about a batch of CVEs, and picks one named answer from a closed list that always includes `cannot_tell`. vens maps the answer to the factor's level; `cannot_tell` maps to the worst case and is counted.
 4. **An answer combined with a declared field (3 factors).** vens crosses the model's answer with a field of `config.yaml` the question does not show: Intrusion detection with `detection`, Loss of accountability with `traceability`, Privacy violation with `data_subjects`.
 
@@ -78,7 +78,7 @@ A question is asked only when the factor's contract requires it: at most 9 quest
 | Intrusion detection (ID) | likelihood | answer and `detection` | the lowest declared level among the channels the model picks; 9 when `detection` is left out |
 | Loss of confidentiality (LC) | technical impact | CVSS v3 and `data_sensitivity` | the worst `C`: `N` 2; `L` 2, or 6 on high or critical data; `H` 6, or 7; 9 with no usable v3 vector |
 | Loss of integrity (LI) | technical impact | CVSS v3 | the worst `I`: `N` 1, `L` 3, `H` 7; 9 with no usable v3 vector |
-| Loss of availability (LAV) | technical impact | CVSS v3 | the worst `A`: `N` 1, `L` 5, `H` 7; 9 with no usable v3 vector |
+| Loss of availability (LAV) | technical impact | CVSS v3 and `availability_requirement` | the worst `A`: `N` 1; `L` 1, or 5 on primary services (high, critical or unset); `H` 5, or 7; 9 with no usable v3 vector |
 | Loss of accountability (LAC) | technical impact | answer and `traceability` | whether the attacker must authenticate, and, apart, whether the exploit defeats attribution, crossed with what is recorded |
 | Financial damage (FD) | business impact | answer | shows `business_criticality` |
 | Reputation damage (RD) | business impact | answer | shows `business_criticality` |

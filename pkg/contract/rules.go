@@ -37,11 +37,17 @@ var exposures = map[string]struct {
 // and medium data are non-sensitive, high and critical data critical.
 var critical = map[string]bool{"low": false, "medium": false, "high": true, "critical": true}
 
+// primaryServices picks Loss of availability's column from
+// availability_requirement: low and medium are secondary services, high and
+// critical primary, a cut vens declares.
+var primaryServices = map[string]bool{"low": false, "medium": false, "high": true, "critical": true}
+
 // The levels Loss of confidentiality, integrity and availability take from
 // the worst value a CVE's usable CVSS v3 vectors give the axis: N the
 // factor's lowest level; for confidentiality, the non-sensitive then the
-// critical column. With no usable v3 vector, each takes OWASP's worst level,
-// which no value gives: no default is documented for it.
+// critical column; for availability, the secondary then the primary services
+// column. With no usable v3 vector, each takes OWASP's worst level, which no
+// value gives: no default is documented for it.
 var (
 	confidentialityLevels = map[string][2]owasp.LossOfConfidentiality{
 		"N": {owasp.LossOfConfidentialityMinimalNonSensitiveDataDisclosed, owasp.LossOfConfidentialityMinimalNonSensitiveDataDisclosed},
@@ -53,16 +59,21 @@ var (
 		"L": owasp.LossOfIntegrityMinimalSeriouslyCorruptData,
 		"H": owasp.LossOfIntegrityExtensiveSeriouslyCorruptData,
 	}
-	availabilityLevels = map[string]owasp.LossOfAvailability{
-		"N": owasp.LossOfAvailabilityMinimalSecondaryServicesInterrupted,
-		"L": owasp.LossOfAvailabilityMinimalPrimaryServicesInterrupted,
-		"H": owasp.LossOfAvailabilityExtensivePrimaryServicesInterrupted,
+	availabilityLevels = map[string][2]owasp.LossOfAvailability{
+		"N": {owasp.LossOfAvailabilityMinimalSecondaryServicesInterrupted, owasp.LossOfAvailabilityMinimalSecondaryServicesInterrupted},
+		"L": {owasp.LossOfAvailabilityMinimalSecondaryServicesInterrupted, owasp.LossOfAvailabilityMinimalPrimaryServicesInterrupted},
+		"H": {owasp.LossOfAvailabilityExtensiveSecondaryServicesInterrupted, owasp.LossOfAvailabilityExtensivePrimaryServicesInterrupted},
 	}
 )
 
 // vectorMissing counts a CVE with no usable CVSS v3 vector, whose three
 // technical impacts read from it take their worst level.
 const vectorMissing = "cvss_v3_missing"
+
+// availabilityMissing counts a CVE whose Loss of availability is read from
+// its usable CVSS v3 vectors while availability_requirement is undeclared:
+// no default being documented, the primary column, the higher, is read.
+const availabilityMissing = "availability_requirement_missing"
 
 // traceabilities lists traceability's values, the least recorded first.
 var traceabilities = [...]string{"none", "per_request", "per_individual"}
@@ -224,9 +235,9 @@ type Levels struct {
 // through its confidentiality answer lowers Privacy violation alone. Loss of
 // confidentiality, integrity and availability are read from the worst value
 // each axis takes over the CVE's usable CVSS v3 vectors, the first crossed
-// with data_sensitivity; with none usable, each takes its worst level,
-// counted. A CVE whose usable v3 vectors give C:N has Privacy violation at
-// its floor, not asked.
+// with data_sensitivity, the last with availability_requirement; with none
+// usable, each takes its worst level, counted. A CVE whose usable v3 vectors
+// give C:N has Privacy violation at its floor, not asked.
 func Compute(d Deployment, c CVE, a Answers, adjusted *Adjusted) (Levels, error) {
 	if err := d.Check(); err != nil {
 		return Levels{}, err
@@ -316,8 +327,9 @@ func lowered[L ~int](s *scorer, f Factor, baseline, adjusted L) L {
 // technicalImpacts are Loss of confidentiality's, integrity's and
 // availability's levels, read from the worst value each axis takes over the
 // CVE's usable CVSS v3 vectors, confidentiality's in data_sensitivity's
-// column. With no usable v3 vector, each is OWASP's worst level, and the CVE
-// is counted once.
+// column, availability's in availability_requirement's, the primary one when
+// it is undeclared, counted. With no usable v3 vector, each is OWASP's worst
+// level, and the CVE is counted once.
 func (s *scorer) technicalImpacts() (owasp.LossOfConfidentiality, owasp.LossOfIntegrity, owasp.LossOfAvailability) {
 	if s.levels.Impact.Vectorless() {
 		s.count(vectorMissing)
@@ -330,9 +342,15 @@ func (s *scorer) technicalImpacts() (owasp.LossOfConfidentiality, owasp.LossOfIn
 	if critical[s.d.DataSensitivity.Value] {
 		column = 1
 	}
+	services := 1
+	if r := s.d.AvailabilityRequirement; r == nil {
+		s.count(availabilityMissing)
+	} else if !primaryServices[*r] {
+		services = 0
+	}
 	return from(s, LC, SourceCVSS, confidentialityLevels[values[cvss.Confidentiality]][column]),
 		from(s, LI, SourceCVSS, integrityLevels[values[cvss.Integrity]]),
-		from(s, LAV, SourceCVSS, availabilityLevels[values[cvss.Availability]])
+		from(s, LAV, SourceCVSS, availabilityLevels[values[cvss.Availability]][services])
 }
 
 // opportunity is Opportunity's level: the answer's, lowered by the

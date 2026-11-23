@@ -138,7 +138,7 @@ See **[`--strict`](reference/generate.md#-strict)**.
 A run that reaches scoring ends with a `Scoring run finished` line, also when it fails during scoring. Its `counters.*` count, per CVE, each fallback the run used:
 
 - `<factor>_cannot_tell` (such as `privacy_cannot_tell`) — the model answered `cannot_tell`, or off its list, so the question's worst answer applied: the factor's worst level, unless `detection` or `data_subjects` limits it or a flagged CVE's adjustment lowers it. A CVE with no description is not asked Motive, Opportunity and Ease of exploit, nor Opportunity in its adjustment, a description being a prerequisite of their answers, and counts in `motive_cannot_tell`, `opportunity_cannot_tell` and `ease_of_exploit_cannot_tell`.
-- `detection_undeclared`, `traceability_missing`, `data_subjects_missing` — a field left out of `config.yaml`. Declare it.
+- `detection_undeclared`, `traceability_missing`, `data_subjects_missing`, `availability_requirement_missing` — a field left out of `config.yaml`. Declare it.
 - `cvss_v3_missing` — the CVE has no usable CVSS v3 vector, so Loss of confidentiality, integrity and availability took 9.
 
 A counter that is high for one question across most CVEs points at missing context: read a few of that question's replies in `--debug-dir`. The full list, with `calls.*` and `defects.*`, is in **[The run summary](reference/generate.md#the-run-summary)**; `answers.json` gives the counters per CVE.

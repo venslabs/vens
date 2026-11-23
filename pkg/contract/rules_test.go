@@ -93,6 +93,7 @@ func ids[V any](c contract[V]) []string {
 
 var (
 	sensitivities       = []string{"low", "medium", "high", "critical"}
+	availabilities      = []string{"low", "medium", "high", "critical"}
 	detectionLevelNames = []string{"not_logged", "logged", "logged_and_reviewed", activeInApplication}
 	// impactValues are the values an axis's worst usable v3 vector gives,
 	// "" for no usable vector.
@@ -201,9 +202,10 @@ func walk(t *testing.T) (reached map[string]map[int]bool, inputs map[string]int)
 }
 
 // walkImpacts walks the technical impacts over the value the CVE's vectors
-// give their axis, none included, and confidentiality over data_sensitivity;
-// then Privacy violation over data_subjects, C at N or not, and the
-// adjustment's confidentiality answers.
+// give their axis, none included, confidentiality over data_sensitivity and
+// availability over availability_requirement, unset included; then Privacy
+// violation over data_subjects, C at N or not, and the adjustment's
+// confidentiality answers.
 func walkImpacts(add func(string, Deployment, CVE, Answers, *Adjusted)) {
 	for _, v := range impactValues {
 		for _, ds := range sensitivities {
@@ -212,7 +214,11 @@ func walkImpacts(add func(string, Deployment, CVE, Answers, *Adjusted)) {
 			add("LC", d, impactCVE(v, v, v), Answers{}, nil)
 		}
 		add("LI", base(), impactCVE(v, v, v), Answers{}, nil)
-		add("LAV", base(), impactCVE(v, v, v), Answers{}, nil)
+		for _, ar := range append([]*string{nil}, ptrs(availabilities)...) {
+			d := base()
+			d.AvailabilityRequirement = ar
+			add("LAV", d, impactCVE(v, v, v), Answers{}, nil)
+		}
 	}
 	adjustments := []*Adjusted{nil, {Confidentiality: affected}, {Confidentiality: notAffected}, {Confidentiality: cannotTell}}
 	for _, id := range ids(privacyViolation) {
@@ -293,7 +299,7 @@ func TestRulesReachTheLevelSetsTheJARRan(t *testing.T) {
 	// config states and the adjustment where the rule reads them.
 	want := map[string]int{
 		"SL": 1, "M": 4, "O": 35, "S": 3, "ED": 1, "EE": 5, "A": 1, "ID": 703,
-		"LC": 16, "LI": 4, "LAV": 4, "LAC": 16, "FD": 5, "RD": 5, "NC": 8, "PV": 288,
+		"LC": 16, "LI": 4, "LAV": 20, "LAC": 16, "FD": 5, "RD": 5, "NC": 8, "PV": 288,
 	}
 	if !maps.Equal(inputs, want) {
 		t.Errorf("inputs walked per rule %v, want %v", inputs, want)
@@ -384,6 +390,30 @@ func TestRulesDirection(t *testing.T) {
 		}
 		if !nonDecreasing(lc) {
 			t.Errorf("LC from %q: levels %v from low to critical data, want non-decreasing", v, lc)
+		}
+	}
+	// A stricter availability_requirement never lowers Loss of availability,
+	// nor does a worse A in any column; unset reads the strictest column.
+	for _, v := range impactValues {
+		var lav []int
+		for _, ar := range append(ptrs(availabilities), nil) {
+			d := base()
+			d.AvailabilityRequirement = ar
+			lav = append(lav, int(computeFor(t, d, impactCVE(v, v, v), Answers{}, nil).Vector.LAV))
+		}
+		if !nonDecreasing(lav) || lav[len(lav)-1] != lav[len(lav)-2] {
+			t.Errorf("LAV from %q: levels %v from low to critical then unset, want non-decreasing, unset at critical's", v, lav)
+		}
+	}
+	for _, ar := range ptrs(availabilities) {
+		var lav []int
+		for _, v := range impactValues {
+			d := base()
+			d.AvailabilityRequirement = ar
+			lav = append(lav, int(computeFor(t, d, impactCVE(v, v, v), Answers{}, nil).Vector.LAV))
+		}
+		if !nonDecreasing(lav) {
+			t.Errorf("LAV, availability_requirement %s: levels %v from N to no vector, want non-decreasing", *ar, lav)
 		}
 	}
 	for _, id := range ids(accountability) {

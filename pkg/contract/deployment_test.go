@@ -55,6 +55,7 @@ func TestDeploymentCheckNamesEachValueItCannotRead(t *testing.T) {
 		{func(d *Deployment) { d.Traceability = ptr("full") }, `traceability "full"`},
 		{func(d *Deployment) { d.DataSubjects = ptr("dozens") }, `data_subjects "dozens"`},
 		{func(d *Deployment) { d.DataSubjects = ptr(cannotTell) }, `data_subjects "cannot_tell"`},
+		{func(d *Deployment) { d.AvailabilityRequirement = ptr("always") }, `availability_requirement "always"`},
 		{func(d *Deployment) {
 			d.Detection = &Detection{Network: activeInApplication, Host: "logged", Application: "logged"}
 		}, `detection.network "active_in_application"`},

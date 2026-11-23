@@ -26,16 +26,17 @@ import (
 func deploymentOf(cfg *riskconfig.Config) contract.Deployment {
 	c := cfg.Context
 	d := contract.Deployment{
-		Name:                cfg.Project.Name,
-		Description:         cfg.Project.Description,
-		Notes:               c.Notes,
-		Exposure:            setting(riskconfig.Exposure, c.Exposure),
-		Listener:            setting(riskconfig.Listener, c.Listener),
-		BusinessCriticality: setting(riskconfig.BusinessCriticality, c.BusinessCriticality),
-		DataSensitivity:     setting(riskconfig.DataSensitivity, c.DataSensitivity),
-		Frameworks:          c.ComplianceRequirements,
-		Traceability:        c.Traceability,
-		DataSubjects:        c.DataSubjects,
+		Name:                    cfg.Project.Name,
+		Description:             cfg.Project.Description,
+		Notes:                   c.Notes,
+		Exposure:                setting(riskconfig.Exposure, c.Exposure),
+		Listener:                setting(riskconfig.Listener, c.Listener),
+		BusinessCriticality:     setting(riskconfig.BusinessCriticality, c.BusinessCriticality),
+		DataSensitivity:         setting(riskconfig.DataSensitivity, c.DataSensitivity),
+		Frameworks:              c.ComplianceRequirements,
+		Traceability:            c.Traceability,
+		DataSubjects:            c.DataSubjects,
+		AvailabilityRequirement: c.AvailabilityRequirement,
 	}
 	for _, s := range riskconfig.ControlScopes() {
 		if c.Controls.Enabled(s.Key) {

@@ -42,6 +42,7 @@ Your `config.yaml` fields work in two ways. A field **shown to the model** is co
 | `traceability` | vens reads it alone, for Loss of accountability | An attacker who leaves no trace is worse. |
 | `detection` | vens reads it alone, for Intrusion detection | An attempt nobody records goes unseen. |
 | `data_subjects` | vens reads it alone, to cap Privacy violation | A leak of a hundred people's data is not a leak of millions. |
+| `availability_requirement` | vens reads it alone, to pick Loss of availability's column | An outage of a 24/7 service is worse than one of a best-effort tool. |
 | `listener` | shown in every call when `present` or `absent` | A batch job accepts no connection. |
 | `controls.*` | the Ease of exploit question shows five of them | A WAF makes some exploits harder. |
 | `notes` | shown in every call | What the other fields cannot say about your architecture. |
@@ -158,7 +159,7 @@ How strict is your uptime target?
 | `high` | 24/7 required |
 | `critical` | Zero downtime tolerance |
 
-It moves no score and no call sends it: Loss of availability is read from the CVE's CVSS v3 vectors. The key still loads.
+vens reads it alone and no call sends it. It picks the column in which Loss of availability is read from the CVE's CVSS v3 vectors: `low` and `medium` read OWASP's secondary services, `high` and `critical` its primary services, so `A:L` and `A:H` weigh less on `low` and `medium`. Left out, unset reads primary, and each CVE whose Loss of availability comes from a usable v3 vector adds one to the `availability_requirement_missing` counter; vens does not warn and `--strict` does not refuse it.
 
 ### `controls` — what defenses are already in place?
 
