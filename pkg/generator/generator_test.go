@@ -448,7 +448,8 @@ func TestGenerator_MultiComponentCVEOneRowAndClaimPerComponent(t *testing.T) {
 
 // Rows are grouped by CVE before batching, so a multi-component CVE is one
 // entry of each call however the rows would have been batched, and the entry
-// lists every affected package with its versions, in scanner order.
+// lists every affected package with its versions, sorted by package name,
+// not in the scanner's order.
 func TestGenerator_MultiComponentCVEAskedOnceRegardlessOfBatchSize(t *testing.T) {
 	vulns := []Vulnerability{
 		{VulnID: "CVE-2024-0000", PkgName: "pkg-b", InstalledVersion: "2.0", FixedVersion: "2.1", Description: "d", BOMRef: "b"},
@@ -466,8 +467,8 @@ func TestGenerator_MultiComponentCVEAskedOnceRegardlessOfBatchSize(t *testing.T)
 		entry := requestEntries(t, m.of(contract.M)[0].req.Human)[0]
 		require.Equal(t, "CVE-2024-0000", entry["vulnId"])
 		require.Equal(t, []any{
-			map[string]any{"name": "pkg-b", "installedVersion": "2.0", "fixedVersion": "2.1"},
 			map[string]any{"name": "pkg-a", "installedVersion": "1.0", "fixedVersion": "1.2"},
+			map[string]any{"name": "pkg-b", "installedVersion": "2.0", "fixedVersion": "2.1"},
 		}, entry["packages"], "batch size %d", batchSize)
 	}
 }

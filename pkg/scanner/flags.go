@@ -42,11 +42,26 @@ func trivySeverityContested(row generator.Vulnerability) bool {
 	return nvdHigh && hasVectorAt(row.CVSS, "nvd", cvss.Newest(row.CVSS))
 }
 
+// trivyContestUnavailable: the row's severity is not NVD's own and the row
+// gives no NVD severity to check it against, so trivySeverityContested
+// cannot fire whatever the severities say; grypeSeverityContested's
+// unavailable on a Trivy row.
+func trivyContestUnavailable(row generator.Vulnerability) bool {
+	return row.SeveritySource != "nvd" && !slices.ContainsFunc(row.VendorSeverities, func(s generator.VendorSeverity) bool {
+		return s.Source == "nvd"
+	})
+}
+
 // grypeSeverityContested is the same check on a Grype match, Negligible read
 // as Low and NVD's word taken from the related records in an nvd namespace:
 // one such record must both say High or Critical and carry the vector.
-// Without such a record the check cannot run: unavailable.
+// Without such a record the check cannot run: unavailable, unless the
+// matched record is NVD's own, which there is nothing to check against.
 func grypeSeverityContested(match grypemodels.Match, vectors []cvss.Vector) (contested, unavailable bool) {
+	matched := match.Vulnerability
+	if strings.HasPrefix(matched.Namespace, "nvd") {
+		return false, false
+	}
 	tier := cvss.Newest(vectors)
 	related, nvdContests := false, false
 	for _, r := range match.RelatedVulnerabilities {
@@ -64,12 +79,8 @@ func grypeSeverityContested(match grypemodels.Match, vectors []cvss.Vector) (con
 	if !related {
 		return false, true
 	}
-	matched := match.Vulnerability
 	low := matched.Severity == "Low" || matched.Severity == "Negligible"
-	if !low || strings.HasPrefix(matched.Namespace, "nvd") {
-		return false, false
-	}
-	return nvdContests, false
+	return low && nvdContests, false
 }
 
 // hasVectorAt reports whether source publishes a vector of the given tier;

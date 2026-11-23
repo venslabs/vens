@@ -215,7 +215,7 @@ Each run also writes **`answers.json`**: for each CVE, each of the 16 factors in
     },
     ...
   ],
-  "counters": { "cvss_v3_missing": 8, "data_subjects_missing": 26, "detection_undeclared": 45, "ease_of_exploit_cannot_tell": 4, "motive_cannot_tell": 4, "opportunity_cannot_tell": 4, "traceability_missing": 45 },
+  "counters": { "cvss_v3_missing": 8, "data_subjects_missing": 26, "detection_undeclared": 45, "ease_of_exploit_cannot_tell": 4, "motive_cannot_tell": 4, "opportunity_cannot_tell": 4, "severity_contested_unavailable": 27, "traceability_missing": 45 },
   "defects": {}
 }
 ```
@@ -388,7 +388,7 @@ Each vulnerability holds one OWASP rating (vector, severity and score), the BOM-
 A run that reaches scoring ends with one `INFO` line, `Scoring run finished`, also when it fails during scoring. From a mock run (`--llm=mock`) on `examples/quickstart`'s Trivy report with `data_subjects`, `detection` and `traceability` removed from its `config.yaml`, so their fallbacks are counted:
 
 ```text
-level=INFO msg="Scoring run finished" rows=107 cves=45 llm_calls=46 asked_again=0 splits=0 calls.M=5 calls.O=5 calls.EE=5 ... calls.adjustment=6 counters.cvss_v3_missing=8 counters.data_subjects_missing=26 counters.detection_undeclared=45 counters.ease_of_exploit_cannot_tell=4 counters.motive_cannot_tell=4 counters.opportunity_cannot_tell=4 counters.traceability_missing=45 failed=false
+level=INFO msg="Scoring run finished" rows=107 cves=45 llm_calls=46 asked_again=0 splits=0 calls.M=5 calls.O=5 calls.EE=5 ... calls.adjustment=6 counters.cvss_v3_missing=8 counters.data_subjects_missing=26 counters.detection_undeclared=45 counters.ease_of_exploit_cannot_tell=4 counters.motive_cannot_tell=4 counters.opportunity_cannot_tell=4 counters.severity_contested_unavailable=27 counters.traceability_missing=45 failed=false
 ```
 
 - `rows` and `cves` — the scanner's findings, and the distinct CVEs among them.
@@ -398,7 +398,7 @@ level=INFO msg="Scoring run finished" rows=107 cves=45 llm_calls=46 asked_again=
     - `<factor>_cannot_tell` (`motive_cannot_tell`, `opportunity_cannot_tell`, `ease_of_exploit_cannot_tell`, `intrusion_detection_cannot_tell`, `accountability_cannot_tell`, `financial_damage_cannot_tell`, `reputation_cannot_tell`, `non_compliance_cannot_tell`, `privacy_cannot_tell`) — the answer read as `cannot_tell`, or an answer off its list, so the question's worst answer applied. That is the factor's worst level, except where a rule still limits it: Intrusion detection takes the worst channel `detection` declares, `data_subjects` caps Privacy violation, and a flagged CVE's adjustment can lower Opportunity or Privacy violation. A CVE with no description is not asked Motive, Opportunity and Ease of exploit, nor Opportunity in its adjustment, a description being a prerequisite of their answers, and counts in `motive_cannot_tell`, `opportunity_cannot_tell` and `ease_of_exploit_cannot_tell`.
     - `detection_undeclared`, `traceability_missing`, `data_subjects_missing`, `availability_requirement_missing` — the fallback of a field left out of `config.yaml`; `availability_requirement_missing` counts the CVEs whose Loss of availability is read from a usable CVSS v3 vector, in the primary column.
     - `cvss_v3_missing` — the CVE has no usable CVSS v3 vector, so Loss of confidentiality, integrity and availability took 9.
-    - `severity_contested_unavailable` — no record in the report to check the CVE's severity against NVD's, so a contested severity could not be flagged.
+    - `severity_contested_unavailable` — no record in the report to check the CVE's severity against NVD's, so a contested severity could not be flagged, on every row of the CVE; where the severity is NVD's own: not counted. Trivy and Grype count it the same way.
     - `reasoning_missing` — a reply gave no reasoning for one of the CVE's answers; the answer is kept.
 - `defects.*` — replies that break the schema or the instructions, counted by kind: `answer_off_list`, `answer_key_written_twice`, `answer_without_reasoning`, `answer_cve_not_asked`, `answer_cve_repeated`, `reply_unreadable` (a reply that is not the JSON asked for, or holds an answer that is not a JSON object, counted once per reply: the CVEs it leaves without an answer are asked again), and for the adjustment `adjustment_unreadable`, `adjustment_key_written_twice`, `adjustment_off_list`, `adjustment_field_not_asked`, `adjustment_without_reasoning`. A provider that honours the schema and the prompt writes none.
 - `failed` — whether the run failed.

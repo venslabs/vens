@@ -15,7 +15,10 @@
 package generator
 
 import (
+	"bytes"
+	"cmp"
 	"context"
+	"encoding/json"
 	"log/slog"
 	"slices"
 	"strings"
@@ -25,7 +28,7 @@ import (
 )
 
 // cve is one vulnerability of the run: every row the scanner reported for it,
-// in scanner order, and what Go reads of them before any call.
+// in compareRows' order, and what Go reads of them before any call.
 type cve struct {
 	rows []Vulnerability
 	// in is the CVE as the questions read it, every row's evidence kept.
@@ -115,10 +118,11 @@ func vectorless(cves []*cve) []string {
 }
 
 // groupVulnsByCVE groups the flat (CVE, component) scanner rows by CVE,
-// preserving first-seen scanner order. Batching operates on these groups, so
-// a multi-component CVE occupies exactly one prompt entry in exactly one
-// batch: the model is asked (and paid) once per CVE instead of once per
-// component row. A row without an ID is never asked about, and is not a CVE.
+// preserving first-seen scanner order, each CVE's rows sorted by compareRows.
+// Batching operates on these groups, so a multi-component CVE occupies
+// exactly one prompt entry in exactly one batch: the model is asked (and
+// paid) once per CVE instead of once per component row. A row without an ID
+// is never asked about, and is not a CVE.
 func groupVulnsByCVE(vulns []Vulnerability) [][]Vulnerability {
 	var groups [][]Vulnerability
 	index := make(map[string]int, len(vulns))
@@ -133,7 +137,35 @@ func groupVulnsByCVE(vulns []Vulnerability) [][]Vulnerability {
 		index[v.VulnID] = len(groups)
 		groups = append(groups, []Vulnerability{v})
 	}
+	for _, g := range groups {
+		slices.SortStableFunc(g, compareRows)
+	}
 	return groups
+}
+
+// compareRows orders one CVE's rows by package name, installed version,
+// package ID, fixed version and BOM-ref, then by their whole content, so
+// the requests, the flags' evidence and the VEX's affects do not depend on
+// the order the scanner wrote the rows in.
+func compareRows(a, b Vulnerability) int {
+	if c := cmp.Or(
+		strings.Compare(a.PkgName, b.PkgName),
+		strings.Compare(a.InstalledVersion, b.InstalledVersion),
+		strings.Compare(a.PkgID, b.PkgID),
+		strings.Compare(a.FixedVersion, b.FixedVersion),
+		strings.Compare(a.BOMRef, b.BOMRef),
+	); c != 0 {
+		return c
+	}
+	return bytes.Compare(rowJSON(a), rowJSON(b))
+}
+
+// rowJSON is a row's JSON encoding, the total tie-break of compareRows. A
+// Vulnerability holds strings, slices of plain structs and bools, which
+// encoding/json always encodes.
+func rowJSON(v Vulnerability) []byte {
+	b, _ := json.Marshal(v)
+	return b
 }
 
 // contractCVE is a CVE's rows as the questions read them, each row with its

@@ -70,8 +70,9 @@ func (s *TrivyScanner) Parse(data []byte) ([]generator.Vulnerability, error) {
 				vuln.SourceURL = v.DataSource.URL
 			}
 			vuln.Flags = generator.Flags{
-				MaintainerDisputed: maintainerDisputed(vuln.Description),
-				SeverityContested:  trivySeverityContested(vuln),
+				MaintainerDisputed:           maintainerDisputed(vuln.Description),
+				SeverityContested:            trivySeverityContested(vuln),
+				SeverityContestedUnavailable: trivyContestUnavailable(vuln),
 			}
 			vulns = append(vulns, vuln)
 		}

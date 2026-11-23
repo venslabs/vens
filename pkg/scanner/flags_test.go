@@ -83,6 +83,64 @@ func TestTrivySeverityContested(t *testing.T) {
 	}
 }
 
+// The contest cannot be checked when the severity is not NVD's own and the
+// row gives no NVD severity to check it against; NVD's word without a v3
+// vector still makes it checkable.
+func TestTrivyContestUnavailable(t *testing.T) {
+	nvd3 := cvss.Vector{Source: "nvd", Version: "3.1", Vector: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N"}
+	row := func(source string, vendor ...generator.VendorSeverity) generator.Vulnerability {
+		return generator.Vulnerability{Severity: "MEDIUM", SeveritySource: source, VendorSeverities: vendor}
+	}
+	debian := generator.VendorSeverity{Source: "debian", Severity: "MEDIUM"}
+	nvd := generator.VendorSeverity{Source: "nvd", Severity: "HIGH"}
+	tests := []struct {
+		name string
+		row  generator.Vulnerability
+		want bool
+	}{
+		{"NVD absent", row("debian", debian), true},
+		{"NVD absent, no severity source", row(""), true},
+		{"NVD present without a v3 vector", row("debian", debian, nvd), false},
+		{"NVD present with a v3 vector", func() generator.Vulnerability { r := row("debian", nvd); r.CVSS = []cvss.Vector{nvd3}; return r }(), false},
+		{"the severity is NVD's own", row("nvd"), false},
+	}
+	for _, tt := range tests {
+		if got := trivyContestUnavailable(tt.row); got != tt.want {
+			t.Errorf("%s: trivyContestUnavailable = %v, want %v", tt.name, got, tt.want)
+		}
+	}
+}
+
+// A CVE's contest is unavailable only when it is on every row: one row with
+// NVD's severity makes the CVE checkable.
+func TestTrivyScanner_Parse_ContestUnavailableOnEveryRow(t *testing.T) {
+	report := `{"Results": [{"Target": "t", "Vulnerabilities": [
+  {"VulnerabilityID": "CVE-2024-0001", "PkgID": "a@1", "PkgName": "a", "SeveritySource": "debian", "Severity": "MEDIUM",
+   "VendorSeverity": {"debian": 2}},
+  {"VulnerabilityID": "CVE-2024-0001", "PkgID": "b@1", "PkgName": "b", "SeveritySource": "ubuntu", "Severity": "MEDIUM",
+   "VendorSeverity": {"ubuntu": 2, "nvd": 3}},
+  {"VulnerabilityID": "CVE-2024-0002", "PkgID": "c@1", "PkgName": "c", "SeveritySource": "debian", "Severity": "LOW",
+   "VendorSeverity": {"debian": 1}},
+  {"VulnerabilityID": "CVE-2024-0002", "PkgID": "d@1", "PkgName": "d", "Severity": "LOW"}
+]}]}`
+	rows, err := (&TrivyScanner{}).Parse([]byte(report))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	want := []bool{true, false, true, true}
+	for i, w := range want {
+		if rows[i].Flags.SeverityContestedUnavailable != w {
+			t.Errorf("row %d (%s, %s): unavailable %v, want %v", i, rows[i].VulnID, rows[i].PkgName, !w, w)
+		}
+	}
+	if generator.CVEFlags(rows[:2]).SeverityContestedUnavailable {
+		t.Error("mixed rows: one row gives NVD's severity, yet the CVE's contest is unavailable")
+	}
+	if !generator.CVEFlags(rows[2:]).SeverityContestedUnavailable {
+		t.Error("no row gives NVD's severity, yet the CVE's contest is available")
+	}
+}
+
 func TestGrypeSeverityContested(t *testing.T) {
 	nvdV3 := grypemodels.Cvss{Source: "nvd@nist.gov", Version: "3.1", Vector: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N"}
 	nvdV2 := grypemodels.Cvss{Source: "nvd@nist.gov", Version: "2.0", Vector: "AV:N/AC:L/Au:N/C:P/I:N/A:N"}
@@ -121,7 +179,9 @@ func TestGrypeSeverityContested(t *testing.T) {
 			grypemodels.Cvss{Source: "nvd@nist.gov", Vector: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N"})), false, false},
 		{"no related NVD record", match(debianLow, record("github:language:python", "High", nvdV3)), false, true},
 		{"no related record at all", match(debianLow), false, true},
-		{"an NVD match has no related NVD record", match(record("nvd:cpe", "High", nvdV3)), false, true},
+		// The matched record is NVD's own: nothing to check it against, nothing missing.
+		{"the matched nvd:cpe record is NVD's own, no related record", match(record("nvd:cpe", "High", nvdV3)), false, false},
+		{"the matched nvd:cpe record is NVD's own and Low", match(record("nvd:cpe", "Low")), false, false},
 	}
 	for _, tt := range tests {
 		contested, unavailable := grypeSeverityContested(tt.match, grypeVectors(tt.match))
@@ -169,9 +229,11 @@ const grypeFlagsReport = `{"matches": [{
 
 func TestGrypeScanner_Parse_SetsFlags(t *testing.T) {
 	rows := parseGrype(t, grypeFlagsReport)
+	// CVE-2024-0002 is matched on NVD's own record: its contest is not
+	// unavailable, there being nothing to check it against.
 	want := []generator.Flags{
 		{MaintainerDisputed: true, SeverityContested: true},
-		{SeverityContestedUnavailable: true},
+		{},
 	}
 	for i, w := range want {
 		if rows[i].Flags != w {
