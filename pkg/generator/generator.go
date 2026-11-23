@@ -17,15 +17,18 @@
 package generator
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
-	"math"
 	"os"
 	"path/filepath"
+	"regexp"
+	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -74,15 +77,78 @@ type LLMVulnerability struct {
 }
 
 // llmOutputEntry represents the LLM response for a single vulnerability.
-// The LLM rates each of the 4 OWASP factors (0-9 scale), and the final score
-// is calculated in Go code for mathematical accuracy.
+// The LLM rates each of the 16 OWASP factors on that factor's own levels, and
+// the vector, severity and score are calculated in Go by owasp.Vector.Rate.
 type llmOutputEntry struct {
-	VulnID             string  `json:"vulnId"`
-	ThreatAgentScore   float64 `json:"threat_agent_score"`  // 0-9: Threat actor factors (skill, motive, opportunity, size)
-	VulnerabilityScore float64 `json:"vulnerability_score"` // 0-9: Vulnerability factors (ease of discovery, ease of exploit)
-	TechnicalImpact    float64 `json:"technical_impact"`    // 0-9: Technical impact (loss of CIA)
-	BusinessImpact     float64 `json:"business_impact"`     // 0-9: Business impact (financial, reputation, compliance)
-	Reasoning          string  `json:"reasoning"`           // Brief explanation of the scoring
+	VulnID string `json:"vulnId"`
+	// Levels is read at parse time from the 16 factor keys, each checked
+	// against its factor's levels; an entry failing that check is dropped.
+	Levels    owasp.Vector `json:"-"`
+	Reasoning string       `json:"reasoning"` // Brief explanation of the scoring
+}
+
+// factor is one OWASP factor as the prompt and the schema ask it: its
+// vector key, its line in OWASP's Risk Rating Methodology (name, question,
+// options) and its distinct levels, those of pkg/owasp's levels.go.
+type factor struct {
+	key      string
+	name     string
+	question string
+	options  string
+	levels   []int
+}
+
+// factors lists the 16 factors in the vector's order, four per group: threat
+// agent, vulnerability, technical impact, business impact.
+var factors = []factor{
+	{"SL", "Skill Level", "How technically skilled is this group of threat agents?",
+		"No technical skills (1), some technical skills (3), advanced computer user (5), network and programming skills (6), security penetration skills (9)",
+		[]int{1, 3, 5, 6, 9}},
+	{"M", "Motive", "How motivated is this group of threat agents to find and exploit this vulnerability?",
+		"Low or no reward (1), possible reward (4), high reward (9)",
+		[]int{1, 4, 9}},
+	{"O", "Opportunity", "What resources and opportunities are required for this group of threat agents to find and exploit this vulnerability?",
+		"Full access or expensive resources required (0), special access or resources required (4), some access or resources required (7), no access or resources required (9)",
+		[]int{0, 4, 7, 9}},
+	{"S", "Size", "How large is this group of threat agents?",
+		"Developers (2), system administrators (2), intranet users (4), partners (5), authenticated users (6), anonymous Internet users (9)",
+		[]int{2, 4, 5, 6, 9}},
+	{"ED", "Ease of Discovery", "How easy is it for this group of threat agents to discover this vulnerability?",
+		"Practically impossible (1), difficult (3), easy (7), automated tools available (9)",
+		[]int{1, 3, 7, 9}},
+	{"EE", "Ease of Exploit", "How easy is it for this group of threat agents to actually exploit this vulnerability?",
+		"Theoretical (1), difficult (3), easy (5), automated tools available (9)",
+		[]int{1, 3, 5, 9}},
+	{"A", "Awareness", "How well known is this vulnerability to this group of threat agents?",
+		"Unknown (1), hidden (4), obvious (6), public knowledge (9)",
+		[]int{1, 4, 6, 9}},
+	{"ID", "Intrusion Detection", "How likely is an exploit to be detected?",
+		"Active detection in application (1), logged and reviewed (3), logged without review (8), not logged (9)",
+		[]int{1, 3, 8, 9}},
+	{"LC", "Loss of Confidentiality", "How much data could be disclosed and how sensitive is it?",
+		"Minimal non-sensitive data disclosed (2), minimal critical data disclosed (6), extensive non-sensitive data disclosed (6), extensive critical data disclosed (7), all data disclosed (9)",
+		[]int{2, 6, 7, 9}},
+	{"LI", "Loss of Integrity", "How much data could be corrupted and how damaged is it?",
+		"Minimal slightly corrupt data (1), minimal seriously corrupt data (3), extensive slightly corrupt data (5), extensive seriously corrupt data (7), all data totally corrupt (9)",
+		[]int{1, 3, 5, 7, 9}},
+	{"LAV", "Loss of Availability", "How much service could be lost and how vital is it?",
+		"Minimal secondary services interrupted (1), minimal primary services interrupted (5), extensive secondary services interrupted (5), extensive primary services interrupted (7), all services completely lost (9)",
+		[]int{1, 5, 7, 9}},
+	{"LAC", "Loss of Accountability", "Are the threat agents' actions traceable to an individual?",
+		"Fully traceable (1), possibly traceable (7), completely anonymous (9)",
+		[]int{1, 7, 9}},
+	{"FD", "Financial damage", "How much financial damage will result from an exploit?",
+		"Less than the cost to fix the vulnerability (1), minor effect on annual profit (3), significant effect on annual profit (7), bankruptcy (9)",
+		[]int{1, 3, 7, 9}},
+	{"RD", "Reputation damage", "Would an exploit result in reputation damage that would harm the business?",
+		"Minimal damage (1), Loss of major accounts (4), loss of goodwill (5), brand damage (9)",
+		[]int{1, 4, 5, 9}},
+	{"NC", "Non-compliance", "How much exposure does non-compliance introduce?",
+		"Minor violation (2), clear violation (5), high profile violation (7)",
+		[]int{2, 5, 7}},
+	{"PV", "Privacy violation", "How much personally identifiable information could be disclosed?",
+		"One individual (3), hundreds of people (5), thousands of people (7), millions of people (9)",
+		[]int{3, 5, 7, 9}},
 }
 
 // llmOutput wraps the array of results from LLM.
@@ -330,23 +396,16 @@ func (g *Generator) generateRiskScore(ctx context.Context, vulnBatch []Vulnerabi
 	for _, answer := range answers {
 		entry, evidenceRef := answer.entry, answer.evidenceRef
 
-		// The aggregates arrive rounded from parse time, so the published
-		// score can be recomputed from its own vector, which carries them
-		// rounded (#358).
-		ta, vul, tech, bus := entry.ThreatAgentScore,
-			entry.VulnerabilityScore,
-			entry.TechnicalImpact,
-			entry.BusinessImpact
-		likelihoodScore := (ta + vul) / 2.0
-		impactScore := (tech + bus) / 2.0
-		owaspScore := likelihoodScore * impactScore // Range: 0-81
-
-		score := clampScore(owaspScore)
-		severity := riskconfig.RiskSeverity(score)
-
-		// Generate OWASP RR vector in standard format
-		vector := owasp.FromAggregatedScores(ta, vul, tech, bus)
-		vectorString := vector.String()
+		// The 16 levels passed their factors' levels at parse time, so Rate
+		// cannot refuse them; its score is likelihood x max(technical,
+		// business) from the exact averages, neither rounded nor clamped.
+		rating, err := entry.Levels.Rate()
+		if err != nil {
+			return fmt.Errorf("vulnerability %s: %w", entry.VulnID, err)
+		}
+		score := rating.Score
+		severity := rating.Severity
+		vectorString := rating.Vector
 
 		comps := vulnsByID[entry.VulnID]
 		if pend, ok := run.pending[entry.VulnID]; ok {
@@ -360,28 +419,14 @@ func (g *Generator) generateRiskScore(ctx context.Context, vulnBatch []Vulnerabi
 			delete(run.pending, entry.VulnID)
 		}
 
-		if answer.zeroLikelihood && !answer.published {
-			// A "not reachable here" verdict is published as-is, so it lands
-			// as info whatever impact the model gave: surface the model's
-			// reasoning at WARN. Only the batch that first publishes it logs it.
-			slog.WarnContext(ctx, "Assessment verdict: not reachable here; publishing its score as-is",
+		for _, v := range comps {
+			slog.InfoContext(ctx, "Scored vulnerability",
 				"vuln", entry.VulnID,
+				"pkg", v.BOMRef,
 				"score", fmt.Sprintf("%.1f", score),
 				"severity", severity,
-				"reasoning", entry.Reasoning,
+				"vector", vectorString,
 			)
-		}
-
-		for _, v := range comps {
-			if !answer.zeroLikelihood {
-				slog.InfoContext(ctx, "Scored vulnerability",
-					"vuln", entry.VulnID,
-					"pkg", v.BOMRef,
-					"score", fmt.Sprintf("%.1f", score),
-					"severity", severity,
-					"vector", vectorString,
-				)
-			}
 
 			var source *cyclonedx.Source
 			if v.SourceName != "" {
@@ -453,34 +498,19 @@ func (g *Generator) generateRiskScore(ctx context.Context, vulnBatch []Vulnerabi
 
 // answer pairs a model entry with the evidence bundle of the call it came from.
 // A retry is a second call, so the entries it recovers cite a different bundle.
-// zeroLikelihood marks a "not reachable here" verdict (see func
-// zeroLikelihood), published as-is with its reasoning logged at WARN. published
-// marks an answer an earlier batch already published: that batch logged its
-// WARN line, so it is not repeated. prompted is the set of (package, version)
-// rows the call behind this answer was asked about; a claim whose row is not in
-// it must say so, because its cited evidence bundle's prompt never mentioned
-// that package.
+// prompted is the set of (package, version) rows the call behind this answer
+// was asked about; a claim whose row is not in it must say so, because its
+// cited evidence bundle's prompt never mentioned that package.
 type answer struct {
-	entry          llmOutputEntry
-	evidenceRef    string
-	zeroLikelihood bool
-	published      bool
-	prompted       map[promptRow]bool
+	entry       llmOutputEntry
+	evidenceRef string
+	prompted    map[promptRow]bool
 }
 
 // promptRow identifies one package row a prompt was asked about.
 type promptRow struct {
 	name    string
 	version string
-}
-
-// zeroLikelihood reports whether both likelihood factors are 0, which makes
-// the score 0 whatever impact the model gave. In practice these are real "not
-// reachable here" verdicts, not refusals: they are published as-is with the
-// reasoning logged at WARN. A zero reached with a non-zero likelihood, e.g.
-// CVE-2019-9192's [0 1 0 0], is a genuine low score and is logged like any other.
-func zeroLikelihood(e llmOutputEntry) bool {
-	return e.ThreatAgentScore == 0 && e.VulnerabilityScore == 0
 }
 
 // scoreAll scores every vulnerability in the batch. A model can leave some out of
@@ -530,7 +560,7 @@ func (g *Generator) scoreAll(ctx context.Context, batch []LLMVulnerability, end 
 			}
 			scored[e.VulnID] = true
 			delete(run.missing, e.VulnID)
-			a := answer{entry: e, evidenceRef: evidenceRef, zeroLikelihood: zeroLikelihood(e), prompted: prompted}
+			a := answer{entry: e, evidenceRef: evidenceRef, prompted: prompted}
 			run.scores[e.VulnID] = a
 			answers = append(answers, a)
 		}
@@ -550,12 +580,9 @@ func (g *Generator) scoreAll(ctx context.Context, batch []LLMVulnerability, end 
 			}
 			if first, ok := run.scores[v.VulnID]; ok {
 				// Pulled from an earlier batch's score, not obtained in this
-				// call. That batch did not always publish it: one split after
-				// a truncated retry never did. Whether the claim for this
-				// batch's row says the cited prompt skipped its package is
-				// decided per row from the answer's prompted set, in
-				// generateRiskScore.
-				first.published = run.scored[v.VulnID]
+				// call. Whether the claim for this batch's row says the cited
+				// prompt skipped its package is decided per row from the
+				// answer's prompted set, in generateRiskScore.
 				slog.DebugContext(ctx, "reusing an earlier batch's first score",
 					"vuln", v.VulnID,
 					"evidence_ref", first.evidenceRef,
@@ -649,8 +676,6 @@ func (g *Generator) evaluateOWASPScores(ctx context.Context, vulns []LLMVulnerab
 	schema := g.buildOutputSchema()
 	systemPrompt += "#### Output format: JSON Schema\n"
 	systemPrompt += string(schema) + "\n"
-	systemPrompt += "#### Output Example\n"
-	systemPrompt += "```json\n" + g.buildOutputExample() + "\n```\n"
 
 	vulnsJSON, err := json.Marshal(vulns)
 	if err != nil {
@@ -696,33 +721,192 @@ func (g *Generator) evaluateOWASPScores(ctx context.Context, vulns []LLMVulnerab
 		evidenceRef = g.attestor.AddBatch(systemPrompt, humanPrompt, []byte(raw))
 	}
 
+	entries, err := parseReply(ctx, raw)
+	if err != nil {
+		return nil, "", err
+	}
+	return entries, evidenceRef, nil
+}
+
+// parseReply reads the model's reply. Nothing is rounded, clamped or snapped:
+// an entry whose factor is missing, null, not an integer or off its factor's
+// levels is dropped and logged at WARN, which leaves its CVE unanswered, so it
+// is asked again like any CVE the model skipped.
+func parseReply(ctx context.Context, raw string) ([]llmOutputEntry, error) {
 	var resp llmOutput
 	if err := json.Unmarshal([]byte(raw), &resp); err != nil {
-		return nil, "", fmt.Errorf("unable to parse LLM output: %w: %q", err, raw)
+		return nil, fmt.Errorf("unable to parse LLM output: %w: %q", err, raw)
+	}
+	// The same text again, each result kept raw for its factor keys; it
+	// decoded above, so it decodes here into as many results.
+	var items struct {
+		Results []json.RawMessage `json:"results"`
+	}
+	if err := json.Unmarshal([]byte(raw), &items); err != nil || len(items.Results) != len(resp.Results) {
+		return nil, fmt.Errorf("unable to parse LLM output: results read twice disagree: %q", raw)
 	}
 
-	for i := range resp.Results {
-		entry := &resp.Results[i]
+	// The first entry for a CVE decides, as on main: once it is dropped, a later
+	// entry for the same CVE in this reply is skipped too, so the CVE is asked
+	// again.
+	seen := make(map[string]bool, len(resp.Results))
+	droppedFirst := make(map[string]bool)
+	entries := make([]llmOutputEntry, 0, len(resp.Results))
+	for i, entry := range resp.Results {
+		if droppedFirst[entry.VulnID] {
+			continue
+		}
+		first := !seen[entry.VulnID]
+		seen[entry.VulnID] = true
+		levels, invalid := readLevels(items.Results[i])
+		if len(invalid) > 0 {
+			slog.WarnContext(ctx, "Dropping an answer whose factor levels are invalid; its CVE stays unanswered",
+				"vuln", entry.VulnID,
+				"field", invalid.keys(),
+				"why", invalid.String(),
+			)
+			if first {
+				droppedFirst[entry.VulnID] = true
+			}
+			continue
+		}
+		entry.Levels = vectorOf(levels)
 
-		// Round once here so the score, the vector, zeroLikelihood and the
-		// debug log below all see the same integers; the attested
-		// raw_response keeps the raw model answer (#358).
-		entry.ThreatAgentScore = math.Round(clampScore09(entry.ThreatAgentScore))
-		entry.VulnerabilityScore = math.Round(clampScore09(entry.VulnerabilityScore))
-		entry.TechnicalImpact = math.Round(clampScore09(entry.TechnicalImpact))
-		entry.BusinessImpact = math.Round(clampScore09(entry.BusinessImpact))
-
-		slog.DebugContext(ctx, "owasp_components",
+		slog.DebugContext(ctx, "owasp_levels",
 			"vuln", entry.VulnID,
-			"threat_agent", entry.ThreatAgentScore,
-			"vulnerability", entry.VulnerabilityScore,
-			"technical_impact", entry.TechnicalImpact,
-			"business_impact", entry.BusinessImpact,
+			"levels", levelsString(levels),
 			"reasoning", entry.Reasoning,
 		)
+		entries = append(entries, entry)
 	}
+	return entries, nil
+}
 
-	return resp.Results, evidenceRef, nil
+// invalidLevel is one factor of an entry that fails its check, and why.
+type invalidLevel struct {
+	key string
+	why string
+}
+
+type invalidLevels []invalidLevel
+
+func (l invalidLevels) keys() string {
+	keys := make([]string, len(l))
+	for i, f := range l {
+		keys[i] = f.key
+	}
+	return strings.Join(keys, ",")
+}
+
+func (l invalidLevels) String() string {
+	parts := make([]string, len(l))
+	for i, f := range l {
+		parts[i] = f.key + ": " + f.why
+	}
+	return strings.Join(parts, "; ")
+}
+
+// readLevels reads the 16 factor levels of one result, in factors' order. item
+// has already decoded into an llmOutputEntry, so it is an object or null.
+func readLevels(item json.RawMessage) ([]int, invalidLevels) {
+	var fields map[string]json.RawMessage
+	_ = json.Unmarshal(item, &fields)
+
+	levels := make([]int, len(factors))
+	var invalid invalidLevels
+	for i, f := range factors {
+		raw, ok := fields[f.key]
+		if !ok {
+			invalid = append(invalid, invalidLevel{f.key, "missing"})
+			continue
+		}
+		raw = bytes.TrimSpace(raw)
+		if string(raw) == "null" {
+			invalid = append(invalid, invalidLevel{f.key, "null"})
+			continue
+		}
+		n, whole := exactLevel(raw)
+		if !whole {
+			invalid = append(invalid, invalidLevel{f.key, "not an integer: " + string(raw)})
+			continue
+		}
+		if !slices.Contains(f.levels, n) {
+			invalid = append(invalid, invalidLevel{f.key, fmt.Sprintf("%s is off its levels %v", raw, f.levels)})
+			continue
+		}
+		levels[i] = n
+	}
+	return levels, invalid
+}
+
+// jsonNumber is the grammar of a JSON number: sign, integer part, fraction
+// and exponent.
+var jsonNumber = regexp.MustCompile(`^(-?)(0|[1-9][0-9]*)(?:\.([0-9]+))?(?:[eE]([+-]?[0-9]+))?$`)
+
+// exactLevel reads raw as the exact value of a JSON number, never through a
+// float: 5, 5.0, 5e0 and 50e-1 all read 5, while 5.5 and 4.9999999999999999
+// are not whole numbers. whole is false for a value that is not a number or
+// not a whole number; a whole number outside 0 to 9 reads -1, on no factor's
+// levels.
+func exactLevel(raw []byte) (level int, whole bool) {
+	m := jsonNumber.FindSubmatch(raw)
+	if m == nil {
+		return 0, false
+	}
+	sign, integer, fraction, exponent := string(m[1]), string(m[2]), string(m[3]), string(m[4])
+	// The value is digits x 10^shift.
+	digits := strings.TrimLeft(integer+fraction, "0")
+	if digits == "" {
+		return 0, true
+	}
+	var shift int64
+	if exponent != "" {
+		var err error
+		if shift, err = strconv.ParseInt(exponent, 10, 32); err != nil {
+			// An exponent beyond 32 bits: a whole number far above 9, or a
+			// fraction far below 1.
+			return -1, !strings.HasPrefix(exponent, "-")
+		}
+	}
+	significant := strings.TrimRight(digits, "0")
+	shift += int64(len(digits)-len(significant)) - int64(len(fraction))
+	switch {
+	case shift < 0:
+		return 0, false
+	case sign == "-" || shift > 0 || len(significant) > 1:
+		return -1, true
+	}
+	return int(significant[0] - '0'), true
+}
+
+// vectorOf turns 16 levels, in factors' order, into an owasp.Vector.
+func vectorOf(l []int) owasp.Vector {
+	return owasp.Vector{
+		SL:  owasp.SkillLevel(l[0]),
+		M:   owasp.Motive(l[1]),
+		O:   owasp.Opportunity(l[2]),
+		S:   owasp.Size(l[3]),
+		ED:  owasp.EaseOfDiscovery(l[4]),
+		EE:  owasp.EaseOfExploit(l[5]),
+		A:   owasp.Awareness(l[6]),
+		ID:  owasp.IntrusionDetection(l[7]),
+		LC:  owasp.LossOfConfidentiality(l[8]),
+		LI:  owasp.LossOfIntegrity(l[9]),
+		LAV: owasp.LossOfAvailability(l[10]),
+		LAC: owasp.LossOfAccountability(l[11]),
+		FD:  owasp.FinancialDamage(l[12]),
+		RD:  owasp.ReputationDamage(l[13]),
+		NC:  owasp.NonCompliance(l[14]),
+		PV:  owasp.PrivacyViolation(l[15]),
+	}
+}
+
+func levelsString(l []int) string {
+	parts := make([]string, len(factors))
+	for i, f := range factors {
+		parts[i] = fmt.Sprintf("%s:%d", f.key, l[i])
+	}
+	return strings.Join(parts, "/")
 }
 
 // buildSystemPrompt creates the system prompt for OWASP score calculation.
@@ -737,12 +921,15 @@ SYSTEM CONTEXT:
 	}
 
 	prompt += `
-TASK: For EACH vulnerability, analyze its specific characteristics and score 4 factors (0-9):
+TASK: For EACH vulnerability, analyze its specific characteristics and rate the 16 OWASP factors below, each separately, on that factor's own levels:
 
 1. THREAT_AGENT (Who can exploit THIS vuln in THIS system?)
    - Consider: Does system exposure match vuln attack vector?
    - Internet-exposed remote vuln: 7-9 | Private network local vuln: 3-5 | Mismatch: lower
-   - Adjust for attacker motivation based on business value
+   - Adjust for attacker motivation based on business value`
+	prompt += factorLines(factors[0:4])
+
+	prompt += `
 
 2. VULNERABILITY (How exploitable is THIS specific vuln?)
    CRITICAL: Score the ACTUAL vulnerability, not the system
@@ -757,6 +944,7 @@ TASK: For EACH vulnerability, analyze its specific characteristics and score 4 f
    - Reduce if controls block this vuln type (WAF blocks web exploits, IDS detects network attacks)`
 		}
 	}
+	prompt += factorLines(factors[4:8])
 
 	prompt += `
 
@@ -777,9 +965,9 @@ TASK: For EACH vulnerability, analyze its specific characteristics and score 4 f
 		prompt += `
      * Accountability loss: score = audit_requirement`
 	}
+	prompt += factorLines(factors[8:12])
 
 	prompt += `
-   - Return highest applicable score
 
 4. BUSINESS_IMPACT (Business damage if THIS vuln exploited?)
    - Base: business_criticality`
@@ -789,12 +977,25 @@ TASK: For EACH vulnerability, analyze its specific characteristics and score 4 f
    - +2 if vuln triggers compliance violation (data breach/audit failure)`
 	}
 	prompt += `
-   - Cap at 9
+   - Cap at 9`
+	prompt += factorLines(factors[12:16])
+
+	prompt += `
 
 SCORING SCALE: low:1-3, medium:4-6, high:7-8, critical:9
-OUTPUT: 4 scores (0-9) + brief reasoning for THIS specific vulnerability in THIS context.
+OUTPUT: the 16 factor levels + brief reasoning for THIS specific vulnerability in THIS context.
 `
 	return prompt
+}
+
+// factorLines lists a group's four factors under its guidance lines, each
+// with its line from OWASP's Risk Rating Methodology.
+func factorLines(group []factor) string {
+	s := "\n   Factors, each rated separately:"
+	for _, f := range group {
+		s += "\n   - " + f.key + ": " + f.name + " - " + f.question + " " + f.options
+	}
+	return s
 }
 
 // buildOutputSchema returns the JSON Schema the LLM output must satisfy.
@@ -805,7 +1006,29 @@ func (g *Generator) buildOutputSchema() json.RawMessage {
 	return json.RawMessage(outputSchema)
 }
 
-const outputSchema = `{
+// outputSchema asks, per result, the vulnId, then each factor as an integer
+// on its own levels with OWASP's question as its description, in the vector's
+// order, then the reasoning.
+var outputSchema = schemaFor(factors)
+
+func schemaFor(fs []factor) string {
+	var props, required strings.Builder
+	props.WriteString(`          "vulnId": {"type": "string", "description": "The vulnerability ID from the input (e.g., CVE-2024-1234)"},` + "\n")
+	required.WriteString(`"vulnId"`)
+	for _, f := range fs {
+		levels := make([]string, len(f.levels))
+		for i, l := range f.levels {
+			levels[i] = fmt.Sprint(l)
+		}
+		question, _ := json.Marshal(f.question)
+		fmt.Fprintf(&props, `          "%s": {"type": "integer", "enum": [%s], "description": %s},`+"\n",
+			f.key, strings.Join(levels, ", "), question)
+		fmt.Fprintf(&required, `, "%s"`, f.key)
+	}
+	props.WriteString(`          "reasoning": {"type": "string", "description": "Brief explanation of each score (2-3 sentences)"}` + "\n")
+	required.WriteString(`, "reasoning"`)
+
+	return `{
   "type": "object",
   "additionalProperties": false,
   "properties": {
@@ -815,62 +1038,11 @@ const outputSchema = `{
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "vulnId": {"type": "string", "description": "The vulnerability ID from the input (e.g., CVE-2024-1234)"},
-          "threat_agent_score": {"type": "number", "description": "Threat Agent score (0-9): skill level, motive, opportunity, size"},
-          "vulnerability_score": {"type": "number", "description": "Vulnerability score (0-9): ease of discovery, ease of exploit"},
-          "technical_impact": {"type": "number", "description": "Technical Impact score (0-9): loss of confidentiality, integrity, availability, accountability"},
-          "business_impact": {"type": "number", "description": "Business Impact score (0-9): financial damage, reputation damage, non-compliance, privacy violation"},
-          "reasoning": {"type": "string", "description": "Brief explanation of each score (2-3 sentences)"}
-        },
-        "required": ["vulnId", "threat_agent_score", "vulnerability_score", "technical_impact", "business_impact", "reasoning"]
+` + props.String() + `        },
+        "required": [` + required.String() + `]
       }
     }
   },
   "required": ["results"]
 }`
-
-// buildOutputExample returns an example output for the LLM.
-func (g *Generator) buildOutputExample() string {
-	return `{
-  "results": [
-    {
-      "vulnId": "CVE-2024-1234",
-      "threat_agent_score": 8,
-      "vulnerability_score": 7,
-      "technical_impact": 8,
-      "business_impact": 9,
-      "reasoning": "RCE in OpenSSL: ThreatAgent=8 (internet-exposed, attracts skilled attackers), Vulnerability=7 (known exploit exists), TechImpact=8 (full system compromise), BusinessImpact=9 (critical system + compliance risk)"
-    },
-    {
-      "vulnId": "CVE-2024-5678",
-      "threat_agent_score": 3,
-      "vulnerability_score": 4,
-      "technical_impact": 4,
-      "business_impact": 5,
-      "reasoning": "DoS in logging lib: ThreatAgent=3 (internal only), Vulnerability=4 (requires config), TechImpact=4 (availability impact medium), BusinessImpact=5 (medium criticality system)"
-    }
-  ]
-}`
-}
-
-// clampScore ensures the score is within [0, 81].
-func clampScore(v float64) float64 {
-	if v < 0.0 {
-		return 0.0
-	}
-	if v > 81.0 {
-		return 81.0
-	}
-	return v
-}
-
-// clampScore09 ensures a component score is within [0, 9].
-func clampScore09(v float64) float64 {
-	if v < 0.0 {
-		return 0.0
-	}
-	if v > 9.0 {
-		return 9.0
-	}
-	return v
 }

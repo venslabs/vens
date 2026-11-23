@@ -1,0 +1,35 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "vulnId": {"type": "string", "description": "The vulnerability ID from the input (e.g., CVE-2024-1234)"},
+          "SL": {"type": "integer", "enum": [1, 3, 5, 6, 9], "description": "How technically skilled is this group of threat agents?"},
+          "M": {"type": "integer", "enum": [1, 4, 9], "description": "How motivated is this group of threat agents to find and exploit this vulnerability?"},
+          "O": {"type": "integer", "enum": [0, 4, 7, 9], "description": "What resources and opportunities are required for this group of threat agents to find and exploit this vulnerability?"},
+          "S": {"type": "integer", "enum": [2, 4, 5, 6, 9], "description": "How large is this group of threat agents?"},
+          "ED": {"type": "integer", "enum": [1, 3, 7, 9], "description": "How easy is it for this group of threat agents to discover this vulnerability?"},
+          "EE": {"type": "integer", "enum": [1, 3, 5, 9], "description": "How easy is it for this group of threat agents to actually exploit this vulnerability?"},
+          "A": {"type": "integer", "enum": [1, 4, 6, 9], "description": "How well known is this vulnerability to this group of threat agents?"},
+          "ID": {"type": "integer", "enum": [1, 3, 8, 9], "description": "How likely is an exploit to be detected?"},
+          "LC": {"type": "integer", "enum": [2, 6, 7, 9], "description": "How much data could be disclosed and how sensitive is it?"},
+          "LI": {"type": "integer", "enum": [1, 3, 5, 7, 9], "description": "How much data could be corrupted and how damaged is it?"},
+          "LAV": {"type": "integer", "enum": [1, 5, 7, 9], "description": "How much service could be lost and how vital is it?"},
+          "LAC": {"type": "integer", "enum": [1, 7, 9], "description": "Are the threat agents' actions traceable to an individual?"},
+          "FD": {"type": "integer", "enum": [1, 3, 7, 9], "description": "How much financial damage will result from an exploit?"},
+          "RD": {"type": "integer", "enum": [1, 4, 5, 9], "description": "Would an exploit result in reputation damage that would harm the business?"},
+          "NC": {"type": "integer", "enum": [2, 5, 7], "description": "How much exposure does non-compliance introduce?"},
+          "PV": {"type": "integer", "enum": [3, 5, 7, 9], "description": "How much personally identifiable information could be disclosed?"},
+          "reasoning": {"type": "string", "description": "Brief explanation of each score (2-3 sentences)"}
+        },
+        "required": ["vulnId", "SL", "M", "O", "S", "ED", "EE", "A", "ID", "LC", "LI", "LAV", "LAC", "FD", "RD", "NC", "PV", "reasoning"]
+      }
+    }
+  },
+  "required": ["results"]
+}

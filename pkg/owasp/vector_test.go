@@ -15,175 +15,191 @@
 package owasp
 
 import (
-	"regexp"
+	"math/rand/v2"
+	"slices"
 	"testing"
 )
 
-func TestOwaspRRVector_String(t *testing.T) {
+func TestVector_Rate(t *testing.T) {
 	tests := []struct {
 		name     string
-		vector   *OwaspRRVector
-		expected string
+		vector   Vector
+		expected Rating
 	}{
 		{
-			name: "all_zeros",
-			vector: &OwaspRRVector{
-				SkillLevel: 0, Motive: 0, Opportunity: 0, Size: 0,
-				EaseOfDiscovery: 0, EaseOfExploit: 0, Awareness: 0, IntrusionDetection: 0,
-				LossOfConfidentiality: 0, LossOfIntegrity: 0, LossOfAvailability: 0, LossOfAccountability: 0,
-				FinancialDamage: 0, ReputationDamage: 0, NonCompliance: 0, PrivacyViolation: 0,
+			name: "lowest_levels",
+			vector: Vector{
+				SL: SkillLevelNoTechnicalSkills, M: MotiveLowOrNoReward,
+				O: OpportunityFullAccessOrExpensiveResourcesRequired, S: SizeDevelopers,
+				ED: EaseOfDiscoveryPracticallyImpossible, EE: EaseOfExploitTheoretical,
+				A: AwarenessUnknown, ID: IntrusionDetectionActiveDetectionInApplication,
+				LC: LossOfConfidentialityMinimalNonSensitiveDataDisclosed, LI: LossOfIntegrityMinimalSlightlyCorruptData,
+				LAV: LossOfAvailabilityMinimalSecondaryServicesInterrupted, LAC: LossOfAccountabilityFullyTraceable,
+				FD: FinancialDamageLessThanTheCostToFixTheVulnerability, RD: ReputationDamageMinimalDamage,
+				NC: NonComplianceMinorViolation, PV: PrivacyViolationOneIndividual,
 			},
-			expected: "SL:0/M:0/O:0/S:0/ED:0/EE:0/A:0/ID:0/LC:0/LI:0/LAV:0/LAC:0/FD:0/RD:0/NC:0/PV:0",
+			// Likelihood 1, impact 1.75: OWASP's Note, written info.
+			expected: Rating{
+				Vector:   "SL:1/M:1/O:0/S:2/ED:1/EE:1/A:1/ID:1/LC:2/LI:1/LAV:1/LAC:1/FD:1/RD:1/NC:2/PV:3",
+				Severity: "info",
+				Score:    1.75,
+			},
 		},
 		{
-			name: "all_nines",
-			vector: &OwaspRRVector{
-				SkillLevel: 9, Motive: 9, Opportunity: 9, Size: 9,
-				EaseOfDiscovery: 9, EaseOfExploit: 9, Awareness: 9, IntrusionDetection: 9,
-				LossOfConfidentiality: 9, LossOfIntegrity: 9, LossOfAvailability: 9, LossOfAccountability: 9,
-				FinancialDamage: 9, ReputationDamage: 9, NonCompliance: 9, PrivacyViolation: 9,
+			name: "highest_levels",
+			vector: Vector{
+				SL: SkillLevelSecurityPenetrationSkills, M: MotiveHighReward,
+				O: OpportunityNoAccessOrResourcesRequired, S: SizeAnonymousInternetUsers,
+				ED: EaseOfDiscoveryAutomatedToolsAvailable, EE: EaseOfExploitAutomatedToolsAvailable,
+				A: AwarenessPublicKnowledge, ID: IntrusionDetectionNotLogged,
+				LC: LossOfConfidentialityAllDataDisclosed, LI: LossOfIntegrityAllDataTotallyCorrupt,
+				LAV: LossOfAvailabilityAllServicesCompletelyLost, LAC: LossOfAccountabilityCompletelyAnonymous,
+				FD: FinancialDamageBankruptcy, RD: ReputationDamageBrandDamage,
+				NC: NonComplianceHighProfileViolation, PV: PrivacyViolationMillionsOfPeople,
 			},
-			expected: "SL:9/M:9/O:9/S:9/ED:9/EE:9/A:9/ID:9/LC:9/LI:9/LAV:9/LAC:9/FD:9/RD:9/NC:9/PV:9",
+			expected: Rating{
+				Vector:   "SL:9/M:9/O:9/S:9/ED:9/EE:9/A:9/ID:9/LC:9/LI:9/LAV:9/LAC:9/FD:9/RD:9/NC:7/PV:9",
+				Severity: "critical",
+				Score:    81,
+			},
 		},
 		{
 			name: "mixed_values",
-			vector: &OwaspRRVector{
-				SkillLevel: 5, Motive: 2, Opportunity: 7, Size: 1,
-				EaseOfDiscovery: 3, EaseOfExploit: 6, Awareness: 9, IntrusionDetection: 2,
-				LossOfConfidentiality: 9, LossOfIntegrity: 7, LossOfAvailability: 5, LossOfAccountability: 8,
-				FinancialDamage: 1, ReputationDamage: 2, NonCompliance: 1, PrivacyViolation: 5,
+			vector: Vector{
+				SL: SkillLevelAdvancedComputerUser, M: MotivePossibleReward,
+				O: OpportunitySomeAccessOrResourcesRequired, S: SizeAuthenticatedUsers,
+				ED: EaseOfDiscoveryEasy, EE: EaseOfExploitEasy,
+				A: AwarenessObvious, ID: IntrusionDetectionLoggedWithoutReview,
+				LC: LossOfConfidentialityMinimalNonSensitiveDataDisclosed, LI: LossOfIntegrityMinimalSeriouslyCorruptData,
+				LAV: LossOfAvailabilityMinimalPrimaryServicesInterrupted, LAC: LossOfAccountabilityPossiblyTraceable,
+				FD: FinancialDamageLessThanTheCostToFixTheVulnerability, RD: ReputationDamageMinimalDamage,
+				NC: NonComplianceMinorViolation, PV: PrivacyViolationOneIndividual,
 			},
-			expected: "SL:5/M:2/O:7/S:1/ED:3/EE:6/A:9/ID:2/LC:9/LI:7/LAV:5/LAC:8/FD:1/RD:2/NC:1/PV:5",
+			// Likelihood 6, technical 4.25 over business 1.75.
+			expected: Rating{
+				Vector:   "SL:5/M:4/O:7/S:6/ED:7/EE:5/A:6/ID:8/LC:2/LI:3/LAV:5/LAC:7/FD:1/RD:1/NC:2/PV:3",
+				Severity: "high",
+				Score:    25.5,
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := tt.vector.String()
+			got, err := tt.vector.Rate()
+			if err != nil {
+				t.Fatalf("Rate() error = %v", err)
+			}
 			if got != tt.expected {
-				t.Errorf("OwaspRRVector.String() = %v, want %v", got, tt.expected)
+				t.Errorf("Rate() = %+v, want %+v", got, tt.expected)
 			}
 		})
 	}
 }
 
-func TestOwaspRRVector_MatchesStandardPattern(t *testing.T) {
-	// This is the standard OWASP RR vector pattern
-	// Reference: https://owasp.org/www-community/OWASP_Risk_Rating_Methodology
-	pattern := regexp.MustCompile(`^SL:\d/M:\d/O:\d/S:\d/ED:\d/EE:\d/A:\d/ID:\d/LC:\d/LI:\d/LAV:\d/LAC:\d/FD:\d/RD:\d/NC:\d/PV:\d$`)
-
+func TestVector_RateRefusesLevelsOffTheEnumerations(t *testing.T) {
 	tests := []struct {
 		name   string
-		vector *OwaspRRVector
+		vector Vector
+		off    string
 	}{
 		{
-			name: "zero_values",
-			vector: &OwaspRRVector{
-				SkillLevel: 0, Motive: 0, Opportunity: 0, Size: 0,
-				EaseOfDiscovery: 0, EaseOfExploit: 0, Awareness: 0, IntrusionDetection: 0,
-				LossOfConfidentiality: 0, LossOfIntegrity: 0, LossOfAvailability: 0, LossOfAccountability: 0,
-				FinancialDamage: 0, ReputationDamage: 0, NonCompliance: 0, PrivacyViolation: 0,
-			},
+			name:   "all_zeros",
+			vector: Vector{},
+			off:    "SL:0, M:0, S:0, ED:0, EE:0, A:0, ID:0, LC:0, LI:0, LAV:0, LAC:0, FD:0, RD:0, NC:0, PV:0",
 		},
 		{
-			name: "max_values",
-			vector: &OwaspRRVector{
-				SkillLevel: 9, Motive: 9, Opportunity: 9, Size: 9,
-				EaseOfDiscovery: 9, EaseOfExploit: 9, Awareness: 9, IntrusionDetection: 9,
-				LossOfConfidentiality: 9, LossOfIntegrity: 9, LossOfAvailability: 9, LossOfAccountability: 9,
-				FinancialDamage: 9, ReputationDamage: 9, NonCompliance: 9, PrivacyViolation: 9,
-			},
+			name:   "all_nines",
+			vector: vectorOf([16]int{9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9}),
+			off:    "NC:9",
 		},
 		{
-			name: "realistic_values",
-			vector: &OwaspRRVector{
-				SkillLevel: 5, Motive: 4, Opportunity: 7, Size: 6,
-				EaseOfDiscovery: 7, EaseOfExploit: 5, Awareness: 6, IntrusionDetection: 8,
-				LossOfConfidentiality: 2, LossOfIntegrity: 3, LossOfAvailability: 5, LossOfAccountability: 7,
-				FinancialDamage: 1, ReputationDamage: 2, NonCompliance: 2, PrivacyViolation: 3,
-			},
+			// OWASP's worked example, which interpolates between the levels.
+			name:   "owasp_worked_example",
+			vector: vectorOf([16]int{5, 2, 7, 1, 3, 6, 9, 2, 9, 7, 5, 8, 1, 2, 1, 5}),
+			off:    "M:2, S:1, EE:6, ID:2, LAC:8, RD:2, NC:1",
+		},
+		{
+			name:   "not_a_digit",
+			vector: vectorOf([16]int{-1, 1, 0, 2, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 2, 10}),
+			off:    "SL:-1, PV:10",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			vectorString := tt.vector.String()
-			if !pattern.MatchString(vectorString) {
-				t.Errorf("Vector %q does not match standard OWASP RR pattern", vectorString)
+			want := "owasp: levels off the calculator's enumerations: " + tt.off
+			if err := tt.vector.Check(); err == nil || err.Error() != want {
+				t.Errorf("Check() = %v, want %q", err, want)
+			}
+			got, err := tt.vector.Rate()
+			if err == nil || err.Error() != want {
+				t.Errorf("Rate() error = %v, want %q", err, want)
+			}
+			if got != (Rating{}) {
+				t.Errorf("Rate() wrote %+v for a vector it refused", got)
 			}
 		})
 	}
 }
 
-func TestFromAggregatedScores(t *testing.T) {
-	tests := []struct {
-		name            string
-		threatAgent     float64
-		vulnerability   float64
-		technicalImpact float64
-		businessImpact  float64
-		wantPattern     string // Use pattern matching since exact values may vary
-	}{
-		{
-			name:            "medium_scores",
-			threatAgent:     5.5,
-			vulnerability:   6.0,
-			technicalImpact: 7.0,
-			businessImpact:  4.0,
-			wantPattern:     "^SL:6/M:6/O:6/S:6/ED:6/EE:6/A:6/ID:6/LC:7/LI:7/LAV:7/LAC:7/FD:4/RD:4/NC:4/PV:4$",
-		},
-		{
-			name:            "high_scores",
-			threatAgent:     8.0,
-			vulnerability:   7.0,
-			technicalImpact: 8.0,
-			businessImpact:  9.0,
-			wantPattern:     "^SL:8/M:8/O:8/S:8/ED:7/EE:7/A:7/ID:7/LC:8/LI:8/LAV:8/LAC:8/FD:9/RD:9/NC:9/PV:9$",
-		},
-		{
-			name:            "low_scores",
-			threatAgent:     2.0,
-			vulnerability:   3.0,
-			technicalImpact: 4.0,
-			businessImpact:  3.0,
-			wantPattern:     "^SL:2/M:2/O:2/S:2/ED:3/EE:3/A:3/ID:3/LC:4/LI:4/LAV:4/LAC:4/FD:3/RD:3/NC:3/PV:3$",
-		},
-		{
-			name:            "clamp_above_9",
-			threatAgent:     12.0, // Should be clamped to 9
-			vulnerability:   10.5, // Should be clamped to 9
-			technicalImpact: 11.0,
-			businessImpact:  15.0,
-			wantPattern:     "^SL:9/M:9/O:9/S:9/ED:9/EE:9/A:9/ID:9/LC:9/LI:9/LAV:9/LAC:9/FD:9/RD:9/NC:9/PV:9$",
-		},
-		{
-			name:            "clamp_below_0",
-			threatAgent:     -1.0, // Should be clamped to 0
-			vulnerability:   -2.0,
-			technicalImpact: 0.0,
-			businessImpact:  -0.5,
-			wantPattern:     "^SL:0/M:0/O:0/S:0/ED:0/EE:0/A:0/ID:0/LC:0/LI:0/LAV:0/LAC:0/FD:0/RD:0/NC:0/PV:0$",
-		},
+func randomLevels(rng *rand.Rand) [16]int {
+	var levels [16]int
+	for i, f := range mirrorEnums {
+		levels[i] = f.levels[rng.IntN(len(f.levels))].level
 	}
+	return levels
+}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			vector := FromAggregatedScores(tt.threatAgent, tt.vulnerability, tt.technicalImpact, tt.businessImpact)
-			vectorString := vector.String()
+// A consumer can derive the rating from the vector alone: the written vector,
+// read and averaged as the calculator does, then max(T, B) (#340) and OWASP's
+// matrix, gives the published severity and score back.
+func TestVector_RateRecomputesFromTheWrittenVector(t *testing.T) {
+	rng := rand.New(rand.NewPCG(310, 340))
+	for range 20_000 {
+		levels := randomLevels(rng)
+		got, err := vectorOf(levels).Rate()
+		if err != nil {
+			t.Fatalf("%s: %v", mirrorVector(levels), err)
+		}
+		parsed, ok := mirrorParse(got.Vector)
+		if !ok || parsed != levels {
+			t.Fatalf("Rate().Vector = %q, the calculator reads %v (ok %t), want %v", got.Vector, parsed, ok, levels)
+		}
+		severity, score, _ := mirrorRate(got.Vector)
+		if got.Severity != severity || got.Score != score {
+			t.Fatalf("%s: Rate() = %s %v, recomputed %s %v", got.Vector, got.Severity, got.Score, severity, score)
+		}
+	}
+}
 
-			matched, err := regexp.MatchString(tt.wantPattern, vectorString)
-			if err != nil {
-				t.Fatalf("Invalid regex pattern: %v", err)
+// Monotone through the vector: raising any one level never lowers the
+// severity or the score.
+func TestVector_RaisingALevelNeverLowersTheRating(t *testing.T) {
+	rng := rand.New(rand.NewPCG(340, 1))
+	for range 500 {
+		base := randomLevels(rng)
+		for i, f := range mirrorEnums {
+			var steps []int
+			for _, l := range f.levels {
+				steps = append(steps, l.level)
 			}
-			if !matched {
-				t.Errorf("FromAggregatedScores() = %v, want pattern %v", vectorString, tt.wantPattern)
-			}
+			slices.Sort(steps)
+			steps = slices.Compact(steps)
 
-			// Verify it matches standard OWASP RR pattern
-			standardPattern := regexp.MustCompile(`^SL:\d/M:\d/O:\d/S:\d/ED:\d/EE:\d/A:\d/ID:\d/LC:\d/LI:\d/LAV:\d/LAC:\d/FD:\d/RD:\d/NC:\d/PV:\d$`)
-			if !standardPattern.MatchString(vectorString) {
-				t.Errorf("Vector %q does not match standard OWASP RR pattern", vectorString)
+			var prev Rating
+			for k, level := range steps {
+				levels := base
+				levels[i] = level
+				got, err := vectorOf(levels).Rate()
+				if err != nil {
+					t.Fatalf("%s: %v", mirrorVector(levels), err)
+				}
+				if k > 0 && (severityRank[got.Severity] < severityRank[prev.Severity] || got.Score < prev.Score) {
+					t.Fatalf("%s up to %d lowers the rating: %+v after %+v", f.abbr, level, got, prev)
+				}
+				prev = got
 			}
-		})
+		}
 	}
 }

@@ -28,18 +28,66 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
 
+	"github.com/CycloneDX/cyclonedx-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/venslabs/vens/internal/testutil"
 	"github.com/venslabs/vens/pkg/attestation"
 	"github.com/venslabs/vens/pkg/llm"
 	"github.com/venslabs/vens/pkg/outputhandler"
+	"github.com/venslabs/vens/pkg/owasp"
 	"github.com/venslabs/vens/pkg/riskconfig"
 )
+
+// Test vectors, every level one of its factor's: midVector rates 27.3125
+// (likelihood 38/8, technical 23/4), lowVector 1.75, highVector 81.
+var (
+	midVector  = owasp.Vector{SL: 5, M: 4, O: 4, S: 5, ED: 3, EE: 5, A: 4, ID: 8, LC: 6, LI: 5, LAV: 5, LAC: 7, FD: 3, RD: 5, NC: 5, PV: 5}
+	lowVector  = owasp.Vector{SL: 1, M: 1, O: 0, S: 2, ED: 1, EE: 1, A: 1, ID: 1, LC: 2, LI: 1, LAV: 1, LAC: 1, FD: 1, RD: 1, NC: 2, PV: 3}
+	highVector = owasp.Vector{SL: 9, M: 9, O: 9, S: 9, ED: 9, EE: 9, A: 9, ID: 9, LC: 9, LI: 9, LAV: 9, LAC: 9, FD: 9, RD: 9, NC: 7, PV: 9}
+)
+
+// levelsOf lists v's 16 levels in factors' order, vectorOf's inverse.
+func levelsOf(v owasp.Vector) []int {
+	return []int{int(v.SL), int(v.M), int(v.O), int(v.S), int(v.ED), int(v.EE), int(v.A), int(v.ID),
+		int(v.LC), int(v.LI), int(v.LAV), int(v.LAC), int(v.FD), int(v.RD), int(v.NC), int(v.PV)}
+}
+
+// MarshalJSON writes an entry as the schema asks for it, vulnId, the 16
+// factor keys in order, then reasoning, so the fake models answer like one.
+func (e llmOutputEntry) MarshalJSON() ([]byte, error) {
+	var b bytes.Buffer
+	id, err := json.Marshal(e.VulnID)
+	if err != nil {
+		return nil, err
+	}
+	b.WriteString(`{"vulnId":`)
+	b.Write(id)
+	for i, l := range levelsOf(e.Levels) {
+		fmt.Fprintf(&b, `,%q:%d`, factors[i].key, l)
+	}
+	reasoning, err := json.Marshal(e.Reasoning)
+	if err != nil {
+		return nil, err
+	}
+	b.WriteString(`,"reasoning":`)
+	b.Write(reasoning)
+	b.WriteString("}")
+	return b.Bytes(), nil
+}
+
+// scoreOf is v's score as owasp.Vector.Rate gives it.
+func scoreOf(t *testing.T, v owasp.Vector) float64 {
+	t.Helper()
+	r, err := v.Rate()
+	require.NoError(t, err)
+	return r.Score
+}
 
 // truncatingLLM returns llm.ErrTruncated whenever a batch carries more than
 // maxPerCall vulnerabilities; smaller batches score normally, except that a CVE
@@ -86,12 +134,9 @@ func (m *truncatingLLM) Generate(_ context.Context, req llm.Request) (string, er
 			continue
 		}
 		out.Results = append(out.Results, llmOutputEntry{
-			VulnID:             v.VulnID,
-			ThreatAgentScore:   5,
-			VulnerabilityScore: 5,
-			TechnicalImpact:    5,
-			BusinessImpact:     5,
-			Reasoning:          "mock",
+			VulnID:    v.VulnID,
+			Levels:    midVector,
+			Reasoning: "mock",
 		})
 	}
 	b, err := json.Marshal(out)
@@ -259,12 +304,9 @@ func (m *droppingLLM) Generate(_ context.Context, req llm.Request) (string, erro
 		}
 		answered[v.VulnID] = true
 		out.Results = append(out.Results, llmOutputEntry{
-			VulnID:             v.VulnID,
-			ThreatAgentScore:   5,
-			VulnerabilityScore: 5,
-			TechnicalImpact:    5,
-			BusinessImpact:     5,
-			Reasoning:          "mock",
+			VulnID:    v.VulnID,
+			Levels:    midVector,
+			Reasoning: "mock",
 		})
 	}
 	b, err := json.Marshal(out)
@@ -485,111 +527,8 @@ func withCapturedLogs(t *testing.T) *captureHandler {
 	return h
 }
 
-// zeroLikelihoodEntry is the shape from
-// https://github.com/venslabs/vens/issues/337: zero likelihood and a token
-// business impact, which computes to a zero score.
-func zeroLikelihoodEntry() llmOutputEntry {
-	return llmOutputEntry{ThreatAgentScore: 0, VulnerabilityScore: 0, TechnicalImpact: 0, BusinessImpact: 1, Reasoning: "mock not reachable here"}
-}
-
 func scoredEntry() llmOutputEntry {
-	return llmOutputEntry{ThreatAgentScore: 5, VulnerabilityScore: 5, TechnicalImpact: 5, BusinessImpact: 5, Reasoning: "mock scored"}
-}
-
-// A zero-likelihood answer ("not reachable here") is a real verdict, not a
-// refusal: it is published as-is and the run succeeds.
-func TestGenerator_ZeroLikelihoodPublishedAsIs(t *testing.T) {
-	m := &scriptedLLM{answer: func(_ int, _ string) llmOutputEntry { return zeroLikelihoodEntry() }}
-	g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 10})
-	require.NoError(t, err)
-
-	var got []outputhandler.VulnRating
-	h := func(group []outputhandler.VulnRating) error {
-		got = append(got, group...)
-		return nil
-	}
-
-	require.NoError(t, g.GenerateRiskScore(context.Background(), testVulns(3), h))
-	require.Len(t, got, 3, "every vulnerability keeps its VEX row")
-	for _, r := range got {
-		require.NotNil(t, r.Rating.Score)
-		require.Equal(t, 0.0, *r.Rating.Score, "zero likelihood computes to a zero score")
-		require.Equal(t, "info", string(r.Rating.Severity))
-	}
-}
-
-// Every zero-likelihood answer lands as info, so its reasoning is logged at
-// WARN in place of the INFO line, whatever impact the model gave.
-func TestGenerator_ZeroLikelihoodLogsReasoningAtWarn(t *testing.T) {
-	for _, shape := range [][4]float64{{0, 0, 0, 1}, {0, 0, 8, 8}, {0.4, 0.4, 8, 8}} {
-		t.Run(fmt.Sprint(shape), func(t *testing.T) {
-			m := &scriptedLLM{answer: func(_ int, _ string) llmOutputEntry {
-				return llmOutputEntry{ThreatAgentScore: shape[0], VulnerabilityScore: shape[1],
-					TechnicalImpact: shape[2], BusinessImpact: shape[3], Reasoning: "not reachable here"}
-			}}
-			g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 10})
-			require.NoError(t, err)
-
-			logs := withCapturedLogs(t)
-
-			var got []outputhandler.VulnRating
-			h := func(group []outputhandler.VulnRating) error {
-				got = append(got, group...)
-				return nil
-			}
-			require.NoError(t, g.GenerateRiskScore(context.Background(), testVulns(1), h))
-			require.Len(t, got, 1)
-			require.Equal(t, 0.0, *got[0].Rating.Score)
-			require.Equal(t, "info", string(got[0].Rating.Severity))
-
-			warns, infos := 0, 0
-			for _, r := range logs.records {
-				switch {
-				case r.level == slog.LevelWarn && r.attrs["vuln"] == "CVE-2024-0000":
-					warns++
-					require.Equal(t, "not reachable here", r.attrs["reasoning"], "the model's reasoning must be logged at WARN")
-				case r.msg == "Scored vulnerability":
-					infos++
-				}
-			}
-			require.Equal(t, 1, warns)
-			require.Zero(t, infos, "the WARN replaces the INFO line")
-		})
-	}
-}
-
-// A zero-likelihood verdict is logged once, by the batch that first publishes
-// it, not again by a later batch that reuses it.
-func TestGenerator_ZeroLikelihoodLogsOnceAcrossBatches(t *testing.T) {
-	m := &scriptedLLM{answer: func(_ int, _ string) llmOutputEntry { return zeroLikelihoodEntry() }}
-	g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 1})
-	require.NoError(t, err)
-
-	logs := withCapturedLogs(t)
-
-	// Same CVE on two components straddling two batches: the second batch
-	// reuses the first batch's verdict instead of asking again.
-	vulns := []Vulnerability{
-		{VulnID: "CVE-2024-0000", PkgName: "pkg-a", Title: "t"},
-		{VulnID: "CVE-2024-0000", PkgName: "pkg-b", Title: "t"},
-	}
-
-	var got []outputhandler.VulnRating
-	h := func(group []outputhandler.VulnRating) error {
-		got = append(got, group...)
-		return nil
-	}
-
-	require.NoError(t, g.GenerateRiskScore(context.Background(), vulns, h))
-	require.Len(t, got, 2, "both batches publish the verdict")
-
-	verdicts := 0
-	for _, r := range logs.records {
-		if r.level == slog.LevelWarn && strings.Contains(r.msg, "not reachable here") {
-			verdicts++
-		}
-	}
-	require.Equal(t, 1, verdicts, "the verdict must be logged once, not again in the batch that reuses the answer")
+	return llmOutputEntry{Levels: midVector, Reasoning: "mock scored"}
 }
 
 // leakingLLM answers every CVE in the prompt, but its first call smuggles in
@@ -611,22 +550,16 @@ func (m *leakingLLM) Generate(_ context.Context, req llm.Request) (string, error
 	out := llmOutput{}
 	for _, v := range in {
 		out.Results = append(out.Results, llmOutputEntry{
-			VulnID:             v.VulnID,
-			ThreatAgentScore:   5,
-			VulnerabilityScore: 5,
-			TechnicalImpact:    5,
-			BusinessImpact:     5,
-			Reasoning:          "real answer",
+			VulnID:    v.VulnID,
+			Levels:    midVector,
+			Reasoning: "real answer",
 		})
 	}
 	if m.calls == 1 {
 		out.Results = append(out.Results, llmOutputEntry{
-			VulnID:             "CVE-2024-0001",
-			ThreatAgentScore:   5,
-			VulnerabilityScore: 5,
-			TechnicalImpact:    5,
-			BusinessImpact:     1,
-			Reasoning:          "leaked stale answer for a CVE that wasn't asked about",
+			VulnID:    "CVE-2024-0001",
+			Levels:    lowVector,
+			Reasoning: "leaked stale answer for a CVE that wasn't asked about",
 		})
 	}
 	b, err := json.Marshal(out)
@@ -659,34 +592,13 @@ func TestGenerator_IgnoresAnswersForCVEsNotInThePrompt(t *testing.T) {
 	for _, r := range got {
 		if r.VulnID == "CVE-2024-0001" {
 			require.NotNil(t, r.Rating.Score)
-			// Fresh score: ((5+5)/2) * ((5+5)/2) = 25. The leaked entry would
-			// have scored ((5+5)/2) * ((5+1)/2) = 15.
-			require.Equal(t, 25.0, *r.Rating.Score,
+			// Fresh score: midVector's. The leaked entry would have scored
+			// lowVector's.
+			require.NotEqual(t, scoreOf(t, midVector), scoreOf(t, lowVector))
+			require.Equal(t, scoreOf(t, midVector), *r.Rating.Score,
 				"CVE-2024-0001 must carry the score from its own ask, not the leaked entry")
 		}
 	}
-}
-
-// A zero reached with a non-zero likelihood is a genuine low score, logged
-// like any other: CVE-2019-9192's [0 1 0 0] is zero via the impact axis.
-func TestGenerator_GenuineZeroIsNotZeroLikelihood(t *testing.T) {
-	m := &scriptedLLM{answer: func(_ int, _ string) llmOutputEntry {
-		return llmOutputEntry{ThreatAgentScore: 0, VulnerabilityScore: 1, TechnicalImpact: 0, BusinessImpact: 0, Reasoning: "genuine low"}
-	}}
-	g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 10})
-	require.NoError(t, err)
-
-	logs := withCapturedLogs(t)
-	require.NoError(t, g.GenerateRiskScore(context.Background(), testVulns(2), nil))
-	infos := 0
-	for _, r := range logs.records {
-		require.False(t, r.level == slog.LevelWarn && strings.Contains(r.msg, "not reachable here"),
-			"a genuine low score is not logged as a not-reachable verdict")
-		if r.msg == "Scored vulnerability" {
-			infos++
-		}
-	}
-	require.Equal(t, 2, infos)
 }
 
 // A CVE in two batches is asked about once: the second batch leaves it out of
@@ -694,9 +606,9 @@ func TestGenerator_GenuineZeroIsNotZeroLikelihood(t *testing.T) {
 func TestGenerator_DupCVEReusesFirstScore(t *testing.T) {
 	m := &scriptedLLM{answer: func(call int, _ string) llmOutputEntry {
 		if call == 1 {
-			return llmOutputEntry{ThreatAgentScore: 5, VulnerabilityScore: 5, TechnicalImpact: 5, BusinessImpact: 5, Reasoning: "first"}
+			return llmOutputEntry{Levels: midVector, Reasoning: "first"}
 		}
-		return llmOutputEntry{ThreatAgentScore: 9, VulnerabilityScore: 9, TechnicalImpact: 9, BusinessImpact: 9, Reasoning: "second"}
+		return llmOutputEntry{Levels: highVector, Reasoning: "second"}
 	}}
 	g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 1})
 	require.NoError(t, err)
@@ -718,7 +630,7 @@ func TestGenerator_DupCVEReusesFirstScore(t *testing.T) {
 	require.Equal(t, "openssl", got[0].BOMRef)
 	require.Equal(t, "libssl3", got[1].BOMRef)
 	for _, r := range got {
-		require.Equal(t, 25.0, *r.Rating.Score, "both rows carry the first score")
+		require.Equal(t, scoreOf(t, midVector), *r.Rating.Score, "both rows carry the first score")
 	}
 }
 
@@ -886,26 +798,6 @@ func TestGenerator_HeldBackCVEOnTwoComponentsFilledInOnce(t *testing.T) {
 	assert.Equal(t, []string{"evidence-batch-3"}, byTarget["c"].Evidence)
 }
 
-// Zero likelihood is what makes a verdict "not reachable here", whatever impact
-// the model gave; a zero reached with a non-zero likelihood is a genuine low
-// score.
-func TestZeroLikelihood(t *testing.T) {
-	for _, tc := range []struct {
-		shape [4]float64
-		want  bool
-	}{
-		{[4]float64{0, 0, 0, 0}, true},
-		{[4]float64{0, 0, 0, 1}, true},
-		{[4]float64{0, 0, 1, 1}, true},
-		{[4]float64{0, 0, 8, 8}, true},
-		{[4]float64{0, 1, 0, 0}, false},
-		{[4]float64{1, 0, 9, 9}, false},
-	} {
-		e := llmOutputEntry{ThreatAgentScore: tc.shape[0], VulnerabilityScore: tc.shape[1], TechnicalImpact: tc.shape[2], BusinessImpact: tc.shape[3]}
-		require.Equal(t, tc.want, zeroLikelihood(e), "shape %v", tc.shape)
-	}
-}
-
 // The error names each unanswered CVE once, in order, never once per row.
 func TestGenerator_ErrorNamesEachMissingCVEOnce(t *testing.T) {
 	m := newDroppingLLM(true, "CVE-2024-0000", "CVE-2024-0002")
@@ -952,12 +844,9 @@ func (m *recordingLLM) Generate(_ context.Context, req llm.Request) (string, err
 	out := llmOutput{Results: make([]llmOutputEntry, 0, len(in))}
 	for _, v := range in {
 		out.Results = append(out.Results, llmOutputEntry{
-			VulnID:             v.VulnID,
-			ThreatAgentScore:   5,
-			VulnerabilityScore: 5,
-			TechnicalImpact:    5,
-			BusinessImpact:     5,
-			Reasoning:          "mock",
+			VulnID:    v.VulnID,
+			Levels:    midVector,
+			Reasoning: "mock",
 		})
 	}
 	b, err := json.Marshal(out)
@@ -1023,13 +912,11 @@ func (m *retryVolunteerLLM) Generate(_ context.Context, req llm.Request) (string
 	out := llmOutput{Results: []llmOutputEntry{}}
 	if m.calls > 1 {
 		for _, v := range in {
-			out.Results = append(out.Results, llmOutputEntry{VulnID: v.VulnID, ThreatAgentScore: 9, VulnerabilityScore: 9,
-				TechnicalImpact: 9, BusinessImpact: 9, Reasoning: "asked"})
+			out.Results = append(out.Results, llmOutputEntry{VulnID: v.VulnID, Levels: highVector, Reasoning: "asked"})
 		}
 	}
 	if m.calls == 2 {
-		out.Results = append(out.Results, llmOutputEntry{VulnID: "CVE-2024-0001", ThreatAgentScore: 1, VulnerabilityScore: 1,
-			TechnicalImpact: 1, BusinessImpact: 1, Reasoning: "not asked"})
+		out.Results = append(out.Results, llmOutputEntry{VulnID: "CVE-2024-0001", Levels: lowVector, Reasoning: "not asked"})
 	}
 	b, err := json.Marshal(out)
 	return string(b), err
@@ -1055,9 +942,8 @@ func TestGenerator_IgnoresAnswersForCVEsNotAskedOnRetry(t *testing.T) {
 		"CVE-2024-0001 must carry the answer to its own question, not the one volunteered on the retry")
 }
 
-// truncatedRetryLLM gives CVE-2024-0000 zero likelihood and leaves
-// CVE-2024-0001 out on its first call, truncates the retry, then scores
-// whatever it is asked.
+// truncatedRetryLLM gives CVE-2024-0000 lowVector and leaves CVE-2024-0001
+// out on its first call, truncates the retry, then scores whatever it is asked.
 type truncatedRetryLLM struct{ calls int }
 
 func (m *truncatedRetryLLM) Generate(_ context.Context, req llm.Request) (string, error) {
@@ -1078,7 +964,7 @@ func (m *truncatedRetryLLM) Generate(_ context.Context, req llm.Request) (string
 		}
 		e := scoredEntry()
 		if v.VulnID == "CVE-2024-0000" {
-			e = zeroLikelihoodEntry()
+			e = llmOutputEntry{Levels: lowVector, Reasoning: "mock low"}
 		}
 		e.VulnID = v.VulnID
 		out.Results = append(out.Results, e)
@@ -1087,31 +973,22 @@ func (m *truncatedRetryLLM) Generate(_ context.Context, req llm.Request) (string
 	return string(b), err
 }
 
-// The zero-likelihood WARN still fires once when the retry truncates and the
-// split batch reuses the first answer, which no batch had published yet. The
-// sub-batch's rows were all in the first call's prompt, so neither claim may
-// say its package was missing from the cited batch's prompt.
-func TestGenerator_ZeroLikelihoodWarnSurvivesTruncatedRetry(t *testing.T) {
+// When the retry truncates, the split batch reuses the first answer, which no
+// batch had published yet. The sub-batch's rows were all in the first call's
+// prompt, so neither claim may say its package was missing from the cited
+// batch's prompt.
+func TestGenerator_ClaimsSurviveTruncatedRetry(t *testing.T) {
 	m := &truncatedRetryLLM{}
 	g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 2})
 	require.NoError(t, err)
 	at := attestation.NewBuilder(attestation.Opts{Provider: "mock", Model: "mock"})
 	g.SetAttestor(at)
 
-	logs := withCapturedLogs(t)
 	vulns := []Vulnerability{
 		{VulnID: "CVE-2024-0000", PkgName: "pkg-a", Title: "t", BOMRef: "a"},
 		{VulnID: "CVE-2024-0001", PkgName: "pkg-b", Title: "t", BOMRef: "b"},
 	}
 	require.NoError(t, g.GenerateRiskScore(context.Background(), vulns, nil))
-
-	warns := 0
-	for _, r := range logs.records {
-		if r.level == slog.LevelWarn && r.attrs["vuln"] == "CVE-2024-0000" {
-			warns++
-		}
-	}
-	require.Equal(t, 1, warns, "the verdict is logged once, even when the retry truncates")
 
 	var buf bytes.Buffer
 	require.NoError(t, at.Write(&buf))
@@ -1136,29 +1013,6 @@ func TestGenerator_ZeroLikelihoodWarnSurvivesTruncatedRetry(t *testing.T) {
 	}
 	assert.Equal(t, []string{"evidence-batch-1"}, byTarget["a"],
 		"the reused answer keeps citing the first call's evidence bundle")
-}
-
-// The published score must be recomputable from its own vector, which
-// carries the aggregates rounded: scoring runs on the values rounded once
-// at parse time, end to end through GenerateRiskScore (#358).
-func TestGenerator_ScoreMatchesVectorRecomputation(t *testing.T) {
-	m := &scriptedLLM{answer: func(_ int, _ string) llmOutputEntry {
-		// The #358 case: vulnerability 7.5 rounds to 8, so the published
-		// score is (7+8)/2 * (9+9)/2 = 67.5 with ED:8 in the vector.
-		return llmOutputEntry{ThreatAgentScore: 7, VulnerabilityScore: 7.5, TechnicalImpact: 9, BusinessImpact: 9, Reasoning: "the #358 case"}
-	}}
-	g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 10})
-	require.NoError(t, err)
-
-	var got []outputhandler.VulnRating
-	require.NoError(t, g.GenerateRiskScore(context.Background(), testVulns(1), func(group []outputhandler.VulnRating) error {
-		got = append(got, group...)
-		return nil
-	}))
-	require.Len(t, got, 1, "the vulnerability keeps its VEX row")
-	require.NotNil(t, got[0].Rating.Score)
-	require.Equal(t, 67.5, *got[0].Rating.Score, "score is computed from the rounded aggregates")
-	require.Contains(t, got[0].Rating.Vector, "ED:8", "vector carries the rounded vulnerability aggregate")
 }
 
 // runDirs lists the run-* directories under a --debug-dir.
@@ -1574,4 +1428,569 @@ func TestGenerator_LogsSplitHoldBackAndSummaryCounts(t *testing.T) {
 	require.Equal(t, int64(1), summary.attrs["asked_again"])
 	require.Equal(t, int64(3), summary.attrs["splits"])
 	require.Equal(t, false, summary.attrs["failed"])
+}
+
+// pkg/owasp is 5f797bf's, file for file and byte for byte.
+func TestOwaspIsByteIdenticalTo5f797bf(t *testing.T) {
+	want := map[string]string{
+		"levels.go":      "db7ecc89d8044f339784e57363599ed285c9ec35443c377643052c368afa5eb4",
+		"rate.go":        "82735a718163ee58ecb28602b218dc89a4436c05e2b96193138454539fc42e1b",
+		"vector.go":      "749189985512f9ecd67b8da08dd9a17a9c228e286fd55752c120aec1a09afe99",
+		"mirror_test.go": "2d7303235238f29c9b5a8eb9e6837f51c59116cee92b6e9264230aa37bf8f18c",
+		"rate_test.go":   "747a00138ec1dd1caa3b10f1d04aaaa4eeffa82feaa7ac6c4f2342758d23bcde",
+		"vector_test.go": "090166e711af3b16c5af62089f2d1da9aec9cd606d935de46e975fb4179676e8",
+	}
+	entries, err := os.ReadDir(filepath.Join("..", "owasp"))
+	require.NoError(t, err)
+	got := map[string]string{}
+	for _, e := range entries {
+		b, err := os.ReadFile(filepath.Join("..", "owasp", e.Name()))
+		require.NoError(t, err)
+		sum := sha256.Sum256(b)
+		got[e.Name()] = hex.EncodeToString(sum[:])
+	}
+	require.Equal(t, want, got)
+}
+
+// recompute rates a published vector from its own 16 levels: OWASP's
+// averages, impact the larger of technical and business, score their product.
+func recompute(t *testing.T, vector string) (severity string, score float64) {
+	t.Helper()
+	parts := strings.Split(vector, "/")
+	require.Len(t, parts, 16)
+	l := make([]float64, 16)
+	for i, p := range parts {
+		key, level, ok := strings.Cut(p, ":")
+		require.True(t, ok)
+		require.Equal(t, factors[i].key, key)
+		_, err := fmt.Sscan(level, &l[i])
+		require.NoError(t, err)
+	}
+	sum := func(xs []float64) float64 {
+		s := 0.0
+		for _, x := range xs {
+			s += x
+		}
+		return s
+	}
+	likelihood, impact := sum(l[0:8])/8, max(sum(l[8:12])/4, sum(l[12:16])/4)
+	band := func(x float64) int {
+		switch {
+		case x < 3:
+			return 0
+		case x < 6:
+			return 1
+		}
+		return 2
+	}
+	matrix := [3][3]string{{"info", "low", "medium"}, {"low", "medium", "high"}, {"medium", "high", "critical"}}
+	return matrix[band(likelihood)][band(impact)], likelihood * impact
+}
+
+// A fixed 16-level reply is published with the vector, severity and score
+// 5f797bf's Vector.Rate gives, and the score recomputes from the vector.
+func TestGenerator_FixedReplyRatedAs5f797bf(t *testing.T) {
+	for _, tc := range []struct {
+		levels   owasp.Vector
+		vector   string
+		severity string
+		score    float64
+	}{
+		// Likelihood 61/8, technical 25/4 above business 19/4.
+		{owasp.Vector{SL: 9, M: 4, O: 7, S: 9, ED: 9, EE: 5, A: 9, ID: 9, LC: 6, LI: 5, LAV: 7, LAC: 7, FD: 3, RD: 4, NC: 5, PV: 7},
+			"SL:9/M:4/O:7/S:9/ED:9/EE:5/A:9/ID:9/LC:6/LI:5/LAV:7/LAC:7/FD:3/RD:4/NC:5/PV:7", "critical", 47.65625},
+		// Likelihood 1, business 7/4 above technical 5/4.
+		{lowVector, "SL:1/M:1/O:0/S:2/ED:1/EE:1/A:1/ID:1/LC:2/LI:1/LAV:1/LAC:1/FD:1/RD:1/NC:2/PV:3", "info", 1.75},
+		{midVector, "SL:5/M:4/O:4/S:5/ED:3/EE:5/A:4/ID:8/LC:6/LI:5/LAV:5/LAC:7/FD:3/RD:5/NC:5/PV:5", "medium", 27.3125},
+	} {
+		t.Run(tc.vector, func(t *testing.T) {
+			want, err := tc.levels.Rate()
+			require.NoError(t, err)
+			require.Equal(t, owasp.Rating{Vector: tc.vector, Severity: tc.severity, Score: tc.score}, want)
+
+			m := &scriptedLLM{answer: func(_ int, _ string) llmOutputEntry {
+				return llmOutputEntry{Levels: tc.levels, Reasoning: "fixed"}
+			}}
+			g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 10})
+			require.NoError(t, err)
+			logs := withCapturedLogs(t)
+			var got []outputhandler.VulnRating
+			require.NoError(t, g.GenerateRiskScore(context.Background(), testVulns(1), func(group []outputhandler.VulnRating) error {
+				got = append(got, group...)
+				return nil
+			}))
+			require.Len(t, got, 1)
+			r := got[0].Rating
+			require.Equal(t, cyclonedx.ScoringMethodOWASP, r.Method)
+			require.Equal(t, want.Vector, r.Vector)
+			require.Equal(t, cyclonedx.Severity(want.Severity), r.Severity)
+			require.NotNil(t, r.Score)
+			require.Equal(t, want.Score, *r.Score)
+
+			severity, score := recompute(t, r.Vector)
+			require.Equal(t, *r.Score, score, "the score recomputes from its own vector")
+			require.Equal(t, string(r.Severity), severity)
+
+			infos := 0
+			for _, rec := range logs.records {
+				if rec.msg == "Scored vulnerability" {
+					infos++
+					require.Equal(t, slog.LevelInfo, rec.level)
+				}
+			}
+			require.Equal(t, 1, infos, "every scored row logs its INFO line")
+		})
+	}
+}
+
+// rawLLM answers each call with the raw reply its function gives.
+type rawLLM struct {
+	calls int
+	reply func(call int, ids []string) string
+}
+
+func (m *rawLLM) Generate(_ context.Context, req llm.Request) (string, error) {
+	var in []struct {
+		VulnID string `json:"vulnId"`
+	}
+	if err := json.Unmarshal([]byte(req.Human), &in); err != nil {
+		return "", err
+	}
+	m.calls++
+	ids := make([]string, len(in))
+	for i, v := range in {
+		ids[i] = v.VulnID
+	}
+	return m.reply(m.calls, ids), nil
+}
+
+// entryWith is midVector's entry for id with field set to the raw JSON value,
+// or left out when value is "".
+func entryWith(id, field, value string) string {
+	b, err := json.Marshal(llmOutputEntry{VulnID: id, Levels: midVector, Reasoning: "mock"})
+	if err != nil {
+		panic(err)
+	}
+	var m map[string]json.RawMessage
+	if err := json.Unmarshal(b, &m); err != nil {
+		panic(err)
+	}
+	if value == "" {
+		delete(m, field)
+	} else {
+		m[field] = json.RawMessage(value)
+	}
+	out, err := json.Marshal(m)
+	if err != nil {
+		panic(err)
+	}
+	return string(out)
+}
+
+var invalidLevelCases = []struct {
+	name, field, value string
+}{
+	{"missing", "SL", ""},
+	{"null", "SL", "null"},
+	{"off its enum", "SL", "2"},
+	{"off its enum, out of range", "O", "10"},
+	{"off its enum, negative", "LAC", "-1"},
+	{"off its enum, a level of another factor", "NC", "9"},
+	{"off its enum, an integral decimal", "NC", "6.0"},
+	{"off its enum, an integral exponent", "SL", "1e1"},
+	{"off its enum, a huge exponent", "LAV", "1e400"},
+	{"non-integer", "LI", "5.5"},
+	{"non-integer, a fraction just under a level", "EE", "4.9999999999999999"},
+	{"non-integer, a fraction just over a level", "EE", "5.0000000000000001"},
+	{"non-integer, a fractional exponent form", "EE", "51e-1"},
+	{"non-integer, a tiny exponent", "PV", "5e-400"},
+	{"non-integer, a string", "PV", `"5"`},
+	{"non-integer, a boolean", "FD", "true"},
+	{"non-integer, an object", "RD", `{"level":4}`},
+}
+
+// An integer-valued JSON number on its factor's enum is that level, whatever
+// its decimal or exponent form; nothing is rounded to get there.
+func TestGenerator_IntegralNumberFormsAreTheirLevel(t *testing.T) {
+	for _, tc := range []struct {
+		field, value string
+		level        int
+	}{
+		{"EE", "5.0", 5}, {"EE", "5.000", 5}, {"EE", "5e0", 5}, {"EE", "5E+0", 5}, {"EE", "50e-1", 5},
+		{"EE", "0.5e1", 5}, {"EE", "0.00005e5", 5}, {"O", "-0", 0}, {"O", "0.0", 0}, {"O", "0e5", 0},
+		{"O", "-0.0e-3", 0}, {"O", "0e99999999999", 0}, {"ID", "8.0", 8}, {"ID", "80E-1", 8},
+	} {
+		t.Run(tc.field+"="+tc.value, func(t *testing.T) {
+			l := levelsOf(midVector)
+			i := slices.IndexFunc(factors, func(f factor) bool { return f.key == tc.field })
+			l[i] = tc.level
+			want := vectorOf(l)
+			require.NoError(t, want.Check())
+
+			logs := withCapturedLogs(t)
+			entries, err := parseReply(context.Background(), `{"results":[`+entryWith("CVE-2024-0000", tc.field, tc.value)+`]}`)
+			require.NoError(t, err)
+			require.Len(t, entries, 1)
+			require.Equal(t, want, entries[0].Levels)
+			for _, r := range logs.records {
+				require.NotEqual(t, slog.LevelWarn, r.level)
+			}
+		})
+	}
+}
+
+// exactLevel reads a JSON number's exact value, never through a float.
+func TestExactLevel(t *testing.T) {
+	for _, tc := range []struct {
+		raw   string
+		level int
+		whole bool
+	}{
+		{"5", 5, true}, {"5.0", 5, true}, {"5e0", 5, true}, {"50e-1", 5, true}, {"0.5e1", 5, true},
+		{"0", 0, true}, {"-0", 0, true}, {"0.000", 0, true}, {"0e-7", 0, true}, {"9", 9, true}, {"9.00e0", 9, true},
+		{"10", -1, true}, {"1e1", -1, true}, {"-1", -1, true}, {"-5.0", -1, true}, {"90e-1", 9, true},
+		{"1e400", -1, true}, {"1e99999999999", -1, true}, {"123456789012345678901234567890", -1, true},
+		{"5.5", 0, false}, {"4.9999999999999999", 0, false}, {"5.0000000000000001", 0, false},
+		{"49999999999999999e-16", 0, false}, {"5e-1", 0, false}, {"5e-99999999999", 0, false},
+		{`"5"`, 0, false}, {"true", 0, false}, {"null", 0, false}, {"05", 0, false}, {"+5", 0, false},
+		{".5", 0, false}, {"5.", 0, false}, {"0x5", 0, false}, {"NaN", 0, false}, {"Infinity", 0, false},
+	} {
+		level, whole := exactLevel([]byte(tc.raw))
+		require.Equal(t, tc.whole, whole, tc.raw)
+		if whole {
+			require.Equal(t, tc.level, level, tc.raw)
+		}
+	}
+}
+
+// Whitespace around a level in the reply's text does not change it.
+func TestGenerator_LevelWithWhitespace(t *testing.T) {
+	entry := strings.Replace(entryWith("CVE-2024-0000", "SL", "5"), `"SL":5`, "\"SL\" :\n\t 5.0 \n", 1)
+	require.Contains(t, entry, "5.0 \n")
+	entries, err := parseReply(context.Background(), `{"results":[`+entry+`]}`)
+	require.NoError(t, err)
+	require.Len(t, entries, 1)
+	require.Equal(t, midVector, entries[0].Levels)
+}
+
+// The first entry for a CVE decides: once it is dropped, a later valid entry
+// for the same CVE in the reply is skipped, and the CVE is asked again.
+func TestGenerator_DroppedFirstEntryDecidesItsCVE(t *testing.T) {
+	m := &rawLLM{reply: func(call int, ids []string) string {
+		if call == 1 {
+			return `{"results":[` + entryWith(ids[0], "SL", "2") + `,` + entryWith(ids[0], "SL", "5") + `]}`
+		}
+		b, _ := json.Marshal(llmOutput{Results: []llmOutputEntry{{VulnID: ids[0], Levels: highVector, Reasoning: "again"}}})
+		return string(b)
+	}}
+	g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 10})
+	require.NoError(t, err)
+	logs := withCapturedLogs(t)
+
+	var emitted []outputhandler.VulnRating
+	require.NoError(t, g.GenerateRiskScore(context.Background(), testVulns(1), func(group []outputhandler.VulnRating) error {
+		emitted = append(emitted, group...)
+		return nil
+	}))
+	require.Equal(t, 2, m.calls, "the reply's later valid entry does not answer the CVE: it is asked again")
+	require.Len(t, emitted, 1)
+	require.Equal(t, scoreOf(t, highVector), *emitted[0].Rating.Score, "published from the ask-again")
+	drops := 0
+	for _, r := range logs.records {
+		if strings.HasPrefix(r.msg, "Dropping an answer") {
+			drops++
+		}
+	}
+	require.Equal(t, 1, drops, "the skipped entry logs nothing more")
+}
+
+// A first entry that passes keeps deciding, as on main, when a later entry
+// for the same CVE in the reply is invalid.
+func TestGenerator_ValidFirstEntryKeepsItsCVE(t *testing.T) {
+	m := &rawLLM{reply: func(_ int, ids []string) string {
+		return `{"results":[` + entryWith(ids[0], "SL", "5") + `,` + entryWith(ids[0], "SL", "2") + `]}`
+	}}
+	g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 10})
+	require.NoError(t, err)
+	var emitted []outputhandler.VulnRating
+	require.NoError(t, g.GenerateRiskScore(context.Background(), testVulns(1), func(group []outputhandler.VulnRating) error {
+		emitted = append(emitted, group...)
+		return nil
+	}))
+	require.Equal(t, 1, m.calls)
+	require.Len(t, emitted, 1)
+	require.Equal(t, scoreOf(t, midVector), *emitted[0].Rating.Score)
+}
+
+// An entry whose level is missing, null, off its enum or not an integer is
+// dropped at parse and logged at WARN with its CVE and field, nothing
+// rounded or snapped; its CVE is asked again once, then fails the run.
+func TestGenerator_InvalidLevelDroppedAskedAgainThenFails(t *testing.T) {
+	for _, tc := range invalidLevelCases {
+		t.Run(tc.name, func(t *testing.T) {
+			m := &rawLLM{reply: func(_ int, ids []string) string {
+				return `{"results":[` + entryWith(ids[0], tc.field, tc.value) + `]}`
+			}}
+			g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 10})
+			require.NoError(t, err)
+			logs := withCapturedLogs(t)
+
+			var emitted []outputhandler.VulnRating
+			err = g.GenerateRiskScore(context.Background(), testVulns(1), func(group []outputhandler.VulnRating) error {
+				emitted = append(emitted, group...)
+				return nil
+			})
+			require.EqualError(t, err, "model returned no score for CVE-2024-0000 after asking again; stopping the run")
+			require.Equal(t, 2, m.calls, "asked once, asked again, then the run fails")
+			require.Empty(t, emitted)
+
+			var drops []capturedRecord
+			for _, r := range logs.records {
+				if strings.HasPrefix(r.msg, "Dropping an answer") {
+					drops = append(drops, r)
+				}
+			}
+			require.Len(t, drops, 2, "one WARN per dropped answer")
+			for _, r := range drops {
+				require.Equal(t, slog.LevelWarn, r.level)
+				require.Equal(t, "CVE-2024-0000", r.attrs["vuln"])
+				require.Equal(t, tc.field, r.attrs["field"])
+			}
+		})
+	}
+}
+
+// A dropped entry's CVE answered validly on the ask-again is published with
+// that answer's rating.
+func TestGenerator_InvalidLevelThenAnsweredOnTheAskAgain(t *testing.T) {
+	for _, tc := range invalidLevelCases {
+		t.Run(tc.name, func(t *testing.T) {
+			m := &rawLLM{reply: func(call int, ids []string) string {
+				if call == 1 {
+					return `{"results":[` + entryWith(ids[0], tc.field, tc.value) + `]}`
+				}
+				b, _ := json.Marshal(llmOutput{Results: []llmOutputEntry{{VulnID: ids[0], Levels: highVector, Reasoning: "again"}}})
+				return string(b)
+			}}
+			g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 10})
+			require.NoError(t, err)
+
+			var emitted []outputhandler.VulnRating
+			require.NoError(t, g.GenerateRiskScore(context.Background(), testVulns(1), func(group []outputhandler.VulnRating) error {
+				emitted = append(emitted, group...)
+				return nil
+			}))
+			require.Equal(t, 2, m.calls)
+			require.Len(t, emitted, 1)
+			require.Equal(t, scoreOf(t, highVector), *emitted[0].Rating.Score)
+		})
+	}
+}
+
+// Only the invalid entry is dropped: the reply's valid entries are kept.
+func TestGenerator_InvalidLevelDropsOnlyItsEntry(t *testing.T) {
+	m := &rawLLM{reply: func(call int, ids []string) string {
+		parts := make([]string, len(ids))
+		for i, id := range ids {
+			if call == 1 && id == "CVE-2024-0001" {
+				parts[i] = entryWith(id, "ID", "4")
+				continue
+			}
+			parts[i] = entryWith(id, "SL", "5")
+		}
+		return `{"results":[` + strings.Join(parts, ",") + `]}`
+	}}
+	g, err := New(Opts{LLM: m, Config: &riskconfig.Config{}, BatchSize: 10})
+	require.NoError(t, err)
+
+	var emitted []outputhandler.VulnRating
+	require.NoError(t, g.GenerateRiskScore(context.Background(), testVulns(3), func(group []outputhandler.VulnRating) error {
+		emitted = append(emitted, group...)
+		return nil
+	}))
+	require.Equal(t, 2, m.calls, "the batch, then CVE-2024-0001 alone")
+	require.Len(t, emitted, 3)
+}
+
+// The mock gives every CVE 16 levels, each one of its factor's, the same on
+// every call, so a mock run parses with nothing dropped.
+func TestMockLLM_SixteenDeterministicLevels(t *testing.T) {
+	for i, f := range factors {
+		require.Equal(t, f.levels, testutil.FactorLevels[i], f.key)
+	}
+	mock := testutil.NewMockLLM()
+	ids := []string{"CVE-2024-0000", "CVE-2023-44487", "GHSA-xxxx-yyyy-zzzz", "CVE-2019-9192", "CVE-2024-1234"}
+	human, err := json.Marshal(func() []LLMVulnerability {
+		v := make([]LLMVulnerability, len(ids))
+		for i, id := range ids {
+			v[i] = LLMVulnerability{VulnID: id}
+		}
+		return v
+	}())
+	require.NoError(t, err)
+	first, err := mock.Generate(context.Background(), llm.Request{Human: string(human)})
+	require.NoError(t, err)
+	again, err := mock.Generate(context.Background(), llm.Request{Human: string(human)})
+	require.NoError(t, err)
+	require.Equal(t, first, again)
+
+	logs := withCapturedLogs(t)
+	entries, err := parseReply(context.Background(), first)
+	require.NoError(t, err)
+	require.Len(t, entries, len(ids))
+	distinct := map[owasp.Vector]bool{}
+	for i, e := range entries {
+		require.Equal(t, ids[i], e.VulnID)
+		require.NoError(t, e.Levels.Check())
+		want := testutil.DeterministicLevels(ids[i])
+		require.Equal(t, want[:], levelsOf(e.Levels))
+		require.Equal(t, "Mock LLM: deterministic scores for testing", e.Reasoning)
+		distinct[e.Levels] = true
+	}
+	require.Greater(t, len(distinct), 1, "the levels depend on the vulnId")
+	for _, r := range logs.records {
+		require.NotEqual(t, slog.LevelWarn, r.level, "nothing dropped")
+	}
+}
+
+// demoContexts holds the demo scan's three contexts, the YAML of vens-demo's
+// contexts/ byte for byte as step 5's runs read them (step-5.md's sha256 in
+// TestDemoContextsAreStep5s).
+var demoContexts = map[string]string{
+	"internet-facing": `# Service A : la MEME image, deployee en frontal internet.
+schema_version: 2
+
+project:
+  name: "checkout-api"
+  description: "Public checkout API handling card payments for the storefront"
+
+context:
+  exposure: "internet"
+  data_sensitivity: "critical"
+  business_criticality: "critical"
+  availability_requirement: "critical"
+
+  compliance_requirements:
+    - "PCI-DSS"
+    - "GDPR"
+
+  audit_requirement: "high"
+
+  # Ce qu un service dans le perimetre PCI-DSS a reellement devant lui.
+  controls:
+    waf: true
+    ddos_protection: true
+    ids: true
+    siem: true
+    edr: true
+    antivirus: false
+    segmentation: true
+    zero_trust: false
+  notes: "Accepts unauthenticated traffic on the payment initiation route and parses attacker-controlled JSON."
+
+  # Schema 2. listener vient des notes ci-dessus. Le reste est declare pour la demo (services
+  # fictifs), fixe le 18/11/2026 avant de lire un score : ni les notes ni les controles ne l etablissent.
+  listener: "present"
+  data_subjects: "millions"
+  detection:
+    network: "logged"
+    host: "logged"
+    application: "not_logged"
+  traceability: "per_request"
+`,
+	"internal": `# Service B : la MEME image, deployee en batch interne.
+schema_version: 2
+
+project:
+  name: "nightly-report"
+  description: "Internal batch job producing an aggregated sales report"
+
+context:
+  exposure: "internal"
+  data_sensitivity: "low"
+  business_criticality: "low"
+  availability_requirement: "low"
+
+  compliance_requirements: []
+
+  audit_requirement: "low"
+
+  # Pas de WAF ni d anti-DDoS : ce job n ecoute sur aucun port.
+  controls:
+    waf: false
+    ddos_protection: false
+    ids: true
+    siem: true
+    edr: true
+    antivirus: false
+    segmentation: true
+    zero_trust: false
+  notes: "No ingress and no listening socket. Runs once a night, reads a pre-validated CSV from an internal bucket, writes an aggregate to a private database, then exits."
+
+  # Schema 2. listener vient des notes ci-dessus. Le reste est declare pour la demo (services
+  # fictifs), fixe le 18/11/2026 avant de lire un score : ni les notes ni les controles ne l etablissent.
+  listener: "absent"
+  data_subjects: "none"
+  detection:
+    network: "logged"
+    host: "logged"
+    application: "not_logged"
+  traceability: "none"
+`,
+	"internal-api": `# Service C : la MEME image, deployee en API interne.
+schema_version: 2
+
+project:
+  name: "stock-api"
+  description: "Internal REST API that warehouse and support tools query for stock levels"
+
+context:
+  exposure: "internal"
+  data_sensitivity: "medium"
+  business_criticality: "medium"
+  availability_requirement: "medium"
+
+  compliance_requirements: []
+
+  audit_requirement: "medium"
+
+  # Pas de WAF ni d anti-DDoS : le service n est joignable que depuis le reseau interne.
+  controls:
+    waf: false
+    ddos_protection: false
+    ids: true
+    siem: true
+    edr: true
+    antivirus: false
+    segmentation: true
+    zero_trust: false
+  notes: "Listens on HTTP on the corporate network only: reachable from every employee workstation and internal service, no route from the internet. Callers are not authenticated, so any host on the corporate network can send requests, and the service parses their JSON."
+
+  # Schema 2. listener vient des notes ci-dessus. Le reste est declare pour la demo (services
+  # fictifs), fixe le 18/11/2026 avant de lire un score : ni les notes ni les controles ne l etablissent.
+  listener: "present"
+  data_subjects: "none"
+  detection:
+    network: "logged"
+    host: "logged"
+    application: "not_logged"
+  traceability: "per_request"
+`,
+}
+
+// demoContextNames orders demoContexts as the campaign reads them.
+var demoContextNames = []string{"internet-facing", "internal", "internal-api"}
+
+func TestDemoContextsAreStep5s(t *testing.T) {
+	want := map[string]string{
+		"internet-facing": "87040dd9320e83a8c33f55cb35cecb655b61b07f48c7fad86e2af97468a6f49a",
+		"internal":        "d23b39a67f72dbbd27082610eb8547d246d1f4890101e40ac903ac052a9062e6",
+		"internal-api":    "fd2bd031c8a7de8ef00066d12e45d7b6c647e3a6c3334b8a06bcc34dddc49e80",
+	}
+	require.Len(t, demoContexts, len(want))
+	require.Len(t, demoContextNames, len(want))
+	for _, name := range demoContextNames {
+		sum := sha256.Sum256([]byte(demoContexts[name]))
+		require.Equal(t, want[name], hex.EncodeToString(sum[:]), name)
+	}
 }

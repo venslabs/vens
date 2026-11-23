@@ -15,11 +15,20 @@
 package generator
 
 import (
+	"context"
 	"encoding/json"
+	"flag"
+	"fmt"
+	"os"
+	"path/filepath"
+	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"github.com/venslabs/vens/internal/testutil"
+	"github.com/venslabs/vens/pkg/llm"
 	"github.com/venslabs/vens/pkg/riskconfig"
 )
 
@@ -76,7 +85,7 @@ func TestPromptCoreStructure(t *testing.T) {
 		{"Factor 3: Technical Impact", "TECHNICAL_IMPACT"},
 		{"Factor 4: Business Impact", "BUSINESS_IMPACT"},
 		{"Scoring scale", "SCORING SCALE"},
-		{"Score range 0-9", "0-9"},
+		{"The 16 factors", "rate the 16 OWASP factors below, each separately, on that factor's own levels:"},
 		{"Low range", "low:1-3"},
 		{"Medium range", "medium:4-6"},
 		{"High range", "high:7-8"},
@@ -114,7 +123,7 @@ func TestPromptOutputInstructions(t *testing.T) {
 
 	outputRequirements := []string{
 		"OUTPUT:",
-		"4 scores",
+		"the 16 factor levels",
 		"reasoning",
 	}
 
@@ -133,8 +142,9 @@ func TestPromptScoreNormalization(t *testing.T) {
 		t.Error("Prompt missing 'Cap at 9' score normalization instruction")
 	}
 
-	if !strings.Contains(prompt, "Return highest applicable score") {
-		t.Error("Prompt missing 'Return highest applicable score' instruction")
+	// It asked for one technical-impact value; each factor is now rated apart.
+	if strings.Contains(prompt, "Return highest applicable score") {
+		t.Error("Prompt still asks to 'Return highest applicable score'")
 	}
 }
 
@@ -364,13 +374,17 @@ func TestPromptAuditRequirementConditional(t *testing.T) {
 // schemaDoc mirrors the JSON Schema produced by buildOutputSchema, enough to
 // assert on its shape in tests.
 type schemaDoc struct {
-	Type       string `json:"type"`
-	Properties struct {
+	Type                 string `json:"type"`
+	AdditionalProperties *bool  `json:"additionalProperties"`
+	Properties           struct {
 		Results struct {
 			Type  string `json:"type"`
 			Items struct {
-				Properties map[string]struct {
+				Type                 string `json:"type"`
+				AdditionalProperties *bool  `json:"additionalProperties"`
+				Properties           map[string]struct {
 					Type        string `json:"type"`
+					Enum        []int  `json:"enum"`
 					Description string `json:"description"`
 				} `json:"properties"`
 				Required []string `json:"required"`
@@ -402,13 +416,22 @@ func TestOutputSchemaRequired(t *testing.T) {
 		t.Errorf("Results type should be 'array', got %q", results.Type)
 	}
 
-	requiredFields := []string{
-		"vulnId",
-		"threat_agent_score",
-		"vulnerability_score",
-		"technical_impact",
-		"business_impact",
-		"reasoning",
+	requiredFields := []string{"vulnId"}
+	for _, f := range factors {
+		requiredFields = append(requiredFields, f.key)
+	}
+	requiredFields = append(requiredFields, "reasoning")
+
+	if len(results.Items.Properties) != len(requiredFields) {
+		t.Errorf("Schema has %d properties, want %d", len(results.Items.Properties), len(requiredFields))
+	}
+	if strings.Join(results.Items.Required, ",") != strings.Join(requiredFields, ",") {
+		t.Errorf("Required is %v, want %v", results.Items.Required, requiredFields)
+	}
+	for _, ap := range []*bool{doc.AdditionalProperties, results.Items.AdditionalProperties} {
+		if ap == nil || *ap {
+			t.Error("additionalProperties must be false in both object schemas")
+		}
 	}
 
 	for _, field := range requiredFields {
@@ -431,103 +454,29 @@ func TestOutputSchemaRequired(t *testing.T) {
 	}
 }
 
-func TestOutputSchemaScoreDescriptions(t *testing.T) {
+func TestOutputSchemaFactors(t *testing.T) {
 	g := newTestGenerator(t, minimalConfig())
 	doc := parseOutputSchema(t, g.buildOutputSchema())
 
 	props := doc.Properties.Results.Items.Properties
-
-	scoreFields := map[string]string{
-		"threat_agent_score":  "0-9",
-		"vulnerability_score": "0-9",
-		"technical_impact":    "0-9",
-		"business_impact":     "0-9",
-	}
-
-	for field, expectedRange := range scoreFields {
-		prop, ok := props[field]
+	for _, f := range factors {
+		prop, ok := props[f.key]
 		if !ok {
-			t.Errorf("Missing field: %s", field)
+			t.Errorf("Missing field: %s", f.key)
 			continue
 		}
-
-		if prop.Type != "number" {
-			t.Errorf("Field %s should be 'number', got %q", field, prop.Type)
+		if prop.Type != "integer" {
+			t.Errorf("Field %s should be 'integer', got %q", f.key, prop.Type)
 		}
-
-		if !strings.Contains(prop.Description, expectedRange) {
-			t.Errorf("Field %s description should contain %q, got %q", field, expectedRange, prop.Description)
+		if fmt.Sprint(prop.Enum) != fmt.Sprint(f.levels) {
+			t.Errorf("Field %s enum %v, want %v", f.key, prop.Enum, f.levels)
 		}
-	}
-}
-
-func TestOutputExample(t *testing.T) {
-	g := newTestGenerator(t, minimalConfig())
-	example := g.buildOutputExample()
-
-	if !strings.HasPrefix(strings.TrimSpace(example), "{") {
-		t.Error("Example should start with '{'")
-	}
-
-	if !strings.Contains(example, `"results"`) {
-		t.Error("Example missing 'results' field")
-	}
-
-	if !strings.Contains(example, "CVE-") {
-		t.Error("Example should contain CVE IDs")
-	}
-
-	scoreFields := []string{
-		"threat_agent_score",
-		"vulnerability_score",
-		"technical_impact",
-		"business_impact",
-	}
-
-	for _, field := range scoreFields {
-		if !strings.Contains(example, field) {
-			t.Errorf("Example missing field: %s", field)
+		if prop.Description != f.question {
+			t.Errorf("Field %s description %q, want OWASP's question %q", f.key, prop.Description, f.question)
 		}
 	}
-
-	if !strings.Contains(example, "reasoning") {
-		t.Error("Example missing 'reasoning' field")
-	}
-}
-
-func TestExampleSchemaConsistency(t *testing.T) {
-	g := newTestGenerator(t, minimalConfig())
-	doc := parseOutputSchema(t, g.buildOutputSchema())
-	example := g.buildOutputExample()
-
-	schemaFields := make([]string, 0)
-	for field := range doc.Properties.Results.Items.Properties {
-		schemaFields = append(schemaFields, field)
-	}
-
-	for _, field := range schemaFields {
-		if !strings.Contains(example, field) {
-			t.Errorf("Schema field %q not found in example - this can cause LLM confusion", field)
-		}
-	}
-
-	scorePatterns := []string{
-		`"threat_agent_score": 8`,
-		`"vulnerability_score": 7`,
-		`"technical_impact": 8`,
-		`"business_impact": 9`,
-	}
-
-	foundNumericScore := false
-	for _, pattern := range scorePatterns {
-		if strings.Contains(example, pattern) {
-			foundNumericScore = true
-			break
-		}
-	}
-
-	if !foundNumericScore {
-		t.Error("Example should contain numeric scores (not quoted strings)")
+	if props["reasoning"].Description != "Brief explanation of each score (2-3 sentences)" {
+		t.Errorf("reasoning keeps main's description, got %q", props["reasoning"].Description)
 	}
 }
 
@@ -597,88 +546,6 @@ func TestPromptAnchoringValues(t *testing.T) {
 	}
 }
 
-func TestOutputExampleValidJSON(t *testing.T) {
-	g := newTestGenerator(t, minimalConfig())
-	example := g.buildOutputExample()
-
-	var parsed map[string]interface{}
-	if err := json.Unmarshal([]byte(example), &parsed); err != nil {
-		t.Errorf("Example is not valid JSON: %v", err)
-	}
-
-	results, ok := parsed["results"].([]interface{})
-	if !ok {
-		t.Fatal("Parsed example missing 'results' array")
-	}
-
-	if len(results) == 0 {
-		t.Error("Example should contain at least one result")
-	}
-}
-
-func TestOutputExampleFewShotDiversity(t *testing.T) {
-	g := newTestGenerator(t, minimalConfig())
-	example := g.buildOutputExample()
-
-	var parsed map[string]interface{}
-	if err := json.Unmarshal([]byte(example), &parsed); err != nil {
-		t.Fatalf("Example is not valid JSON: %v", err)
-	}
-
-	results, ok := parsed["results"].([]interface{})
-	if !ok {
-		t.Fatal("Parsed example missing 'results' array")
-	}
-
-	if len(results) < 2 {
-		t.Error("Example should contain at least 2 results for few-shot diversity")
-	}
-
-	var hasHighScore, hasLowScore bool
-	for _, r := range results {
-		result, ok := r.(map[string]interface{})
-		if !ok {
-			continue
-		}
-
-		if score, ok := result["threat_agent_score"].(float64); ok {
-			if score >= 7 {
-				hasHighScore = true
-			}
-			if score <= 4 {
-				hasLowScore = true
-			}
-		}
-	}
-
-	if !hasHighScore || !hasLowScore {
-		t.Error("Example should show both high-score and low-score cases for calibration")
-	}
-}
-
-func TestOutputExampleReasoningQuality(t *testing.T) {
-	g := newTestGenerator(t, minimalConfig())
-	example := g.buildOutputExample()
-
-	reasoningIndicators := []string{
-		"ThreatAgent",
-		"Vulnerability",
-		"TechImpact",
-		"BusinessImpact",
-	}
-
-	foundCount := 0
-	for _, indicator := range reasoningIndicators {
-		if strings.Contains(example, indicator) {
-			foundCount++
-		}
-	}
-
-	if foundCount < 3 {
-		t.Errorf("Example reasoning should reference OWASP factors, found %d/4", foundCount)
-	}
-}
-
 func TestPromptReasoningGuidance(t *testing.T) {
 	g := newTestGenerator(t, minimalConfig())
 	prompt := g.buildSystemPrompt()
@@ -716,11 +583,8 @@ func TestPromptLength(t *testing.T) {
 	g := newTestGenerator(t, cfg)
 	prompt := g.buildSystemPrompt()
 
-	maxLength := 4000
-	if len(prompt) > maxLength {
-		t.Errorf("Prompt too long: %d chars (max %d). Risk of truncation.", len(prompt), maxLength)
-	}
-
+	// main's 4000-character cap cannot hold the 16 OWASP factor lines; the
+	// exact prompt is pinned by the golden files instead.
 	minLength := 500
 	if len(prompt) < minLength {
 		t.Errorf("Prompt suspiciously short: %d chars (min %d)", len(prompt), minLength)
@@ -750,5 +614,185 @@ func minimalConfig() *riskconfig.Config {
 			DataSensitivity:     "high",
 			BusinessCriticality: "critical",
 		},
+	}
+}
+
+var update = flag.Bool("update", false, "rewrite the comparator's golden prompts and schema under testdata")
+
+// systemCapture records the system prompt of the last call.
+type systemCapture struct{ system string }
+
+func (c *systemCapture) Generate(ctx context.Context, req llm.Request) (string, error) {
+	c.system = req.System
+	return testutil.NewMockLLM().Generate(ctx, req)
+}
+
+// sentSystemPrompt is the system prompt one call sends in a context, schema
+// included, as the provider receives it.
+func sentSystemPrompt(t *testing.T, name string) string {
+	t.Helper()
+	yaml, ok := demoContexts[name]
+	require.True(t, ok, name)
+	cfg, err := riskconfig.Parse([]byte(yaml))
+	require.NoError(t, err)
+	c := &systemCapture{}
+	g, err := New(Opts{LLM: c, Config: cfg, BatchSize: 1})
+	require.NoError(t, err)
+	require.NoError(t, g.GenerateRiskScore(context.Background(), testVulns(1), nil))
+	return c.system
+}
+
+func readGolden(t *testing.T, path ...string) string {
+	t.Helper()
+	b, err := os.ReadFile(filepath.Join(append([]string{"testdata"}, path...)...))
+	require.NoError(t, err)
+	return string(b)
+}
+
+func writeGolden(t *testing.T, content string, path ...string) {
+	t.Helper()
+	p := filepath.Join(append([]string{"testdata"}, path...)...)
+	require.NoError(t, os.MkdirAll(filepath.Dir(p), 0o755))
+	require.NoError(t, os.WriteFile(p, []byte(content), 0o644))
+}
+
+// The system prompt sent in each context is its golden file, byte for byte.
+func TestSystemPromptGolden(t *testing.T) {
+	for _, c := range demoContextNames {
+		t.Run(c, func(t *testing.T) {
+			got := sentSystemPrompt(t, c)
+			if *update {
+				writeGolden(t, got, "prompts", "comparator", c+".system.prompt")
+			}
+			require.Equal(t, readGolden(t, "prompts", "comparator", c+".system.prompt"), got)
+		})
+	}
+}
+
+// The schema is its golden file, byte for byte.
+func TestOutputSchemaGolden(t *testing.T) {
+	g := newTestGenerator(t, minimalConfig())
+	got := string(g.buildOutputSchema())
+	if *update {
+		writeGolden(t, got, "schema.json")
+	}
+	require.Equal(t, readGolden(t, "schema.json"), got)
+	require.True(t, json.Valid([]byte(got)))
+}
+
+// owaspLines reads testdata/owasp-factors.txt: each factor's line in OWASP's
+// Risk Rating Methodology, from its name to its last level, bold marks removed.
+func owaspLines(t *testing.T) map[string]string {
+	t.Helper()
+	out := map[string]string{}
+	for _, line := range strings.Split(strings.TrimSuffix(readGolden(t, "owasp-factors.txt"), "\n"), "\n") {
+		key, text, ok := strings.Cut(line, ": ")
+		require.True(t, ok, line)
+		out[key] = text
+	}
+	require.Len(t, out, 16)
+	return out
+}
+
+func replaceOnce(t *testing.T, s, old, new string) string {
+	t.Helper()
+	require.Equal(t, 1, strings.Count(s, old), "%q must occur once", old)
+	return strings.Replace(s, old, new, 1)
+}
+
+// The prompt main 43ab10b sends in each context (testdata/prompts/main-43ab10b,
+// equal to every system prompt step 5's main control sent) becomes this
+// branch's by the spec's five edits and the schema alone.
+func TestSystemPromptIsMainsWithTheFiveEdits(t *testing.T) {
+	lines := owaspLines(t)
+	block := func(keys ...string) string {
+		s := "\n   Factors, each rated separately:"
+		for _, k := range keys {
+			s += "\n   - " + k + ": " + lines[k]
+		}
+		return s
+	}
+	schema := readGolden(t, "schema.json")
+	for _, c := range demoContextNames {
+		t.Run(c, func(t *testing.T) {
+			s := readGolden(t, "prompts", "main-43ab10b", c+".system.prompt")
+
+			// 5: the output example block, which ends main's prompt, is removed.
+			i := strings.Index(s, "#### Output Example\n")
+			require.Positive(t, i)
+			require.True(t, strings.HasSuffix(s, "\n```\n"))
+			s = s[:i]
+			// The schema: main's four scores give way to the 16 factors.
+			head := "#### Output format: JSON Schema\n"
+			j := strings.Index(s, head)
+			require.Positive(t, j)
+			s = s[:j+len(head)] + schema + "\n"
+			// 1.
+			s = replaceOnce(t, s, "score 4 factors (0-9):",
+				"rate the 16 OWASP factors below, each separately, on that factor's own levels:")
+			// 3.
+			s = replaceOnce(t, s, "\n   - Return highest applicable score", "")
+			// 4.
+			s = replaceOnce(t, s, "OUTPUT: 4 scores (0-9) + brief reasoning", "OUTPUT: the 16 factor levels + brief reasoning")
+			// 2: each group's four factors after its last guidance line.
+			s = replaceOnce(t, s, "\n\n2. VULNERABILITY", block("SL", "M", "O", "S")+"\n\n2. VULNERABILITY")
+			s = replaceOnce(t, s, "\n\n3. TECHNICAL_IMPACT", block("ED", "EE", "A", "ID")+"\n\n3. TECHNICAL_IMPACT")
+			s = replaceOnce(t, s, "\n\n4. BUSINESS_IMPACT", block("LC", "LI", "LAV", "LAC")+"\n\n4. BUSINESS_IMPACT")
+			s = replaceOnce(t, s, "\n\nSCORING SCALE", block("FD", "RD", "NC", "PV")+"\n\nSCORING SCALE")
+
+			require.Equal(t, s, readGolden(t, "prompts", "comparator", c+".system.prompt"))
+			require.Equal(t, s, sentSystemPrompt(t, c))
+		})
+	}
+}
+
+// Each factor's line and question in the code are OWASP's, and its levels
+// are the distinct numbers its options carry.
+func TestFactorsAreOWASPs(t *testing.T) {
+	lines := owaspLines(t)
+	number := regexp.MustCompile(`\((\d)\)`)
+	for _, f := range factors {
+		require.Equal(t, lines[f.key], f.name+" - "+f.question+" "+f.options, f.key)
+		var distinct []int
+		for _, m := range number.FindAllStringSubmatch(f.options, -1) {
+			n := int(m[1][0] - '0')
+			if !slices.Contains(distinct, n) {
+				distinct = append(distinct, n)
+			}
+		}
+		slices.Sort(distinct)
+		require.Equal(t, distinct, f.levels, f.key)
+	}
+}
+
+// Each schema enum is levels.go's set of distinct levels for its factor:
+// owasp.Vector.Check accepts a level, all others valid, exactly when the
+// enum holds it.
+func TestSchemaEnumsAreLevelsGos(t *testing.T) {
+	g := newTestGenerator(t, minimalConfig())
+	props := parseOutputSchema(t, g.buildOutputSchema()).Properties.Results.Items.Properties
+	base := make([]int, len(factors))
+	for i, f := range factors {
+		base[i] = f.levels[0]
+	}
+	require.NoError(t, vectorOf(base).Check())
+	for i, f := range factors {
+		enum := props[f.key].Enum
+		require.NotEmpty(t, enum, f.key)
+		for level := -100; level <= 100; level++ {
+			l := slices.Clone(base)
+			l[i] = level
+			err := vectorOf(l).Check()
+			require.Equal(t, slices.Contains(enum, level), err == nil, "%s:%d", f.key, level)
+		}
+	}
+}
+
+// The request carries no example levels: any would be free parameters.
+func TestRequestHasNoOutputExample(t *testing.T) {
+	for _, c := range demoContextNames {
+		s := sentSystemPrompt(t, c)
+		require.NotContains(t, s, "Output Example", c)
+		require.True(t, strings.HasSuffix(s, "#### Output format: JSON Schema\n"+string(json.RawMessage(outputSchema))+"\n"), c)
 	}
 }
