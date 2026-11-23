@@ -24,7 +24,6 @@ import (
 	"strings"
 
 	"github.com/venslabs/vens/pkg/contract"
-	"github.com/venslabs/vens/pkg/cvss"
 )
 
 const (
@@ -55,28 +54,21 @@ type adjustmentReply struct {
 }
 
 // adjust makes a flagged CVE's adjustment call, after its ordinary
-// questions: it shows every row's evidence, the flags and the answers given,
-// and may lower Opportunity, when a row describes the CVE, and each axis
-// Applicability did not floor, never raise them. A CVE not reachable here,
-// whose Opportunity and axes are at their lowest, is shown reachability's
-// answer and asked confidentiality alone, when it was asked Privacy
-// violation. With nothing left to ask, it makes no call. A reply Go cannot
-// read leaves the baselines.
+// questions: it shows every row's evidence, the flags and the Opportunity
+// answer given, and may lower Opportunity, never raise it. A CVE no row
+// describes was not asked Opportunity: it makes no call. A reply Go cannot
+// read leaves the baseline.
 func (g *Generator) adjust(ctx context.Context, run *scoringRun, c *cve, a *assessment) error {
-	floored := c.applicability.Floored
-	if len(contract.AdjustmentFields(g.deployment, c.in, floored, a.answers.R)) == 0 {
-		reason := "no description and every axis floored"
-		if !contract.Reachable(a.answers.R) {
-			reason = "not reachable and Privacy violation not asked"
-		}
-		slog.DebugContext(ctx, "no adjustment call: "+reason, "vuln", c.id())
+	if len(contract.AdjustmentFields(c.in)) == 0 {
+		slog.DebugContext(ctx, "no adjustment call: no description", "vuln", c.id())
 		return nil
 	}
-	request, err := contract.AdjustmentRequest(g.deployment, c.in, floored, c.flags, baselines(c.in, a.answers, floored))
+	given := contract.Answers{O: shownAs(contract.O, a.answers.O)}
+	request, err := contract.AdjustmentRequest(g.deployment, c.in, c.flags, given)
 	if err != nil {
 		return err
 	}
-	schema, err := contract.AdjustmentSchema(g.deployment, c.in, floored, a.answers.R)
+	schema, err := contract.AdjustmentSchema(c.in)
 	if err != nil {
 		return err
 	}
@@ -94,31 +86,9 @@ func (g *Generator) adjust(ctx context.Context, run *scoringRun, c *cve, a *asse
 	return nil
 }
 
-// baselines are the answers the adjustment shows as given: Opportunity's,
-// when a row describes the CVE, and each axis's that Applicability did not
-// floor; for a CVE not reachable here, reachability's alone. An answer Go
-// reads as cannot_tell is shown as cannot_tell, so that a reply keeping it
-// keeps what Go keeps.
-func baselines(c contract.CVE, given contract.Answers, floored [3]bool) contract.Answers {
-	b := contract.Answers{R: given.R}
-	if !contract.Reachable(given.R) {
-		return b
-	}
-	if c.Described() {
-		b.O = shownAs(contract.O, given.O)
-	}
-	if !floored[cvss.Confidentiality] {
-		b.LC = shownAs(contract.LC, given.LC)
-	}
-	if !floored[cvss.Integrity] {
-		b.LI = shownAs(contract.LI, given.LI)
-	}
-	if !floored[cvss.Availability] {
-		b.LAV = shownAs(contract.LAV, given.LAV)
-	}
-	return b
-}
-
+// shownAs is the answer the adjustment shows as given: an answer Go reads as
+// cannot_tell is shown as cannot_tell, so that a reply keeping it keeps what
+// Go keeps.
 func shownAs(f contract.Factor, answer string) string {
 	if r, _ := contract.ReadAnswer(f, answer); r == contract.Invalid {
 		return cannotTell
@@ -165,12 +135,7 @@ func readAdjustment(ctx context.Context, run *scoringRun, id, raw string, lists 
 		return value
 	}
 	got := adjustmentReply{
-		adjusted: contract.Adjusted{
-			Opportunity:     read("opportunity"),
-			Confidentiality: read("confidentiality"),
-			Integrity:       read("integrity"),
-			Availability:    read("availability"),
-		},
+		adjusted:  contract.Adjusted{Opportunity: read("opportunity")},
 		reading:   adjustmentAnswered,
 		shown:     strings.Join(parts, ", "),
 		reasoning: reasoningOf(fields["reasoning"]),
@@ -178,7 +143,7 @@ func readAdjustment(ctx context.Context, run *scoringRun, id, raw string, lists 
 	for _, name := range slices.Sorted(maps.Keys(fields)) {
 		if _, asked := lists[name]; !asked && name != "reasoning" {
 			// A provider honouring the schema cannot write one: the object
-			// is closed, and a floored axis is not in it.
+			// is closed.
 			run.defect(defectAdjustmentNotAsked)
 			slog.WarnContext(ctx, "Adjustment reply gives a field the call did not ask; ignoring it",
 				"vuln", id, "field", cut(name, loggedLimit), "answer", cut(string(fields[name]), loggedLimit))

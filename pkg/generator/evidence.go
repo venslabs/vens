@@ -64,13 +64,14 @@ func CVEFlags(rows []Vulnerability) Flags {
 	return f
 }
 
-// CVEApplicability reads Applicability over every vector of one CVE's rows.
-func CVEApplicability(rows []Vulnerability) cvss.Applicability {
+// CVEImpact reads what the CVSS v3 vectors of one CVE's rows give its three
+// technical impacts.
+func CVEImpact(rows []Vulnerability) cvss.Impact {
 	var vectors []cvss.Vector
 	for _, r := range rows {
 		vectors = append(vectors, r.CVSS...)
 	}
-	return cvss.ApplicabilityOf(vectors)
+	return cvss.ImpactOf(vectors)
 }
 
 // disputed is the wording by which a description says its CVE is disputed or

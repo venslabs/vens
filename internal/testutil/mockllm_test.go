@@ -107,6 +107,15 @@ func TestMockSkipsAndForcesCannotTell(t *testing.T) {
 		}
 	}
 
+	// Written id@CVE, only that vulnerability is answered cannot_tell.
+	t.Setenv(CannotTellEnv, "millions@CVE-2024-0003")
+	r, _ = ask(t, contract.PV)
+	for _, a := range r.Answers {
+		if cannot := string(a.Answer) == `"cannot_tell"`; cannot != (a.VulnID == "CVE-2024-0003") {
+			t.Errorf("with %s=millions@CVE-2024-0003, %s answered %s", CannotTellEnv, a.VulnID, a.Answer)
+		}
+	}
+
 	t.Setenv(CannotTellEnv, "cannot_tell")
 	r, _ = ask(t, contract.ID)
 	for _, a := range r.Answers {
@@ -120,7 +129,7 @@ func TestMockSkipsAndForcesCannotTell(t *testing.T) {
 // asks, an answer from that field's list.
 func TestMockAnswersTheAdjustment(t *testing.T) {
 	described := contract.CVE{ID: "CVE-X", Rows: []contract.Row{{Description: "A described vulnerability."}}}
-	schema, err := contract.AdjustmentSchema(contract.Deployment{}, described, [3]bool{true, false, false}, "")
+	schema, err := contract.AdjustmentSchema(described)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -133,9 +142,7 @@ func TestMockAnswersTheAdjustment(t *testing.T) {
 		t.Fatal(err)
 	}
 	lists := map[string][]string{
-		"opportunity":  {"no_access_or_resources_required", "some_access_or_resources_required", "special_access_or_resources_required", "full_access_or_expensive_resources_required", "keep"},
-		"integrity":    {"affected", "not_affected"},
-		"availability": {"affected", "not_affected"},
+		"opportunity": {"no_access_or_resources_required", "some_access_or_resources_required", "special_access_or_resources_required", "full_access_or_expensive_resources_required", "keep"},
 	}
 	for name, list := range lists {
 		if !slices.Contains(list, got[name]) {

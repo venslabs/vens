@@ -1,1 +1,0 @@
-{"type":"object","additionalProperties":false,"required":["reasoning","confidentiality"],"properties":{"reasoning":{"type":"string"},"confidentiality":{"type":"string","enum":["affected","not_affected","cannot_tell"]}}}

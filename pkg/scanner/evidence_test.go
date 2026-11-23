@@ -213,7 +213,7 @@ func TestTrivyScanner_Parse_UnprefixedVectorsBesideV2(t *testing.T) {
 		if !reflect.DeepEqual(versions, tt.versions) || cvss.Newest(row.CVSS) != tt.newest {
 			t.Errorf("%s: versions %v, newest %d; want %v, %d", row.VulnID, versions, cvss.Newest(row.CVSS), tt.versions, tt.newest)
 		}
-		got := generator.CVEApplicability([]generator.Vulnerability{row})
+		got := applicabilityOf([]generator.Vulnerability{row})
 		if got.Floored != tt.floored || len(got.Missing) != 0 {
 			t.Errorf("%s: Applicability %+v, want floored %v and nothing missing", row.VulnID, got, tt.floored)
 		}

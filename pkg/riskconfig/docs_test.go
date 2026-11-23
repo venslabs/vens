@@ -45,7 +45,7 @@ type block struct {
 
 var (
 	fenceOpen   = regexp.MustCompile("^( *)(`{3,}|~{3,})\\s*([^`\\s]*)")
-	docsCheck   = regexp.MustCompile(`^<!-- docs-check: E([1-5]) -->$`)
+	docsCheck   = regexp.MustCompile(`^<!-- docs-check: E([1-6]) -->$`)
 	preElement  = regexp.MustCompile(`(?s)<pre[^>]*>(.*?)</pre>`)
 	htmlTag     = regexp.MustCompile(`<[^>]+>`)
 	topLevelKey = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*:(\s|$)`)
@@ -609,6 +609,9 @@ func collectKeys(t reflect.Type, prefix string, out map[string]bool) {
 	for name, ft := range yamlKeys(t) {
 		path := strings.TrimPrefix(prefix+"."+name, ".")
 		out[path] = true
+		if ft.Kind() == reflect.Slice {
+			ft = ft.Elem()
+		}
 		if ft.Kind() == reflect.Struct {
 			collectKeys(ft, path, out)
 		}

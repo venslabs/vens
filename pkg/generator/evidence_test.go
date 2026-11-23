@@ -15,13 +15,12 @@
 package generator
 
 import (
-	"reflect"
 	"testing"
 
 	"github.com/venslabs/vens/pkg/cvss"
 )
 
-func TestCVEApplicability_ReadsEveryRow(t *testing.T) {
+func TestCVEImpact_ReadsEveryRow(t *testing.T) {
 	nvdA := cvss.Vector{Source: "nvd", Version: "3.1", Vector: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:N"}
 	// Same source and version as nvdA, another vector: keyed by source or by
 	// version, one of the two would be lost.
@@ -31,20 +30,23 @@ func TestCVEApplicability_ReadsEveryRow(t *testing.T) {
 		{VulnID: "CVE-2024-0001", PkgName: "b", CVSS: []cvss.Vector{nvdB}},
 		{VulnID: "CVE-2024-0001", PkgName: "c", CVSS: []cvss.Vector{nvdA}},
 	}
-	got := CVEApplicability(rows)
-	if want := [3]bool{true, false, true}; got.Floored != want {
-		t.Errorf("Floored = %v, want %v: I is L on the second row", got.Floored, want)
-	}
-	if len(got.Missing) != 0 {
-		t.Errorf("Missing = %v, want none", got.Missing)
+	got := CVEImpact(rows)
+	if want := [3]string{"N", "L", "N"}; got.Values != want || got.Usable != 2 {
+		t.Errorf("CVEImpact = %+v, want %v from 2 vectors: I is L on the second row", got, want)
 	}
 }
 
-func TestCVEApplicability_NoVectorOnAnyRow(t *testing.T) {
-	got := CVEApplicability([]Vulnerability{{VulnID: "CVE-2024-0002"}, {VulnID: "CVE-2024-0002"}})
-	want := cvss.Applicability{Missing: []cvss.Missing{{Cause: cvss.NoVector}}}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("CVEApplicability = %+v, want %+v", got, want)
+// A row without a vector does not stop another row's: the impact reads the
+// CVE's vectors, whichever rows carry them, and no vector on any row leaves
+// it vectorless.
+func TestCVEImpact_RowsWithoutVectors(t *testing.T) {
+	if got := CVEImpact([]Vulnerability{{VulnID: "CVE-2024-0002"}, {VulnID: "CVE-2024-0002"}}); !got.Vectorless() {
+		t.Errorf("no vector on any row: %+v, want it vectorless", got)
+	}
+	v := cvss.Vector{Source: "nvd", Version: "3.1", Vector: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N"}
+	got := CVEImpact([]Vulnerability{{VulnID: "CVE-2024-0003"}, {VulnID: "CVE-2024-0003", CVSS: []cvss.Vector{v}}})
+	if want := [3]string{"H", "N", "N"}; got.Values != want {
+		t.Errorf("CVEImpact = %+v, want %v", got, want)
 	}
 }
 
@@ -77,15 +79,5 @@ func TestCVEFlags(t *testing.T) {
 		if got != tt.want || got.Flagged() != tt.flagged {
 			t.Errorf("%s: CVEFlags = %+v (flagged %v), want %+v (flagged %v)", tt.name, got, got.Flagged(), tt.want, tt.flagged)
 		}
-	}
-}
-
-// A row without a vector does not stop another row's vectors from flooring:
-// Applicability reads the CVE's vectors, whichever rows carry them.
-func TestCVEApplicability_RowWithoutVector(t *testing.T) {
-	v := cvss.Vector{Source: "nvd", Version: "2.0", Vector: "AV:N/AC:L/Au:N/C:N/I:N/A:N"}
-	got := CVEApplicability([]Vulnerability{{VulnID: "CVE-2024-0003"}, {VulnID: "CVE-2024-0003", CVSS: []cvss.Vector{v}}})
-	if want := [3]bool{true, true, true}; got.Floored != want || len(got.Missing) != 0 {
-		t.Errorf("CVEApplicability = %+v, want every axis floored and nothing missing", got)
 	}
 }

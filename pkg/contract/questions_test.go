@@ -22,19 +22,14 @@ import (
 	"github.com/venslabs/vens/pkg/cvss"
 )
 
-func questions(t *testing.T, d Deployment, floored [3]bool) []Factor {
+func questions(t *testing.T, d Deployment) []Factor {
 	t.Helper()
-	q, err := Questions(d, describedCVE, floored)
+	q, err := Questions(d, describedCVE)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return q
 }
-
-var (
-	allFloored = [3]bool{true, true, true}
-	cFloored   = [3]bool{cvss.Confidentiality: true}
-)
 
 // declared declares every field the rules read, at values that leave every
 // question asked.
@@ -48,24 +43,28 @@ func declared() Deployment {
 }
 
 func TestQuestionsInTheDeclaredOrder(t *testing.T) {
-	if got := questions(t, declared(), [3]bool{}); !slices.Equal(got, Order()) {
-		t.Errorf("every field declared, nothing floored: %v, want %v", got, Order())
+	if got := questions(t, declared()); !slices.Equal(got, Order()) {
+		t.Errorf("every field declared: %v, want %v", got, Order())
 	}
-	if got, want := questions(t, base(), allFloored), []Factor{R, M, O, EE, LAC, FD, RD}; !slices.Equal(got, want) {
-		t.Errorf("nothing declared, every axis floored: %v, want %v", got, want)
+	if got, want := questions(t, base()), []Factor{M, O, EE, LAC, FD, RD, PV}; !slices.Equal(got, want) {
+		t.Errorf("nothing declared: %v, want %v", got, want)
+	}
+	if want := []Factor{M, O, EE, ID, LAC, FD, RD, NC, PV}; !slices.Equal(Order(), want) {
+		t.Errorf("Order() = %v, want %v", Order(), want)
 	}
 	order := Order()
 	order[0] = PV
-	if Order()[0] != R {
+	if Order()[0] != M {
 		t.Error("Order shares its slice with the package")
 	}
 }
 
-// What is not asked: LC and PV when C is floored, LI when I is, LAV when A
-// is, ID when detection is undeclared or declared at one level, NC when no
-// framework is declared, PV when data_subjects caps it at the lowest level,
-// and M, O and EE when no row describes the CVE, a title alone or a blank
-// description included; one row described of two is enough.
+// What is not asked: ID when detection is undeclared or declared at one
+// level, NC when no framework is declared, PV when data_subjects caps it at
+// the lowest level, and M, O and EE when no row describes the CVE, a title
+// alone or a blank description included; one row described of two is
+// enough. Loss of confidentiality, integrity and availability are never
+// asked, and no vector stops Privacy violation.
 func TestQuestionsNotAsked(t *testing.T) {
 	titled := CVE{ID: "CVE-N", Rows: []Row{{PkgName: "liba", Title: "[Privilege escalation possible to other user than root]"}}}
 	blank := CVE{ID: "CVE-N", Rows: []Row{{PkgName: "liba", Description: " \n\t"}, {PkgName: "libb"}}}
@@ -82,26 +81,24 @@ func TestQuestionsNotAsked(t *testing.T) {
 		name    string
 		d       Deployment
 		cve     CVE
-		floored [3]bool
 		missing []Factor
 	}{
-		{"C floored", declared(), describedCVE, cFloored, []Factor{LC, PV}},
-		{"I floored", declared(), describedCVE, [3]bool{cvss.Integrity: true}, []Factor{LI}},
-		{"A floored", declared(), describedCVE, [3]bool{cvss.Availability: true}, []Factor{LAV}},
-		{"detection undeclared", undeclared, describedCVE, [3]bool{}, []Factor{ID}},
-		{"detection at one level", uniform, describedCVE, [3]bool{}, []Factor{ID}},
-		{"no framework", noFramework, describedCVE, [3]bool{}, []Factor{NC}},
-		{"data_subjects none", none, describedCVE, [3]bool{}, []Factor{PV}},
-		{"data_subjects one_individual", one, describedCVE, [3]bool{}, []Factor{PV}},
-		{"data_subjects hundreds", hundreds, describedCVE, [3]bool{}, nil},
-		{"data_subjects undeclared", unset, describedCVE, [3]bool{}, nil},
-		{"a title alone", declared(), titled, [3]bool{}, []Factor{M, O, EE}},
-		{"a blank description", declared(), blank, [3]bool{}, []Factor{M, O, EE}},
-		{"no description, every axis floored", base(), titled, allFloored, []Factor{M, O, EE, ID, LC, LI, LAV, NC, PV}},
-		{"one row described of two", declared(), oneOfTwo, [3]bool{}, nil},
+		{"detection undeclared", undeclared, describedCVE, []Factor{ID}},
+		{"detection at one level", uniform, describedCVE, []Factor{ID}},
+		{"no framework", noFramework, describedCVE, []Factor{NC}},
+		{"data_subjects none", none, describedCVE, []Factor{PV}},
+		{"data_subjects one_individual", one, describedCVE, []Factor{PV}},
+		{"data_subjects hundreds", hundreds, describedCVE, nil},
+		{"data_subjects undeclared", unset, describedCVE, nil},
+		{"a title alone", declared(), titled, []Factor{M, O, EE}},
+		{"a blank description", declared(), blank, []Factor{M, O, EE}},
+		{"no description, nothing declared", base(), titled, []Factor{M, O, EE, ID, NC}},
+		{"one row described of two", declared(), oneOfTwo, nil},
+		{"every axis at N", declared(), impactCVE("N", "N", "N"), nil},
+		{"no vector", declared(), impactCVE("", "", ""), nil},
 	} {
 		want := slices.DeleteFunc(Order(), func(f Factor) bool { return slices.Contains(c.missing, f) })
-		got, err := Questions(c.d, c.cve, c.floored)
+		got, err := Questions(c.d, c.cve)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -111,56 +108,33 @@ func TestQuestionsNotAsked(t *testing.T) {
 	}
 }
 
-// The CVE whose only vector is v4, its three V metrics at N, SC and SI at L
-// and SA at N: an impact on subsequent systems alone keeps C and I
-// applicable, so LC, LI and PV are asked and LAV is not.
-func TestQuestionsOnASubsequentSystemsOnlyV4Vector(t *testing.T) {
-	a := cvss.ApplicabilityOf([]cvss.Vector{{Source: "nvd", Version: "4.0",
-		Vector: "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:N/VI:N/VA:N/SC:L/SI:L/SA:N"}})
-	got := questions(t, declared(), a.Floored)
-	for _, f := range []Factor{LC, LI, PV} {
-		if !slices.Contains(got, f) {
-			t.Errorf("%s not asked: %v", f, got)
-		}
-	}
-	if slices.Contains(got, LAV) {
-		t.Errorf("LAV asked with VA and SA at N: %v", got)
-	}
-}
-
 // A question not asked takes the level Go decides and counts nothing, even
 // fed an answer that would count.
 func TestNotAskedTakesGosLevelAndCountsNothing(t *testing.T) {
-	all := Answers{M: "high_reward", O: cannotTell, EE: cannotTell, ID: []string{cannotTell}, LC: cannotTell,
-		LI: cannotTell, LAV: cannotTell, LAC: cannotTell, FD: cannotTell, RD: cannotTell, NC: cannotTell, PV: cannotTell}
+	all := Answers{M: "high_reward", O: cannotTell, EE: cannotTell, ID: []string{cannotTell},
+		LAC: cannotTell, FD: cannotTell, RD: cannotTell, NC: cannotTell, PV: cannotTell}
 	d := declared()
 	d.Detection = &Detection{Network: "logged", Host: "logged", Application: "logged"}
 	d.DataSubjects = ptr("one_individual")
 	d.Frameworks = nil
-	l := compute(t, d, allFloored, all, nil)
-	want := map[string]int{"ID": 8, "LC": 2, "LI": 1, "LAV": 1, "NC": 2, "PV": 3}
+	l := compute(t, d, all, nil)
+	want := map[string]int{"ID": 8, "NC": 2, "PV": 3}
 	got := levels(l.Vector)
 	for f, w := range want {
 		if got[f] != w {
 			t.Errorf("%s = %d, want %d", f, got[f], w)
 		}
 	}
-	for _, f := range []Factor{ID, LC, LI, LAV, NC, PV} {
+	for _, f := range []Factor{ID, NC, PV} {
 		if _, read := l.Readings[f]; read {
 			t.Errorf("%s not asked, yet read %v", f, l.Readings[f])
 		}
 	}
 	for _, c := range l.Counters {
 		switch c {
-		case "intrusion_detection_cannot_tell", "confidentiality_cannot_tell", "integrity_cannot_tell",
-			"availability_cannot_tell", "non_compliance_cannot_tell", "privacy_cannot_tell", "data_subjects_missing":
+		case "intrusion_detection_cannot_tell", "non_compliance_cannot_tell", "privacy_cannot_tell", "data_subjects_missing":
 			t.Errorf("a question not asked counted %s", c)
 		}
-	}
-	// C floored also floors PV, whatever data_subjects caps.
-	d.DataSubjects = ptr("millions")
-	if got := level(t, "PV", d, cFloored, all, nil); got != 3 {
-		t.Errorf("PV with C floored = %d, want 3", got)
 	}
 }
 
@@ -177,9 +151,6 @@ func TestCannotTellLevelsAndCounters(t *testing.T) {
 		{O, func(a *Answers, s string) { a.O = s }, 9, "opportunity_cannot_tell"},
 		{EE, func(a *Answers, s string) { a.EE = s }, 9, "ease_of_exploit_cannot_tell"},
 		{ID, func(a *Answers, s string) { a.ID = []string{s} }, 9, "intrusion_detection_cannot_tell"},
-		{LC, func(a *Answers, s string) { a.LC = s }, 9, "confidentiality_cannot_tell"},
-		{LI, func(a *Answers, s string) { a.LI = s }, 9, "integrity_cannot_tell"},
-		{LAV, func(a *Answers, s string) { a.LAV = s }, 9, "availability_cannot_tell"},
 		{LAC, func(a *Answers, s string) { a.LAC = s }, 9, "accountability_cannot_tell"},
 		{FD, func(a *Answers, s string) { a.FD = s }, 9, "financial_damage_cannot_tell"},
 		{RD, func(a *Answers, s string) { a.RD = s }, 9, "reputation_cannot_tell"},
@@ -194,7 +165,7 @@ func TestCannotTellLevelsAndCounters(t *testing.T) {
 		for _, raw := range []string{cannotTell, "", "bogus", "High_Reward"} {
 			var a Answers
 			c.set(&a, raw)
-			l := compute(t, d, [3]bool{}, a, nil)
+			l := compute(t, d, a, nil)
 			want := CannotTell
 			if raw != cannotTell {
 				want = Invalid
@@ -235,7 +206,7 @@ func TestIntrusionDetectionSets(t *testing.T) {
 		{[]string{"bogus"}, 8, Invalid},
 		{[]string{"application", "bogus"}, 8, Invalid},
 	} {
-		l := compute(t, d, [3]bool{}, Answers{ID: c.set}, nil)
+		l := compute(t, d, Answers{ID: c.set}, nil)
 		if got := int(l.Vector.ID); got != c.level || l.Readings[ID] != c.reading {
 			t.Errorf("%q: ID %d read %v, want %d read %v", c.set, got, l.Readings[ID], c.level, c.reading)
 		}
@@ -245,51 +216,46 @@ func TestIntrusionDetectionSets(t *testing.T) {
 // An undeclared field a rule falls back on is counted once per CVE, and only
 // where the rule reads it.
 func TestUndeclaredFieldsCounted(t *testing.T) {
-	answered := Answers{R: "reachable", M: "possible_reward", O: "some_access_or_resources_required", EE: "easy", ID: []string{"network"},
-		LC: "minimal", LI: "minimal_slightly_corrupt", LAV: "minimal_primary_interrupted", LAC: "identified",
-		FD: "bankruptcy", RD: "minimal_damage", NC: "clear_violation", PV: "hundreds"}
-	if got := compute(t, declared(), [3]bool{}, answered, nil).Counters; len(got) != 0 {
+	answered := Answers{M: "possible_reward", O: "some_access_or_resources_required", EE: "easy", ID: []string{"network"},
+		LAC: "identified", FD: "bankruptcy", RD: "minimal_damage", NC: "clear_violation", PV: "hundreds"}
+	if got := compute(t, declared(), answered, nil).Counters; len(got) != 0 {
 		t.Errorf("every field declared and every answer listed: counters %v", got)
 	}
-	got := compute(t, base(), [3]bool{}, answered, nil).Counters
+	got := compute(t, base(), answered, nil).Counters
 	if want := []string{"detection_undeclared", "traceability_missing", "data_subjects_missing"}; !slices.Equal(got, want) {
 		t.Errorf("nothing declared: counters %v, want %v", got, want)
 	}
-	// With C floored Privacy violation is not asked, so data_subjects is not
-	// read.
-	got = compute(t, base(), cFloored, answered, nil).Counters
-	if want := []string{"detection_undeclared", "traceability_missing"}; !slices.Equal(got, want) {
-		t.Errorf("nothing declared, C floored: counters %v, want %v", got, want)
+	// Every axis at N no longer keeps Privacy violation from asking, so
+	// data_subjects is still read.
+	l := computeFor(t, base(), impactCVE("N", "N", "N"), answered, nil)
+	if want := []string{"detection_undeclared", "traceability_missing", "data_subjects_missing"}; !slices.Equal(l.Counters, want) {
+		t.Errorf("nothing declared, every axis at N: counters %v, want %v", l.Counters, want)
 	}
-	if l := compute(t, base(), [3]bool{}, answered, nil); levels(l.Vector)["ID"] != 9 || levels(l.Vector)["LAC"] != 7 {
+	if l := compute(t, base(), answered, nil); levels(l.Vector)["ID"] != 9 || levels(l.Vector)["LAC"] != 7 {
 		t.Errorf("undeclared detection and traceability: ID %d, LAC %d, want 9 and 7", l.Vector.ID, l.Vector.LAC)
 	}
 }
 
-// The adjustment never raises a level. Only Opportunity, LC, LI, LAV and PV
-// can move; keep, affected, cannot_tell and anything off the lists leave
-// the baseline; C not_affected gives LC 2 and PV 3.
+// The adjustment never raises a level, and moves Opportunity alone; keep,
+// cannot_tell and anything off the list leave the baseline.
 func TestAdjustmentNeverRaises(t *testing.T) {
 	d := declared()
 	d.DataSensitivity.Value = "critical"
 	d.DataSubjects = ptr("millions")
 	baselines := []Answers{
-		{O: "no_access_or_resources_required", LC: "all", LI: "all_data_totally_corrupt", LAV: "all_services_completely_lost", PV: "millions"},
-		{O: "special_access_or_resources_required", LC: "minimal", LI: "minimal_slightly_corrupt", LAV: "minimal_secondary_interrupted", PV: "none"},
-		{O: cannotTell, LC: cannotTell, LI: cannotTell, LAV: cannotTell, PV: cannotTell},
+		{O: "no_access_or_resources_required", PV: "millions"},
+		{O: "special_access_or_resources_required", PV: "none"},
+		{O: cannotTell, PV: cannotTell},
 	}
-	adjustments := append(append([]string{"", keep, "bogus"}, ids(opportunity)...), adjustedAxis...)
+	adjustments := append([]string{"", keep, "bogus", cannotTell}, ids(opportunity)...)
 	for _, a := range baselines {
-		before := levels(compute(t, d, [3]bool{}, a, nil).Vector)
+		before := levels(compute(t, d, a, nil).Vector)
 		for _, o := range adjustments {
-			for _, axis := range adjustments {
-				adj := &Adjusted{Opportunity: o, Confidentiality: axis, Integrity: axis, Availability: axis}
-				after := levels(compute(t, d, [3]bool{}, a, adj).Vector)
-				for f, b := range before {
-					moved := after[f] != b
-					if after[f] > b || (moved && !slices.Contains([]string{"O", "LC", "LI", "LAV", "PV"}, f)) {
-						t.Errorf("%+v adjusted by %+v: %s went from %d to %d", a, *adj, f, b, after[f])
-					}
+			adj := &Adjusted{Opportunity: o}
+			after := levels(compute(t, d, a, adj).Vector)
+			for f, b := range before {
+				if moved := after[f] != b; after[f] > b || (moved && f != "O") {
+					t.Errorf("%+v adjusted by %+v: %s went from %d to %d", a, *adj, f, b, after[f])
 				}
 			}
 		}
@@ -297,26 +263,19 @@ func TestAdjustmentNeverRaises(t *testing.T) {
 	a := baselines[0]
 	for _, c := range []struct {
 		adj  Adjusted
-		want map[string]int
+		want int
 	}{
-		{Adjusted{Opportunity: keep}, map[string]int{"O": 9}},
-		{Adjusted{Opportunity: cannotTell}, map[string]int{"O": 9}},
-		{Adjusted{Opportunity: "full_access_or_expensive_resources_required"}, map[string]int{"O": 0}},
-		{Adjusted{Confidentiality: notAffected}, map[string]int{"LC": 2, "PV": 3, "LI": 9}},
-		{Adjusted{Confidentiality: affected, Integrity: notAffected}, map[string]int{"LC": 9, "LI": 1, "PV": 9}},
-		{Adjusted{Availability: notAffected}, map[string]int{"LAV": 1}},
-		{Adjusted{Availability: cannotTell}, map[string]int{"LAV": 9}},
+		{Adjusted{Opportunity: keep}, 9},
+		{Adjusted{Opportunity: cannotTell}, 9},
+		{Adjusted{Opportunity: "full_access_or_expensive_resources_required"}, 0},
 	} {
-		got := levels(compute(t, d, [3]bool{}, a, &c.adj).Vector)
-		for f, w := range c.want {
-			if got[f] != w {
-				t.Errorf("%+v: %s = %d, want %d", c.adj, f, got[f], w)
-			}
+		if got := level(t, "O", d, a, &c.adj); got != c.want {
+			t.Errorf("%+v: O = %d, want %d", c.adj, got, c.want)
 		}
 	}
 	// The adjustment's own cannot_tell is not counted.
-	abstained := &Adjusted{Opportunity: cannotTell, Confidentiality: cannotTell, Integrity: cannotTell, Availability: cannotTell}
-	if before, after := compute(t, d, [3]bool{}, a, nil).Counters, compute(t, d, [3]bool{}, a, abstained).Counters; !slices.Equal(before, after) {
+	abstained := &Adjusted{Opportunity: cannotTell}
+	if before, after := compute(t, d, a, nil).Counters, compute(t, d, a, abstained).Counters; !slices.Equal(before, after) {
 		t.Errorf("the adjustment's cannot_tell counted: %v, then %v", before, after)
 	}
 }
@@ -324,26 +283,24 @@ func TestAdjustmentNeverRaises(t *testing.T) {
 func TestComputeRefusesAnInvalidDeployment(t *testing.T) {
 	d := base()
 	d.Exposure.Value = "public"
-	if _, err := Compute(d, describedCVE, [3]bool{}, Answers{}, nil); err == nil {
+	if _, err := Compute(d, describedCVE, Answers{}, nil); err == nil {
 		t.Error("Compute took an exposure off its list")
 	}
 	for _, c := range []CVE{{ID: "CVE-X"}, {Rows: []Row{{}}}} {
-		if _, err := Compute(base(), c, [3]bool{}, Answers{}, nil); err == nil {
+		if _, err := Compute(base(), c, Answers{}, nil); err == nil {
 			t.Errorf("Compute took %+v", c)
 		}
 	}
-	if _, err := Questions(d, describedCVE, [3]bool{}); err == nil {
+	if _, err := Questions(d, describedCVE); err == nil {
 		t.Error("Questions took an exposure off its list")
 	}
 }
 
 func TestReadingsHoldEveryQuestionAsked(t *testing.T) {
-	for _, floored := range [][3]bool{{}, cFloored, allFloored} {
-		for _, d := range []Deployment{base(), declared()} {
-			l := compute(t, d, floored, Answers{}, nil)
-			if got, want := slices.Sorted(maps.Keys(l.Readings)), slices.Sorted(slices.Values(questions(t, d, floored))); !slices.Equal(got, want) {
-				t.Errorf("readings for %v, questions %v", got, want)
-			}
+	for _, d := range []Deployment{base(), declared()} {
+		l := compute(t, d, Answers{}, nil)
+		if got, want := slices.Sorted(maps.Keys(l.Readings)), slices.Sorted(slices.Values(questions(t, d))); !slices.Equal(got, want) {
+			t.Errorf("readings for %v, questions %v", got, want)
 		}
 	}
 }
@@ -353,12 +310,12 @@ func TestReadingsHoldEveryQuestionAsked(t *testing.T) {
 // takes cannot_tell's 9, counted once. The rest reads as usual.
 func TestNoDescriptionReadsTheLikelihoodAnswersAsCannotTell(t *testing.T) {
 	answers := Answers{M: "low_or_no_reward", O: "full_access_or_expensive_resources_required", EE: cannotTell,
-		LC: "minimal", LAC: "identified", FD: "bankruptcy", RD: "minimal_damage"}
+		LAC: "identified", FD: "bankruptcy", RD: "minimal_damage"}
 	for _, rows := range [][]Row{
 		{{PkgName: "liba"}},
 		{{PkgName: "liba", Description: " \n"}, {PkgName: "libb"}},
 	} {
-		l := computeFor(t, base(), CVE{ID: "CVE-N", Rows: rows}, [3]bool{}, answers, nil)
+		l := computeFor(t, base(), CVE{ID: "CVE-N", Rows: rows}, answers, nil)
 		got := levels(l.Vector)
 		for _, f := range []Factor{M, O, EE} {
 			if got[string(f)] != 9 || l.Readings[f] != NoDescription || l.Sources[f] != SourceAnswer {
@@ -370,32 +327,28 @@ func TestNoDescriptionReadsTheLikelihoodAnswersAsCannotTell(t *testing.T) {
 				t.Errorf("%s counted %d times: %v", counter, n, l.Counters)
 			}
 		}
-		if got["LC"] != 2 || l.Readings[LC] != Answered {
-			t.Errorf("LC = %d read %v, want its answer's 2", got["LC"], l.Readings[LC])
+		if got["FD"] != 9 || l.Readings[FD] != Answered {
+			t.Errorf("FD = %d read %v, want its answer's 9", got["FD"], l.Readings[FD])
 		}
 	}
 	// One row with a description is enough to read the answers.
 	c := CVE{ID: "CVE-N", Rows: []Row{{PkgName: "liba"}, {PkgName: "libb", Description: "Described."}}}
-	if got := levels(computeFor(t, base(), c, [3]bool{}, answers, nil).Vector); got["M"] != 1 || got["O"] != 0 {
+	if got := levels(computeFor(t, base(), c, answers, nil).Vector); got["M"] != 1 || got["O"] != 0 {
 		t.Errorf("one row described: M %d, O %d, want 1 and 0", got["M"], got["O"])
 	}
-	// Nor can the adjustment lower Opportunity from there, whatever the call
-	// asked: a description is a prerequisite of that answer too. Its axes
-	// still take the adjustment.
-	l := computeFor(t, base(), CVE{ID: "CVE-N", Rows: []Row{{PkgName: "liba"}}}, [3]bool{}, answers,
-		&Adjusted{Opportunity: "special_access_or_resources_required", Integrity: notAffected})
+	// Nor can the adjustment lower Opportunity from there: a description is
+	// a prerequisite of that answer too.
+	l := computeFor(t, base(), CVE{ID: "CVE-N", Rows: []Row{{PkgName: "liba"}}}, answers,
+		&Adjusted{Opportunity: "special_access_or_resources_required"})
 	if l.Vector.O != 9 || l.Sources[O] != SourceAnswer || l.Readings[O] != NoDescription {
 		t.Errorf("adjusted with no description: O %d from %v read %v, want 9 from no description", l.Vector.O, l.Sources[O], l.Readings[O])
-	}
-	if l.Vector.LI != 1 || l.Sources[LI] != SourceAdjustment {
-		t.Errorf("adjusted with no description: LI %d from %v, want the floor from the adjustment", l.Vector.LI, l.Sources[LI])
 	}
 }
 
 // An adjustment lowers Opportunity below a cannot_tell baseline of 9, which
 // still counts.
 func TestAdjustmentLowersACannotTellBaseline(t *testing.T) {
-	l := compute(t, base(), [3]bool{}, Answers{O: cannotTell}, &Adjusted{Opportunity: "special_access_or_resources_required"})
+	l := compute(t, base(), Answers{O: cannotTell}, &Adjusted{Opportunity: "special_access_or_resources_required"})
 	if l.Vector.O != 4 || l.Readings[O] != CannotTell || l.Sources[O] != SourceAdjustment || !slices.Contains(l.Counters, "opportunity_cannot_tell") {
 		t.Errorf("O %d read %v from %v, counters %v", l.Vector.O, l.Readings[O], l.Sources[O], l.Counters)
 	}
@@ -403,25 +356,22 @@ func TestAdjustmentLowersACannotTellBaseline(t *testing.T) {
 
 // A question skipped because no answer could move its level ignores a junk
 // answer and the adjustment alike: ID keeps the one declared level and PV the
-// floor data_subjects sets, neither read nor counted, while the factors
-// asked take the adjustment.
+// floor data_subjects sets, neither read nor counted, while Opportunity takes
+// the adjustment.
 func TestSkippedQuestionsIgnoreJunkAndTheAdjustment(t *testing.T) {
 	d := declared()
 	d.Detection = &Detection{Network: "logged_and_reviewed", Host: "logged_and_reviewed", Application: "logged_and_reviewed"}
 	d.DataSubjects = ptr("none")
-	a := Answers{R: "reachable", M: "high_reward", O: "no_access_or_resources_required", EE: "easy", ID: []string{"bogus"},
-		LC: "all", LI: "all_data_totally_corrupt", LAV: "all_services_completely_lost", LAC: "unidentified",
-		FD: "bankruptcy", RD: "brand_damage", NC: "high_profile_violation", PV: "bogus"}
-	adjusted := &Adjusted{Opportunity: "special_access_or_resources_required", Confidentiality: notAffected,
-		Integrity: notAffected, Availability: notAffected}
-	l := compute(t, d, [3]bool{}, a, adjusted)
+	a := Answers{M: "high_reward", O: "no_access_or_resources_required", EE: "easy", ID: []string{"bogus"},
+		LAC: "unidentified", FD: "bankruptcy", RD: "brand_damage", NC: "high_profile_violation", PV: "bogus"}
+	l := compute(t, d, a, &Adjusted{Opportunity: "special_access_or_resources_required"})
 	got := levels(l.Vector)
-	for f, w := range map[string]int{"ID": 3, "PV": 3, "O": 4, "LC": 2, "LI": 1, "LAV": 1} {
+	for f, w := range map[string]int{"ID": 3, "PV": 3, "O": 4} {
 		if got[f] != w {
 			t.Errorf("%s = %d, want %d", f, got[f], w)
 		}
 	}
-	for f, w := range map[Factor]Source{ID: SourceConfig, PV: SourceConfig, O: SourceAdjustment, LC: SourceAdjustment, LI: SourceAdjustment, LAV: SourceAdjustment} {
+	for f, w := range map[Factor]Source{ID: SourceConfig, PV: SourceConfig, O: SourceAdjustment} {
 		if l.Sources[f] != w {
 			t.Errorf("%s from %v, want %v", f, l.Sources[f], w)
 		}
@@ -436,138 +386,126 @@ func TestSkippedQuestionsIgnoreJunkAndTheAdjustment(t *testing.T) {
 	}
 }
 
-// Reached drops the six questions reachability decides only when its answer
-// says not reachable; cannot_tell, an empty answer and one off the list keep
-// them, the worst case. It never changes the slice it is given.
-func TestReachedNarrowsTheQuestionsOnce(t *testing.T) {
-	all := questions(t, declared(), [3]bool{})
-	kept := slices.Clone(all)
-	for answer, want := range map[string][]Factor{
-		"reachable":    all,
-		cannotTell:     all,
-		"":             all,
-		"bogus":        all,
-		notReachableID: {R, M, ID, FD, RD, NC, PV},
-	} {
-		if got := Reached(all, answer); !slices.Equal(got, want) {
-			t.Errorf("%q: %v, want %v", answer, got, want)
+// C2's table: Loss of confidentiality, integrity and availability from the
+// worst value each axis takes over the CVE's usable CVSS v3 vectors,
+// confidentiality's in data_sensitivity's column, every cell. Go alone
+// reads them: no answer is asked or read, nothing is counted, and the
+// source is the vectors.
+func TestTechnicalImpactsFromCVSS(t *testing.T) {
+	lc := map[string]map[string]int{
+		"N": {"low": 2, "medium": 2, "high": 2, "critical": 2},
+		"L": {"low": 2, "medium": 2, "high": 6, "critical": 6},
+		"H": {"low": 6, "medium": 6, "high": 7, "critical": 7},
+	}
+	li := map[string]int{"N": 1, "L": 3, "H": 7}
+	lav := map[string]int{"N": 1, "L": 5, "H": 7}
+	answered := Answers{M: "possible_reward", O: "some_access_or_resources_required", EE: "easy", ID: []string{"network"},
+		LAC: "identified", FD: "bankruptcy", RD: "minimal_damage", NC: "clear_violation", PV: "hundreds"}
+	for _, value := range []string{"N", "L", "H"} {
+		for _, ds := range sensitivities {
+			d := declared()
+			d.DataSensitivity.Value = ds
+			l := computeFor(t, d, impactCVE(value, "N", "N"), answered, nil)
+			if got := int(l.Vector.LC); got != lc[value][ds] {
+				t.Errorf("C:%s, data_sensitivity %s: LC = %d, want %d", value, ds, got, lc[value][ds])
+			}
+		}
+		if got := int(computeFor(t, declared(), impactCVE("N", value, "N"), answered, nil).Vector.LI); got != li[value] {
+			t.Errorf("I:%s: LI = %d, want %d", value, got, li[value])
+		}
+		if got := int(computeFor(t, declared(), impactCVE("N", "N", value), answered, nil).Vector.LAV); got != lav[value] {
+			t.Errorf("A:%s: LAV = %d, want %d", value, got, lav[value])
 		}
 	}
-	if !slices.Equal(all, kept) {
-		t.Errorf("Reached changed its input: %v", all)
+	l := computeFor(t, declared(), impactCVE("H", "L", "N"), answered, nil)
+	for _, f := range []Factor{LC, LI, LAV} {
+		if l.Sources[f] != SourceCVSS {
+			t.Errorf("%s from %v, want cvss", f, l.Sources[f])
+		}
+		if _, read := l.Readings[f]; read {
+			t.Errorf("%s read %v: no question asks it", f, l.Readings[f])
+		}
+	}
+	if len(l.Counters) != 0 || l.Impact.Values != [3]string{"H", "L", "N"} {
+		t.Errorf("counters %v, impact %+v", l.Counters, l.Impact)
 	}
 }
 
-// Not reachable sets the six factors it decides to their lowest levels,
-// whatever their answers, the config and the adjustment: Opportunity 0, Ease
-// of exploit 1, LC 2, LI 1, LAV 1 and LAC the lowest of its traceability
-// column. Each comes from reachability, an axis Applicability floored from
-// the floor, none is read or counted, a CVE no row describes included, and
-// the adjustment moves none of them: its confidentiality not_affected lowers
-// Privacy violation alone, to its floor. The rest is computed as for a
-// reachable CVE.
-func TestNotReachableSetsTheSixToTheirLowest(t *testing.T) {
-	worst := Answers{R: notReachableID, M: "high_reward", O: cannotTell, EE: "bogus", ID: []string{cannotTell},
-		LC: cannotTell, LI: "all_data_totally_corrupt", LAV: cannotTell, LAC: "defeats_attribution",
-		FD: "bankruptcy", RD: "brand_damage", NC: "high_profile_violation", PV: "millions"}
-	lowering := &Adjusted{Opportunity: "special_access_or_resources_required", Confidentiality: notAffected,
-		Integrity: notAffected, Availability: notAffected}
-	undescribed := CVE{ID: "CVE-N", Rows: []Row{{PkgName: "liba"}}}
-	lac := map[string]int{"": 7, "none": 7, "per_request": 7, "per_individual": 1}
-	for tr, wantLAC := range lac {
-		for _, c := range []CVE{describedCVE, undescribed} {
-			for _, floored := range [][3]bool{{}, allFloored} {
-				for _, adjusted := range []*Adjusted{nil, lowering} {
-					d := declared()
-					d.DataSensitivity.Value = "critical"
-					d.DataSubjects = ptr("millions")
-					d.Traceability = nil
-					if tr != "" {
-						d.Traceability = ptr(tr)
-					}
-					l := computeFor(t, d, c, floored, worst, adjusted)
-					got := levels(l.Vector)
-					want := map[string]int{"O": 0, "EE": 1, "LC": 2, "LI": 1, "LAV": 1, "LAC": wantLAC, "PV": 9}
-					pv := SourceAnswer
-					switch {
-					case floored[0]:
-						want["PV"], pv = 3, SourceFloor
-					case adjusted != nil:
-						want["PV"], pv = 3, SourceAdjustment
-					}
-					if l.Sources[PV] != pv {
-						t.Errorf("traceability %q, %s, floored %v, adjusted %v: PV from %v, want %v", tr, c.ID, floored, adjusted != nil, l.Sources[PV], pv)
-					}
-					for f, w := range want {
-						if got[f] != w {
-							t.Errorf("traceability %q, %s, floored %v, adjusted %v: %s = %d, want %d", tr, c.ID, floored, adjusted != nil, f, got[f], w)
-						}
-					}
-					for _, f := range []Factor{O, EE, LC, LI, LAV, LAC} {
-						source := SourceReachability
-						if floored[0] && (f == LC || f == LI || f == LAV) {
-							source = SourceFloor
-						}
-						if l.Sources[f] != source {
-							t.Errorf("%s from %v, want %v", f, l.Sources[f], source)
-						}
-						if _, read := l.Readings[f]; read {
-							t.Errorf("%s not asked, yet read %v", f, l.Readings[f])
-						}
-						if slices.Contains(l.Counters, f.Counter()) {
-							t.Errorf("%s not asked, yet counted: %v", f, l.Counters)
-						}
-					}
-					if l.Readings[R] != Answered {
-						t.Errorf("not_reachable read %v", l.Readings[R])
-					}
+// With no usable CVSS v3 vector, no default being documented, Loss of
+// confidentiality, integrity and availability are 9 in either column, the
+// CVE counted once as cvss_v3_missing: no vector, a v2 or a v4 vector alone,
+// or a v3 vector refused whole. One usable vector is enough.
+func TestTechnicalImpactsWithoutAUsableVector(t *testing.T) {
+	v2 := cvss.Vector{Source: "nvd", Version: "2.0", Vector: "AV:N/AC:L/Au:N/C:N/I:N/A:N"}
+	v4 := cvss.Vector{Source: "nvd", Version: "4.0", Vector: "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:N/VI:N/VA:N/SC:N/SI:N/SA:N"}
+	refused := v31("nvd", "AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N")
+	for name, vectors := range map[string][]cvss.Vector{
+		"no vector":       nil,
+		"v2 alone":        {v2},
+		"v4 alone":        {v4},
+		"v3 refused":      {refused},
+		"all three apart": {v2, v4, refused},
+	} {
+		for _, ds := range []string{"low", "critical"} {
+			d := declared()
+			d.DataSensitivity.Value = ds
+			c := CVE{ID: "CVE-V", Rows: []Row{{PkgName: "liba", Description: "Described.", CVSS: vectors}}}
+			l := computeFor(t, d, c, Answers{}, nil)
+			if l.Vector.LC != 9 || l.Vector.LI != 9 || l.Vector.LAV != 9 {
+				t.Errorf("%s, %s: LC %d, LI %d, LAV %d, want 9", name, ds, l.Vector.LC, l.Vector.LI, l.Vector.LAV)
+			}
+			if n := len(slices.DeleteFunc(slices.Clone(l.Counters), func(c string) bool { return c != vectorMissing })); n != 1 {
+				t.Errorf("%s, %s: counters %v, want %s once", name, ds, l.Counters, vectorMissing)
+			}
+			for _, f := range []Factor{LC, LI, LAV} {
+				if l.Sources[f] != SourceCVSS {
+					t.Errorf("%s: %s from %v, want cvss", name, f, l.Sources[f])
 				}
 			}
 		}
 	}
+	c := CVE{ID: "CVE-V", Rows: []Row{{PkgName: "liba", Description: "Described.", CVSS: []cvss.Vector{v2, refused, v31("redhat", "AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N")}}}}
+	if l := computeFor(t, declared(), c, Answers{}, nil); l.Vector.LC != 2 || slices.Contains(l.Counters, vectorMissing) {
+		t.Errorf("one usable vector: LC %d, counters %v", l.Vector.LC, l.Counters)
+	}
 }
 
-// Every answer reachability does not read as not reachable leaves the six
-// factors to their own answers, as computed for a reachable CVE; cannot_tell,
-// an empty answer and one off the list are counted. Not reachable never
-// raises a level: whatever the six answer, each is at least its level then.
-func TestReachableKeepsTheAnswersAndNotReachableNeverRaises(t *testing.T) {
+// Every vector of every row counts: per axis the worst value over all of
+// them, whatever row or source gives it.
+func TestTechnicalImpactsTakeTheWorstValueOverRows(t *testing.T) {
+	c := CVE{ID: "CVE-W", Rows: []Row{
+		{PkgName: "liba", Description: "Described.", CVSS: []cvss.Vector{v31("nvd", "AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:H")}},
+		{PkgName: "libb", CVSS: []cvss.Vector{v31("redhat", "AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:L/A:N")}},
+	}}
 	d := declared()
-	reachable := compute(t, d, [3]bool{}, Answers{R: "reachable", LC: "extensive", LAC: "unidentified"}, nil)
-	for answer, reading := range map[string]Reading{cannotTell: CannotTell, "": Invalid, "bogus": Invalid} {
-		l := compute(t, d, [3]bool{}, Answers{R: answer, LC: "extensive", LAC: "unidentified"}, nil)
-		if l.Vector != reachable.Vector || l.Readings[R] != reading || !slices.Contains(l.Counters, "reachability_cannot_tell") {
-			t.Errorf("%q: %+v read %v counted %v, want reachable's %+v", answer, l.Vector, l.Readings[R], l.Counters, reachable.Vector)
-		}
+	d.DataSensitivity.Value = "high"
+	l := computeFor(t, d, c, Answers{}, nil)
+	if l.Vector.LC != 7 || l.Vector.LI != 3 || l.Vector.LAV != 7 {
+		t.Errorf("LC %d, LI %d, LAV %d, want 7, 3 and 7", l.Vector.LC, l.Vector.LI, l.Vector.LAV)
 	}
-	if slices.Contains(reachable.Counters, "reachability_cannot_tell") {
-		t.Errorf("reachable counted: %v", reachable.Counters)
-	}
-	cases := []struct {
-		set func(*Answers, string)
-		ids []string
-	}{
-		{func(a *Answers, id string) { a.O = id }, ids(opportunity)},
-		{func(a *Answers, id string) { a.EE = id }, ids(easeOfExploit)},
-		{func(a *Answers, id string) { a.LC = id }, ids(confidentiality)},
-		{func(a *Answers, id string) { a.LI = id }, ids(integrity)},
-		{func(a *Answers, id string) { a.LAV = id }, ids(availability)},
-		{func(a *Answers, id string) { a.LAC = id }, ids(accountability)},
-	}
-	for _, tr := range traceabilities {
-		d.Traceability = ptr(tr)
-		for _, c := range cases {
-			for _, id := range c.ids {
-				a := Answers{R: "reachable"}
-				c.set(&a, id)
-				before := levels(compute(t, d, [3]bool{}, a, nil).Vector)
-				a.R = notReachableID
-				after := levels(compute(t, d, [3]bool{}, a, nil).Vector)
-				for _, f := range decided {
-					if after[f] > before[f] {
-						t.Errorf("%s %s under %s: not reachable raised %s from %d to %d", c.ids[0], id, tr, f, before[f], after[f])
-					}
-				}
+}
+
+// Privacy violation follows no Loss of confidentiality floor: a CVE whose
+// vectors give C:N, or none, is asked it, and its answer stands under the
+// cap data_subjects sets.
+func TestPrivacyViolationFollowsNoConfidentialityFloor(t *testing.T) {
+	for _, c := range []CVE{impactCVE("N", "N", "N"), impactCVE("", "", "")} {
+		for _, subjects := range []*string{nil, ptr("thousands"), ptr("millions")} {
+			d := declared()
+			d.DataSubjects = subjects
+			q, err := Questions(d, c)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !slices.Contains(q, PV) {
+				t.Errorf("%s, data_subjects %v: PV not asked", c.Rows[0].CVSS, subjects)
+			}
+			want := 9
+			if subjects != nil && *subjects == "thousands" {
+				want = 7
+			}
+			if l := computeFor(t, d, c, Answers{PV: "millions"}, nil); int(l.Vector.PV) != want {
+				t.Errorf("%v, data_subjects %v: PV = %d, want %d", c.Rows[0].CVSS, subjects, l.Vector.PV, want)
 			}
 		}
 	}

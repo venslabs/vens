@@ -48,7 +48,7 @@ var Frames = []Frame{
 	},
 	{
 		Name:  "13-adjustment.schema.json",
-		Order: []string{"reasoning", "opportunity", "confidentiality", "integrity", "availability"},
+		Order: []string{"reasoning", "opportunity"},
 	},
 }
 

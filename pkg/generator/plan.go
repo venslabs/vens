@@ -29,8 +29,10 @@ import (
 type cve struct {
 	rows []Vulnerability
 	// in is the CVE as the questions read it, every row's evidence kept.
-	in            contract.CVE
-	applicability cvss.Applicability
+	in     contract.CVE
+	impact cvss.Impact
+	// declared is what the config's reachability entries say of it.
+	declared declaration
 	// flags are the flags its rows raised, each with its evidence and its
 	// row's package; a CVE with none gets no adjustment.
 	flags []contract.Flag
@@ -45,22 +47,20 @@ func (c *cve) id() string { return c.in.ID }
 func (c *cve) asks(f contract.Factor) bool { return slices.Contains(c.questions, f) }
 
 // counters lists the counters the CVE adds one to: those its levels name,
-// then applicability_missing and severity_contested_unavailable.
+// then severity_contested_unavailable.
 func (c *cve) counters(l contract.Levels) []string {
 	out := slices.Clone(l.Counters)
-	if len(c.applicability.Missing) > 0 {
-		out = append(out, "applicability_missing")
-	}
 	if c.contestUnchecked {
 		out = append(out, "severity_contested_unavailable")
 	}
 	return out
 }
 
-// plan groups the rows by CVE and reads, for each CVE, Applicability over
-// every vector of every row, the flags of every row, and the questions it
-// gets. A flag the adjustment would refuse, such as one whose evidence its
-// row cannot quote, stops the run here, before any call is paid.
+// plan groups the rows by CVE and reads, for each CVE, what its CVSS v3
+// vectors give the three technical impacts, what the config's reachability
+// entries declare of it, the flags of every row, and the questions it gets.
+// A flag the adjustment would refuse, such as one whose evidence its row
+// cannot quote, stops the run here, before any call is paid.
 func (g *Generator) plan(ctx context.Context, vulns []Vulnerability) ([]*cve, error) {
 	groups := groupVulnsByCVE(vulns)
 	cves := make([]*cve, 0, len(groups))
@@ -68,16 +68,24 @@ func (g *Generator) plan(ctx context.Context, vulns []Vulnerability) ([]*cve, er
 		c := &cve{
 			rows:             rows,
 			in:               contractCVE(rows),
-			applicability:    CVEApplicability(rows),
+			impact:           CVEImpact(rows),
 			flags:            rowFlags(rows),
 			contestUnchecked: CVEFlags(rows).SeverityContestedUnavailable,
+		}
+		c.declared = declared(g.o.Config.Reachability, c.in)
+		if c.declared.vetoed() {
+			slog.WarnContext(ctx, "Reachability entries disagree; one asserting reachability vetoes the status, so none is published",
+				"vuln", c.id(),
+				"unreachable", c.declared.selectors(c.declared.unreachable),
+				"reachable", c.declared.selectors(c.declared.reachable),
+			)
 		}
 		if len(c.flags) > 0 {
 			if err := contract.CheckFlags(c.flags, c.in); err != nil {
 				return nil, err
 			}
 		}
-		questions, err := contract.Questions(g.deployment, c.in, c.applicability.Floored)
+		questions, err := contract.Questions(g.deployment, c.in)
 		if err != nil {
 			return nil, err
 		}
@@ -98,6 +106,18 @@ func undescribed(cves []*cve) []string {
 	var ids []string
 	for _, c := range cves {
 		if !c.in.Described() {
+			ids = append(ids, c.id())
+		}
+	}
+	return ids
+}
+
+// vectorless lists the CVEs with no usable CVSS v3 vector, whose technical
+// impacts take their worst level.
+func vectorless(cves []*cve) []string {
+	var ids []string
+	for _, c := range cves {
+		if c.impact.Vectorless() {
 			ids = append(ids, c.id())
 		}
 	}

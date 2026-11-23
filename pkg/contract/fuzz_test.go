@@ -26,17 +26,16 @@ import (
 )
 
 // FuzzCompute drives the rules with any answers, every config state,
-// Applicability state, description state and adjustment: whatever the
+// technical impact state, description state and adjustment: whatever the
 // replies hold, the vector is one the calculator takes, each level in the set
 // its JAR ran, each with its source; its severity and score are OWASP's
 // matrix and likelihood × impact recomputed from the vector alone; Motive,
 // Opportunity and Ease of exploit are asked only of a CVE a row describes,
-// the last two only when reachability's answer is read as reachable, and no
-// adjustment lowers the Opportunity of one no row describes; a CVE not
-// reachable has the six factors reachability decides at their lowest and
-// takes its adjustment's confidentiality answer alone; and the readings are the questions asked, and for a
-// CVE no row describes the likelihood questions it is not asked for want of a
-// description.
+// and no adjustment lowers the Opportunity of one no row describes; Loss of
+// confidentiality, integrity and availability are the vectors' whatever the
+// answers and the adjustment; and the readings are the questions asked, and
+// for a CVE no row describes the likelihood questions it is not asked for
+// want of a description.
 func FuzzCompute(f *testing.F) {
 	sets := owaspLevelSets(f)
 	f.Add([]byte{}, "")
@@ -76,14 +75,13 @@ func FuzzCompute(f *testing.F) {
 		if next()%2 == 1 {
 			d.Frameworks = []string{"PCI-DSS"}
 		}
-		c := describedCVE
+		// A first value of "" leaves the CVE with no vector.
+		c := impactCVE(impactValues[next()%4], impactValues[next()%3], impactValues[next()%3])
 		if next()%2 == 1 {
-			c = CVE{ID: "CVE-N", Rows: []Row{{PkgName: "libexample"}}}
+			c.Rows[0].Description = ""
 		}
-		floored := [3]bool{next()%2 == 1, next()%2 == 1, next()%2 == 1}
 		a := Answers{
-			R: pick(ids(reachability)), M: pick(ids(motive)), O: pick(ids(opportunity)), EE: pick(ids(easeOfExploit)),
-			LC: pick(ids(confidentiality)), LI: pick(ids(integrity)), LAV: pick(ids(availability)),
+			M: pick(ids(motive)), O: pick(ids(opportunity)), EE: pick(ids(easeOfExploit)),
 			LAC: pick(ids(accountability)), FD: pick(ids(financialDamage)), RD: pick(ids(reputationDamage)),
 			NC: pick(ids(nonCompliance)), PV: pick(ids(privacyViolation)),
 		}
@@ -92,13 +90,10 @@ func FuzzCompute(f *testing.F) {
 		}
 		var adjusted *Adjusted
 		if next()%2 == 1 {
-			adjusted = &Adjusted{
-				Opportunity:     pick(append([]string{keep}, ids(opportunity)...)),
-				Confidentiality: pick(adjustedAxis), Integrity: pick(adjustedAxis), Availability: pick(adjustedAxis),
-			}
+			adjusted = &Adjusted{Opportunity: pick(append([]string{keep}, ids(opportunity)...))}
 		}
 
-		l, err := Compute(d, c, floored, a, adjusted)
+		l, err := Compute(d, c, a, adjusted)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -110,46 +105,31 @@ func FuzzCompute(f *testing.F) {
 		if len(l.Sources) != len(vectorOrder) || slices.Contains(slices.Collect(maps.Values(l.Sources)), 0) {
 			t.Errorf("sources %v, want one for each of the 16 levels", l.Sources)
 		}
-		planned, err := Questions(d, c, floored)
+		asked, err := Questions(d, c)
 		if err != nil {
 			t.Fatal(err)
 		}
-		reached := Reachable(a.R)
-		asked := Reached(planned, a.R)
 		read := slices.Clone(asked)
 		if !c.Described() {
-			read = append(read, M)
-			if reached {
-				read = append(read, O, EE)
-			}
+			read = append(read, M, O, EE)
 		}
 		if got := slices.Sorted(maps.Keys(l.Readings)); !slices.Equal(got, slices.Sorted(slices.Values(read))) {
 			t.Errorf("readings for %v, questions %v", got, asked)
 		}
 		for _, f := range []Factor{M, O, EE} {
-			if want := c.Described() && (f == M || reached); slices.Contains(asked, f) != want {
-				t.Errorf("%s asked: %v, described: %v, reachable: %v", f, slices.Contains(asked, f), c.Described(), reached)
+			if slices.Contains(asked, f) != c.Described() {
+				t.Errorf("%s asked: %v, described: %v", f, slices.Contains(asked, f), c.Described())
 			}
 		}
-		if !c.Described() && reached && (l.Vector.O != 9 || l.Sources[O] != SourceAnswer) {
+		if !c.Described() && (l.Vector.O != 9 || l.Sources[O] != SourceAnswer) {
 			t.Errorf("no description, adjusted by %+v: O %d from %v, want cannot_tell's 9", adjusted, l.Vector.O, l.Sources[O])
 		}
-		if !reached {
-			var confidentiality *Adjusted
-			if adjusted != nil {
-				confidentiality = &Adjusted{Confidentiality: adjusted.Confidentiality}
-			}
-			alone, err := Compute(d, c, floored, a, confidentiality)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if alone.Vector != l.Vector {
-				t.Errorf("not reachable, adjusted by %+v: %+v, by its confidentiality alone %+v", adjusted, l.Vector, alone.Vector)
-			}
-			if l.Vector.O != 0 || l.Vector.EE != 1 || l.Vector.LC != 2 || l.Vector.LI != 1 || l.Vector.LAV != 1 ||
-				l.Vector.LAC != accountabilityLevels[actorNoLoss][max(0, slices.Index(traceabilities[:], deref(d.Traceability)))] {
-				t.Errorf("not reachable: %+v, want the six at their lowest", l.Vector)
-			}
+		plain, err := Compute(d, c, Answers{}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if l.Vector.LC != plain.Vector.LC || l.Vector.LI != plain.Vector.LI || l.Vector.LAV != plain.Vector.LAV {
+			t.Errorf("answers %+v and adjustment %+v moved the technical impacts: %+v, the vectors give %+v", a, adjusted, l.Vector, plain.Vector)
 		}
 	})
 }

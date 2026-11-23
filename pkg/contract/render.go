@@ -32,7 +32,17 @@ const systemTemplate = `You are a security expert. You answer questions of the O
 DEPLOYMENT
 {deployment}
 
-Judge each vulnerability from its own entry and this deployment. A vulnerability is reachable here when this deployment, as it is deployed, runs its vulnerable code where some input or action could trigger it, whatever access or effort that takes: how much it takes is for the questions on access and ease. It is not reachable here only when the facts given show it: this deployment does not run the vulnerable code, or nothing can trigger it here, as when it lies in a component, feature, platform or configuration this deployment does not use. When the facts given do not show it, judge the vulnerability as reachable. Choose cannot_tell only when the facts given do not decide between the other answers: an answer saying that the vulnerability is not reachable here, or that exploiting it has no such impact, is chosen like any other. In reasoning, state in one sentence the fact that decides the answer, before giving it.`
+Judge each vulnerability from its own entry and this deployment. Choose cannot_tell only when the facts given do not decide between the other answers. In reasoning, state in one sentence the fact that decides the answer, before giving it.`
+
+// reachabilityParagraph is 5f797bf's definition of reachability in the
+// system prompt, which #310's C1 drops with the reachability question. S1's
+// preregistration decides whether it stays dropped or comes back rewritten;
+// to restore it, put it after the last paragraph's first sentence. 5f797bf
+// also went on after "do not decide between the other answers" with ": an
+// answer saying that the vulnerability is not reachable here, or that
+// exploiting it has no such impact, is chosen like any other", naming
+// answers C1 and C2 remove.
+const reachabilityParagraph = "A vulnerability is reachable here when this deployment, as it is deployed, runs its vulnerable code where some input or action could trigger it, whatever access or effort that takes: how much it takes is for the questions on access and ease. It is not reachable here only when the facts given show it: this deployment does not run the vulnerable code, or nothing can trigger it here, as when it lies in a component, feature, platform or configuration this deployment does not use. When the facts given do not show it, judge the vulnerability as reachable."
 
 // The deployment's lines. Description and Notes are left out when unset, and
 // Listener when unknown.
@@ -62,7 +72,7 @@ const cvssSentence = `CVSS metrics {metrics} of the newest CVSS version publishe
 
 // cvssShown names the metrics of the newest CVSS version a question shows.
 // Only Opportunity and Ease of exploit are shown any; C, I and A are Go's,
-// read for Applicability.
+// read for Loss of confidentiality, integrity and availability.
 var cvssShown = map[Factor][]string{
 	O:  {"AV", "AT", "PR", "UI"},
 	EE: {"AC", "AT", "PR", "UI"},
@@ -159,13 +169,8 @@ func background(f Factor, d Deployment) []string {
 		if line := controlsLine(d.Controls); line != "" {
 			return []string{line}
 		}
-	case LI, PV:
+	case PV:
 		return []string{setting("Data sensitivity", d.DataSensitivity)}
-	case LAV:
-		if d.AvailabilityRequirement != nil {
-			return []string{setting("Availability requirement", *d.AvailabilityRequirement)}
-		}
-		return []string{setting("Business criticality", d.BusinessCriticality)}
 	case FD, RD:
 		return []string{setting("Business criticality", d.BusinessCriticality)}
 	}

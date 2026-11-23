@@ -51,18 +51,29 @@ func levels(v owasp.Vector) map[string]int {
 	}
 }
 
-// describedCVE is a CVE a row describes, the case every rule but the
-// likelihood fallback reads.
-var describedCVE = CVE{ID: "CVE-T", Rows: []Row{{PkgName: "libexample", Description: "A described vulnerability."}}}
+// describedCVE is a CVE a row describes, with a usable CVSS v3 vector: the
+// case every rule but the likelihood and the technical impact fallbacks
+// reads.
+var describedCVE = impactCVE("L", "L", "L")
 
-func compute(t *testing.T, d Deployment, floored [3]bool, a Answers, adjusted *Adjusted) Levels {
-	t.Helper()
-	return computeFor(t, d, describedCVE, floored, a, adjusted)
+// impactCVE is a CVE a row describes, with one CVSS v3.1 vector giving C, I
+// and A these values, or with no vector when they are empty.
+func impactCVE(c, i, a string) CVE {
+	row := Row{PkgName: "libexample", Description: "A described vulnerability."}
+	if c != "" {
+		row.CVSS = []cvss.Vector{v31("nvd", "AV:N/AC:L/PR:N/UI:N/S:U/C:"+c+"/I:"+i+"/A:"+a)}
+	}
+	return CVE{ID: "CVE-T", Rows: []Row{row}}
 }
 
-func computeFor(t *testing.T, d Deployment, c CVE, floored [3]bool, a Answers, adjusted *Adjusted) Levels {
+func compute(t *testing.T, d Deployment, a Answers, adjusted *Adjusted) Levels {
 	t.Helper()
-	l, err := Compute(d, c, floored, a, adjusted)
+	return computeFor(t, d, describedCVE, a, adjusted)
+}
+
+func computeFor(t *testing.T, d Deployment, c CVE, a Answers, adjusted *Adjusted) Levels {
+	t.Helper()
+	l, err := Compute(d, c, a, adjusted)
 	if err != nil {
 		t.Fatalf("Compute: %v", err)
 	}
@@ -80,11 +91,12 @@ func ids[V any](c contract[V]) []string {
 	return out
 }
 
-// The adjustment states a rule's domain walks: none, then each answer.
 var (
-	adjustedAxis        = []string{affected, notAffected, cannotTell}
 	sensitivities       = []string{"low", "medium", "high", "critical"}
 	detectionLevelNames = []string{"not_logged", "logged", "logged_and_reviewed", activeInApplication}
+	// impactValues are the values an axis's worst usable v3 vector gives,
+	// "" for no usable vector.
+	impactValues = []string{"N", "L", "H", ""}
 )
 
 // detections returns every state of detection: undeclared, then each
@@ -119,158 +131,93 @@ func channelSets() [][]string {
 	return out
 }
 
-// decided are the six factors reachability's answer decides, as the vector
-// names them.
-var decided = []string{"O", "EE", "LC", "LI", "LAV", "LAC"}
-
-// reachabilityMoves adds Privacy violation, which a not reachable CVE's
-// adjustment still lowers through confidentiality.
-var reachabilityMoves = append(slices.Clone(decided), "PV")
-
 // walk calls each rule over its whole input domain and returns, per factor,
-// the levels reached and the number of inputs walked. Reachability, no
-// factor, is walked as "R": each input adds the levels of the six factors it
-// decides, and Privacy violation's.
+// the levels reached and the number of inputs walked.
 func walk(t *testing.T) (reached map[string]map[int]bool, inputs map[string]int) {
 	reached, inputs = map[string]map[int]bool{}, map[string]int{}
 	sets := owaspLevelSets(t)
-	add := func(factor string, d Deployment, floored [3]bool, a Answers, adjusted *Adjusted) {
-		l := compute(t, d, floored, a, adjusted)
+	add := func(factor string, d Deployment, c CVE, a Answers, adjusted *Adjusted) {
+		l := computeFor(t, d, c, a, adjusted)
 		rating, err := l.Vector.Rate()
 		if err != nil {
 			t.Fatalf("the calculator refuses %+v: %v", l.Vector, err)
 		}
 		checkRating(t, rating, levels(l.Vector), sets)
 		inputs[factor]++
-		factors := []string{factor}
-		if factor == "R" {
-			factors = reachabilityMoves
+		if reached[factor] == nil {
+			reached[factor] = map[int]bool{}
 		}
-		for _, f := range factors {
-			if reached[f] == nil {
-				reached[f] = map[int]bool{}
-			}
-			reached[f][levels(l.Vector)[f]] = true
-		}
+		reached[factor][levels(l.Vector)[factor]] = true
 	}
 	for _, f := range []string{"SL", "ED", "A"} {
-		add(f, base(), [3]bool{}, Answers{}, nil)
+		add(f, base(), describedCVE, Answers{}, nil)
 	}
 	for _, e := range []string{"internal", "private", "internet"} {
 		d := base()
 		d.Exposure.Value = e
-		add("S", d, [3]bool{}, Answers{}, nil)
+		add("S", d, describedCVE, Answers{}, nil)
 	}
 	for _, id := range ids(motive) {
-		add("M", base(), [3]bool{}, Answers{M: id}, nil)
+		add("M", base(), describedCVE, Answers{M: id}, nil)
 	}
 	for _, id := range ids(easeOfExploit) {
-		add("EE", base(), [3]bool{}, Answers{EE: id}, nil)
+		add("EE", base(), describedCVE, Answers{EE: id}, nil)
 	}
 	for _, id := range ids(financialDamage) {
-		add("FD", base(), [3]bool{}, Answers{FD: id}, nil)
+		add("FD", base(), describedCVE, Answers{FD: id}, nil)
 	}
 	for _, id := range ids(reputationDamage) {
-		add("RD", base(), [3]bool{}, Answers{RD: id}, nil)
+		add("RD", base(), describedCVE, Answers{RD: id}, nil)
 	}
 	for _, id := range ids(opportunity) {
-		add("O", base(), [3]bool{}, Answers{O: id}, nil)
+		add("O", base(), describedCVE, Answers{O: id}, nil)
 		for _, adj := range append([]string{keep}, ids(opportunity)...) {
-			add("O", base(), [3]bool{}, Answers{O: id}, &Adjusted{Opportunity: adj})
+			add("O", base(), describedCVE, Answers{O: id}, &Adjusted{Opportunity: adj})
 		}
 	}
-	walkAxes(t, add)
+	walkImpacts(add)
 	for _, id := range ids(accountability) {
 		for _, tr := range []*string{nil, ptr("none"), ptr("per_request"), ptr("per_individual")} {
 			d := base()
 			d.Traceability = tr
-			add("LAC", d, [3]bool{}, Answers{LAC: id}, nil)
+			add("LAC", d, describedCVE, Answers{LAC: id}, nil)
 		}
 	}
 	for _, id := range ids(nonCompliance) {
 		for _, fw := range [][]string{nil, {"PCI-DSS"}} {
 			d := base()
 			d.Frameworks = fw
-			add("NC", d, [3]bool{}, Answers{NC: id}, nil)
+			add("NC", d, describedCVE, Answers{NC: id}, nil)
 		}
 	}
 	for _, det := range detections() {
 		for _, set := range channelSets() {
 			d := base()
 			d.Detection = det
-			add("ID", d, [3]bool{}, Answers{ID: set}, nil)
+			add("ID", d, describedCVE, Answers{ID: set}, nil)
 		}
 	}
-	walkReachability(add)
 	return reached, inputs
 }
 
-// walkReachability walks reachability's answers, an id off the list
-// included, over what the six factors it decides read: the data's
-// sensitivity, traceability, the axes floored and an adjustment lowering all
-// it can, Privacy violation's included. Their own answers sit at the worst
-// case, so a not reachable answer has everything to lower.
-func walkReachability(add func(string, Deployment, [3]bool, Answers, *Adjusted)) {
-	worst := Answers{O: cannotTell, EE: cannotTell, LC: cannotTell, LI: cannotTell, LAV: cannotTell, LAC: cannotTell}
-	lowering := &Adjusted{Opportunity: "full_access_or_expensive_resources_required", Confidentiality: notAffected,
-		Integrity: notAffected, Availability: notAffected}
-	for _, id := range append(ids(reachability), "bogus") {
-		for _, ds := range []string{"low", "critical"} {
-			for _, tr := range []*string{nil, ptr("none"), ptr("per_request"), ptr("per_individual")} {
-				for _, floored := range [][3]bool{{}, allFloored} {
-					for _, adjusted := range []*Adjusted{nil, lowering} {
-						d := base()
-						d.DataSensitivity.Value, d.Traceability = ds, tr
-						a := worst
-						a.R = id
-						add("R", d, floored, a, adjusted)
-					}
-				}
-			}
-		}
-	}
-}
-
-// walkAxes walks the rules Applicability and the adjustment's axes reach.
-func walkAxes(t *testing.T, add func(string, Deployment, [3]bool, Answers, *Adjusted)) {
-	t.Helper()
-	axisStates := func(axis int, each func(floored [3]bool, adjusted *Adjusted)) {
-		for _, fl := range []bool{false, true} {
-			var floored [3]bool
-			floored[axis] = fl
-			each(floored, nil)
-			for _, adj := range adjustedAxis {
-				a := &Adjusted{}
-				switch axis {
-				case cvss.Confidentiality:
-					a.Confidentiality = adj
-				case cvss.Integrity:
-					a.Integrity = adj
-				default:
-					a.Availability = adj
-				}
-				each(floored, a)
-			}
-		}
-	}
-	for _, id := range ids(integrity) {
-		axisStates(cvss.Integrity, func(fl [3]bool, adj *Adjusted) { add("LI", base(), fl, Answers{LI: id}, adj) })
-	}
-	for _, id := range ids(availability) {
-		axisStates(cvss.Availability, func(fl [3]bool, adj *Adjusted) { add("LAV", base(), fl, Answers{LAV: id}, adj) })
-	}
-	for _, id := range ids(confidentiality) {
+// walkImpacts walks the technical impacts over the value the CVE's vectors
+// give their axis, none included, and confidentiality over data_sensitivity;
+// then Privacy violation over data_subjects, which no axis moves.
+func walkImpacts(add func(string, Deployment, CVE, Answers, *Adjusted)) {
+	for _, v := range impactValues {
 		for _, ds := range sensitivities {
 			d := base()
 			d.DataSensitivity.Value = ds
-			axisStates(cvss.Confidentiality, func(fl [3]bool, adj *Adjusted) { add("LC", d, fl, Answers{LC: id}, adj) })
+			add("LC", d, impactCVE(v, v, v), Answers{}, nil)
 		}
+		add("LI", base(), impactCVE(v, v, v), Answers{}, nil)
+		add("LAV", base(), impactCVE(v, v, v), Answers{}, nil)
 	}
 	for _, id := range ids(privacyViolation) {
 		for _, ds := range append([]*string{nil}, ptrs(ids(privacyViolation)[:5])...) {
 			d := base()
 			d.DataSubjects = ds
-			axisStates(cvss.Confidentiality, func(fl [3]bool, adj *Adjusted) { add("PV", d, fl, Answers{PV: id}, adj) })
+			add("PV", d, describedCVE, Answers{PV: id}, nil)
 		}
 	}
 }
@@ -320,23 +267,27 @@ func owaspLevelSets(t testing.TB) map[string][]int {
 }
 
 // Every rule is a total function over a finite domain. Walked whole, every
-// answer, cannot_tell and the answers below the scale included, each input
-// writes a vector the calculator parses and scores, and each rule reaches
-// exactly the level set the calculator's JAR ran: a rule that reaches
+// answer, cannot_tell included, and every value the CVSS v3 vectors give,
+// none included, each input writes a vector the calculator parses and
+// scores, and each rule reaches exactly the level set the calculator's JAR
+// ran, but the levels C2's table leaves unreached: a rule that reaches
 // another level fails here until the JAR is run over the new sets.
 func TestRulesReachTheLevelSetsTheJARRan(t *testing.T) {
 	reached, inputs := walk(t)
 	sets := owaspLevelSets(t)
+	// Loss of integrity's extensive, slightly corrupt: no v3 value gives it.
+	unreached := map[string][]int{"LI": {5}}
 	for _, f := range vectorOrder {
-		if got := slices.Sorted(maps.Keys(reached[f])); !slices.Equal(got, sets[f]) {
-			t.Errorf("%s reaches %v, the JAR ran %v", f, got, sets[f])
+		want := slices.DeleteFunc(slices.Clone(sets[f]), func(l int) bool { return slices.Contains(unreached[f], l) })
+		if got := slices.Sorted(maps.Keys(reached[f])); !slices.Equal(got, want) {
+			t.Errorf("%s reaches %v, the JAR ran %v, %v of them unreached", f, got, sets[f], unreached[f])
 		}
 	}
-	// Each domain's size: the answers, times the config states, Applicability
-	// and the adjustment where the rule reads them.
+	// Each domain's size: the answers or the vectors' values, times the
+	// config states and the adjustment where the rule reads them.
 	want := map[string]int{
 		"SL": 1, "M": 4, "O": 35, "S": 3, "ED": 1, "EE": 5, "A": 1, "ID": 703,
-		"LC": 160, "LI": 56, "LAV": 56, "LAC": 16, "FD": 5, "RD": 5, "NC": 8, "PV": 288, "R": 128,
+		"LC": 16, "LI": 4, "LAV": 4, "LAC": 16, "FD": 5, "RD": 5, "NC": 8, "PV": 36,
 	}
 	if !maps.Equal(inputs, want) {
 		t.Errorf("inputs walked per rule %v, want %v", inputs, want)
@@ -344,9 +295,9 @@ func TestRulesReachTheLevelSetsTheJARRan(t *testing.T) {
 }
 
 // level returns one factor's level for a deployment and answers.
-func level(t *testing.T, factor string, d Deployment, floored [3]bool, a Answers, adjusted *Adjusted) int {
+func level(t *testing.T, factor string, d Deployment, a Answers, adjusted *Adjusted) int {
 	t.Helper()
-	return levels(compute(t, d, floored, a, adjusted).Vector)[factor]
+	return levels(compute(t, d, a, adjusted).Vector)[factor]
 }
 
 func nonDecreasing(levels []int) bool {
@@ -363,7 +314,7 @@ func TestRulesDirection(t *testing.T) {
 			set(&a, id)
 			d := base()
 			d.Frameworks = []string{"PCI-DSS"}
-			out = append(out, level(t, factor, d, [3]bool{}, a, nil))
+			out = append(out, level(t, factor, d, a, nil))
 		}
 		return out
 	}
@@ -374,13 +325,10 @@ func TestRulesDirection(t *testing.T) {
 	}{
 		{"M", func(a *Answers, id string) { a.M = id }, ids(motive)},
 		{"EE", func(a *Answers, id string) { a.EE = id }, ids(easeOfExploit)},
-		{"LI", func(a *Answers, id string) { a.LI = id }, ids(integrity)},
-		{"LAV", func(a *Answers, id string) { a.LAV = id }, ids(availability)},
 		{"FD", func(a *Answers, id string) { a.FD = id }, ids(financialDamage)},
 		{"RD", func(a *Answers, id string) { a.RD = id }, ids(reputationDamage)},
 		{"NC", func(a *Answers, id string) { a.NC = id }, ids(nonCompliance)},
 		{"PV", func(a *Answers, id string) { a.PV = id }, ids(privacyViolation)},
-		{"LC", func(a *Answers, id string) { a.LC = id }, ids(confidentiality)},
 		{"LAC", func(a *Answers, id string) { a.LAC = id }, ids(accountability)},
 	}
 	for _, c := range readOnly {
@@ -399,21 +347,37 @@ func TestRulesDirection(t *testing.T) {
 	for _, e := range []string{"internal", "private", "internet"} {
 		d := base()
 		d.Exposure.Value = e
-		size = append(size, level(t, "S", d, [3]bool{}, Answers{}, nil))
+		size = append(size, level(t, "S", d, Answers{}, nil))
 	}
 	if !nonDecreasing(size) {
 		t.Errorf("S: levels %v from internal to internet, want non-decreasing", size)
 	}
 
-	for _, id := range ids(confidentiality) {
+	// A worse value on an axis, no usable vector last, and more sensitive
+	// data never lower a technical impact.
+	for _, ds := range sensitivities {
+		d := base()
+		d.DataSensitivity.Value = ds
+		var lc, li, lav []int
+		for _, v := range impactValues {
+			l := computeFor(t, d, impactCVE(v, v, v), Answers{}, nil)
+			lc, li, lav = append(lc, int(l.Vector.LC)), append(li, int(l.Vector.LI)), append(lav, int(l.Vector.LAV))
+		}
+		for name, got := range map[string][]int{"LC": lc, "LI": li, "LAV": lav} {
+			if !nonDecreasing(got) {
+				t.Errorf("%s, data_sensitivity %s: levels %v from N to no vector, want non-decreasing", name, ds, got)
+			}
+		}
+	}
+	for _, v := range impactValues {
 		var lc []int
 		for _, ds := range sensitivities {
 			d := base()
 			d.DataSensitivity.Value = ds
-			lc = append(lc, level(t, "LC", d, [3]bool{}, Answers{LC: id}, nil))
+			lc = append(lc, int(computeFor(t, d, impactCVE(v, v, v), Answers{}, nil).Vector.LC))
 		}
 		if !nonDecreasing(lc) {
-			t.Errorf("LC %s: levels %v from low to critical data, want non-decreasing", id, lc)
+			t.Errorf("LC from %q: levels %v from low to critical data, want non-decreasing", v, lc)
 		}
 	}
 	for _, id := range ids(accountability) {
@@ -421,7 +385,7 @@ func TestRulesDirection(t *testing.T) {
 		for _, tr := range traceabilities {
 			d := base()
 			d.Traceability = ptr(tr)
-			lac = append(lac, level(t, "LAC", d, [3]bool{}, Answers{LAC: id}, nil))
+			lac = append(lac, level(t, "LAC", d, Answers{LAC: id}, nil))
 		}
 		slices.Reverse(lac)
 		if !nonDecreasing(lac) {
@@ -433,7 +397,7 @@ func TestRulesDirection(t *testing.T) {
 		for _, cap := range ids(privacyViolation)[:5] {
 			d := base()
 			d.DataSubjects = ptr(cap)
-			pv = append(pv, level(t, "PV", d, [3]bool{}, Answers{PV: id}, nil))
+			pv = append(pv, level(t, "PV", d, Answers{PV: id}, nil))
 		}
 		if !nonDecreasing(pv) {
 			t.Errorf("PV %s: levels %v from the smallest population to the largest, want non-decreasing", id, pv)
@@ -448,9 +412,9 @@ func TestIntrusionDetectionDirection(t *testing.T) {
 	for _, det := range detections()[1:] {
 		d := base()
 		d.Detection = det
-		worst := level(t, "ID", d, [3]bool{}, Answers{ID: []string{cannotTell}}, nil)
+		worst := level(t, "ID", d, Answers{ID: []string{cannotTell}}, nil)
 		for _, set := range channelSets() {
-			got := level(t, "ID", d, [3]bool{}, Answers{ID: set}, nil)
+			got := level(t, "ID", d, Answers{ID: set}, nil)
 			if got > worst {
 				t.Errorf("%+v: %v gives %d, above cannot_tell's %d", *det, set, got, worst)
 			}
@@ -458,7 +422,7 @@ func TestIntrusionDetectionDirection(t *testing.T) {
 				if slices.Contains(set, more) || slices.Contains(set, cannotTell) || slices.Contains(set, "bogus") || len(set) == 0 {
 					continue
 				}
-				if wider := level(t, "ID", d, [3]bool{}, Answers{ID: append(slices.Clone(set), more)}, nil); wider > got {
+				if wider := level(t, "ID", d, Answers{ID: append(slices.Clone(set), more)}, nil); wider > got {
 					t.Errorf("%+v: adding %s to %v raised %d to %d", *det, more, set, got, wider)
 				}
 			}
@@ -473,7 +437,7 @@ func TestIntrusionDetectionDirection(t *testing.T) {
 			d2 := base()
 			d2.Detection = &improved
 			for _, set := range channelSets() {
-				if before, after := level(t, "ID", d, [3]bool{}, Answers{ID: set}, nil), level(t, "ID", d2, [3]bool{}, Answers{ID: set}, nil); after > before {
+				if before, after := level(t, "ID", d, Answers{ID: set}, nil), level(t, "ID", d2, Answers{ID: set}, nil); after > before {
 					t.Errorf("%+v to %+v: %v went from %d to %d", *det, improved, set, before, after)
 				}
 			}

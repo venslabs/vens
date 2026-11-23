@@ -73,7 +73,7 @@ func TestGenerator_LogsBatchCompositionAndRunSummary(t *testing.T) {
 	summary := runSummary(t, logs)
 	require.Equal(t, int64(4), summary.attrs["rows"])
 	require.Equal(t, int64(4), summary.attrs["cves"])
-	require.Equal(t, int64(22), summary.attrs["llm_calls"])
+	require.Equal(t, int64(14), summary.attrs["llm_calls"])
 	require.Equal(t, int64(0), summary.attrs["asked_again"])
 	require.Equal(t, int64(0), summary.attrs["splits"])
 	require.Equal(t, false, summary.attrs["failed"])
@@ -83,7 +83,7 @@ func TestGenerator_LogsBatchCompositionAndRunSummary(t *testing.T) {
 	require.NotContains(t, summary.attrs, "calls.ID")
 	require.NotContains(t, summary.attrs, "calls."+adjustmentCall)
 	require.Equal(t, map[string]int64{
-		"applicability_missing": 4, "data_subjects_missing": 4, "detection_undeclared": 4, "traceability_missing": 4,
+		"cvss_v3_missing": 4, "data_subjects_missing": 4, "detection_undeclared": 4, "traceability_missing": 4,
 	}, countersOf(summary), "testVulns carry no vector; testConfig declares no optional field")
 }
 
@@ -100,8 +100,8 @@ func TestGenerator_LogsRunSummaryWhenTheRunFails(t *testing.T) {
 	require.Equal(t, true, summary.attrs["failed"])
 	require.Equal(t, int64(4), summary.attrs["rows"])
 	require.Equal(t, int64(4), summary.attrs["cves"])
-	require.Equal(t, int64(2), summary.attrs["llm_calls"], "reachability's call and its ask-again; the run stops there")
-	require.Equal(t, int64(2), summary.attrs["calls.R"])
+	require.Equal(t, int64(2), summary.attrs["llm_calls"], "Motive's call and its ask-again; the run stops there")
+	require.Equal(t, int64(2), summary.attrs["calls.M"])
 	require.Equal(t, int64(1), summary.attrs["asked_again"])
 	require.Equal(t, int64(0), summary.attrs["splits"])
 	require.Empty(t, countersOf(summary), "no CVE was rated")

@@ -37,6 +37,11 @@ context:
   controls: {...}
   notes: string
   audit_requirement: string  # moves no score
+
+reachability:                # optional, publishes a VEX status
+  - cve: string              # or component: string
+    reachable: boolean
+    provenance: string
 ```
 
 `data_subjects`, `detection` and `traceability` are optional, but each one left out takes the fallback its section states: vens warns at load, counts each use in the run summary, and `--strict` refuses the run. Declare them. See the **[fully declared file](#fully-declared-file)**.
@@ -72,7 +77,7 @@ How the system is exposed to attackers. Every call shows the model the value, it
 
 ### `context.data_sensitivity`
 
-Type of data handled by the system. vens uses it to pick the column of Loss of confidentiality: the model answers how much data an exploit could read, and vens crosses that answer with the column. The Loss of confidentiality question does not show this field. The Motive, Loss of integrity and Privacy violation questions show it, with its meaning.
+Type of data handled by the system. vens uses it to pick the column of Loss of confidentiality, which no question asks: vens reads it from the CVE's CVSS v3 vectors and crosses it with the column. The Motive and Privacy violation questions show this field, with its meaning.
 
 | Value | Meaning | Loss of confidentiality column |
 |---|---|---|
@@ -81,18 +86,20 @@ Type of data handled by the system. vens uses it to pick the column of Loss of c
 | `high` | PII, financial data, customer info | critical |
 | `critical` | Secrets, PHI, payment card data | critical |
 
-| Answer to the Loss of confidentiality question | non-sensitive | critical |
-|---|---|---|
-| `no_impact` | 2 | 2 |
-| `minimal` | 2 | 6 |
-| `extensive` | 6 | 7 |
-| `all` | 9 | 9 |
+Loss of confidentiality, integrity and availability come from the worst value, `H` over `L` over `N`, that the CVE's usable CVSS v3 vectors give `C`, `I` and `A`, across every row and source of the scanner's report. A v3 vector is usable when it parses, any `CVSS:` prefix stating 3.0 or 3.1, and gives `C`, `I` and `A` each once on `H`, `L` or `N`; any other is refused whole. v2 and v4 vectors are not read.
 
-`no_impact` says that exploiting it discloses nothing: it takes the lowest level, as a CVE answered not reachable does, which is not asked this question. `cannot_tell`, which says only that the facts given do not decide, reads as `all`.
+| CVSS v3 | Loss of confidentiality, non-sensitive | Loss of confidentiality, critical | Loss of integrity | Loss of availability |
+|---|---|---|---|---|
+| `N` | 2 | 2 | 1 | 1 |
+| `L` | 2 | 6 | 3 | 5 |
+| `H` | 6 | 7 | 7 | 7 |
+| no usable v3 vector | 9 | 9 | 9 | 9 |
+
+No default is documented for a CVE with no usable v3 vector: the three take 9, the CVE adds one to the `cvss_v3_missing` counter, and `--strict` refuses the run.
 
 ### `context.business_criticality`
 
-How critical the system is to the business. No level reads it directly. The Motive, Financial damage and Reputation damage questions show it, with its meaning, and so does Loss of availability when `availability_requirement` is not set.
+How critical the system is to the business. No level reads it directly. The Motive, Financial damage and Reputation damage questions show it, with its meaning.
 
 | Value | Meaning |
 |---|---|
@@ -107,7 +114,7 @@ How critical the system is to the business. No level reads it directly. The Moti
 
 ### `context.availability_requirement`
 
-Strictness of uptime requirements. The Loss of availability question shows it, with its meaning. If omitted, that question shows `business_criticality` instead.
+Strictness of uptime requirements. Moves no score and no call sends it: Loss of availability, which it described, is read from the CVE's CVSS v3 vectors (see [`data_sensitivity`](#contextdata_sensitivity)). The key still loads.
 
 | Value | Meaning |
 |---|---|
@@ -115,8 +122,6 @@ Strictness of uptime requirements. The Loss of availability question shows it, w
 | `medium` | Business-hours SLA |
 | `high` | 24/7 required |
 | `critical` | Zero downtime tolerance |
-
-**When to set it explicitly:** only when availability needs differ from business criticality (e.g. a `medium`-criticality internal tool that must not go down during trading hours).
 
 ### `context.compliance_requirements`
 
@@ -207,7 +212,7 @@ vens reads this field alone; no call sends it. The Loss of accountability questi
 | `unidentified` | 9 | 7 | 7 |
 | `defeats_attribution` | 9 | 9 | 9 |
 
-`identified` (no accountability loss: the attacker must authenticate under an identity of their own, and the exploit leaves the records intact; not having to authenticate never counts) takes the lowest level the column gives, as a CVE answered not reachable does, which is not asked this question. `cannot_tell` reads as `defeats_attribution`. Left out, vens uses the `none` column: each CVE adds one to the `traceability_missing` counter, vens warns at load (W1 or W3), and `--strict` refuses the run.
+`identified` (no accountability loss: the attacker must authenticate under an identity of their own, and the exploit leaves the records intact; not having to authenticate never counts) takes the lowest level the column gives. `cannot_tell` reads as `defeats_attribution`. Left out, vens uses the `none` column: each CVE adds one to the `traceability_missing` counter, vens warns at load (W1 or W3), and `--strict` refuses the run.
 
 ### `context.controls`
 
@@ -250,7 +255,7 @@ notes: |
   runs as non-root. Secrets from AWS Secrets Manager.
 ```
 
-Shown to the model in every call, with the rest of the deployment. A reachability verdict written here reaches the rating only through the model's answers.
+Shown to the model in every call, with the rest of the deployment. A reachability verdict written here publishes no VEX status, and no question asks whether a CVE is reachable: declare it under [`reachability`](#reachability).
 
 ### `context.audit_requirement`
 
@@ -261,6 +266,43 @@ Since v0.7.0, moves no score and no call sends it. It states a requirement, not 
 | `low` | Basic logging |
 | `medium` | Audit trail required |
 | `high` | Forensic-grade, immutable logging |
+
+---
+
+## `reachability`
+
+Optional. Declarations of whether a CVE's vulnerable code is reachable in this deployment, each with where it comes from. vens carries them into the VEX; it does not judge them, they move no score, and no question asks the model whether a CVE is reachable.
+
+| Field | Type | Required | Description |
+|---|---|:---:|---|
+| `cve` | string | one of the two | A vulnerability id, matched without regard to case. |
+| `component` | string | one of the two | A package name as the scanner names it, matched without regard to case. |
+| `reachable` | boolean | ✅ | `false` declares the code not reachable; `true` declares it reachable. |
+| `provenance` | string | ✅ | Where the declaration comes from, such as a tool run or a review. The VEX's `detail` cites it. |
+
+An entry declaring a CVE not reachable hits it when its `cve` is the CVE's id, or when its `component` is the package of every row the scan lists for that CVE: a component on one package of a CVE found on two does not hit it. Hit, and with no entry declaring the CVE reachable, by its id or by any of its packages, the VEX gives the CVE:
+
+```json
+"analysis": {
+  "state": "not_affected",
+  "justification": "code_not_reachable",
+  "detail": "Declared not reachable by config.yaml reachability[0] (cve: CVE-2024-24790). Provenance: govulncheck run of 2026-11-20, no call path from main"
+}
+```
+
+The rating stays the one the answers give: no level is lowered and no severity capped. An entry declaring the CVE reachable vetoes the status: none is published, and vens warns. Silence publishes nothing. vens reads no upstream VEX.
+
+```yaml
+reachability:
+  - cve: CVE-2024-24790
+    reachable: false
+    provenance: "govulncheck run of 2026-11-20, no call path from main"
+  - component: libssl3
+    reachable: true
+    provenance: "pentest report 2026-10, TLS handshake reaches it"
+```
+
+Each entry gives exactly one selector, `cve` or `component`, `reachable` written `true` or `false`, and a `provenance` that is not blank; anything else is refused (E6), and a key other than the four is refused as unknown (E3).
 
 ---
 
@@ -278,9 +320,9 @@ The file is refused when:
 - `project.name` is empty;
 - `context.exposure`, `context.data_sensitivity` or `context.business_criticality` is missing or not one of its values;
 - an optional field has a value off its list, or `compliance_requirements` names an unknown framework;
-- one of E1 to E5 below applies. vens checks `schema_version` first, so a file written for another schema gets E1 or E2 and no other error.
+- one of E1 to E6 below applies. vens checks `schema_version` first, so a file written for another schema gets E1 or E2 and no other error.
 
-E1 to E5 and W1 to W5 are labels on this page; the messages do not print them.
+E1 to E6 and W1 to W5 are labels on this page; the messages do not print them.
 
 ### E1: no schema_version
 
@@ -316,7 +358,7 @@ A key that schema 2 does not have, with its line and where it sits. A misspelled
 config.yaml line 10: unknown key `tracability` under context
 ```
 
-A key outside `project` and `context` reads `at the top level` instead of `under context`.
+A key outside `project`, `context` and `reachability` reads `at the top level` instead of `under context`; a key of a `reachability` entry other than its four reads `under reachability[0]`, with the entry's place.
 
 ### E4: listener, data_subjects or traceability
 
@@ -366,6 +408,36 @@ context.detection.network: active_in_application applies to application only
 
 A channel's value off its list, or a channel written as a list or a mapping, gets E4's form for `context.detection.network`, `host` or `application`.
 
+### E6: reachability
+
+Written with no value, or as anything but a list:
+
+```text
+reachability must be a list of entries, got a mapping
+```
+
+An entry with no selector, or with both:
+
+```text
+reachability[0] gives no selector: write cve or component
+```
+
+```text
+reachability[1] gives both cve and component: an entry has one selector
+```
+
+`reachable` left out, or written as anything but `true` or `false`:
+
+```text
+reachability[0].reachable must be true or false, got no
+```
+
+`provenance` left out or blank, or a selector or provenance that is not a string:
+
+```text
+reachability[0].provenance is required: say where the assertion comes from
+```
+
 ### Warnings
 
 A warning does not stop the run. vens logs it at load, before any LLM call, at the default log level. Each field left out gets one warning, which says what its fallback does.
@@ -373,7 +445,7 @@ A warning does not stop the run. vens logs it at load, before any LLM call, at t
 **W1**: `audit_requirement` set, `traceability` left out.
 
 ```text
-context.audit_requirement no longer moves any score, and context.traceability is not declared: Loss of accountability uses its `none` column, 7 when the vulnerable code is not reachable here, or when the attacker must authenticate and cannot act as someone else or tamper with the records, 9 otherwise.
+context.audit_requirement no longer moves any score, and context.traceability is not declared: Loss of accountability uses its `none` column, 7 when the attacker must authenticate and cannot act as someone else or tamper with the records, 9 otherwise.
 ```
 
 **W2**: `ids`, `siem` or `edr` set to `true`, `detection` left out.

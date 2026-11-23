@@ -19,49 +19,17 @@ import (
 	"github.com/venslabs/vens/pkg/riskconfig"
 )
 
-// The 13 questions and their answers. A question names the attacker group
+// The nine questions and their answers. A question names the attacker group
 // as {group}; Non-compliance's names the declared frameworks as {frameworks}.
 // cannot_tell means only that the facts given do not decide: a model answer
 // has no documented default, so it maps to the factor's worst legal level.
 
 const cannotTellText = "The facts given do not say."
 
-// impactCannotTellText is cannot_tell's text on reachability, whose list
-// says that the vulnerable code is not reachable here, and on the four
-// technical impact questions, three of which list that the exploit has no
-// such impact: neither is cannot_tell.
+// impactCannotTellText is cannot_tell's text on Loss of accountability,
+// whose list holds its no accountability loss: that answer is not
+// cannot_tell.
 const impactCannotTellText = "The facts given do not decide between the answers above."
-
-// notReachable is how reachability's answer says the vulnerable code is not
-// reachable here, reading reachability as the system prompt defines it once.
-const notReachable = "the facts given show that the vulnerable code is not reachable in this deployment, as defined above"
-
-// notReachableID is reachability's one answer that is not read as reachable;
-// noImpactID is the answer below the scales of Loss of confidentiality,
-// integrity and availability, which lands on the factor's floor, so it never
-// raises a level any other answer would give. Loss of accountability's
-// identified answer is its no accountability loss.
-const (
-	notReachableID = "not_reachable"
-	noImpactID     = "no_impact"
-)
-
-const notReachableText = "Not reachable here: " + notReachable + "."
-
-// reachability is asked of every CVE first. Its answer decides once, for
-// Opportunity, Ease of exploit and the four technical impacts, whether their
-// questions are asked: not reachable sets each to its lowest level instead.
-// cannot_tell is read as reachable, the worst case.
-var reachability = contract[bool]{
-	factor:   R,
-	question: "Can {group} reach the vulnerable code of this vulnerability in this deployment, whatever access or effort that takes, as reachability is defined above?",
-	answers: []answer[bool]{
-		{"reachable", "Reachable here: the vulnerable code is reachable in this deployment, as defined above.", true},
-		{notReachableID, notReachableText, false},
-		{cannotTell, impactCannotTellText, true},
-	},
-	counter: "reachability_cannot_tell",
-}
 
 var motive = contract[owasp.Motive]{
 	factor:   M,
@@ -126,64 +94,9 @@ var intrusionDetection = contract[channel]{
 	counter: "intrusion_detection_cannot_tell",
 }
 
-// extent is how much data Loss of confidentiality's answer says an exploit
-// discloses, which Go crosses with data_sensitivity. extentNone is no_impact's:
-// it discloses nothing here.
-type extent int
-
-const (
-	extentNone extent = iota
-	extentMinimal
-	extentExtensive
-	extentAll
-)
-
-var confidentiality = contract[extent]{
-	factor:   LC,
-	question: "If {group} exploited this vulnerability in this deployment, how much of the data this service handles could they read? The data it handles is what the deployment's description and notes say it holds or processes. Where they do not say, it handles whatever the service can read. Count all the distinct data they could read by exploiting it as often as they can.",
-	answers: []answer[extent]{
-		{noImpactID, "No data disclosed: it is reachable, but exploiting it here discloses none of the data this service handles, as when its only effect is a crash, a slowdown or a change that reveals nothing.", extentNone},
-		{"minimal", "Minimal: a small, bounded amount, such as a few values, one record, a file path, a version string, or a fragment of memory or metadata.", extentMinimal},
-		{"extensive", "Extensive: a large amount, such as many records, whole files or tables, or the data of many users, but not all the data this service can read.", extentExtensive},
-		{"all", "All: all the data this service can read, as when the exploit runs code as the service or yields the credentials or keys that open every store it reads.", extentAll},
-		{cannotTell, impactCannotTellText, extentAll},
-	},
-	counter: "confidentiality_cannot_tell",
-}
-
-var integrity = contract[owasp.LossOfIntegrity]{
-	factor:   LI,
-	question: "If {group} exploited this vulnerability in this deployment, how much of the data this service handles could they corrupt, and how badly? Count all the distinct data they could corrupt by exploiting it as often as they can.",
-	answers: []answer[owasp.LossOfIntegrity]{
-		{noImpactID, "No data corrupted: it is reachable, but exploiting it here changes none of the data this service handles, as when its only effect is a crash, a slowdown or a disclosure.", integrityFloor},
-		{"minimal_slightly_corrupt", "Minimal, slightly corrupt: a little of the data, such as one record, file, setting or message, changed in ways that are easy to notice or undo, such as a malformed value, a log line or a cache entry that is rebuilt.", owasp.LossOfIntegrityMinimalSlightlyCorruptData},
-		{"minimal_seriously_corrupt", "Minimal, seriously corrupt: a little of the data, changed in ways that matter, such as an altered record, credential, setting or file that the service or its users will trust and act on.", owasp.LossOfIntegrityMinimalSeriouslyCorruptData},
-		{"extensive_slightly_corrupt", "Extensive, slightly corrupt: much of the data, changed in ways that are easy to notice or undo.", owasp.LossOfIntegrityExtensiveSlightlyCorruptData},
-		{"extensive_seriously_corrupt", "Extensive, seriously corrupt: much of the data, changed in ways that matter, but not everything this service holds.", owasp.LossOfIntegrityExtensiveSeriouslyCorruptData},
-		{"all_data_totally_corrupt", "All data totally corrupt: everything this service holds can be overwritten or destroyed, as when the exploit runs code as the service.", owasp.LossOfIntegrityAllDataTotallyCorrupt},
-		{cannotTell, impactCannotTellText, owasp.LossOfIntegrityAllDataTotallyCorrupt},
-	},
-	counter: "integrity_cannot_tell",
-}
-
-var availability = contract[owasp.LossOfAvailability]{
-	factor:   LAV,
-	question: "If {group} exploited this vulnerability in this deployment, how much of this service could they interrupt, and how vital is what they would interrupt? Primary is what the deployment's description and notes say this service exists to do, and any part it cannot do that without; secondary is anything else it runs, such as a tool in the image, an optional feature, an admin or debug function, or a background task. Where they do not say, count what is interrupted as primary.",
-	answers: []answer[owasp.LossOfAvailability]{
-		{noImpactID, "Nothing interrupted: it is reachable, but exploiting it here interrupts nothing this service does, as when its only effect is a disclosure or a change of data.", availabilityFloor},
-		{"minimal_secondary_interrupted", "Minimal, secondary: a brief or partial interruption of something secondary, such as one request, process or worker failing and being restarted.", owasp.LossOfAvailabilityMinimalSecondaryServicesInterrupted},
-		{"minimal_primary_interrupted", "Minimal, primary: a brief or partial interruption of something primary, such as one request, process or worker failing and being restarted.", owasp.LossOfAvailabilityMinimalPrimaryServicesInterrupted},
-		{"extensive_secondary_interrupted", "Extensive, secondary: a lasting or broad interruption of something secondary: it stays down until someone acts, or fails for everyone for as long as the attack goes on.", owasp.LossOfAvailabilityExtensiveSecondaryServicesInterrupted},
-		{"extensive_primary_interrupted", "Extensive, primary: a lasting or broad interruption of something primary: it stays down until someone acts, or fails for everyone for as long as the attack goes on.", owasp.LossOfAvailabilityExtensivePrimaryServicesInterrupted},
-		{"all_services_completely_lost", "All services completely lost: the service and what runs with it, completely, as when the exploit takes down the host or every instance of the service.", owasp.LossOfAvailabilityAllServicesCompletelyLost},
-		{cannotTell, impactCannotTellText, owasp.LossOfAvailabilityAllServicesCompletelyLost},
-	},
-	counter: "availability_cannot_tell",
-}
-
 // actor is what Loss of accountability's answer says of the attacker's
-// traces, which Go crosses with traceability. actorNoLoss is identified's, and
-// a CVE not reachable here takes it: no accountability loss.
+// traces, which Go crosses with traceability. actorNoLoss is identified's: no
+// accountability loss.
 type actor int
 
 const (
@@ -277,14 +190,10 @@ func bandAnswers(bands []riskconfig.Band, texts map[string]string) []answer[owas
 // table is the one table the request, the schema and the rules read, so the
 // text shown, the enum and the map cannot drift apart.
 var table = map[Factor]shown{
-	R:   reachability.shown(),
 	M:   motive.shown(),
 	O:   opportunity.shown(),
 	EE:  easeOfExploit.shown(),
 	ID:  intrusionDetection.shown(),
-	LC:  confidentiality.shown(),
-	LI:  integrity.shown(),
-	LAV: availability.shown(),
 	LAC: accountability.shown(),
 	FD:  financialDamage.shown(),
 	RD:  reputationDamage.shown(),

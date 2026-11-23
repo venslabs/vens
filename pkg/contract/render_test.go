@@ -16,7 +16,6 @@ package contract
 
 import (
 	"encoding/json"
-	"fmt"
 	"regexp"
 	"slices"
 	"strings"
@@ -81,23 +80,8 @@ var cvssBatch = []CVE{
 
 var (
 	adjustFlags = []Flag{{Name: SeverityContested, Evidence: "LOW from debian, NVD says HIGH", Package: "libfoo"}}
-	adjustGiven = Answers{O: "no_access_or_resources_required", LC: "all", LI: "extensive_seriously_corrupt", LAV: "minimal_primary_interrupted"}
+	adjustGiven = Answers{O: "no_access_or_resources_required"}
 )
-
-// baselines returns given without the answers of the floored axes, whose
-// questions were not asked.
-func baselines(given Answers, floored [3]bool) Answers {
-	if floored[cvss.Confidentiality] {
-		given.LC = ""
-	}
-	if floored[cvss.Integrity] {
-		given.LI = ""
-	}
-	if floored[cvss.Availability] {
-		given.LAV = ""
-	}
-	return given
-}
 
 func TestCVSSLines(t *testing.T) {
 	want := map[Factor][]string{
@@ -235,7 +219,6 @@ func TestFactsPerQuestion(t *testing.T) {
 	labels := map[Factor][]string{
 		M:  {"Business criticality: high", "Data sensitivity: low"},
 		EE: {"Controls in front of this deployment: waf (Web Application Firewall; scope: SQL injection, XSS, path traversal); zero_trust ("},
-		LI: {"Data sensitivity: low"}, LAV: {"Business criticality: high"},
 		FD: {"Business criticality: high"}, RD: {"Business criticality: high"}, PV: {"Data sensitivity: low"},
 	}
 	for _, f := range Order() {
@@ -258,19 +241,14 @@ func TestFactsPerQuestion(t *testing.T) {
 			t.Errorf("%s's facts show impact metrics %v", f, metrics)
 		}
 	}
-	// Availability requirement replaces the business criticality once set.
-	d.AvailabilityRequirement = &Setting{"critical", "Zero downtime tolerance"}
-	if got := background(LAV, d); !slices.Equal(got, []string{"Availability requirement: critical (Zero downtime tolerance)"}) {
-		t.Errorf("LAV with availability_requirement set shows %q", got)
-	}
 	// No control set to true, no controls line, and no block at all without
 	// Ease of exploit's CVSS lines.
 	d.Controls = nil
 	if got := background(EE, d); got != nil {
 		t.Errorf("EE without controls shows %q", got)
 	}
-	if got := facts(LC, d, cvssBatch); got != "" {
-		t.Errorf("LC's request has a facts block: %q", got)
+	if got := facts(LAC, d, cvssBatch); got != "" {
+		t.Errorf("LAC's request has a facts block: %q", got)
 	}
 }
 
@@ -282,7 +260,7 @@ func TestHiddenFieldsAreNeverSent(t *testing.T) {
 		for _, f := range Order() {
 			out = append(out, text(t)(Request(f, d, cvssBatch)))
 		}
-		return append(out, text(t)(AdjustmentRequest(d, conflicting, [3]bool{}, adjustFlags, adjustGiven)))
+		return append(out, text(t)(AdjustmentRequest(d, conflicting, adjustFlags, adjustGiven)))
 	}
 	plain := base()
 	plain.Frameworks = []string{"PCI-DSS"}
@@ -304,7 +282,7 @@ var digit = regexp.MustCompile(`[0-9]`)
 func TestNoLevelIsShown(t *testing.T) {
 	for _, s := range []string{
 		systemTemplate, projectLine, descriptionLine, exposureLine, listenerLine, notesLine,
-		requestTemplate, cvssSentence, adjustmentTemplate, adjustOpportunityLine, adjustAxisLine,
+		requestTemplate, cvssSentence, adjustmentTemplate, adjustOpportunityLine,
 	} {
 		if digit.MatchString(s) {
 			t.Errorf("a frame holds a digit: %q", s)
@@ -335,8 +313,7 @@ func TestNoLevelIsShown(t *testing.T) {
 // map Go reads are the same ids in the same order.
 func TestOneTable(t *testing.T) {
 	maps := map[Factor][]string{
-		R: ids(reachability), M: ids(motive), O: ids(opportunity), EE: ids(easeOfExploit), ID: ids(intrusionDetection),
-		LC: ids(confidentiality), LI: ids(integrity), LAV: ids(availability), LAC: ids(accountability),
+		M: ids(motive), O: ids(opportunity), EE: ids(easeOfExploit), ID: ids(intrusionDetection), LAC: ids(accountability),
 		FD: ids(financialDamage), RD: ids(reputationDamage), NC: ids(nonCompliance), PV: ids(privacyViolation),
 	}
 	d := base()
@@ -401,11 +378,11 @@ func TestEntryFromConflictingRows(t *testing.T) {
 
 // The adjustment's entry lists every row's evidence: each vendor severity
 // with the packages it came from, every distinct vector of every version
-// and source, the flags, and the answers of the axes not floored.
+// and source, the flags, and the Opportunity answer.
 func TestAdjustmentEntryListsEveryRowsEvidence(t *testing.T) {
 	flags := []Flag{{MaintainerDisputed, "the maintainer disputes it", "libfoo-dev"}}
-	given := Answers{O: "some_access_or_resources_required", LC: "extensive", LI: "minimal_slightly_corrupt"}
-	e, err := newAdjustmentEntry(conflicting, [3]bool{cvss.Availability: true}, flags, given)
+	given := Answers{O: "some_access_or_resources_required"}
+	e, err := newAdjustmentEntry(conflicting, flags, given)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -416,7 +393,7 @@ func TestAdjustmentEntryListsEveryRowsEvidence(t *testing.T) {
 		`"description":"A crafted header overflows a buffer.","severity":"HIGH","severitySource":"nvd"}`,
 		`"description":"A crafted header overflows a buffer; the maintainer disputes it.","severity":"MEDIUM","severitySource":"redhat"}`,
 		`"flags":[{"flag":"maintainer_disputed","evidence":"the maintainer disputes it","package":"libfoo-dev"}]`,
-		`"answers":{"opportunity":"some_access_or_resources_required","confidentiality":"extensive","integrity":"minimal_slightly_corrupt"}}`,
+		`"answers":{"opportunity":"some_access_or_resources_required"}}`,
 	} {
 		if !strings.Contains(got, part) {
 			t.Errorf("the adjustment's entry lacks %s:\n%s", part, got)
@@ -424,137 +401,63 @@ func TestAdjustmentEntryListsEveryRowsEvidence(t *testing.T) {
 	}
 }
 
-// The adjustment asks Opportunity, when a row describes the CVE, then each
-// axis Applicability did not floor, in its request, its reply line and its
-// schema alike, as AdjustmentFields lists them: a CVE no row describes is
-// shown no Opportunity at all. With nothing left to ask, the request and the
-// schema are refused.
-func TestAdjustmentAsksTheAxesNotFloored(t *testing.T) {
+// The adjustment asks Opportunity alone, when a row describes the CVE, in
+// its request, its reply line and its schema alike: Loss of confidentiality,
+// integrity and availability are Go's, whatever the CVE's vectors. A CVE no
+// row describes has nothing to adjust: the request and the schema are
+// refused.
+func TestAdjustmentAsksOpportunityAlone(t *testing.T) {
 	undescribed := CVE{ID: "CVE-N", Rows: []Row{{PkgName: "libfoo", Title: "Overflow in libfoo", Severity: "LOW"}}}
-	for _, c := range []CVE{conflicting, undescribed} {
-		for mask := range 8 {
-			floored := [3]bool{mask&1 != 0, mask&2 != 0, mask&4 != 0}
-			var want []string
-			if c.Described() {
-				want = append(want, "opportunity")
-			}
-			for axis, name := range axisNames {
-				if !floored[axis] {
-					want = append(want, name)
-				}
-			}
-			if got := AdjustmentFields(base(), c, floored, "reachable"); !slices.Equal(got, want) {
-				t.Errorf("%s, floored %v: fields %v, want %v", c.ID, floored, got, want)
-			}
-			given := baselines(adjustGiven, floored)
-			if !c.Described() {
-				given.O = ""
-			}
-			if len(want) == 0 {
-				if _, err := AdjustmentRequest(base(), c, floored, adjustFlags, given); err == nil {
-					t.Errorf("%s, floored %v: a request with nothing to ask", c.ID, floored)
-				}
-				if _, err := AdjustmentSchema(base(), c, floored, given.R); err == nil {
-					t.Errorf("%s, floored %v: a schema with nothing to ask", c.ID, floored)
-				}
-				continue
-			}
-			request := text(t)(AdjustmentRequest(base(), c, floored, adjustFlags, given))
-			questions := strings.Split(strings.Split(request, "\nQUESTIONS\n")[1], "\n\n")[0]
-			var asked []string
-			for _, line := range strings.Split(questions, "\n") {
-				name, _, _ := strings.Cut(line, ":")
-				asked = append(asked, name)
-			}
-			var s struct{ Required []string }
-			if err := json.Unmarshal([]byte(data(t)(AdjustmentSchema(base(), c, floored, given.R))), &s); err != nil {
-				t.Fatal(err)
-			}
-			reply := `Reply with {"reasoning": "...", "` + strings.Join(want, `": "...", "`) + `": "..."}.`
-			if !slices.Equal(asked, want) || !slices.Equal(s.Required, append([]string{"reasoning"}, want...)) || !strings.HasSuffix(request, reply) {
-				t.Errorf("%s, floored %v: asks %v, requires %v, ends %q", c.ID, floored, asked, s.Required, request[strings.LastIndex(request, "\n")+1:])
-			}
-			if !c.Described() && strings.Contains(strings.ToLower(request), "opportunit") {
-				t.Errorf("%s, floored %v: the request shows Opportunity:\n%s", c.ID, floored, request)
-			}
+	if got := AdjustmentFields(undescribed); got != nil {
+		t.Errorf("a CVE no row describes: fields %v", got)
+	}
+	if _, err := AdjustmentRequest(base(), undescribed, adjustFlags, Answers{}); err == nil {
+		t.Error("a request for a CVE no row describes")
+	}
+	if _, err := AdjustmentSchema(undescribed); err == nil {
+		t.Error("a schema for a CVE no row describes")
+	}
+	if got := AdjustmentFields(conflicting); !slices.Equal(got, []string{"opportunity"}) {
+		t.Errorf("a described CVE: fields %v", got)
+	}
+	request := text(t)(AdjustmentRequest(base(), conflicting, adjustFlags, adjustGiven))
+	questions := strings.Split(strings.Split(request, "\nQUESTIONS\n")[1], "\n\n")[0]
+	if !strings.HasPrefix(questions, "opportunity: ") || strings.Contains(questions, "\n") {
+		t.Errorf("asks %q", questions)
+	}
+	if !strings.HasSuffix(request, `Reply with {"reasoning": "...", "opportunity": "..."}.`) {
+		t.Errorf("ends %q", request[strings.LastIndex(request, "\n")+1:])
+	}
+	for _, word := range []string{"confidentiality:", "integrity", "availability", "not_affected", "reachab"} {
+		if strings.Contains(request, word) {
+			t.Errorf("the request shows %q:\n%s", word, request)
 		}
+	}
+	var s struct{ Required []string }
+	if err := json.Unmarshal([]byte(data(t)(AdjustmentSchema(conflicting))), &s); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(s.Required, []string{"reasoning", "opportunity"}) {
+		t.Errorf("the schema requires %v", s.Required)
 	}
 }
 
-// A CVE not reachable here was asked neither Opportunity nor the axes, which
-// are at their lowest: its adjustment shows reachability's answer as the one
-// given and asks confidentiality alone, which Privacy violation follows, and
-// only when it was asked Privacy violation; otherwise there is nothing to
-// adjust and the request and the schema are refused. The rest of the request
-// is a reachable CVE's.
-func TestAdjustmentOfANotReachableCVE(t *testing.T) {
-	undescribed := CVE{ID: "CVE-N", Rows: []Row{{PkgName: "libfoo", Title: "Overflow in libfoo", Severity: "LOW"}}}
-	given := Answers{R: notReachableID}
-	for _, c := range []CVE{conflicting, undescribed} {
-		for _, subjects := range []*string{nil, ptr("none"), ptr("one_individual"), ptr("hundreds")} {
-			for mask := range 8 {
-				floored := [3]bool{mask&1 != 0, mask&2 != 0, mask&4 != 0}
-				d := base()
-				d.DataSubjects = subjects
-				name := fmt.Sprintf("%s, data_subjects %q, floored %v", c.ID, deref(subjects), floored)
-				var want []string
-				if asked(PV, d, floored, c.Described()) {
-					want = []string{"confidentiality"}
-				}
-				if got := AdjustmentFields(d, c, floored, notReachableID); !slices.Equal(got, want) {
-					t.Errorf("%s: fields %v, want %v", name, got, want)
-				}
-				if want == nil {
-					if _, err := AdjustmentRequest(d, c, floored, adjustFlags, given); err == nil {
-						t.Errorf("%s: a request with nothing to ask", name)
-					}
-					if _, err := AdjustmentSchema(d, c, floored, notReachableID); err == nil {
-						t.Errorf("%s: a schema with nothing to ask", name)
-					}
-					continue
-				}
-				request := text(t)(AdjustmentRequest(d, c, floored, adjustFlags, given))
-				for _, part := range []string{
-					`"answers":{"reachability":"not_reachable"}}`,
-					"the flag's quoted evidence, and the answer it was given without that evidence: not reachable here, as reachability is defined above. " +
-						"That answer stands and is not asked again. Assuming exploitation were possible here, with every other deployment fact unchanged, " +
-						"answer the question below from the supplied evidence alone. Unreachability alone does not justify `not_affected`.\n\nQUESTIONS\n",
-					"\nQUESTIONS\nconfidentiality: Given this evidence, can exploiting it here affect confidentiality at all? Answer with affected, not_affected or cannot_tell.\n\n",
-					`Reply with {"reasoning": "...", "confidentiality": "..."}.`,
-				} {
-					if !strings.Contains(request, part) {
-						t.Errorf("%s: the request lacks %q:\n%s", name, part, request)
-					}
-				}
-				if strings.Contains(strings.ToLower(request), "opportunit") || strings.Contains(request, "integrity") || strings.Contains(request, "availability") {
-					t.Errorf("%s: the request shows what was not asked:\n%s", name, request)
-				}
-				var s struct{ Required []string }
-				if err := json.Unmarshal([]byte(data(t)(AdjustmentSchema(d, c, floored, notReachableID))), &s); err != nil {
-					t.Fatal(err)
-				}
-				if !slices.Equal(s.Required, []string{"reasoning", "confidentiality"}) {
-					t.Errorf("%s: the schema requires %v", name, s.Required)
-				}
-			}
+// C1 drops the definition of reachability with its question: no frame
+// defines or names it, and the paragraph kept aside is 5f797bf's.
+func TestNoFrameDefinesReachability(t *testing.T) {
+	d := declared()
+	d.Frameworks = []string{"PCI-DSS"}
+	sent := []string{text(t)(SystemPrompt(d)), text(t)(AdjustmentRequest(d, conflicting, adjustFlags, adjustGiven))}
+	for _, f := range Order() {
+		sent = append(sent, text(t)(Request(f, d, cvssBatch)))
+	}
+	for _, s := range sent {
+		if strings.Contains(s, reachabilityParagraph) || strings.Contains(strings.ToLower(s), "reachab") {
+			t.Errorf("a frame defines or names reachability:\n%s", s)
 		}
 	}
-	reached := text(t)(AdjustmentRequest(base(), conflicting, [3]bool{}, adjustFlags, adjustGiven))
-	unreached := text(t)(AdjustmentRequest(base(), conflicting, [3]bool{}, adjustFlags, given))
-	cut := func(s string) string {
-		head, _, _ := strings.Cut(s, `"answers":`)
-		_, tail, _ := strings.Cut(s, "\n\nThis vulnerability is flagged")
-		return head + tail[:strings.Index(tail, ", and the answer")]
-	}
-	if cut(reached) != cut(unreached) {
-		t.Errorf("the entry or the text before the answers differ:\n%s\n%s", reached, unreached)
-	}
-	for _, answer := range []string{"reachable", cannotTell, "", "bogus"} {
-		a := adjustGiven
-		a.R = answer
-		if got := text(t)(AdjustmentRequest(base(), conflicting, [3]bool{}, adjustFlags, a)); got != reached {
-			t.Errorf("reachability %q read as reachable changed the request:\n%s", answer, got)
-		}
+	if !strings.HasPrefix(reachabilityParagraph, "A vulnerability is reachable here when this deployment, as it is deployed, runs its vulnerable code") {
+		t.Errorf("the paragraph kept aside is not 5f797bf's: %q", reachabilityParagraph)
 	}
 }
 
@@ -599,10 +502,10 @@ func TestRenderRefusesWhatItCannotSend(t *testing.T) {
 		"a schema with an id twice": second(Schema(M, []string{"CVE-C", "CVE-C"})),
 		"a schema with an empty id": second(Schema(M, []string{""})),
 		"a schema for no question":  second(Schema("S", []string{"CVE-C"})),
-		"an adjustment unflagged":   second(AdjustmentRequest(base(), conflicting, [3]bool{}, nil, adjustGiven)),
-		"an unknown flag":           second(AdjustmentRequest(base(), conflicting, [3]bool{}, []Flag{{Name: "suspicious"}}, adjustGiven)),
-		"an adjustment of no CVE":   second(AdjustmentRequest(base(), CVE{}, [3]bool{}, adjustFlags, adjustGiven)),
-		"an adjustment for it":      second(AdjustmentRequest(bad, conflicting, [3]bool{}, adjustFlags, adjustGiven)),
+		"an adjustment unflagged":   second(AdjustmentRequest(base(), conflicting, nil, adjustGiven)),
+		"an unknown flag":           second(AdjustmentRequest(base(), conflicting, []Flag{{Name: "suspicious"}}, adjustGiven)),
+		"an adjustment of no CVE":   second(AdjustmentRequest(base(), CVE{}, adjustFlags, adjustGiven)),
+		"an adjustment for it":      second(AdjustmentRequest(bad, conflicting, adjustFlags, adjustGiven)),
 	} {
 		if err == nil {
 			t.Errorf("%s: no error", name)
@@ -618,23 +521,23 @@ func second[T any](_ T, err error) error { return err }
 func TestSeveritySourceShownToTheAdjustmentOnly(t *testing.T) {
 	rows := func(first, second string) CVE {
 		return CVE{ID: "CVE-L", Rows: []Row{
-			{PkgName: "liba", Severity: "LOW", SeveritySource: first},
-			{PkgName: "libb", Severity: "LOW", SeveritySource: second},
+			{PkgName: "liba", Severity: "LOW", SeveritySource: first, Description: "Described."},
+			{PkgName: "libb", Severity: "LOW", SeveritySource: second, Description: "Described."},
 		}}
 	}
 	flags := []Flag{{SeverityContested, "LOW from debian, NVD says HIGH", "liba"}}
-	given := Answers{LC: cannotTell, LI: cannotTell, LAV: cannotTell}
+	given := Answers{O: cannotTell}
 	for _, c := range []struct {
 		cve        CVE
 		adjustment string
 	}{
-		{rows("debian", "ubuntu"), `{"vulnId":"CVE-L","severity":"LOW","packages":[{"name":"liba","severitySource":"debian"},{"name":"libb","severitySource":"ubuntu"}],`},
-		{rows("debian", "debian"), `{"vulnId":"CVE-L","severity":"LOW","severitySource":"debian","packages":[{"name":"liba"},{"name":"libb"}],`},
+		{rows("debian", "ubuntu"), `{"vulnId":"CVE-L","description":"Described.","severity":"LOW","packages":[{"name":"liba","severitySource":"debian"},{"name":"libb","severitySource":"ubuntu"}],`},
+		{rows("debian", "debian"), `{"vulnId":"CVE-L","description":"Described.","severity":"LOW","severitySource":"debian","packages":[{"name":"liba"},{"name":"libb"}],`},
 	} {
-		if got := text(t)(entriesJSON([]CVE{c.cve})); got != `[{"vulnId":"CVE-L","severity":"LOW","packages":[{"name":"liba"},{"name":"libb"}]}]` {
+		if got := text(t)(entriesJSON([]CVE{c.cve})); got != `[{"vulnId":"CVE-L","description":"Described.","severity":"LOW","packages":[{"name":"liba"},{"name":"libb"}]}]` {
 			t.Errorf("the ordinary entry shows the severity's source: %s", got)
 		}
-		e, err := newAdjustmentEntry(c.cve, [3]bool{}, flags, given)
+		e, err := newAdjustmentEntry(c.cve, flags, given)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -644,45 +547,32 @@ func TestSeveritySourceShownToTheAdjustmentOnly(t *testing.T) {
 	}
 }
 
-// The adjustment shows the baselines it may lower and the flags it rests on,
-// so it refuses an answer no question lists, an answer for an axis not asked,
-// a flag quoting nothing and a flag on a package the CVE does not have;
-// CheckFlags refuses such a flag with the same error. cannot_tell is a
-// baseline like any other answer.
+// The adjustment shows the baseline it may lower and the flags it rests on,
+// so it refuses an answer Opportunity's question does not list, a flag
+// quoting nothing and a flag on a package the CVE does not have; CheckFlags
+// refuses such a flag with the same error. cannot_tell is a baseline like
+// any other answer.
 func TestAdjustmentRefusesWhatItCannotShow(t *testing.T) {
-	cFloored := [3]bool{cvss.Confidentiality: true}
-	with := func(change func(*Answers)) Answers {
-		a := adjustGiven
-		change(&a)
-		return a
-	}
 	for name, c := range map[string]struct {
-		floored [3]bool
-		flags   []Flag
-		given   Answers
+		flags []Flag
+		given Answers
 	}{
-		"no Opportunity answer":          {given: with(func(a *Answers) { a.O = "" })},
-		"keep as Opportunity's answer":   {given: with(func(a *Answers) { a.O = keep })},
-		"an answer for a floored axis":   {floored: cFloored, given: adjustGiven},
-		"cannot_tell for a floored axis": {floored: cFloored, given: with(func(a *Answers) { a.LC = cannotTell })},
-		"no answer for an axis asked":    {given: with(func(a *Answers) { a.LI = "" })},
-		"another factor's answer":        {given: with(func(a *Answers) { a.LAV = "all" })},
-		"a flag quoting nothing":         {flags: []Flag{{MaintainerDisputed, "  ", "libfoo"}}, given: adjustGiven},
-		"a flag naming no package":       {flags: []Flag{{MaintainerDisputed, "disputed", ""}}, given: adjustGiven},
-		"a flag on another package":      {flags: []Flag{{MaintainerDisputed, "disputed", "libother"}}, given: adjustGiven},
-		"not reachable, an answer given": {given: with(func(a *Answers) { a.R = notReachableID })},
-		"not reachable, Opportunity's":   {given: Answers{R: notReachableID, O: cannotTell}},
-		"not reachable, an axis's":       {given: Answers{R: notReachableID, LAV: cannotTell}},
+		"no Opportunity answer":        {given: Answers{}},
+		"keep as Opportunity's answer": {given: Answers{O: keep}},
+		"another factor's answer":      {given: Answers{O: "all"}},
+		"a flag quoting nothing":       {flags: []Flag{{MaintainerDisputed, "  ", "libfoo"}}, given: adjustGiven},
+		"a flag naming no package":     {flags: []Flag{{MaintainerDisputed, "disputed", ""}}, given: adjustGiven},
+		"a flag on another package":    {flags: []Flag{{MaintainerDisputed, "disputed", "libother"}}, given: adjustGiven},
 	} {
 		flags := c.flags
 		if flags == nil {
 			flags = adjustFlags
 		}
-		_, err := AdjustmentRequest(base(), conflicting, c.floored, flags, c.given)
+		_, err := AdjustmentRequest(base(), conflicting, flags, c.given)
 		if err == nil {
 			t.Errorf("%s: no error", name)
 		}
-		if _, err := newAdjustmentEntry(conflicting, c.floored, flags, c.given); err == nil {
+		if _, err := newAdjustmentEntry(conflicting, flags, c.given); err == nil {
 			t.Errorf("%s: the entry took it", name)
 		}
 		if c.flags != nil {
@@ -691,39 +581,26 @@ func TestAdjustmentRefusesWhatItCannotShow(t *testing.T) {
 			}
 		}
 	}
-	abstained := Answers{O: cannotTell, LC: cannotTell, LI: cannotTell, LAV: cannotTell}
-	for _, floored := range [][3]bool{{}, cFloored, {true, true, true}} {
-		if _, err := AdjustmentRequest(base(), conflicting, floored, adjustFlags, baselines(abstained, floored)); err != nil {
-			t.Errorf("cannot_tell baselines, floored %v: %v", floored, err)
-		}
+	if _, err := AdjustmentRequest(base(), conflicting, adjustFlags, Answers{O: cannotTell}); err != nil {
+		t.Errorf("a cannot_tell baseline: %v", err)
 	}
-	// A CVE no row describes was not asked Opportunity.
+	// A CVE no row describes was not asked Opportunity: nothing to adjust.
 	undescribed := CVE{ID: "CVE-N", Rows: []Row{{PkgName: "libfoo"}}}
-	if _, err := AdjustmentRequest(base(), undescribed, [3]bool{}, adjustFlags, adjustGiven); err == nil {
-		t.Error("an Opportunity answer for a CVE no row describes was shown")
-	}
-	without := adjustGiven
-	without.O = ""
-	if _, err := AdjustmentRequest(base(), undescribed, [3]bool{}, adjustFlags, without); err != nil {
-		t.Errorf("no Opportunity answer for a CVE no row describes: %v", err)
+	for _, given := range []Answers{adjustGiven, {}} {
+		if _, err := AdjustmentRequest(base(), undescribed, adjustFlags, given); err == nil {
+			t.Errorf("an adjustment of a CVE no row describes, given %+v", given)
+		}
 	}
 }
 
 // A description is a prerequisite of any Opportunity answer, the
-// adjustment's too. A flagged CVE no row describes is shown no Opportunity
-// baseline, and Compute leaves its O at cannot_tell's 9 whatever the
-// adjustment answers, as it would an answer the call did not ask. A
-// described CVE is shown the answer Go keeps, which keep keeps and a lower
-// answer lowers, a cannot_tell baseline included: there the model abstained,
-// and Go set nothing aside.
+// adjustment's too. A flagged CVE no row describes makes no adjustment call,
+// and Compute leaves its O at cannot_tell's 9 whatever an adjustment would
+// answer. A described CVE is shown the answer Go keeps, which keep keeps and
+// a lower answer lowers, a cannot_tell baseline included: there the model
+// abstained, and Go set nothing aside.
 func TestAdjustmentLowersTheOpportunityOfADescribedCVEOnly(t *testing.T) {
 	flags := []Flag{{SeverityContested, "LOW from debian, NVD says HIGH", "liba"}}
-	axes := Answers{LC: "minimal", LI: "minimal_slightly_corrupt", LAV: "minimal_secondary_interrupted"}
-	with := func(o string) Answers {
-		a := axes
-		a.O = o
-		return a
-	}
 	undescribed := []Row{{PkgName: "liba", Severity: "LOW"}}
 	described := []Row{{PkgName: "liba", Severity: "LOW", Description: "Described."}}
 	for _, c := range []struct {
@@ -734,23 +611,25 @@ func TestAdjustmentLowersTheOpportunityOfADescribedCVEOnly(t *testing.T) {
 		kept, lowered int
 		source        Source
 	}{
-		{"no description", undescribed, axes, `"answers":{"confidentiality":"minimal",`, 9, 9, SourceAnswer},
-		{"a description", described, with("special_access_or_resources_required"),
-			`"answers":{"opportunity":"special_access_or_resources_required",`, 4, 0, SourceAdjustment},
-		{"a description, cannot_tell", described, with(cannotTell), `"answers":{"opportunity":"cannot_tell",`, 9, 0, SourceAdjustment},
+		{"no description", undescribed, Answers{}, "", 9, 9, SourceAnswer},
+		{"a description", described, Answers{O: "special_access_or_resources_required"},
+			`"answers":{"opportunity":"special_access_or_resources_required"}`, 4, 0, SourceAdjustment},
+		{"a description, cannot_tell", described, Answers{O: cannotTell}, `"answers":{"opportunity":"cannot_tell"}`, 9, 0, SourceAdjustment},
 	} {
 		cve := CVE{ID: "CVE-N", Rows: c.rows}
-		request := text(t)(AdjustmentRequest(base(), cve, [3]bool{}, flags, c.given))
-		if !strings.Contains(request, c.shown) {
-			t.Errorf("%s: the request does not show %s:\n%s", c.name, c.shown, request)
+		if c.shown != "" {
+			request := text(t)(AdjustmentRequest(base(), cve, flags, c.given))
+			if !strings.Contains(request, c.shown) {
+				t.Errorf("%s: the request does not show %s:\n%s", c.name, c.shown, request)
+			}
 		}
-		if l := computeFor(t, base(), cve, [3]bool{}, c.given, nil); int(l.Vector.O) != c.kept {
+		if l := computeFor(t, base(), cve, c.given, nil); int(l.Vector.O) != c.kept {
 			t.Errorf("%s: Go's baseline %d, want %d", c.name, l.Vector.O, c.kept)
 		}
-		if l := computeFor(t, base(), cve, [3]bool{}, c.given, &Adjusted{Opportunity: keep}); int(l.Vector.O) != c.kept {
+		if l := computeFor(t, base(), cve, c.given, &Adjusted{Opportunity: keep}); int(l.Vector.O) != c.kept {
 			t.Errorf("%s: kept, O = %d, want %d", c.name, l.Vector.O, c.kept)
 		}
-		l := computeFor(t, base(), cve, [3]bool{}, c.given, &Adjusted{Opportunity: "full_access_or_expensive_resources_required"})
+		l := computeFor(t, base(), cve, c.given, &Adjusted{Opportunity: "full_access_or_expensive_resources_required"})
 		if int(l.Vector.O) != c.lowered || l.Sources[O] != c.source {
 			t.Errorf("%s: adjusted to 0, O = %d from %v, want %d from %v", c.name, l.Vector.O, l.Sources[O], c.lowered, c.source)
 		}
@@ -768,14 +647,14 @@ func TestFlagNamesARowByItsPackage(t *testing.T) {
 	if got := []string{c.Rows[0].Package(), c.Rows[1].Package(), c.Rows[2].Package(), (Row{}).Package()}; !slices.Equal(got, []string{"liba", "libb@2", "pkg:generic/libc@3", ""}) {
 		t.Errorf("packages %q", got)
 	}
-	given := Answers{O: "some_access_or_resources_required", LC: cannotTell, LI: cannotTell, LAV: cannotTell}
+	given := Answers{O: "some_access_or_resources_required"}
 	for _, pkg := range []string{"liba", "libb@2", "pkg:generic/libc@3"} {
-		if _, err := AdjustmentRequest(base(), c, [3]bool{}, []Flag{{MaintainerDisputed, "disputed", pkg}}, given); err != nil {
+		if _, err := AdjustmentRequest(base(), c, []Flag{{MaintainerDisputed, "disputed", pkg}}, given); err != nil {
 			t.Errorf("a flag on %q: %v", pkg, err)
 		}
 	}
 	for _, pkg := range []string{"liba@1", "libc", ""} {
-		if _, err := AdjustmentRequest(base(), c, [3]bool{}, []Flag{{MaintainerDisputed, "disputed", pkg}}, given); err == nil {
+		if _, err := AdjustmentRequest(base(), c, []Flag{{MaintainerDisputed, "disputed", pkg}}, given); err == nil {
 			t.Errorf("a flag on %q, which names no row as a flag does, was taken", pkg)
 		}
 	}

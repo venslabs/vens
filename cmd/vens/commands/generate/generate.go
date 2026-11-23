@@ -49,9 +49,10 @@ config.yaml describes the deployment: how it is exposed, the data it handles, ho
 many people's personal data it holds, and what logs and records an attack on it
 (https://venslabs.github.io/vens/reference/config-schema/).
 
-For each CVE, the LLM answers one question per OWASP factor it is asked, up to 12 of the 16, each from
+For each CVE, the LLM answers one question per OWASP factor it is asked, up to 9 of the 16, each from
 a closed list of named answers. vens sets the others from the scan report, the config or a fixed
-level, then computes every level, the OWASP vector and the rating:
+level, Loss of confidentiality, integrity and availability from the worst C, I and A of the CVE's
+CVSS v3 vectors, then computes every level, the OWASP vector and the rating:
   Likelihood = the average of the 8 threat agent and vulnerability factors
   Impact     = the larger of the technical and the business impact, each the average of its 4 factors
   Severity   = OWASP's matrix of the likelihood and impact levels
@@ -61,14 +62,18 @@ A missing input takes a fallback, counted in the run summary, unless --strict fa
 answer to a question read as cannot_tell, and Motive, Opportunity and Ease of exploit for a CVE
 with no description, count as the worst answer; undeclared, detection makes Intrusion detection 9,
 traceability makes Loss of accountability 7 or 9, and data_subjects leaves Privacy violation at the
-model's band; an axis whose CVSS vectors are missing, unparsable, or lack one of its metrics or give
-one a value off its scale has its loss asked, not floored.
+model's band; a CVE with no usable CVSS v3 vector has Loss of confidentiality, integrity and
+availability at 9.
 
 A CVE whose description says it is disputed or not a security issue, or that the report rates low
-while NVD rates it high or critical, is flagged: one more call, the adjustment, when it has a field
-left to ask, may lower its Opportunity, an axis's loss and Privacy violation, even below these
-fallbacks, but not the Opportunity of a CVE with no description, which keeps its worst level. The
-adjustment's cannot_tell keeps the baseline: it is not counted and does not fail a --strict run.`,
+while NVD rates it high or critical, is flagged: one more call, the adjustment, may lower the
+Opportunity of a CVE with a description, even below the fallback. The adjustment's cannot_tell
+keeps the baseline: it is not counted and does not fail a --strict run.
+
+The config's reachability entries are the only source of a VEX status: an entry declaring a CVE not
+reachable, by its id or by a component covering every package the scan lists for it, publishes it
+not_affected, code_not_reachable, with a detail citing the entry, unless an entry declaring it
+reachable vetoes it. The rating is computed as for any other CVE.`,
 		Example:               Example(),
 		Args:                  cobra.ExactArgs(2),
 		RunE:                  action,
@@ -90,7 +95,7 @@ adjustment's cannot_tell keeps the baseline: it is not counted and does not fail
 	flags.Bool("attest", false, "Emit a CycloneDX Attestations (CDXA) sibling file with prompt hash, input hash, model, seed, raw LLM response")
 	flags.String("attest-signing-key", "", "Path to an unencrypted PKCS#8 PEM P-256 private key used to sign the --attest file (requires --attest)")
 	flags.String("attest-signing-key-id", "", "Optional key id label recorded in the signature (requires --attest-signing-key; default: SHA-256 fingerprint of the public key)")
-	flags.Bool("strict", false, "Fail a run that would use a worst-case fallback, and write no VEX or attestation: an undeclared data_subjects, detection or traceability; a CVE with no description, or with no CVSS vector or one that does not parse, lacks an axis metric or gives one a value off its scale; or an answer to a question read as cannot_tell (the adjustment's cannot_tell keeps the baseline)")
+	flags.Bool("strict", false, "Fail a run that would use a worst-case fallback, and write no VEX or attestation: an undeclared data_subjects, detection or traceability; a CVE with no description, or with no usable CVSS v3 vector; or an answer to a question read as cannot_tell (the adjustment's cannot_tell keeps the baseline)")
 
 	return cmd
 }

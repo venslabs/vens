@@ -49,6 +49,9 @@ type Config struct {
 	SchemaVersion int           `yaml:"schema_version"`
 	Project       ProjectConfig `yaml:"project"`
 	Context       ContextHints  `yaml:"context"`
+	// Reachability lists the declarations of reachability, in their order.
+	// They publish a VEX status and move no score.
+	Reachability []ReachabilityEntry `yaml:"reachability,omitempty"`
 }
 
 // ProjectConfig names the deployment in every question's deployment block.
@@ -65,19 +68,20 @@ type ContextHints struct {
 	// deployment block with its meaning.
 	Exposure string `yaml:"exposure"`
 
-	// DataSensitivity is low, medium, high or critical: Loss of
-	// confidentiality's column in Go (low and medium non-sensitive, high and
-	// critical critical), hidden from that question; background to Motive,
-	// Loss of integrity and Privacy violation.
+	// DataSensitivity is low, medium, high or critical: the column in which
+	// Go reads Loss of confidentiality from the CVSS v3 vectors (low and
+	// medium non-sensitive, high and critical critical); background to
+	// Motive and Privacy violation.
 	DataSensitivity string `yaml:"data_sensitivity"`
 
 	// BusinessCriticality is low, medium, high or critical: background to
-	// Motive, Financial damage and Reputation damage, and to Loss of
-	// availability when AvailabilityRequirement is unset.
+	// Motive, Financial damage and Reputation damage.
 	BusinessCriticality string `yaml:"business_criticality"`
 
-	// AvailabilityRequirement is low, medium, high or critical: background
-	// to Loss of availability. nil: BusinessCriticality stands in.
+	// AvailabilityRequirement is low, medium, high or critical. Loss of
+	// availability, which it was background to, is read from the CVSS v3
+	// vectors, so it moves no score and is sent nowhere; kept as
+	// information.
 	AvailabilityRequirement *string `yaml:"availability_requirement,omitempty"`
 
 	// ComplianceRequirements are the frameworks Non-compliance asks about.
@@ -180,6 +184,9 @@ func Parse(b []byte) (*Config, error) {
 	if err := checkKnownKeys(root, reflect.TypeFor[Config](), ""); err != nil {
 		return nil, err
 	}
+	if err := checkReachability(root); err != nil {
+		return nil, err
+	}
 	var decoded Config
 	dec := yaml.NewDecoder(bytes.NewReader(b))
 	dec.KnownFields(true)
@@ -220,6 +227,14 @@ func (c Config) validated() (Config, error) {
 	}
 	if err := n.Context.checkSchema2Values(); err != nil {
 		return Config{}, err
+	}
+	n.Reachability = nil
+	for i, e := range c.Reachability {
+		e = e.normalized()
+		if err := e.check(fmt.Sprintf("reachability[%d]", i)); err != nil {
+			return Config{}, err
+		}
+		n.Reachability = append(n.Reachability, e)
 	}
 	return n, nil
 }

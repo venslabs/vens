@@ -76,9 +76,9 @@ func TestGenerator_FailsFastInSplitOfLaterBatch(t *testing.T) {
 	g := newGen(t, Opts{LLM: m, BatchSize: 4})
 
 	err := g.GenerateRiskScore(context.Background(), testVulns(8), nil)
-	require.EqualError(t, err, "model returned no answer to Reachability (R) for CVE-2024-0005 after asking again; stopping the run")
-	assert.Equal(t, []int{4, 2, 2, 4, 2, 2, 1}, sizes(m.of(contract.R)), "batch 1 in halves, batch 2 in halves and the ask-again")
-	assert.Equal(t, []int{4, 2, 2}, sizes(m.of(contract.M)), "batch 2 never gets to Motive")
+	require.EqualError(t, err, "model returned no answer to Motive (M) for CVE-2024-0005 after asking again; stopping the run")
+	assert.Equal(t, []int{4, 2, 2, 4, 2, 2, 1}, sizes(m.of(contract.M)), "batch 1 in halves, batch 2 in halves and the ask-again")
+	assert.Equal(t, []int{4, 2, 2}, sizes(m.of(contract.O)), "batch 2 never gets to Opportunity")
 	last := m.calls[len(m.calls)-1]
 	assert.Equal(t, []string{"CVE-2024-0005"}, last.ids)
 }
@@ -91,8 +91,8 @@ func TestGenerator_Attestor_OneEvidencePerCall(t *testing.T) {
 	g.SetAttestor(at)
 
 	require.NoError(t, g.GenerateRiskScore(context.Background(), testVulns(15), nil))
-	require.Len(t, m.calls, 22, "two batches, eleven questions each")
-	require.Equal(t, 22, at.BatchCount())
+	require.Len(t, m.calls, 14, "two batches, seven questions each")
+	require.Equal(t, 14, at.BatchCount())
 }
 
 type failingLLM struct{}
@@ -125,7 +125,7 @@ func TestGenerator_AsksAgainForSkippedVulnerabilities(t *testing.T) {
 	require.NoError(t, g.GenerateRiskScore(context.Background(), testVulns(5), collect(&emitted)))
 	require.Len(t, byID(emitted), 5)
 	require.Len(t, emitted, 5, "each CVE rated once")
-	require.Equal(t, []int{5, 2}, sizes(m.of(contract.R)), "the ask-again carries only the two skipped CVEs")
+	require.Equal(t, []int{5, 2}, sizes(m.of(contract.M)), "the ask-again carries only the two skipped CVEs")
 	require.Equal(t, []string{"CVE-2024-0001", "CVE-2024-0003"}, m.calls[1].ids)
 }
 
@@ -140,7 +140,7 @@ func TestGenerator_FailsWhenASkippedVulnerabilityNeverComesBack(t *testing.T) {
 	err := g.GenerateRiskScore(context.Background(), testVulns(4), collect(&emitted))
 	require.EqualError(t, err, "model returned no answer to Opportunity (O) for CVE-2024-0002 after asking again; stopping the run")
 	require.Empty(t, emitted, "the batch fails before it is rated; the failed run commits no VEX")
-	require.Equal(t, []string{"R", "M", "O", "O"}, m.log(), "asked once, asked again, then gives up")
+	require.Equal(t, []string{"M", "O", "O"}, m.log(), "asked once, asked again, then gives up")
 	require.Equal(t, []int{4, 1}, sizes(m.of(contract.O)))
 }
 
@@ -150,7 +150,7 @@ func TestGenerator_FailsFastWithoutScoringLaterBatches(t *testing.T) {
 	g := newGen(t, Opts{LLM: m, BatchSize: 2})
 
 	err := g.GenerateRiskScore(context.Background(), testVulns(4), nil)
-	require.EqualError(t, err, "model returned no answer to Reachability (R) for CVE-2024-0000 after asking again; stopping the run")
+	require.EqualError(t, err, "model returned no answer to Motive (M) for CVE-2024-0000 after asking again; stopping the run")
 	require.Equal(t, []int{2, 1}, sizes(m.calls), "the second batch must never be asked about")
 }
 
@@ -167,7 +167,7 @@ func TestGenerator_AsksOncePerSkippedVulnerability(t *testing.T) {
 
 	var emitted []outputhandler.VulnRating
 	require.NoError(t, g.GenerateRiskScore(context.Background(), vulns, collect(&emitted)))
-	require.Equal(t, []int{2, 1}, sizes(m.of(contract.R)), "each ask carries the CVE once, not once per component")
+	require.Equal(t, []int{2, 1}, sizes(m.of(contract.M)), "each ask carries the CVE once, not once per component")
 
 	got := make([]string, 0, len(emitted))
 	for _, r := range emitted {
@@ -485,7 +485,7 @@ func TestGenerator_ErrorNamesEachUnansweredCVEOnce(t *testing.T) {
 		{VulnID: "CVE-2024-0000", PkgName: "pkg-d", Description: "d"},
 	}
 	err := g.GenerateRiskScore(context.Background(), vulns, nil)
-	require.EqualError(t, err, "model returned no answer to Reachability (R) for CVE-2024-0000, CVE-2024-0002 after asking again; stopping the run")
+	require.EqualError(t, err, "model returned no answer to Motive (M) for CVE-2024-0000, CVE-2024-0002 after asking again; stopping the run")
 }
 
 // A claim's reasoning joins each answer's sentence as "factor (answer):
@@ -514,19 +514,15 @@ func TestGenerator_ClaimReasoningJoinsEachAnswer(t *testing.T) {
 	require.Len(t, got, 1)
 	lines := strings.Split(got[0].Reasoning, "\n")
 	require.Equal(t, []string{
-		"R (reachable): because of CVE-2024-0000",
 		"M (low_or_no_reward): because of CVE-2024-0000",
 		"O (no_access_or_resources_required): because of CVE-2024-0000",
 		"EE (theoretical): because of CVE-2024-0000",
 		"ID (network, host): because of CVE-2024-0000",
-		"LC (no_impact): because of CVE-2024-0000",
-		"LI (no_impact): because of CVE-2024-0000",
-		"LAV (no_impact): because of CVE-2024-0000",
 		"LAC (identified): because of CVE-2024-0000",
 		"FD (less_than_cost_to_fix): because of CVE-2024-0000",
 		"RD (minimal_damage): because of CVE-2024-0000",
 		"PV (none): because of CVE-2024-0000",
-		"adjustment (opportunity: keep, confidentiality: affected, integrity: affected, availability: affected): the evidence",
+		"adjustment (opportunity: keep): the evidence",
 	}, lines)
 	score := *emitted[0].Rating.Score
 	assert.Equal(t, fmt.Sprintf("CVE-2024-0000 on pkg  assessed at OWASP risk %.2f (%s)", score, emitted[0].Rating.Severity), got[0].Predicate)
@@ -544,8 +540,7 @@ func TestGenerator_ClaimReasoningKeepsOneLinePerAnswer(t *testing.T) {
 			}
 		},
 		adjust: func(fakeCall) map[string]any {
-			return map[string]any{"reasoning": "\nThe dispute\r\nstands.  ", "opportunity": "keep",
-				"confidentiality": "affected", "integrity": "affected", "availability": "affected"}
+			return map[string]any{"reasoning": "\nThe dispute\r\nstands.  ", "opportunity": "keep"}
 		},
 	}
 	g := newGen(t, Opts{LLM: m})
@@ -554,15 +549,15 @@ func TestGenerator_ClaimReasoningKeepsOneLinePerAnswer(t *testing.T) {
 
 	lines := strings.Split(claims(t, at)[0].Reasoning, "\n")
 	require.Len(t, lines, len(questionsUndeclared)+1)
-	assert.Equal(t, "M (low_or_no_reward): It holds the keys. An attacker wants them. Enough.", lines[1])
-	assert.Equal(t, "adjustment (opportunity: keep, confidentiality: affected, integrity: affected, availability: affected): The dispute stands.", lines[len(lines)-1])
+	assert.Equal(t, "M (low_or_no_reward): It holds the keys. An attacker wants them. Enough.", lines[0])
+	assert.Equal(t, "adjustment (opportunity: keep): The dispute stands.", lines[len(lines)-1])
 }
 
 // Outside a strict run, a CVE no row describes is not asked Motive,
 // Opportunity and Ease of exploit, its vector holding cannot_tell's level for
 // each: its claim says so in their place, with no answer, and the lines of
-// the questions it is asked read as ever. Its adjustment asks the axes
-// alone.
+// the questions it is asked read as ever. Its flag makes no adjustment call:
+// Opportunity, the one field the adjustment asks, needs a description.
 func TestGenerator_ClaimSaysWhatAnUndescribedCVEIsNotAsked(t *testing.T) {
 	at := attestation.NewBuilder(attestation.Opts{Provider: "mock", Model: "mock"})
 	g := newGen(t, Opts{LLM: &fakeLLM{}})
@@ -581,18 +576,15 @@ func TestGenerator_ClaimSaysWhatAnUndescribedCVEIsNotAsked(t *testing.T) {
 	got := claims(t, at)
 	require.Len(t, got, 2)
 	lines := strings.Split(got[0].Reasoning, "\n")
-	require.Len(t, lines, len(questionsUndeclared)+1)
 	assert.Equal(t, []string{
 		"M (not asked: no description)",
 		"O (not asked: no description)",
 		"EE (not asked: no description)",
-		"R (reachable): because of CVE-2024-0000",
-		"LC (no_impact): because of CVE-2024-0000",
-	}, lines[:5])
-	for _, line := range lines[3:] {
-		assert.NotContains(t, line, "not asked")
-	}
-	assert.Equal(t, "adjustment (confidentiality: affected, integrity: affected, availability: affected): the evidence", lines[len(lines)-1])
+		"LAC (identified): because of CVE-2024-0000",
+		"FD (less_than_cost_to_fix): because of CVE-2024-0000",
+		"RD (minimal_damage): because of CVE-2024-0000",
+		"PV (none): because of CVE-2024-0000",
+	}, lines)
 	assert.NotContains(t, got[1].Reasoning, "not asked", "a described CVE is asked them")
 }
 
@@ -632,8 +624,8 @@ func TestGenerator_ClaimShowsAnAnswerOffItsListOnOneLine(t *testing.T) {
 	} {
 		lines := strings.Split(got[i].Reasoning, "\n")
 		require.Len(t, lines, len(questionsUndeclared), got[i].Target)
-		assert.Equal(t, want, lines[1], got[i].Target)
-		assert.Equal(t, "O (no_access_or_resources_required): because of CVE-2024-000"+strconv.Itoa(i), lines[2])
+		assert.Equal(t, want, lines[0], got[i].Target)
+		assert.Equal(t, "O (no_access_or_resources_required): because of CVE-2024-000"+strconv.Itoa(i), lines[1])
 	}
 
 	answers, _ := readAnswers(t, parent)
@@ -695,9 +687,9 @@ func TestGenerator_AnswerWithoutReasoning(t *testing.T) {
 		assert.True(t, strings.HasSuffix(line, "): (no reasoning given)"), line)
 	}
 	for i := 1; i < 7; i++ {
-		assert.Equal(t, "M (low_or_no_reward): (no reasoning given)", strings.Split(got[i].Reasoning, "\n")[1], got[i].Target)
+		assert.Equal(t, "M (low_or_no_reward): (no reasoning given)", strings.Split(got[i].Reasoning, "\n")[0], got[i].Target)
 	}
-	assert.Equal(t, "M (low_or_no_reward): because of CVE-2024-0007", strings.Split(got[7].Reasoning, "\n")[1])
+	assert.Equal(t, "M (low_or_no_reward): because of CVE-2024-0007", strings.Split(got[7].Reasoning, "\n")[0])
 
 	assert.Equal(t, int64(7), runSummary(t, logs).attrs["counters."+reasoningMissing])
 	answers, _ := readAnswers(t, parent)

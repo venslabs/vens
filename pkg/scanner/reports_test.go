@@ -58,6 +58,14 @@ type reportCounts struct {
 	V4CVEs, V4OnlyCVEs, V4Vectors, V4AxisNSubsequentNot, V4SubsequentUnread int
 	// The flags per CVE, and the CVEs whose rows disagree on one.
 	MaintainerDisputed, SeverityContested, Flagged, SeverityContestedUnavailable, FlagSplit int
+	// What C2 reads: CVEs with no usable v3 vector, with a v3 vector refused,
+	// whose usable v3 vectors disagree and on how many axes, and with a v4
+	// vector beside. Z2's replay printed 10, 0, 8, 12 and 9 for the demo scan.
+	Impact impactCounts
+}
+
+type impactCounts struct {
+	Vectorless, Rejected, Disagree, DisagreeAxes, V4 int
 }
 
 func noDiffer() map[string]int {
@@ -83,6 +91,7 @@ var committedReports = []struct {
 			ApplicabilityMissing: 7, NoVector: 7,
 			V4CVEs: 9, V4OnlyCVEs: 0, V4Vectors: 9, V4AxisNSubsequentNot: 0, V4SubsequentUnread: 0,
 			MaintainerDisputed: 6, SeverityContested: 4, Flagged: 7, SeverityContestedUnavailable: 0, FlagSplit: 0,
+			Impact: impactCounts{Vectorless: 10, Rejected: 0, Disagree: 8, DisagreeAxes: 12, V4: 9},
 		},
 	},
 	{
@@ -96,6 +105,7 @@ var committedReports = []struct {
 			ApplicabilityMissing: 5, NoVector: 5,
 			V4CVEs: 0, V4OnlyCVEs: 0, V4Vectors: 0, V4AxisNSubsequentNot: 0, V4SubsequentUnread: 0,
 			MaintainerDisputed: 5, SeverityContested: 4, Flagged: 6, SeverityContestedUnavailable: 0, FlagSplit: 0,
+			Impact: impactCounts{Vectorless: 8, Rejected: 0, Disagree: 3, DisagreeAxes: 5, V4: 0},
 		},
 	},
 	{
@@ -109,6 +119,7 @@ var committedReports = []struct {
 			ApplicabilityMissing: 2, NoVector: 2,
 			V4CVEs: 7, V4OnlyCVEs: 5, V4Vectors: 8, V4AxisNSubsequentNot: 0, V4SubsequentUnread: 0,
 			MaintainerDisputed: 5, SeverityContested: 5, Flagged: 7, SeverityContestedUnavailable: 5, FlagSplit: 0,
+			Impact: impactCounts{Vectorless: 10, Rejected: 0, Disagree: 3, DisagreeAxes: 5, V4: 7},
 		},
 	},
 }
@@ -172,6 +183,42 @@ func groupByCVE(rows []generator.Vulnerability) [][]generator.Vulnerability {
 	return cves
 }
 
+// countImpact counts what C2 reads of one CVE: its impact as the generator
+// reads it, and whether its usable v3 vectors, each read alone, disagree.
+func countImpact(c *impactCounts, cve []generator.Vulnerability, vectors []cvss.Vector) {
+	impact := generator.CVEImpact(cve)
+	c.Vectorless += btoi(impact.Vectorless())
+	c.Rejected += btoi(len(impact.Rejected) > 0)
+	c.V4 += btoi(impact.V4 > 0)
+	var values [][3]string
+	for _, v := range vectors {
+		if one := cvss.ImpactOf([]cvss.Vector{v}); !one.Vectorless() {
+			values = append(values, one.Values)
+		}
+	}
+	axes := 0
+	for axis := range 3 {
+		for _, v := range values[min(1, len(values)):] {
+			if v[axis] != values[0][axis] {
+				axes++
+				break
+			}
+		}
+	}
+	c.Disagree += btoi(axes > 0)
+	c.DisagreeAxes += axes
+}
+
+// applicabilityOf reads Applicability over every vector of one CVE's rows,
+// the step 3 counts' reading of which axes every vector gives N.
+func applicabilityOf(rows []generator.Vulnerability) cvss.Applicability {
+	var vectors []cvss.Vector
+	for _, r := range rows {
+		vectors = append(vectors, r.CVSS...)
+	}
+	return cvss.ApplicabilityOf(vectors)
+}
+
 func countReport(rows []generator.Vulnerability) reportCounts {
 	c := reportCounts{Rows: len(rows), Differ: noDiffer(), NewestTier: map[int]int{}, FlooredAxes: map[string]int{}}
 	for _, cve := range groupByCVE(rows) {
@@ -186,7 +233,7 @@ func countReport(rows []generator.Vulnerability) reportCounts {
 		}
 		countTiers(&c, vectors)
 
-		a := generator.CVEApplicability(cve)
+		a := applicabilityOf(cve)
 		axes := ""
 		for i, name := range []string{"C", "I", "A"} {
 			if a.Floored[i] {
@@ -204,6 +251,8 @@ func countReport(rows []generator.Vulnerability) reportCounts {
 		if reflect.DeepEqual(a.Missing, []cvss.Missing{{Cause: cvss.NoVector}}) {
 			c.NoVector++
 		}
+
+		countImpact(&c.Impact, cve, vectors)
 
 		f := generator.CVEFlags(cve)
 		c.MaintainerDisputed += btoi(f.MaintainerDisputed)

@@ -24,7 +24,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
-	"errors"
 	"fmt"
 	"go/ast"
 	"go/parser"
@@ -110,7 +109,7 @@ func TestScript(t *testing.T) {
 			"json-eq":       jsonEqCmd,
 			"envsubst":      envsubstCmd,
 			"vex-vectors":   vexVectorsCmd,
-			"below-scale":   belowScaleCmd,
+			"cvss-impacts":  cvssImpactsCmd,
 			"gen-ec-key":    genECKeyCmd,
 			"jsf-verify":    jsfVerifyCmd,
 		},
@@ -327,25 +326,16 @@ func checkVEXVectors(data []byte, count int, sets [16][]int) error {
 	return nil
 }
 
-// belowScaleCmd reads the answers.json of the one run under a --debug-dir
-// and checks the answers below the technical impact scales. A CVE whose
-// reachability answer is not_reachable has Opportunity at 0, Ease of exploit
-// at 1 and the four technical impacts at the levels given, none answered,
-// each from reachability or, for an axis its vectors floor, the floor. Every
-// no_impact answer of Loss of confidentiality, integrity and availability is
-// read as answered, from the answer, at the level given. The run must answer
-// not_reachable at least once, and no_impact at least once: which of the
-// three gets it is the mock's hash.
-func belowScaleCmd(ts *testscript.TestScript, neg bool, args []string) {
-	if neg || len(args) != 5 {
-		ts.Fatalf("usage: below-scale debug-dir LC=level LI=level LAV=level LAC=level")
-	}
-	want := map[string]int{}
-	for _, arg := range args[1:] {
-		factor, digit, _ := strings.Cut(arg, "=")
-		level, err := strconv.Atoi(digit)
-		ts.Check(err)
-		want[factor] = level
+// cvssImpactsCmd reads the answers.json of the one run under a --debug-dir
+// and checks C2 on every CVE rated: Loss of confidentiality, integrity and
+// availability carry no answer, come from the CVSS v3 vectors, and take the
+// level C2's table gives the worst value recorded for their axis,
+// confidentiality's in the column the argument names; with no value recorded,
+// all three take 9 and the CVE counts cvss_v3_missing once. The run must
+// rate at least one CVE each way.
+func cvssImpactsCmd(ts *testscript.TestScript, neg bool, args []string) {
+	if neg || len(args) != 2 || (args[1] != "sensitive" && args[1] != "non-sensitive") {
+		ts.Fatalf("usage: cvss-impacts debug-dir sensitive|non-sensitive")
 	}
 	runs, err := filepath.Glob(filepath.Join(ts.MkAbs(args[0]), "run-*", "answers.json"))
 	ts.Check(err)
@@ -354,67 +344,58 @@ func belowScaleCmd(ts *testscript.TestScript, neg bool, args []string) {
 	}
 	data, err := os.ReadFile(runs[0])
 	ts.Check(err)
-	ts.Check(checkBelowScale(data, want))
+	ts.Check(checkCVSSImpacts(data, args[1] == "sensitive"))
 }
 
-type factorRecord struct {
-	Factor  string `json:"factor"`
-	Answer  any    `json:"answer"`
-	Reading string `json:"reading"`
-	Level   int    `json:"level"`
-	Source  string `json:"source"`
-}
-
-func checkBelowScale(data []byte, want map[string]int) error {
+func checkCVSSImpacts(data []byte, sensitive bool) error {
 	var answers struct {
 		Vulnerabilities []struct {
-			VulnID       string         `json:"vulnId"`
-			Reachability *factorRecord  `json:"reachability"`
-			Factors      []factorRecord `json:"factors"`
+			VulnID  string `json:"vulnId"`
+			Factors []struct {
+				Factor string `json:"factor"`
+				Answer any    `json:"answer"`
+				Level  int    `json:"level"`
+				Source string `json:"source"`
+				CVSS   string `json:"cvss"`
+			} `json:"factors"`
+			Counters []string `json:"counters"`
 		} `json:"vulnerabilities"`
 	}
 	if err := json.Unmarshal(data, &answers); err != nil {
 		return err
 	}
-	lowest := map[string]int{"O": 0, "EE": 1}
-	for f, level := range want {
-		lowest[f] = level
+	column := 0
+	if sensitive {
+		column = 1
 	}
-	seen := map[string]int{}
+	table := map[string]map[string]int{
+		"LC":  {"N": 2, "L": [2]int{2, 6}[column], "H": [2]int{6, 7}[column], "": 9},
+		"LI":  {"N": 1, "L": 3, "H": 7, "": 9},
+		"LAV": {"N": 1, "L": 5, "H": 7, "": 9},
+	}
+	seen := map[bool]int{}
 	for _, v := range answers.Vulnerabilities {
-		if v.Reachability == nil {
-			return fmt.Errorf("%s has no reachability answer", v.VulnID)
-		}
-		unreachable := v.Reachability.Answer == "not_reachable"
-		if unreachable {
-			seen["R not_reachable"]++
-		}
+		vectorless := 0
 		for _, f := range v.Factors {
-			level, decided := lowest[f.Factor]
-			if unreachable && decided {
-				floored := f.Source == "floor" && f.Factor != "O" && f.Factor != "EE" && f.Factor != "LAC"
-				if f.Answer != nil || f.Level != level || (f.Source != "reachability" && !floored) {
-					return fmt.Errorf("%s not reachable: %s %v at %d from %s, want no answer at %d from reachability", v.VulnID, f.Factor, f.Answer, f.Level, f.Source, level)
-				}
+			levels, impact := table[f.Factor]
+			if !impact {
 				continue
 			}
-			if f.Answer != "no_impact" {
-				continue
+			if f.Answer != nil || f.Source != "cvss" || f.Level != levels[f.CVSS] {
+				return fmt.Errorf("%s: %s answered %v at %d from %s, want no answer at %d from cvss for %q", v.VulnID, f.Factor, f.Answer, f.Level, f.Source, levels[f.CVSS], f.CVSS)
 			}
-			if _, impact := want[f.Factor]; !impact || f.Factor == "LAC" {
-				return fmt.Errorf("%s: %s answered no_impact, which only LC, LI and LAV list", v.VulnID, f.Factor)
+			if f.CVSS == "" {
+				vectorless++
 			}
-			if f.Reading != "answered" || f.Source != "answer" || f.Level != level {
-				return fmt.Errorf("%s: %s no_impact read %s from %s at %d, want answered from the answer at %d", v.VulnID, f.Factor, f.Reading, f.Source, f.Level, level)
-			}
-			seen[f.Factor+" no_impact"]++
 		}
+		counted := slices.Contains(v.Counters, "cvss_v3_missing")
+		if (vectorless != 0 && vectorless != 3) || counted != (vectorless == 3) {
+			return fmt.Errorf("%s: %d of the three without a value, counted cvss_v3_missing %t", v.VulnID, vectorless, counted)
+		}
+		seen[vectorless == 3]++
 	}
-	if seen["R not_reachable"] == 0 {
-		return errors.New("no reachability answered not_reachable: the run exercises nothing")
-	}
-	if seen["LC no_impact"]+seen["LI no_impact"]+seen["LAV no_impact"] == 0 {
-		return errors.New("no technical impact answered no_impact: the run exercises nothing")
+	if seen[true] == 0 || seen[false] == 0 {
+		return fmt.Errorf("%d CVEs with a usable v3 vector, %d without: the run exercises one way only", seen[false], seen[true])
 	}
 	return nil
 }

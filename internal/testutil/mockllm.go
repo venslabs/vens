@@ -39,8 +39,9 @@ const SkipEnv = "VENS_MOCK_LLM_SKIP"
 
 // CannotTellEnv holds comma-separated answer ids: a question whose closed
 // answers list one of them is answered cannot_tell for every vulnerability
-// it asks about, so that strict-run tests can stop a run at a chosen
-// question. cannot_tell itself names every question.
+// it asks about, or, written id@CVE, for that vulnerability alone, so that
+// strict-run tests can stop a run at a chosen question and batch.
+// cannot_tell itself names every question.
 const CannotTellEnv = "VENS_MOCK_LLM_CANNOT_TELL"
 
 const cannotTell = "cannot_tell"
@@ -98,7 +99,12 @@ func answerQuestion(item *schemaNode) map[string][]answer {
 		choices = answerNode.Items.Enum
 	}
 	skip, forcedIDs := listEnv(SkipEnv), listEnv(CannotTellEnv)
-	forced := slices.ContainsFunc(choices, func(id string) bool { return slices.Contains(forcedIDs, id) })
+	forcedFor := func(vuln string) bool {
+		return slices.ContainsFunc(forcedIDs, func(entry string) bool {
+			id, only, targeted := strings.Cut(entry, "@")
+			return slices.Contains(choices, id) && (!targeted || only == vuln)
+		})
+	}
 	options := slices.DeleteFunc(slices.Clone(choices), func(id string) bool { return id == cannotTell })
 
 	answers := []answer{}
@@ -108,6 +114,7 @@ func answerQuestion(item *schemaNode) map[string][]answer {
 		}
 		a := answer{VulnID: id, Reasoning: "Mock LLM: deterministic answer for testing"}
 		h := hash(id + "\x00" + strings.Join(choices, ","))
+		forced := forcedFor(id)
 		switch {
 		case forced && set:
 			a.Answer = []string{cannotTell}

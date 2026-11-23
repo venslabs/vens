@@ -20,19 +20,22 @@ import (
 	"encoding/json"
 	"log/slog"
 
+	"github.com/CycloneDX/cyclonedx-go"
 	"github.com/venslabs/vens/pkg/contract"
+	"github.com/venslabs/vens/pkg/cvss"
 	"github.com/venslabs/vens/pkg/owasp"
 )
 
 // answersFile is answers.json, which --debug-dir gets once per run: per CVE,
-// how its adjustment read, and per factor, the answer as the reply gave it
-// and how Go read it, the level and where it came from; the counters, per
-// CVE and summed over the run; and the run summary's defects, each kind found
-// with its total, {} when the replies held none. A failed run also lists,
-// unrated, the CVEs of its failing batch it read answers for, and the defects
-// counted before it stopped. It holds no reasoning and no CVE text Go sent,
-// but keeps each answer verbatim: one off its list is the model's own text,
-// which may quote the CVE's.
+// how its adjustment read, what the config's reachability entries declare of
+// it, and per factor, the answer as the reply gave it and how Go read it, the
+// level and where it came from; the counters, per CVE and summed over the
+// run; and the run summary's defects, each kind found with its total, {} when
+// the replies held none. A failed run also lists, unrated, the CVEs of its
+// failing batch it read answers for, and the defects counted before it
+// stopped. It holds no reasoning and no CVE text Go sent, but keeps each
+// answer verbatim: one off its list is the model's own text, which may quote
+// the CVE's.
 type answersFile struct {
 	Vulnerabilities []answersEntry `json:"vulnerabilities"`
 	Counters        map[string]int `json:"counters"`
@@ -49,13 +52,23 @@ type answersEntry struct {
 	// Adjustment is how the adjustment reply read: not_asked, answered,
 	// unreadable or key_written_twice.
 	Adjustment adjustmentReading `json:"adjustment"`
-	// Reachability is the reachability question's answer and how Go read it,
-	// absent from an unrated entry that has none.
-	Reachability *factorRecord `json:"reachability,omitempty"`
+	// Declared is what the config's reachability entries declare of a rated
+	// CVE, absent when none hits it.
+	Declared *declaredRecord `json:"declared,omitempty"`
 	// Factors holds the 16 in the vector's order; an unrated entry, only the
-	// questions answered, in call order, reachability's apart.
+	// questions answered, in call order.
 	Factors  []factorRecord `json:"factors"`
 	Counters []string       `json:"counters,omitempty"`
+}
+
+// declaredRecord lists, by their index in the config, the reachability
+// entries that hit a CVE, those asserting it unreachable and those asserting
+// it reachable apart, and the VEX status they publish, absent when an entry
+// asserting reachability vetoes it.
+type declaredRecord struct {
+	Unreachable []int                            `json:"unreachable,omitempty"`
+	Reachable   []int                            `json:"reachable,omitempty"`
+	Analysis    *cyclonedx.VulnerabilityAnalysis `json:"analysis,omitempty"`
 }
 
 type factorRecord struct {
@@ -64,12 +77,20 @@ type factorRecord struct {
 	// kept; absent when the question was not asked.
 	Answer  json.RawMessage  `json:"answer,omitempty"`
 	Reading contract.Reading `json:"reading,omitempty"`
-	// Adjusted is a flagged CVE's adjustment answer for Opportunity or an
-	// axis's factor, as the reply gave it.
+	// Adjusted is a flagged CVE's adjustment answer for Opportunity, as the
+	// reply gave it.
 	Adjusted string          `json:"adjusted,omitempty"`
 	Level    *int            `json:"level,omitempty"`
 	Source   contract.Source `json:"source,omitempty"`
+	// CVSS is, for Loss of confidentiality, integrity and availability, the
+	// worst value, H, L or N, the CVE's usable CVSS v3 vectors give the axis,
+	// absent when none is usable.
+	CVSS string `json:"cvss,omitempty"`
 }
+
+// impactAxes indexes each technical impact read from the CVSS v3 vectors by
+// its axis.
+var impactAxes = map[contract.Factor]int{contract.LC: cvss.Confidentiality, contract.LI: cvss.Integrity, contract.LAV: cvss.Availability}
 
 // rated records a rated CVE for answers.json and adds its counters to the
 // run's, reasoning_missing last.
@@ -82,16 +103,21 @@ func (run *scoringRun) rated(c *cve, a *assessment, l contract.Levels) {
 		run.counters[name]++
 	}
 	levels := vectorLevels(l.Vector)
-	e := answersEntry{VulnID: c.id(), Adjustment: cmp.Or(a.adjustment, adjustmentNotAsked), Counters: counters,
-		Reachability: &factorRecord{Factor: contract.R, Answer: rawAnswer(a, contract.R), Reading: l.Readings[contract.R]}}
+	e := answersEntry{VulnID: c.id(), Adjustment: cmp.Or(a.adjustment, adjustmentNotAsked), Counters: counters}
+	if d := c.declared; len(d.unreachable)+len(d.reachable) > 0 {
+		e.Declared = &declaredRecord{Unreachable: d.unreachable, Reachable: d.reachable, Analysis: d.analysis()}
+	}
 	for _, f := range vectorOrder {
 		level := levels[f]
 		r := factorRecord{Factor: f, Reading: l.Readings[f], Level: &level, Source: l.Sources[f]}
 		if c.asks(f) {
 			r.Answer = rawAnswer(a, f)
 		}
-		if a.adjusted != nil {
-			r.Adjusted = adjustedAnswer(*a.adjusted, f)
+		if a.adjusted != nil && f == contract.O {
+			r.Adjusted = a.adjusted.Opportunity
+		}
+		if axis, ok := impactAxes[f]; ok {
+			r.CVSS = l.Impact.Values[axis]
 		}
 		e.Factors = append(e.Factors, r)
 	}
@@ -110,14 +136,10 @@ func (run *scoringRun) unrated(c *cve, a *assessment) {
 	for _, f := range a.read {
 		reading, _ := contract.ReadAnswer(f, answerOf(a.answers, f)...)
 		r := factorRecord{Factor: f, Answer: rawAnswer(a, f), Reading: reading}
-		if a.adjusted != nil {
-			r.Adjusted = adjustedAnswer(*a.adjusted, f)
+		if a.adjusted != nil && f == contract.O {
+			r.Adjusted = a.adjusted.Opportunity
 		}
-		if f == contract.R {
-			e.Reachability = &r
-		} else {
-			e.Factors = append(e.Factors, r)
-		}
+		e.Factors = append(e.Factors, r)
 		if reading == contract.CannotTell || reading == contract.Invalid {
 			e.Counters = append(e.Counters, f.Counter())
 		}
@@ -174,18 +196,4 @@ func answerOf(a contract.Answers, f contract.Factor) []string {
 		return a.ID
 	}
 	return []string{*answerField(&a, f)}
-}
-
-func adjustedAnswer(a contract.Adjusted, f contract.Factor) string {
-	switch f {
-	case contract.O:
-		return a.Opportunity
-	case contract.LC:
-		return a.Confidentiality
-	case contract.LI:
-		return a.Integrity
-	case contract.LAV:
-		return a.Availability
-	}
-	return ""
 }

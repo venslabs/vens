@@ -591,6 +591,7 @@ func TestRoundTrip(t *testing.T) {
 		minimal,
 		withContext(declaredAll, "availability_requirement: low", "compliance_requirements: [gdpr]",
 			"audit_requirement: high", "controls: {waf: true, siem: true}", "notes: n"),
+		withReachability("- cve: CVE-1", "  reachable: false", "  provenance: p", "- component: a", "  reachable: true", "  provenance: q"),
 	} {
 		cfg := mustParse(t, src)
 		out, err := yaml.Marshal(cfg)
@@ -606,7 +607,7 @@ func TestRoundTrip(t *testing.T) {
 
 func TestWarnings(t *testing.T) {
 	const (
-		w1 = "context.audit_requirement no longer moves any score, and context.traceability is not declared: Loss of accountability uses its `none` column, 7 when the vulnerable code is not reachable here, or when the attacker must authenticate and cannot act as someone else or tamper with the records, 9 otherwise."
+		w1 = "context.audit_requirement no longer moves any score, and context.traceability is not declared: Loss of accountability uses its `none` column, 7 when the attacker must authenticate and cannot act as someone else or tamper with the records, 9 otherwise."
 		w2 = "controls ids/siem/edr give no detection credit, and context.detection is not declared: every channel counts as not logged, so Intrusion detection is 9 on every finding."
 		w3 = "context.traceability is not declared: Loss of accountability uses its `none` column, 7 or 9 on every finding."
 		w4 = "context.detection is not declared: every channel counts as not logged, so Intrusion detection is 9 on every finding."
@@ -772,5 +773,98 @@ func TestAccessorsReturnCopies(t *testing.T) {
 	if DataSubjectsBands()[0].Name != "none" || ControlScopes()[0].Scope == "x" || ComplianceFrameworks()[0] != "PCI-DSS" ||
 		Exposure.Values()[0] != "internal" {
 		t.Error("an accessor returned the package's own slice")
+	}
+}
+
+// withReachability returns the minimal config with lines added under a
+// top-level reachability key.
+func withReachability(lines ...string) string {
+	var b strings.Builder
+	b.WriteString(minimal)
+	b.WriteString("reachability:\n")
+	for _, l := range lines {
+		b.WriteString("  " + l + "\n")
+	}
+	return b.String()
+}
+
+func TestReachabilityEntriesLoad(t *testing.T) {
+	cfg := mustParse(t, withReachability(
+		"- cve: ' CVE-2024-24790 '",
+		"  reachable: false",
+		"  provenance: \" govulncheck, no call path \"",
+		"- component: libssl3",
+		"  reachable: true",
+		"  provenance: pentest",
+	))
+	want := []ReachabilityEntry{
+		{CVE: "CVE-2024-24790", Reachable: false, Provenance: "govulncheck, no call path"},
+		{Component: "libssl3", Reachable: true, Provenance: "pentest"},
+	}
+	if !reflect.DeepEqual(cfg.Reachability, want) {
+		t.Errorf("reachability = %+v, want %+v", cfg.Reachability, want)
+	}
+	if got := []string{want[0].Selector(), want[1].Selector()}; !slices.Equal(got, []string{"cve: CVE-2024-24790", "component: libssl3"}) {
+		t.Errorf("selectors %q", got)
+	}
+	if cfg := mustParse(t, minimal+"reachability: []\n"); cfg.Reachability != nil {
+		t.Errorf("an empty list: %+v", cfg.Reachability)
+	}
+	if cfg := mustParse(t, minimal); cfg.Reachability != nil {
+		t.Errorf("no key: %+v", cfg.Reachability)
+	}
+}
+
+// Each entry gives exactly one selector, reachable written true or false, and
+// a provenance that is not blank, all strings but reachable; a key other than
+// the four is unknown. Every refusal names the entry.
+func TestReachabilityEntriesRefused(t *testing.T) {
+	for _, tc := range []struct {
+		lines []string
+		code  int
+		want  string
+	}{
+		{[]string{"- reachable: false", "  provenance: p"}, 6, "reachability[0] gives no selector: write cve or component"},
+		{[]string{"- cve: CVE-1", "  component: a", "  reachable: false", "  provenance: p"}, 6,
+			"reachability[0] gives both cve and component: an entry has one selector"},
+		{[]string{"- cve: CVE-1", "  reachable: false", "  provenance: p", "- cve: CVE-2", "  component: a", "  reachable: true", "  provenance: p"}, 6,
+			"reachability[1] gives both cve and component: an entry has one selector"},
+		{[]string{"- cve: CVE-1", "  provenance: p"}, 6, "reachability[0].reachable is required: write true or false"},
+		{[]string{"- cve: CVE-1", "  reachable: no", "  provenance: p"}, 6, "reachability[0].reachable must be true or false, got no"},
+		{[]string{"- cve: CVE-1", "  reachable: \"false\"", "  provenance: p"}, 6, `reachability[0].reachable must be true or false, got "false"`},
+		{[]string{"- cve: CVE-1", "  reachable: false"}, 6, "reachability[0].provenance is required: say where the assertion comes from"},
+		{[]string{"- cve: CVE-1", "  reachable: false", "  provenance: '  '"}, 6, "reachability[0].provenance has no value: write one or remove the key"},
+		{[]string{"- cve: CVE-1", "  reachable: false", "  provenance:"}, 6, "reachability[0].provenance must be a string, got no value"},
+		{[]string{"- cve: [CVE-1]", "  reachable: false", "  provenance: p"}, 6, "reachability[0].cve must be a string, got a sequence"},
+		{[]string{"- cve: 2024", "  reachable: false", "  provenance: p"}, 6, "reachability[0].cve must be a string, got 2024"},
+		{[]string{"- cve: ''", "  component: a", "  reachable: false", "  provenance: p"}, 6, "reachability[0].cve has no value: write one or remove the key"},
+		{[]string{"- cve: CVE-1", "  reachable: false", "  provenance: p", "  scope: all"}, 3, "config.yaml line 12: unknown key `scope` under reachability[0]"},
+		{[]string{"- CVE-1"}, 6, "reachability[0] must be a mapping of cve or component, reachable and provenance, got CVE-1"},
+	} {
+		parseFails(t, withReachability(tc.lines...), tc.code, tc.want)
+	}
+	parseFails(t, minimal+"reachability:\n", 6, "reachability has no value: write a list of entries or remove the key")
+	parseFails(t, minimal+"reachability:\n  cve: CVE-1\n", 6, "reachability must be a list of entries, got a mapping")
+	parseFails(t, withContext("reachability: []"), 3, "config.yaml line 8: unknown key `reachability` under context")
+}
+
+// A config built in Go, not read from a file, gets the same rules once
+// trimmed.
+func TestReachabilityEntriesValidatedInGo(t *testing.T) {
+	base := mustParse(t, minimal)
+	for _, tc := range []struct {
+		entry ReachabilityEntry
+		want  string
+	}{
+		{ReachabilityEntry{Provenance: "p"}, "reachability[0] gives no selector: write cve or component"},
+		{ReachabilityEntry{CVE: " ", Component: "\t", Provenance: "p"}, "reachability[0] gives no selector: write cve or component"},
+		{ReachabilityEntry{CVE: "CVE-1", Component: "a", Provenance: "p"}, "reachability[0] gives both cve and component: an entry has one selector"},
+		{ReachabilityEntry{CVE: "CVE-1", Provenance: "  "}, "reachability[0].provenance is required: say where the assertion comes from"},
+	} {
+		c := *base
+		c.Reachability = []ReachabilityEntry{tc.entry}
+		if _, err := c.validated(); err == nil || err.Error() != tc.want || errorCode(err) != 6 {
+			t.Errorf("%+v: %v (E%d), want %q", tc.entry, err, errorCode(err), tc.want)
+		}
 	}
 }

@@ -1,24 +1,24 @@
 # A strict run stops right after the first answer read as cannot_tell, even
 # when that is the run's last call: Privacy violation, the last question, is
-# asked only about CVE-2024-2222 (CVE-2024-1111's vector floors
-# confidentiality), in the second batch. The first batch was already rated,
-# yet neither the VEX nor the attestation is written.
-env VENS_MOCK_LLM_CANNOT_TELL=one_individual
+# answered cannot_tell for CVE-2024-2222 alone, in the second batch. The
+# first batch was already rated, yet neither the VEX nor the attestation is
+# written.
+env VENS_MOCK_LLM_CANNOT_TELL=one_individual@CVE-2024-2222
 ! exec vens generate --strict --llm=mock --llm-batch-size=1 --attest --config-file=config.yaml --sbom-serial-number=urn:uuid:22222222-2222-2222-2222-222222222222 report.json out.cdx.json
 stderr 'strict: the answer to Privacy violation \(PV\) for CVE-2024-2222 reads as cannot_tell, counted as privacy_cannot_tell; stopping the run'
 stderr 'Scored vulnerability.*CVE-2024-1111'
 ! stderr 'Scored vulnerability.*CVE-2024-2222'
-stderr 'Scoring run finished.* llm_calls=19 .* calls.PV=1 .*counters.privacy_cannot_tell=1 .*failed=true'
+stderr 'Scoring run finished.* llm_calls=16 .* calls.PV=2 .*counters.privacy_cannot_tell=1 .*failed=true'
 ! stderr 'calls.adjustment'
 ! exists out.cdx.json
 ! exists out.attestation.cdx.json
 ! exec sh -c 'ls $VENS_TEMP_GLOB'
 
 # The same answers without --strict take Privacy violation's worst case,
-# counted, and write both files: the run makes the same 19 calls, so the
+# counted, and write both files: the run makes the same 16 calls, so the
 # strict run stopped at its last.
 exec vens generate --llm=mock --llm-batch-size=1 --attest --config-file=config.yaml --sbom-serial-number=urn:uuid:22222222-2222-2222-2222-222222222222 report.json out.cdx.json
-stderr 'Scoring run finished.* llm_calls=19 .*counters.privacy_cannot_tell=1 .*failed=false'
+stderr 'Scoring run finished.* llm_calls=16 .*counters.privacy_cannot_tell=1 .*failed=false'
 exists out.cdx.json
 exists out.attestation.cdx.json
 json-contains out.cdx.json '"CVE-2024-2222"'

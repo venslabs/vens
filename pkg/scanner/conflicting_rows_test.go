@@ -69,8 +69,12 @@ func TestConflictingRows_EveryRowsEvidenceKept(t *testing.T) {
 	}
 
 	// Applicability reads both NVD vectors: I is high on the second row only.
-	got := generator.CVEApplicability(rows)
+	got := applicabilityOf(rows)
 	if want := [3]bool{true, false, true}; got.Floored != want || len(got.Missing) != 0 {
-		t.Errorf("CVEApplicability = %+v, want floored %v and nothing missing", got, want)
+		t.Errorf("Applicability = %+v, want floored %v and nothing missing", got, want)
+	}
+	// So does the technical impacts' reading, the worst value per axis.
+	if impact := generator.CVEImpact(rows); impact.Values != [3]string{"N", "H", "N"} || impact.Usable != 2 {
+		t.Errorf("CVEImpact = %+v, want N, H, N from both vectors", impact)
 	}
 }

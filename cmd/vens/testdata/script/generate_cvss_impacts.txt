@@ -1,0 +1,30 @@
+# Loss of confidentiality, integrity and availability come from the worst C,
+# I and A of each CVE's usable CVSS v3 vectors, confidentiality's in the
+# column data_sensitivity picks, and no call asks them; a CVE with no usable
+# v3 vector takes 9 for each, counted. The quickstart's data is high, so
+# sensitive, and eight of its CVEs carry no v3 vector. Every vector stays one
+# the calculator takes.
+exec vens generate --llm=mock --debug-dir=dbg --config-file=$QUICKSTART/config.yaml --sbom-serial-number=urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79 $QUICKSTART/reports/python-slim.trivy.json out.cdx.json
+stderr 'No usable CVSS v3 vector in the scanner''s report; Loss of confidentiality, integrity and availability take their worst level.* cves=8 '
+stderr 'Scoring run finished.* counters.cvss_v3_missing=8 '
+! stderr 'calls.LC=|calls.LI=|calls.LAV=|calls.R='
+vex-vectors out.cdx.json 45
+cvss-impacts dbg sensitive
+
+# The system prompt no longer defines reachability, and no request asks it
+# or lists an answer below an impact scale; CVE descriptions may still say
+# "reachable".
+exec sh -c 'cat dbg/run-*/batch-00001.system.prompt'
+! stdout 'reachab'
+stdout 'Choose cannot_tell only when the facts given do not decide between the other answers'
+exec sh -c 'cat dbg/run-*/*.human.prompt'
+! stdout 'reachability is defined'
+! stdout 'not_reachable'
+! stdout 'no_impact'
+
+# Low data takes the non-sensitive column.
+exec sh -c 'sed "s/data_sensitivity: \"high\"/data_sensitivity: \"low\"/" "$QUICKSTART/config.yaml" > low.yaml'
+grep 'data_sensitivity: "low"' low.yaml
+exec vens generate --llm=mock --debug-dir=dbg2 --config-file=low.yaml --sbom-serial-number=urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79 $QUICKSTART/reports/python-slim.trivy.json out2.cdx.json
+vex-vectors out2.cdx.json 45
+cvss-impacts dbg2 non-sensitive

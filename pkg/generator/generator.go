@@ -91,9 +91,9 @@ type Opts struct {
 	Config *riskconfig.Config
 	// Strict refuses a run that would fall back to a worst case: a config
 	// leaving data_subjects, detection or traceability undeclared, and a CVE
-	// whose vectors leave an axis's Applicability unknown or that no row
-	// describes, both before any call; then the first answer Go reads as
-	// cannot_tell, right after the call that gave it.
+	// with no usable CVSS v3 vector or that no row describes, both before any
+	// call; then the first answer Go reads as cannot_tell, right after the
+	// call that gave it.
 	Strict bool
 }
 
@@ -175,6 +175,10 @@ func (g *Generator) GenerateRiskScore(ctx context.Context, vulns []Vulnerability
 	}
 	if ids := undescribed(cves); len(ids) > 0 {
 		slog.WarnContext(ctx, "No description in the scanner's report; Motive, Opportunity and Ease of exploit are not asked, each at its worst level",
+			"cves", len(ids), "vulns", strings.Join(ids, ","))
+	}
+	if ids := vectorless(cves); len(ids) > 0 {
+		slog.WarnContext(ctx, "No usable CVSS v3 vector in the scanner's report; Loss of confidentiality, integrity and availability take their worst level",
 			"cves", len(ids), "vulns", strings.Join(ids, ","))
 	}
 	size := max(g.o.BatchSize, 1)

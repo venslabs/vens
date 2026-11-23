@@ -46,7 +46,6 @@ func TestDeploymentCheckNamesEachValueItCannotRead(t *testing.T) {
 		{func(d *Deployment) { d.BusinessCriticality = Setting{} }, "business_criticality has no value"},
 		{func(d *Deployment) { d.Listener = Setting{Value: "maybe", Meaning: "x"} }, `listener "maybe"`},
 		{func(d *Deployment) { d.Listener = Setting{Value: "present"} }, `listener "present" has no meaning`},
-		{func(d *Deployment) { d.AvailabilityRequirement = &Setting{Value: "high"} }, `availability_requirement "high" has no meaning`},
 		{func(d *Deployment) { d.Controls = []Control{{"ids", "IDS", "Network-level exploits"}} }, `control "ids" is not one`},
 		{func(d *Deployment) {
 			d.Controls = []Control{{"waf", "WAF", "SQLi"}, {"waf", "WAF", "SQLi"}}

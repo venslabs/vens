@@ -44,17 +44,15 @@ func meant(field riskconfig.Field, value string) Setting {
 // config builds a deployment from its values: the three required settings
 // at one level, as the vens-demo contexts and the quickstart declare them.
 func config(name, description, exposure, level, listener, notes string, frameworks []string, controls ...string) Deployment {
-	availability := meant(riskconfig.AvailabilityRequirement, level)
 	d := Deployment{
-		Name:                    name,
-		Description:             description,
-		Notes:                   notes,
-		Exposure:                meant(riskconfig.Exposure, exposure),
-		Listener:                meant(riskconfig.Listener, listener),
-		BusinessCriticality:     meant(riskconfig.BusinessCriticality, level),
-		DataSensitivity:         meant(riskconfig.DataSensitivity, level),
-		AvailabilityRequirement: &availability,
-		Frameworks:              frameworks,
+		Name:                name,
+		Description:         description,
+		Notes:               notes,
+		Exposure:            meant(riskconfig.Exposure, exposure),
+		Listener:            meant(riskconfig.Listener, listener),
+		BusinessCriticality: meant(riskconfig.BusinessCriticality, level),
+		DataSensitivity:     meant(riskconfig.DataSensitivity, level),
+		Frameworks:          frameworks,
 	}
 	scopes := riskconfig.ControlScopes()
 	for _, key := range controls {
@@ -70,9 +68,6 @@ func config(name, description, exposure, level, listener, notes string, framewor
 var frameConfigs = []struct {
 	name       string
 	deployment Deployment
-	// adjustFloored is what Applicability floored for the flagged CVE whose
-	// adjustment the frames show.
-	adjustFloored [3]bool
 }{
 	{
 		name: "internal",
@@ -101,7 +96,6 @@ var frameConfigs = []struct {
 			"internet", "high", "present",
 			"Customer-facing REST API built with FastAPI/Flask running on Python 3.11-slim (Debian). Handles authentication, user data, and payment processing. Uses PostgreSQL database. Deployed in Kubernetes behind load balancer. Container runs as non-root user. SSL/TLS terminated at load balancer. Rate limiting and input validation implemented. Regular security patches applied monthly.",
 			[]string{"GDPR", "SOC2"}, "waf", "ddos_protection", "segmentation"),
-		adjustFloored: [3]bool{cvss.Confidentiality: true, cvss.Integrity: true},
 	},
 }
 
@@ -123,7 +117,12 @@ var frameFlagged = CVE{ID: "CVE-F", Rows: []Row{{PkgName: "libexample", Installe
 
 var frameFlags = []Flag{{Name: MaintainerDisputed, Evidence: "...", Package: "libexample"}}
 
-var frameGiven = Answers{O: "some_access_or_resources_required", LC: "extensive", LI: "minimal_slightly_corrupt", LAV: "extensive_primary_interrupted"}
+var frameGiven = Answers{O: "some_access_or_resources_required"}
+
+// frameNumbers keeps each question's file number from the 12 questions of
+// b7c0435, so that a frame keeps its name: Loss of confidentiality, integrity
+// and availability, 05 to 07, are no longer asked.
+var frameNumbers = map[Factor]int{M: 1, O: 2, EE: 3, ID: 4, LAC: 8, FD: 9, RD: 10, NC: 11, PV: 12}
 
 // elide replaces the one occurrence of part in text by its placeholder.
 func elide(t *testing.T, text, part, placeholder string) string {
@@ -135,44 +134,29 @@ func elide(t *testing.T, text, part, placeholder string) string {
 }
 
 // frames renders what one deployment sends, file by file: the system prompt,
-// each question's request and schema over the two CVEs, reachability's
-// first, Non-compliance's only with a framework, and a flagged CVE's
-// adjustment, then that CVE's when it is not reachable here, if it is asked
-// Privacy violation. The CVE entries are elided.
-func frames(t *testing.T, d Deployment, adjustFloored [3]bool) map[string]string {
+// each question's request and schema over the two CVEs, Non-compliance's
+// only with a framework, and a flagged CVE's adjustment. The CVE entries are
+// elided.
+func frames(t *testing.T, d Deployment) map[string]string {
 	t.Helper()
 	text, data := text(t), data(t)
 	out := map[string]string{"00-system.txt": text(SystemPrompt(d))}
 	entries := text(entriesJSON(frameBatch))
-	for i, f := range Order() {
+	for _, f := range Order() {
 		if f == NC && len(d.Frameworks) == 0 {
 			continue
 		}
-		// Reachability, asked first, is 00: the factors keep their numbers.
-		name := fmt.Sprintf("%02d-%s", i, f)
+		name := fmt.Sprintf("%02d-%s", frameNumbers[f], f)
 		out[name+".request.txt"] = elide(t, text(Request(f, d, frameBatch)), entries, "[entries]")
 		out[name+".schema.json"] = data(Schema(f, []string{"CVE-A", "CVE-B"}))
 	}
-	given := baselines(frameGiven, adjustFloored)
-	request := text(AdjustmentRequest(d, frameFlagged, adjustFloored, frameFlags, given))
-	e, err := newAdjustmentEntry(frameFlagged, adjustFloored, frameFlags, given)
+	request := text(AdjustmentRequest(d, frameFlagged, frameFlags, frameGiven))
+	e, err := newAdjustmentEntry(frameFlagged, frameFlags, frameGiven)
 	if err != nil {
 		t.Fatal(err)
 	}
-	entry := data(json.Marshal(e))
-	out["13-adjustment.request.txt"] = elide(t, request, entry, "[entry]")
-	out["13-adjustment.schema.json"] = data(AdjustmentSchema(d, frameFlagged, adjustFloored, given.R))
-	if len(AdjustmentFields(d, frameFlagged, adjustFloored, notReachableID)) == 0 {
-		return out
-	}
-	unreached := Answers{R: notReachableID}
-	request = text(AdjustmentRequest(d, frameFlagged, adjustFloored, frameFlags, unreached))
-	e, err = newAdjustmentEntry(frameFlagged, adjustFloored, frameFlags, unreached)
-	if err != nil {
-		t.Fatal(err)
-	}
-	out["13-adjustment-not-reachable.request.txt"] = elide(t, request, data(json.Marshal(e)), "[entry]")
-	out["13-adjustment-not-reachable.schema.json"] = data(AdjustmentSchema(d, frameFlagged, adjustFloored, notReachableID))
+	out["13-adjustment.request.txt"] = elide(t, request, data(json.Marshal(e)), "[entry]")
+	out["13-adjustment.schema.json"] = data(AdjustmentSchema(frameFlagged))
 	return out
 }
 
@@ -251,14 +235,14 @@ func checkGoldenDir(t *testing.T, dir string, rendered map[string]string) {
 func TestGoldenFrames(t *testing.T) {
 	for _, c := range frameConfigs {
 		t.Run(c.name, func(t *testing.T) {
-			checkGoldenDir(t, filepath.Join("testdata", c.name), frames(t, c.deployment, c.adjustFloored))
+			checkGoldenDir(t, filepath.Join("testdata", c.name), frames(t, c.deployment))
 		})
 	}
 }
 
 // The parts the reference frames elide, written out: a batch's entries, its
 // first CVE's rows disagreeing, with the CVSS lines of each version, and the
-// adjustment's entry of that CVE, reached and not reachable here.
+// adjustment's entry of that CVE.
 func TestGoldenEntries(t *testing.T) {
 	var d Deployment
 	for _, c := range frameConfigs {
@@ -268,9 +252,8 @@ func TestGoldenEntries(t *testing.T) {
 	}
 	flags := []Flag{{Name: MaintainerDisputed, Evidence: "the maintainer disputes it", Package: "libfoo-dev"}}
 	checkGoldenDir(t, filepath.Join("testdata", "conflicting-rows"), map[string]string{
-		"02-O.request.txt":                        text(t)(Request(O, d, cvssBatch)),
-		"13-adjustment.request.txt":               text(t)(AdjustmentRequest(d, conflicting, [3]bool{cvss.Availability: true}, flags, baselines(frameGiven, [3]bool{cvss.Availability: true}))),
-		"13-adjustment-not-reachable.request.txt": text(t)(AdjustmentRequest(d, conflicting, [3]bool{cvss.Availability: true}, flags, Answers{R: notReachableID})),
+		"02-O.request.txt":          text(t)(Request(O, d, cvssBatch)),
+		"13-adjustment.request.txt": text(t)(AdjustmentRequest(d, conflicting, flags, frameGiven)),
 	})
 }
 

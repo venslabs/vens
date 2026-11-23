@@ -74,7 +74,6 @@ func TestDeploymentOf(t *testing.T) {
 	assert.Equal(t, contract.Setting{Value: "internet", Meaning: "Publicly accessible"}, d.Exposure)
 	assert.Equal(t, contract.Setting{Value: "high", Meaning: "PII, financial data, customer info"}, d.DataSensitivity)
 	assert.Equal(t, contract.Setting{Value: "critical", Meaning: "Revenue-critical, compliance-required"}, d.BusinessCriticality)
-	assert.Equal(t, &contract.Setting{Value: "high", Meaning: "24/7 required"}, d.AvailabilityRequirement)
 	assert.Equal(t, riskconfig.Listener.Meaning("present"), d.Listener.Meaning)
 	assert.Equal(t, []contract.Control{
 		{Key: "waf", Description: "Web Application Firewall", Scope: "SQL injection, XSS, path traversal"},
@@ -138,22 +137,6 @@ func TestPromptSecurityControlsConditional(t *testing.T) {
 	}
 }
 
-// Loss of availability's background is the availability requirement when
-// declared, the business criticality otherwise.
-func TestPromptAvailabilityRequirementConditional(t *testing.T) {
-	lav := func(cfg *riskconfig.Config) string {
-		for _, c := range sent(t, cfg) {
-			if c.factor == contract.LAV {
-				return facts(c.req.Human)
-			}
-		}
-		t.Fatal("no Loss of availability call")
-		return ""
-	}
-	assert.Equal(t, "Availability requirement: high (24/7 required)", lav(richConfig()))
-	assert.Equal(t, "Business criticality: critical (Revenue-critical, compliance-required)", lav(testConfig()))
-}
-
 // Non-compliance is asked only when a framework is declared, and its
 // question names the frameworks.
 func TestPromptComplianceConditional(t *testing.T) {
@@ -170,11 +153,11 @@ func TestPromptComplianceConditional(t *testing.T) {
 	assert.Contains(t, nc[0].req.Human, "QUESTION\nThis service must comply with PCI-DSS, GDPR.")
 }
 
-// audit_requirement moves nothing and reaches no request, nor do the fields
-// Go reads alone.
+// audit_requirement and availability_requirement move nothing and reach no
+// request, nor do the fields Go reads alone.
 func TestPromptAuditRequirementConditional(t *testing.T) {
 	for _, c := range sent(t, richConfig()) {
-		for _, hidden := range []string{"audit", "traceability", "per_individual", "data_subjects", "detection", "logged_and_reviewed", "not_logged"} {
+		for _, hidden := range []string{"audit", "Availability requirement", "24/7", "traceability", "per_individual", "data_subjects", "detection", "logged_and_reviewed", "not_logged"} {
 			assert.NotContains(t, c.req.System, hidden)
 			assert.NotContains(t, c.req.Human, hidden)
 		}

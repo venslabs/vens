@@ -41,9 +41,6 @@ type Deployment struct {
 	// DataSensitivity is low, medium, high or critical, which also picks
 	// Loss of confidentiality's column.
 	DataSensitivity Setting
-	// AvailabilityRequirement is nil when unset: Loss of availability then
-	// shows the business criticality.
-	AvailabilityRequirement *Setting
 	// Controls are the controls set to true among waf, ddos_protection,
 	// segmentation, zero_trust and antivirus, which Ease of exploit shows in
 	// that order.
@@ -168,9 +165,6 @@ func (d Deployment) shownSettings() []keyedSetting {
 	}
 	if listenerShown(d.Listener.Value) {
 		s = append(s, keyedSetting{"listener", d.Listener})
-	}
-	if d.AvailabilityRequirement != nil {
-		s = append(s, keyedSetting{"availability_requirement", *d.AvailabilityRequirement})
 	}
 	return s
 }

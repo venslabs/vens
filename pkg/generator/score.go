@@ -152,13 +152,12 @@ func (a *assessment) reasoning(readings map[contract.Factor]contract.Reading) st
 	return strings.Join(lines, "\n")
 }
 
-// answerField is the field of a that holds question f's answer, f
-// reachability or one of the model-answered factors whose answer is one id.
+// answerField is the field of a that holds question f's answer, f one of
+// the model-answered factors whose answer is one id.
 func answerField(a *contract.Answers, f contract.Factor) *string {
 	return map[contract.Factor]*string{
-		contract.R: &a.R, contract.M: &a.M, contract.O: &a.O, contract.EE: &a.EE, contract.LC: &a.LC, contract.LI: &a.LI,
-		contract.LAV: &a.LAV, contract.LAC: &a.LAC, contract.FD: &a.FD, contract.RD: &a.RD,
-		contract.NC: &a.NC, contract.PV: &a.PV,
+		contract.M: &a.M, contract.O: &a.O, contract.EE: &a.EE, contract.LAC: &a.LAC,
+		contract.FD: &a.FD, contract.RD: &a.RD, contract.NC: &a.NC, contract.PV: &a.PV,
 	}[f]
 }
 
@@ -195,8 +194,7 @@ func (g *Generator) scoreBatch(ctx context.Context, run *scoringRun, batch []*cv
 // askBatch asks the batch's questions, one call per question in the declared
 // order, each about the batch's CVEs that get it, so that the order never
 // depends on which questions the first CVE gets; then makes each flagged
-// CVE's adjustment call. Reachability comes first: a CVE whose answer says
-// not reachable is not asked the six questions it decides.
+// CVE's adjustment call.
 func (g *Generator) askBatch(ctx context.Context, run *scoringRun, batch []*cve, assessed map[string]*assessment) error {
 	for _, f := range contract.Order() {
 		var asked []*cve
@@ -211,9 +209,6 @@ func (g *Generator) askBatch(ctx context.Context, run *scoringRun, batch []*cve,
 		if err := g.ask(ctx, run, f, asked, assessed); err != nil {
 			return err
 		}
-		if f == contract.R {
-			reached(ctx, batch, assessed)
-		}
 	}
 	for _, c := range batch {
 		if len(c.flags) > 0 {
@@ -225,25 +220,13 @@ func (g *Generator) askBatch(ctx context.Context, run *scoringRun, batch []*cve,
 	return nil
 }
 
-// reached narrows each CVE's questions to those it still gets once its
-// reachability answer is read.
-func reached(ctx context.Context, batch []*cve, assessed map[string]*assessment) {
-	for _, c := range batch {
-		answer := assessed[c.id()].answers.R
-		c.questions = contract.Reached(c.questions, answer)
-		if !contract.Reachable(answer) {
-			slog.DebugContext(ctx, "not reachable: Opportunity, Ease of exploit and the technical impacts not asked",
-				"vuln", c.id(), "questions", joinFactors(c.questions))
-		}
-	}
-}
-
 // rate computes a CVE's 16 levels and their rating, records them for the run,
-// and returns one rating per row, each with its attestation claim. A vector
-// off the calculator's levels stops the run: the rules' tests keep that from
-// happening.
+// and returns one rating per row, each with its attestation claim and the
+// VEX status the config declares, which leaves the rating as computed. A
+// vector off the calculator's levels stops the run: the rules' tests keep
+// that from happening.
 func (g *Generator) rate(ctx context.Context, run *scoringRun, c *cve, a *assessment) ([]outputhandler.VulnRating, error) {
-	levels, err := contract.Compute(g.deployment, c.in, c.applicability.Floored, a.answers, a.adjusted)
+	levels, err := contract.Compute(g.deployment, c.in, a.answers, a.adjusted)
 	if err != nil {
 		return nil, err
 	}
@@ -253,6 +236,11 @@ func (g *Generator) rate(ctx context.Context, run *scoringRun, c *cve, a *assess
 	}
 	run.rated(c, a, levels)
 	reasoning := a.reasoning(levels.Readings)
+	analysis := c.declared.analysis()
+	if analysis != nil {
+		slog.InfoContext(ctx, "Declared not reachable; the VEX publishes it not_affected, code_not_reachable, with its rating",
+			"vuln", c.id(), "entries", c.declared.selectors(c.declared.unreachable))
+	}
 	out := make([]outputhandler.VulnRating, 0, len(c.rows))
 	for _, v := range c.rows {
 		slog.InfoContext(ctx, "Scored vulnerability",
@@ -262,7 +250,7 @@ func (g *Generator) rate(ctx context.Context, run *scoringRun, c *cve, a *assess
 			"severity", rating.Severity,
 			"vector", rating.Vector,
 		)
-		out = append(out, vulnRating(c.id(), v, rating))
+		out = append(out, vulnRating(c.id(), v, rating, analysis))
 		if g.attestor != nil {
 			g.attestor.AddClaim(a.evidence, attestation.ClaimInput{
 				VulnID:      c.id(),
@@ -279,7 +267,7 @@ func (g *Generator) rate(ctx context.Context, run *scoringRun, c *cve, a *assess
 	return out, nil
 }
 
-func vulnRating(id string, v Vulnerability, r owasp.Rating) outputhandler.VulnRating {
+func vulnRating(id string, v Vulnerability, r owasp.Rating, analysis *cyclonedx.VulnerabilityAnalysis) outputhandler.VulnRating {
 	source := vuln.Source(id)
 	if v.SourceName != "" {
 		source = &cyclonedx.Source{Name: v.SourceName, URL: v.SourceURL}
@@ -294,6 +282,7 @@ func vulnRating(id string, v Vulnerability, r owasp.Rating) outputhandler.VulnRa
 			Severity: cyclonedx.Severity(r.Severity),
 			Vector:   r.Vector,
 		},
-		Source: source,
+		Source:   source,
+		Analysis: analysis,
 	}
 }

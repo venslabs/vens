@@ -21,16 +21,16 @@ stderr 'strict: context.data_subjects, context.detection, context.traceability n
 stderr 'openai: OPENAI_API_KEY is not set'
 ! stderr 'strict:'
 
-# Before any LLM call, a strict run refuses every CVE whose vectors leave an
-# axis unknown, whatever the cause, and every CVE no row describes. One error
-# names each; CVE-2024-0007, complete, is not named.
+# Before any LLM call, a strict run refuses every CVE with no usable CVSS v3
+# vector, whatever the cause, a v4 vector alone included, and every CVE no
+# row describes. One error names each; CVE-2024-0007, complete, is not named.
 ! exec vens generate --strict --llm=mock --attest --config-file=declared.yaml --sbom-serial-number=urn:uuid:22222222-2222-2222-2222-222222222222 report.json out.cdx.json
 stderr 'strict: 6 vulnerabilities would fall back to a worst case, so no LLM call is made:'
-stderr 'CVE-2024-0001: applicability_missing: no CVSS vector in the scanner''s report'
-stderr 'CVE-2024-0002: applicability_missing: nvd CVSS 3.1 vector \\"CVSS:3.1/AV:N/garbage\\" does not parse'
-stderr 'CVE-2024-0003: applicability_missing: nvd CVSS 3.1 vector lacks A'
-stderr 'CVE-2024-0004: applicability_missing: redhat CVSS 3.1 vector gives I:X, off its version''s scale'
-stderr 'CVE-2024-0005: applicability_missing: nvd CVSS 4.0 vector lacks SA'
+stderr 'CVE-2024-0001: cvss_v3_missing: no CVSS v3 vector in the scanner''s report, so Loss of confidentiality, integrity and availability take their worst level'
+stderr 'CVE-2024-0002: cvss_v3_missing: no usable CVSS v3 vector, so Loss of confidentiality, integrity and availability take their worst level: nvd CVSS 3.1 vector \\"CVSS:3.1/AV:N/garbage\\": \\"garbage\\" is not a metric:value pair'
+stderr 'CVE-2024-0003: cvss_v3_missing: .*nvd CVSS 3.1 vector \\"CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N\\": A is absent or off H, L and N'
+stderr 'CVE-2024-0004: cvss_v3_missing: .*redhat CVSS 3.1 vector \\"CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:X/A:N\\": I is absent or off H, L and N'
+stderr 'CVE-2024-0005: cvss_v3_missing: no CVSS v3 vector in the scanner''s report'
 stderr 'CVE-2024-0006: no description in the scanner''s report, so Motive, Opportunity and Ease of exploit are not asked and take their worst case'
 ! stderr 'CVE-2024-0007:'
 stderr 'Scoring run finished.* llm_calls=0 .*failed=true'
@@ -40,7 +40,7 @@ stderr 'Scoring run finished.* llm_calls=0 .*failed=true'
 
 # Without --strict the same report is rated, each fallback counted.
 exec vens generate --llm=mock --attest --config-file=declared.yaml --sbom-serial-number=urn:uuid:22222222-2222-2222-2222-222222222222 report.json out.cdx.json
-stderr 'Scoring run finished.* counters.applicability_missing=5 .*failed=false'
+stderr 'Scoring run finished.* counters.cvss_v3_missing=5 .*failed=false'
 exists out.cdx.json
 exists out.attestation.cdx.json
 

@@ -45,10 +45,11 @@ func fullConfig() *riskconfig.Config {
 	return cfg
 }
 
-// A batch whose first CVE has every axis floored still asks in the declared
-// order, each question of the CVEs that get it: the order never depends on
-// the first CVE's questions. The debug files and the evidence's prompt
-// hashes follow the calls.
+// A batch asks in the declared order, each question of the CVEs that get
+// it, whatever the first CVE's vectors: the order never depends on the first
+// CVE's questions, and no call asks Loss of confidentiality, integrity or
+// availability. The debug files and the evidence's prompt hashes follow the
+// calls.
 func TestGenerator_AsksInTheDeclaredOrder(t *testing.T) {
 	parent := t.TempDir()
 	m := &fakeLLM{}
@@ -64,19 +65,15 @@ func TestGenerator_AsksInTheDeclaredOrder(t *testing.T) {
 		factor string
 		ids    []string
 	}{
-		{"R", []string{"CVE-2024-0000", "CVE-2024-0001"}},
 		{"M", []string{"CVE-2024-0000", "CVE-2024-0001"}},
 		{"O", []string{"CVE-2024-0000", "CVE-2024-0001"}},
 		{"EE", []string{"CVE-2024-0000", "CVE-2024-0001"}},
 		{"ID", []string{"CVE-2024-0000", "CVE-2024-0001"}},
-		{"LC", []string{"CVE-2024-0001"}},
-		{"LI", []string{"CVE-2024-0001"}},
-		{"LAV", []string{"CVE-2024-0001"}},
 		{"LAC", []string{"CVE-2024-0000", "CVE-2024-0001"}},
 		{"FD", []string{"CVE-2024-0000", "CVE-2024-0001"}},
 		{"RD", []string{"CVE-2024-0000", "CVE-2024-0001"}},
 		{"NC", []string{"CVE-2024-0000", "CVE-2024-0001"}},
-		{"PV", []string{"CVE-2024-0001"}},
+		{"PV", []string{"CVE-2024-0000", "CVE-2024-0001"}},
 	}
 	require.Len(t, m.calls, len(want))
 	dirs, err := filepath.Glob(filepath.Join(parent, "run-*"))
@@ -93,12 +90,11 @@ func TestGenerator_AsksInTheDeclaredOrder(t *testing.T) {
 	}
 }
 
-// A CVE with C floored is in neither Loss of confidentiality's nor Privacy
-// violation's call; Non-compliance is asked only with a framework;
-// Intrusion detection only with detection at levels that differ; Privacy
-// violation only when data_subjects is unset or caps above 3. A question not
-// asked takes the level Go decides and counts no cannot_tell, however every
-// asked question is answered.
+// Non-compliance is asked only with a framework; Intrusion detection only
+// with detection at levels that differ; Privacy violation only when
+// data_subjects is unset or caps above 3, whatever the vectors give C. A
+// question not asked takes the level Go decides and counts no cannot_tell,
+// however every asked question is answered.
 func TestGenerator_QuestionsNotAsked(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -109,10 +105,10 @@ func TestGenerator_QuestionsNotAsked(t *testing.T) {
 		counted  []string
 	}{
 		{
-			name:     "C floored",
-			cvss:     []cvss.Vector{v31("nvd", "AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:H")},
-			notAsked: []string{"LC", "PV", "ID", "NC"},
-			levels:   map[string]int{"LC": 2, "PV": 3},
+			name:     "every axis at N",
+			cvss:     []cvss.Vector{v31("nvd", noImpact)},
+			notAsked: []string{"LC", "LI", "LAV", "ID", "NC"},
+			levels:   map[string]int{"LC": 2, "LI": 1, "LAV": 1, "PV": 9},
 		},
 		{
 			name:     "no framework, no detection",
@@ -194,21 +190,20 @@ func TestGenerator_QuestionsNotAsked(t *testing.T) {
 	}
 }
 
-// The floors come from the CVE's own vectors, every vector of every row: an
-// axis is floored only when all of them give it N, and the floored factors
-// take OWASP's floor without being asked.
-func TestGenerator_FloorsFromTheCVEsOwnVectors(t *testing.T) {
+// Loss of confidentiality, integrity and availability come from the CVE's
+// own vectors, every vector of every row, the worst value per axis, and from
+// no answer: no call asks them, and Privacy violation is asked whatever the
+// vectors give C. A CVE with no vector takes 9 for each, counted once.
+func TestGenerator_TechnicalImpactsFromTheCVEsOwnVectors(t *testing.T) {
+	logs := withCapturedLogs(t)
 	vulns := []Vulnerability{
 		{VulnID: "CVE-2024-0001", PkgName: "a", Description: "d", BOMRef: "a1", CVSS: []cvss.Vector{v31("nvd", noImpact)}},
 		{VulnID: "CVE-2024-0001", PkgName: "b", Description: "d", BOMRef: "a2", CVSS: []cvss.Vector{v31("redhat", noImpact)}},
-		{VulnID: "CVE-2024-0002", PkgName: "a", Description: "d", BOMRef: "b1", CVSS: []cvss.Vector{v31("nvd", noImpact)}},
-		{VulnID: "CVE-2024-0002", PkgName: "b", Description: "d", BOMRef: "b2", CVSS: []cvss.Vector{v31("redhat", "AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N")}},
+		{VulnID: "CVE-2024-0002", PkgName: "a", Description: "d", BOMRef: "b1", CVSS: []cvss.Vector{v31("nvd", "AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:H")}},
+		{VulnID: "CVE-2024-0002", PkgName: "b", Description: "d", BOMRef: "b2", CVSS: []cvss.Vector{v31("redhat", "AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:L/A:N")}},
 		{VulnID: "CVE-2024-0003", PkgName: "a", Description: "d", BOMRef: "c1"},
 	}
 	m := &fakeLLM{answer: func(c fakeCall, _ string) any {
-		if c.factor == contract.LC {
-			return "all"
-		}
 		if c.factor == contract.PV {
 			return "millions"
 		}
@@ -218,21 +213,21 @@ func TestGenerator_FloorsFromTheCVEsOwnVectors(t *testing.T) {
 	var emitted []outputhandler.VulnRating
 	require.NoError(t, g.GenerateRiskScore(context.Background(), vulns, collect(&emitted)))
 
-	assert.Equal(t, []string{"CVE-2024-0002", "CVE-2024-0003"}, m.of(contract.LC)[0].ids, "the second CVE's other row gives C:H")
-	assert.Equal(t, []string{"CVE-2024-0002", "CVE-2024-0003"}, m.of(contract.PV)[0].ids)
-	assert.Equal(t, []string{"CVE-2024-0003"}, m.of(contract.LI)[0].ids, "no vector floors nothing")
-	assert.Equal(t, []string{"CVE-2024-0003"}, m.of(contract.LAV)[0].ids)
-
+	assert.Equal(t, []string{"CVE-2024-0001", "CVE-2024-0002", "CVE-2024-0003"}, m.of(contract.PV)[0].ids)
 	got := byID(emitted)
 	for id, want := range map[string]map[string]int{
-		"CVE-2024-0001": {"LC": 2, "LI": 1, "LAV": 1, "PV": 3},
-		"CVE-2024-0002": {"LC": 9, "LI": 1, "LAV": 1, "PV": 9},
-		"CVE-2024-0003": {"LC": 9, "PV": 9},
+		"CVE-2024-0001": {"LC": 2, "LI": 1, "LAV": 1, "PV": 9},
+		"CVE-2024-0002": {"LC": 7, "LI": 3, "LAV": 7, "PV": 9},
+		"CVE-2024-0003": {"LC": 9, "LI": 9, "LAV": 9, "PV": 9},
 	} {
 		for f, level := range want {
 			assert.Equal(t, level, vectorLevel(t, got[id].Rating.Vector, f), "%s %s", id, f)
 		}
 	}
+	assert.Equal(t, int64(1), runSummary(t, logs).attrs["counters.cvss_v3_missing"])
+	warned := logs.find(slog.LevelWarn, "No usable CVSS v3 vector in the scanner's report; Loss of confidentiality, integrity and availability take their worst level")
+	require.Len(t, warned, 1)
+	assert.Equal(t, "CVE-2024-0003", warned[0].attrs["vulns"])
 }
 
 // An answer off the list, which only a provider ignoring the schema can
@@ -339,8 +334,8 @@ func TestGenerator_ConflictingRows(t *testing.T) {
 	assert.Equal(t, "The parser overflows.", packages[0].(map[string]any)["description"])
 	assert.Equal(t, "MEDIUM", packages[1].(map[string]any)["severity"])
 
-	assert.Equal(t, []string{"R", "M", "O", "EE", "LC", "LAV", "LAC", "FD", "RD", "PV", adjustmentCall}, m.log(),
-		"I is N on every vector; C and A are not")
+	assert.Equal(t, append(append([]string{}, questionsUndeclared...), adjustmentCall), m.log(),
+		"whatever the vectors give C, I and A, no call asks them")
 	for _, line := range []string{
 		"- CVE-2024-0007: CVSS 3.1, nvd: AV:N PR:N UI:N",
 		"- CVE-2024-0007: CVSS 3.1, nvd: AV:L PR:L UI:N",
@@ -351,9 +346,7 @@ func TestGenerator_ConflictingRows(t *testing.T) {
 
 	adjustment := m.calls[len(m.calls)-1]
 	assert.Equal(t, map[string][]string{
-		"opportunity":     {"no_access_or_resources_required", "some_access_or_resources_required", "special_access_or_resources_required", "full_access_or_expensive_resources_required", "keep", cannotTell},
-		"confidentiality": {"affected", "not_affected", cannotTell},
-		"availability":    {"affected", "not_affected", cannotTell},
+		"opportunity": {"no_access_or_resources_required", "some_access_or_resources_required", "special_access_or_resources_required", "full_access_or_expensive_resources_required", "keep", cannotTell},
 	}, adjustment.fields)
 	var shown struct {
 		Packages []struct {
@@ -445,7 +438,7 @@ func TestGenerator_KeyWrittenTwiceReadsCannotTell(t *testing.T) {
 		"CVE-2024-0001": {[]any{"low_or_no_reward"}, "invalid"},
 		"CVE-2024-0002": {"low_or_no_reward", "answered"},
 	}, written)
-	assert.Equal(t, `M (["cannot_tell","low_or_no_reward"]): r0`, strings.Split(claims(t, at)[0].Reasoning, "\n")[1])
+	assert.Equal(t, `M (["cannot_tell","low_or_no_reward"]): r0`, strings.Split(claims(t, at)[0].Reasoning, "\n")[0])
 }
 
 // A key written twice outside every answer leaves them all in doubt. Here

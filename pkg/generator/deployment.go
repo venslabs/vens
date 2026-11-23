@@ -37,10 +37,6 @@ func deploymentOf(cfg *riskconfig.Config) contract.Deployment {
 		Traceability:        c.Traceability,
 		DataSubjects:        c.DataSubjects,
 	}
-	if c.AvailabilityRequirement != nil {
-		a := setting(riskconfig.AvailabilityRequirement, *c.AvailabilityRequirement)
-		d.AvailabilityRequirement = &a
-	}
 	for _, s := range riskconfig.ControlScopes() {
 		if c.Controls.Enabled(s.Key) {
 			d.Controls = append(d.Controls, contract.Control{Key: s.Key, Description: s.Description, Scope: s.Scope})

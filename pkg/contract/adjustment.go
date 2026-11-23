@@ -20,21 +20,17 @@ import (
 	"fmt"
 	"slices"
 	"strings"
-
-	"github.com/venslabs/vens/pkg/cvss"
 )
 
-// A flagged CVE first gets the ordinary questions; then one call shows it the
-// evidence the flag rests on and lets it lower Opportunity, when a row
-// describes the CVE, and each axis Applicability did not floor, never raise
-// them. A CVE not reachable here has those at their lowest already: its call
-// shows reachability's answer as the one given and asks confidentiality
-// alone, which Privacy violation follows.
+// A flagged CVE first gets the ordinary questions; then, when a row
+// describes it, one call shows it the evidence the flag rests on and lets it
+// lower Opportunity, never raise it. Loss of confidentiality, integrity and
+// availability are read from the CVSS v3 vectors: no call asks them.
 
 const adjustmentTemplate = `FLAGGED VULNERABILITY
 {entry}
 
-This vulnerability is flagged: its maintainers dispute it, or its severity sources disagree. Its entry carries the evidence: every CVSS vector published for it with its source, every vendor severity, the flag's quoted evidence, and {given}
+This vulnerability is flagged: its maintainers dispute it, or its severity sources disagree. Its entry carries the evidence: every CVSS vector published for it with its source, every vendor severity, the flag's quoted evidence, and the answer it was given without that evidence. Reconsider it from that evidence.
 
 QUESTIONS
 {questions}
@@ -42,35 +38,13 @@ QUESTIONS
 Choose cannot_tell only when the evidence does not decide.
 Reply with {"reasoning": "...", {fields}}.`
 
-// What the entry's answers are, as the adjustment's text names them, and how
-// to read them: the answers of the questions it may lower, to reconsider; or,
-// for a CVE not reachable here, reachability's, which stands, so that the
-// question is answered from the evidence and not from unreachability.
-const (
-	givenAnswers      = "the answers it was given without that evidence. Reconsider it from that evidence."
-	givenNotReachable = "the answer it was given without that evidence: not reachable here, as reachability is defined above. " +
-		"That answer stands and is not asked again. Assuming exploitation were possible here, with every other deployment fact unchanged, " +
-		"answer the question below from the supplied evidence alone. Unreachability alone does not justify `not_affected`."
-)
-
-const (
-	adjustOpportunityLine = `opportunity: Given this evidence, what access or resources do {group} really need to exploit it here? Answer with one of: {o_ids}; keep, if the answer it was given stands; or cannot_tell.`
-	adjustAxisLine        = `{axis}: Given this evidence, can exploiting it here affect {axis} at all? Answer with affected, not_affected or cannot_tell.`
-)
+const adjustOpportunityLine = `opportunity: Given this evidence, what access or resources do {group} really need to exploit it here? Answer with one of: {o_ids}; keep, if the answer it was given stands; or cannot_tell.`
 
 // The flags that send a CVE to the adjustment.
 const (
 	MaintainerDisputed = "maintainer_disputed"
 	SeverityContested  = "severity_contested"
 )
-
-// axisNames names the axes, indexed as cvss's, as the adjustment's questions
-// and reply do.
-var axisNames = [3]string{
-	cvss.Confidentiality: "confidentiality",
-	cvss.Integrity:       "integrity",
-	cvss.Availability:    "availability",
-}
 
 // Flag is one flag a row of a flagged CVE raised: its name, the evidence the
 // adjustment quotes for it, and that row's package as Row.Package names it.
@@ -83,7 +57,7 @@ type Flag struct {
 // adjustmentEntry is a flagged CVE's entry with the evidence its ordinary
 // questions were not shown: every vendor severity with the packages it came
 // from, every distinct vector of every version and source, C, I and A
-// included, the flags, and the answers the ordinary calls gave.
+// included, the flags, and the Opportunity answer the ordinary call gave.
 type adjustmentEntry struct {
 	entry
 	VendorSeverity []sourcedSeverity `json:"vendorSeverity"`
@@ -104,114 +78,62 @@ type sourcedVector struct {
 	Vector  string `json:"vector"`
 }
 
-// shownAnswers are the baselines the adjustment may lower: Opportunity's
-// answer, when a row describes the CVE, and the answer of each axis's factor
-// Applicability did not floor; for a CVE not reachable here, reachability's
-// answer alone.
+// shownAnswers is the baseline the adjustment may lower: Opportunity's
+// answer.
 type shownAnswers struct {
-	Reachability    *string `json:"reachability,omitempty"`
-	Opportunity     *string `json:"opportunity,omitempty"`
-	Confidentiality *string `json:"confidentiality,omitempty"`
-	Integrity       *string `json:"integrity,omitempty"`
-	Availability    *string `json:"availability,omitempty"`
+	Opportunity string `json:"opportunity"`
 }
 
 const adjustOpportunity = "opportunity"
 
-// AdjustmentFields lists the fields a flagged CVE's adjustment asks, in the
-// order its request asks them: opportunity, when a row describes the CVE,
-// then each axis Applicability did not floor (indexed as cvss's axes). A
-// description is a prerequisite of any Opportunity answer, ordinary or
-// adjusted. A CVE whose reachability answer says not reachable has its
-// Opportunity and axes at their lowest: it is asked confidentiality alone,
-// when it was asked Privacy violation, which the answer not_affected lowers.
-// With no field left, there is no adjustment to make.
-func AdjustmentFields(d Deployment, c CVE, floored [3]bool, reachabilityAnswer string) []string {
-	if !Reachable(reachabilityAnswer) {
-		if asked(PV, d, floored, c.Described()) {
-			return []string{axisNames[cvss.Confidentiality]}
-		}
-		return nil
-	}
-	var fields []string
+// AdjustmentFields lists the fields a flagged CVE's adjustment asks:
+// opportunity, when a row describes the CVE, a description being a
+// prerequisite of any Opportunity answer, ordinary or adjusted. With no field
+// left, there is no adjustment to make.
+func AdjustmentFields(c CVE) []string {
 	if c.Described() {
-		fields = append(fields, adjustOpportunity)
+		return []string{adjustOpportunity}
 	}
-	for axis, name := range axisNames {
-		if !floored[axis] {
-			fields = append(fields, name)
-		}
-	}
-	return fields
+	return nil
 }
 
 // AdjustmentRequest returns the request of a flagged CVE's adjustment call:
-// its entry with every row's evidence, its flags and the answers its
-// ordinary calls gave, reachability's alone for a CVE not reachable here,
-// then one question per field AdjustmentFields lists. The call shares the
+// its entry with every row's evidence, its flags and the Opportunity answer
+// its ordinary call gave, then Opportunity's question. The call shares the
 // run's system prompt.
-func AdjustmentRequest(d Deployment, c CVE, floored [3]bool, flags []Flag, given Answers) (string, error) {
+func AdjustmentRequest(d Deployment, c CVE, flags []Flag, given Answers) (string, error) {
 	if err := d.Check(); err != nil {
 		return "", err
 	}
-	entry, err := newAdjustmentEntry(c, floored, flags, given)
+	entry, err := newAdjustmentEntry(c, flags, given)
 	if err != nil {
 		return "", err
-	}
-	fields := AdjustmentFields(d, c, floored, given.R)
-	if len(fields) == 0 {
-		return "", noAdjustment(c, given.R)
-	}
-	shown := givenAnswers
-	if !Reachable(given.R) {
-		shown = givenNotReachable
 	}
 	e, err := json.Marshal(entry)
 	if err != nil {
 		return "", err
 	}
-	var questions, replied []string
-	for _, name := range fields {
-		line := fill(adjustAxisLine, "{axis}", name)
-		if name == adjustOpportunity {
-			line = fill(adjustOpportunityLine, "{group}", group(d), "{o_ids}", strings.Join(lowerable(), ", "))
-		}
-		questions = append(questions, line)
-		replied = append(replied, `"`+name+`": "..."`)
-	}
 	return fill(adjustmentTemplate,
 		"{entry}", string(e),
-		"{given}", shown,
-		"{questions}", strings.Join(questions, "\n"),
-		"{fields}", strings.Join(replied, ", "),
+		"{questions}", fill(adjustOpportunityLine, "{group}", group(d), "{o_ids}", strings.Join(lowerable(), ", ")),
+		"{fields}", `"`+adjustOpportunity+`": "..."`,
 	), nil
 }
 
 // AdjustmentSchema returns the JSON Schema of a flagged CVE's adjustment
-// call: the reasoning; then, for each field AdjustmentFields lists,
-// Opportunity's answer, keep or cannot_tell, or an axis's affected,
-// not_affected or cannot_tell.
-func AdjustmentSchema(d Deployment, c CVE, floored [3]bool, reachabilityAnswer string) (json.RawMessage, error) {
-	fields := AdjustmentFields(d, c, floored, reachabilityAnswer)
-	if len(fields) == 0 {
-		return nil, noAdjustment(c, reachabilityAnswer)
+// call: the reasoning, then Opportunity's answer, keep or cannot_tell.
+func AdjustmentSchema(c CVE) (json.RawMessage, error) {
+	if len(AdjustmentFields(c)) == 0 {
+		return nil, noAdjustment(c)
 	}
-	ps := []property{{"reasoning", &schema{Type: "string"}}}
-	for _, name := range fields {
-		answers := enum(affected, notAffected, cannotTell)
-		if name == adjustOpportunity {
-			answers = enum(append(lowerable(), keep, cannotTell)...)
-		}
-		ps = append(ps, property{name, answers})
-	}
-	return json.Marshal(object(ps...))
+	return json.Marshal(object(
+		property{"reasoning", &schema{Type: "string"}},
+		property{adjustOpportunity, enum(append(lowerable(), keep, cannotTell)...)},
+	))
 }
 
-func noAdjustment(c CVE, reachabilityAnswer string) error {
-	if !Reachable(reachabilityAnswer) {
-		return fmt.Errorf("%s has nothing left to adjust: it is not reachable here and was not asked %s", c.ID, PV)
-	}
-	return fmt.Errorf("%s has nothing left to adjust: no row describes it and every axis is floored", c.ID)
+func noAdjustment(c CVE) error {
+	return fmt.Errorf("%s has nothing to adjust: no row describes it", c.ID)
 }
 
 // lowerable returns Opportunity's answers besides cannot_tell, the ones an
@@ -222,18 +144,16 @@ func lowerable() []string {
 }
 
 // newAdjustmentEntry writes a flagged CVE's entry, its evidence and the
-// answers its ordinary calls gave, which are the baselines the adjustment may
-// lower. A CVE no row describes was not asked Opportunity: it shows none. A
-// CVE not reachable here was asked none of them: it shows reachability's
-// answer.
-func newAdjustmentEntry(c CVE, floored [3]bool, flags []Flag, given Answers) (adjustmentEntry, error) {
+// Opportunity answer its ordinary call gave, which is the baseline the
+// adjustment may lower.
+func newAdjustmentEntry(c CVE, flags []Flag, given Answers) (adjustmentEntry, error) {
 	if err := checkCVE(c); err != nil {
 		return adjustmentEntry{}, err
 	}
 	if err := CheckFlags(flags, c); err != nil {
 		return adjustmentEntry{}, err
 	}
-	if err := checkGiven(c, given, floored); err != nil {
+	if err := checkGiven(c, given); err != nil {
 		return adjustmentEntry{}, err
 	}
 	e := adjustmentEntry{
@@ -241,28 +161,13 @@ func newAdjustmentEntry(c CVE, floored [3]bool, flags []Flag, given Answers) (ad
 		VendorSeverity: vendorSeverities(c),
 		CVSS:           []sourcedVector{},
 		Flags:          flags,
+		Answers:        shownAnswers{Opportunity: given.O},
 	}
 	for _, v := range c.vectors() {
 		sv := sourcedVector{Source: v.Source, Version: v.Version, Vector: v.Vector}
 		if !slices.Contains(e.CVSS, sv) {
 			e.CVSS = append(e.CVSS, sv)
 		}
-	}
-	if !Reachable(given.R) {
-		e.Answers.Reachability = &given.R
-		return e, nil
-	}
-	if c.Described() {
-		e.Answers.Opportunity = &given.O
-	}
-	if !floored[cvss.Confidentiality] {
-		e.Answers.Confidentiality = &given.LC
-	}
-	if !floored[cvss.Integrity] {
-		e.Answers.Integrity = &given.LI
-	}
-	if !floored[cvss.Availability] {
-		e.Answers.Availability = &given.LAV
 	}
 	return e, nil
 }
@@ -309,36 +214,15 @@ func CheckFlags(flags []Flag, c CVE) error {
 	return nil
 }
 
-// checkGiven checks the baselines the adjustment shows: Opportunity's answer,
-// when a row describes the CVE, and, for each axis Applicability did not
-// floor, its factor's, each one its question lists, cannot_tell included. An
-// axis floored, and Opportunity for a CVE no row describes, were not asked
-// and have no answer; nor were any of the four for a CVE not reachable here.
-func checkGiven(c CVE, given Answers, floored [3]bool) error {
-	if !Reachable(given.R) {
-		factors, answers := [...]Factor{O, LC, LI, LAV}, [...]string{given.O, given.LC, given.LI, given.LAV}
-		for i, f := range factors {
-			if answers[i] != "" {
-				return fmt.Errorf("%s was not asked, %s not reachable here, yet has the answer %q", f, c.ID, answers[i])
-			}
-		}
-		return nil
-	}
+// checkGiven checks the baseline the adjustment shows: the Opportunity
+// answer of a CVE a row describes, one its question lists, cannot_tell
+// included. A CVE no row describes is not adjusted.
+func checkGiven(c CVE, given Answers) error {
 	switch {
-	case !c.Described() && given.O != "":
-		return fmt.Errorf("%s was not asked, %s described by no row, yet has the answer %q", O, c.ID, given.O)
-	case c.Described() && !slices.Contains(table[O].ids, given.O):
+	case !c.Described():
+		return noAdjustment(c)
+	case !slices.Contains(table[O].ids, given.O):
 		return fmt.Errorf("%s's answer %q is not one its question lists", O, given.O)
-	}
-	factors := [3]Factor{cvss.Confidentiality: LC, cvss.Integrity: LI, cvss.Availability: LAV}
-	answers := [3]string{cvss.Confidentiality: given.LC, cvss.Integrity: given.LI, cvss.Availability: given.LAV}
-	for axis, f := range factors {
-		switch {
-		case floored[axis] && answers[axis] != "":
-			return fmt.Errorf("%s was not asked, its axis floored, yet has the answer %q", f, answers[axis])
-		case !floored[axis] && !slices.Contains(table[f].ids, answers[axis]):
-			return fmt.Errorf("%s's answer %q is not one its question lists", f, answers[axis])
-		}
 	}
 	return nil
 }

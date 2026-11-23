@@ -19,6 +19,7 @@ import (
 	"strings"
 
 	"github.com/venslabs/vens/pkg/contract"
+	"github.com/venslabs/vens/pkg/cvss"
 	"github.com/venslabs/vens/pkg/riskconfig"
 )
 
@@ -34,21 +35,18 @@ func CheckStrictConfig(cfg *riskconfig.Config) error {
 	return nil
 }
 
-// preflight is a strict run's check before any call. A CVE whose vectors
-// leave an axis's Applicability unknown keeps that axis applicable, and a
-// CVE no row describes is not asked Motive, Opportunity and Ease of exploit,
-// each at its worst level: each falls back to a worst case known before
-// anything is spent. One error names every such CVE with its causes.
+// preflight is a strict run's check before any call. A CVE with no usable
+// CVSS v3 vector takes the worst level of Loss of confidentiality, integrity
+// and availability, and a CVE no row describes is not asked Motive,
+// Opportunity and Ease of exploit, each at its worst level: each falls back
+// to a worst case known before anything is spent. One error names every such
+// CVE with its causes.
 func preflight(cves []*cve) error {
 	var lines []string
 	for _, c := range cves {
 		var causes []string
-		if missing := c.applicability.Missing; len(missing) > 0 {
-			parts := make([]string, len(missing))
-			for i, m := range missing {
-				parts[i] = m.String()
-			}
-			causes = append(causes, "applicability_missing: "+strings.Join(parts, "; "))
+		if c.impact.Vectorless() {
+			causes = append(causes, "cvss_v3_missing: "+noVector(c.impact))
 		}
 		if !c.in.Described() {
 			causes = append(causes, "no description in the scanner's report, so Motive, Opportunity and Ease of exploit are not asked and take their worst case")
@@ -66,6 +64,19 @@ func preflight(cves []*cve) error {
 	}
 	return fmt.Errorf("strict: %d %s would fall back to a worst case, so no LLM call is made:\n  %s",
 		len(lines), noun, strings.Join(lines, "\n  "))
+}
+
+// noVector says why a CVE has no usable CVSS v3 vector: none in the report,
+// or each one it has refused.
+func noVector(i cvss.Impact) string {
+	if len(i.Rejected) == 0 {
+		return "no CVSS v3 vector in the scanner's report, so Loss of confidentiality, integrity and availability take their worst level"
+	}
+	parts := make([]string, len(i.Rejected))
+	for n, r := range i.Rejected {
+		parts[n] = r.String()
+	}
+	return "no usable CVSS v3 vector, so Loss of confidentiality, integrity and availability take their worst level: " + strings.Join(parts, "; ")
 }
 
 // firstCannotTell is a strict run's stop after a call: the first answer of

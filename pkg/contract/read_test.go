@@ -26,8 +26,6 @@ func answersFor(f Factor, answer []string) Answers {
 		one = answer[0]
 	}
 	switch f {
-	case R:
-		a.R = one
 	case M:
 		a.M = one
 	case O:
@@ -36,12 +34,6 @@ func answersFor(f Factor, answer []string) Answers {
 		a.EE = one
 	case ID:
 		a.ID = answer
-	case LC:
-		a.LC = one
-	case LI:
-		a.LI = one
-	case LAV:
-		a.LAV = one
 	case LAC:
 		a.LAC = one
 	case FD:
@@ -76,7 +68,7 @@ func TestReadAnswerAgreesWithCompute(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if want := compute(t, d, [3]bool{}, answersFor(f, answer), nil).Readings[f]; got != want {
+			if want := compute(t, d, answersFor(f, answer), nil).Readings[f]; got != want {
 				t.Errorf("%s %q: ReadAnswer %v, Compute %v", f, answer, got, want)
 			}
 		}
@@ -101,7 +93,7 @@ func TestReadAnswerShapes(t *testing.T) {
 			t.Errorf("ReadAnswer(%s, %q) = %v, %v; want %v", c.f, c.answer, got, err, c.want)
 		}
 	}
-	for _, f := range []Factor{SL, S, ED, A, "X"} {
+	for _, f := range []Factor{SL, S, ED, A, LC, LI, LAV, "R", "X"} {
 		if _, err := ReadAnswer(f, "high_reward"); err == nil {
 			t.Errorf("ReadAnswer(%s) read an answer to a question no call asks", f)
 		}
@@ -109,7 +101,7 @@ func TestReadAnswerShapes(t *testing.T) {
 }
 
 func TestFactorNamesAndCounters(t *testing.T) {
-	for _, f := range []Factor{R, SL, M, O, S, ED, EE, A, ID, LC, LI, LAV, LAC, FD, RD, NC, PV} {
+	for _, f := range []Factor{SL, M, O, S, ED, EE, A, ID, LC, LI, LAV, LAC, FD, RD, NC, PV} {
 		if f.Name() == "" {
 			t.Errorf("%s has no name", f)
 		}
@@ -120,8 +112,10 @@ func TestFactorNamesAndCounters(t *testing.T) {
 	if got := PV.Name(); got != "Privacy violation" {
 		t.Errorf("PV is named %q", got)
 	}
-	if got := R.Name(); got != "Reachability" {
-		t.Errorf("R is named %q", got)
+	for _, f := range []Factor{LC, LI, LAV} {
+		if f.Counter() != "" {
+			t.Errorf("%s, read from the CVSS vectors, counts %q", f, f.Counter())
+		}
 	}
 	for r, want := range map[Reading]string{Answered: "answered", CannotTell: "cannot_tell", Invalid: "invalid", NoDescription: "no_description", 0: "unknown"} {
 		if text, _ := r.MarshalText(); r.String() != want || string(text) != want {

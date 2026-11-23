@@ -64,7 +64,6 @@ func TestProviderAcceptanceGate(t *testing.T) {
 	require.Empty(t, acceptanceFailures(t, &fakeLLM{}), "clean replies pass")
 
 	const first = "CVE-2024-24790"
-	const axes = `"confidentiality":"affected","integrity":"affected","availability":"affected"`
 	motive := func(c fakeCall, id string) bool { return c.factor == contract.M && id == first }
 	// motiveReply writes Motive's reply by hand: each entry clean but the
 	// first CVE's, which writes entry, and outside the answers extra.
@@ -136,24 +135,24 @@ func TestProviderAcceptanceGate(t *testing.T) {
 		}}, "calls.M: 2, want 1"},
 		"an unreadable adjustment": {&fakeLLM{reply: adjustment(`not json`)}, "defects.adjustment_unreadable: 1"},
 		"an adjustment key written twice": {&fakeLLM{reply: adjustment(
-			`{"reasoning":"r","opportunity":"keep","opportunity":"keep",` + axes + `}`,
+			`{"reasoning":"r","opportunity":"keep","opportunity":"keep"}`,
 		)}, "defects.adjustment_key_written_twice: 1"},
 		"an adjustment answer off its list": {&fakeLLM{reply: adjustment(
-			`{"reasoning":"r","opportunity":"bogus",` + axes + `}`,
+			`{"reasoning":"r","opportunity":"bogus"}`,
 		)}, "defects.adjustment_off_list: 1"},
-		"two adjustment answers off their lists, counted per field": {&fakeLLM{reply: adjustment(
-			`{"reasoning":"r","opportunity":"bogus","confidentiality":"bogus","integrity":"affected","availability":"affected"}`,
-		)}, "defects.adjustment_off_list: 2"},
 		"an adjustment field not asked": {&fakeLLM{reply: adjustment(
-			`{"reasoning":"r","opportunity":"keep",` + axes + `,"notes":"n"}`,
+			`{"reasoning":"r","opportunity":"keep","notes":"n"}`,
 		)}, "defects.adjustment_field_not_asked: 1"},
+		"two axes no call asks, counted per field": {&fakeLLM{reply: adjustment(
+			`{"reasoning":"r","opportunity":"keep","confidentiality":"not_affected","integrity":"bogus"}`,
+		)}, "defects.adjustment_field_not_asked: 2"},
 		"an adjustment field left out": {&fakeLLM{reply: adjustment(
-			`{"reasoning":"r","opportunity":"keep","confidentiality":"affected","integrity":"affected"}`,
+			`{"reasoning":"r"}`,
 		)}, "defects.adjustment_off_list: 1"},
-		"an adjustment without reasoning": {&fakeLLM{reply: adjustment(`{"opportunity":"keep",` + axes + `}`)},
+		"an adjustment without reasoning": {&fakeLLM{reply: adjustment(`{"opportunity":"keep"}`)},
 			"defects.adjustment_without_reasoning: 1"},
 		"an adjustment reasoning that is a list": {&fakeLLM{reply: adjustment(
-			`{"reasoning":["r"],"opportunity":"keep",` + axes + `}`,
+			`{"reasoning":["r"],"opportunity":"keep"}`,
 		)}, "defects.adjustment_without_reasoning: 1"},
 	} {
 		t.Run(name, func(t *testing.T) {

@@ -61,7 +61,7 @@ func FuzzReadReplies(f *testing.F) {
 		{contract.ID, `{"answers":[{` + a + `,"answer":["network","network"],"reasoning":"r"},{` + b + `,"answer":[],"reasoning":"r"}]}`},
 		{contract.ID, `{"answers":[{` + a + `,"answer":["cannot_tell","host"],"reasoning":"r"},{` + b + `,"answer":["bogus"],"reasoning":"r"}]}`},
 		{contract.ID, `{"answers":[{` + a + `,"answer":"network","reasoning":"r"},{` + b + `,"answer":["host","application"],"reasoning":"r"}]}`},
-		{contract.LC, `{"answers":[{` + a + `,"answer":{"extent":` + "\n" + `"all"},"reasoning":"r"}]}`},
+		{contract.LAC, `{"answers":[{` + a + `,"answer":{"actor":` + "\n" + `"identified"},"reasoning":"r"}]}`},
 		{contract.PV, `{"answers":[{` + a + `,"answer":"millions","reasoning":"r"},{` + b + `,"answer":"cannot_tell","reasoning":"r"}]}`},
 		{contract.M, `{"answers":[null]}`},
 		{contract.M, `{"answers":null}`},
@@ -72,8 +72,7 @@ func FuzzReadReplies(f *testing.F) {
 		{contract.M, `{"answers":[{` + a + `,"answer":"high_reward","reasoning":"r"},{` + b + `,"ans`},
 		{contract.M, `{"answer":1e400,"answer":2}`},
 		{contract.M, `not json`},
-		{contract.R, `{"answers":[{` + a + `,"answer":"not_reachable","reasoning":"r"},{` + b + `,"answer":"reachable","reasoning":"r"}]}`},
-		{contract.R, `{"answers":[{` + a + `,"answer":"not_reachable","answer":"reachable","reasoning":"r"},{` + b + `,"answer":"Not_Reachable","reasoning":"r"}]}`},
+		{contract.LAC, `{"answers":[{` + a + `,"answer":"identified","answer":"unidentified","reasoning":"r"},{` + b + `,"answer":"Identified","reasoning":"r"}]}`},
 	} {
 		f.Add(uint8(slices.Index(contract.Order(), seed.q)), seed.reply)
 	}
@@ -109,15 +108,12 @@ func FuzzReadReplies(f *testing.F) {
 				require.Equal(t, want, reading, c.id())
 			}
 
-			worst := h.levels(t, c, c.applicability.Floored, cannotTellToAll(), nil)
+			worst := h.levels(t, c, cannotTellToAll(), nil)
 			a := &assessment{answers: cannotTellToAll()}
 			a.answer(q, r)
-			l := h.levels(t, c, c.applicability.Floored, a.answers, nil)
+			l := h.levels(t, c, a.answers, nil)
 			if reading != contract.Answered {
 				require.Equal(t, vectorLevels(worst.Vector)[q], vectorLevels(l.Vector)[q], "%s: %s lowered by an answer Go does not read", c.id(), q)
-				if q == contract.R {
-					require.Equal(t, worst.Vector, l.Vector, "%s: a reachability answer Go does not read lowered the vector", c.id())
-				}
 			}
 			lines := strings.Split(a.reasoning(l.Readings), "\n")
 			require.Len(t, lines, 1)
@@ -126,58 +122,42 @@ func FuzzReadReplies(f *testing.F) {
 	})
 }
 
-// FuzzReadAdjustment reads an adjustment reply as Go reads one, with any of
-// the axes floored, for a CVE a row describes or one none does, reachable or
-// not, then rates the CVE with it, every other question answered
-// cannot_tell. Nothing panics, the
-// vector rates, no level rises, and none lowers but through a JSON object
-// that writes no key twice, by a field the call asked, written as a string
-// on its list. With no field left to ask, there is no schema.
+// FuzzReadAdjustment reads an adjustment reply as Go reads one, for a CVE a
+// row describes or one none does, then rates the CVE with it, every other
+// question answered cannot_tell. Nothing panics, the vector rates, no level
+// rises, and none lowers but Opportunity, through a JSON object that writes
+// no key twice, by an opportunity field written as a string on its list. A
+// CVE no row describes has no field to ask, and no schema.
 func FuzzReadAdjustment(f *testing.F) {
-	const axes = `"confidentiality":"affected","integrity":"affected","availability":"affected"`
-	const notAffected = `"confidentiality":"not_affected","integrity":"not_affected","availability":"not_affected"`
 	const lower = `"opportunity":"full_access_or_expensive_resources_required"`
 	for _, seed := range []struct {
-		floored uint8
-		reply   string
+		undescribed bool
+		reply       string
 	}{
-		{0, `{"reasoning":"the evidence","opportunity":"keep",` + axes + `}`},
-		{0, `{"reasoning":"r",` + lower + `,` + notAffected + `}`},
-		{0, `{"reasoning":"r","opportunity":"keep",` + lower + `,` + axes + `}`},
-		{0, `{"reasoning":"r",` + lower + `,` + notAffected + `,"detail":{"why":[{"a":1,"a":2}]}}`},
-		{0, `{"reasoning":"r","opportunity":"keep","\u006fpportunity":"full_access_or_expensive_resources_required",` + axes + `}`},
-		{0, `{"reasoning":"r","opportunity":"bad\nO (full_access_or_expensive_resources_required): forged",` + axes + `}`},
-		{0, `{"reasoning":"r","opportunity":7,"confidentiality":["not_affected"]}`},
-		{0, `{` + lower + `,` + notAffected + `}`},
-		{0, `{"reasoning":{"why":"the dispute"},` + lower + `,` + axes + `}`},
-		{0, `{"reasoning":" \n\t ",` + lower + `,` + axes + `}`},
-		{0, `{"reasoning": "r"}`},
-		{1, `{"reasoning":"r","opportunity":"keep",` + notAffected + `}`},
-		{7, `{"reasoning":"r","opportunity":"special_access_or_resources_required"}`},
-		{0, `not json`},
-		{0, `null`},
-		{0, `[]`},
-		{0, `{"reasoning":"r","opportunity":"keep"} {}`},
-		{8, `{"reasoning":"r",` + lower + `,` + notAffected + `}`},
-		{16, `{"reasoning":"r",` + lower + `,` + notAffected + `}`},
-		{17, `{"reasoning":"r","confidentiality":"not_affected"}`},
-		{14, `{"reasoning":"r",` + lower + `,"confidentiality":"not_affected"}`},
-		{15, `{"reasoning":"r",` + lower + `}`},
+		{false, `{"reasoning":"the evidence","opportunity":"keep"}`},
+		{false, `{"reasoning":"r",` + lower + `}`},
+		{false, `{"reasoning":"r","opportunity":"keep",` + lower + `}`},
+		{false, `{"reasoning":"r",` + lower + `,"detail":{"why":[{"a":1,"a":2}]}}`},
+		{false, `{"reasoning":"r","opportunity":"keep","\u006fpportunity":"full_access_or_expensive_resources_required"}`},
+		{false, `{"reasoning":"r","opportunity":"bad\nO (full_access_or_expensive_resources_required): forged"}`},
+		{false, `{"reasoning":"r","opportunity":7,"confidentiality":["not_affected"]}`},
+		{false, `{` + lower + `,"confidentiality":"not_affected","integrity":"not_affected","availability":"not_affected"}`},
+		{false, `{"reasoning":{"why":"the dispute"},` + lower + `}`},
+		{false, `{"reasoning":" \n\t ",` + lower + `}`},
+		{false, `{"reasoning": "r"}`},
+		{false, `{"reasoning":"r","opportunity":"special_access_or_resources_required"}`},
+		{false, `not json`},
+		{false, `null`},
+		{false, `[]`},
+		{false, `{"reasoning":"r","opportunity":"keep"} {}`},
+		{true, `{"reasoning":"r",` + lower + `}`},
 	} {
-		f.Add(seed.floored, seed.reply)
+		f.Add(seed.undescribed, seed.reply)
 	}
 	h := newFuzzRun(f)
-	lowers := map[contract.Factor]string{
-		contract.O: "opportunity", contract.LC: "confidentiality", contract.PV: "confidentiality",
-		contract.LI: "integrity", contract.LAV: "availability",
-	}
-	f.Fuzz(func(t *testing.T, floored uint8, raw string) {
-		var axes [3]bool
-		for axis := range axes {
-			axes[axis] = floored&(1<<axis) != 0
-		}
+	f.Fuzz(func(t *testing.T, undescribed bool, raw string) {
 		c := h.cves[0]
-		if floored&8 != 0 {
+		if undescribed {
 			bare := *c
 			bare.in.Rows = slices.Clone(c.in.Rows)
 			for i := range bare.in.Rows {
@@ -186,11 +166,8 @@ func FuzzReadAdjustment(f *testing.F) {
 			c = &bare
 		}
 		answers := cannotTellToAll()
-		if floored&16 != 0 {
-			answers.R = "not_reachable"
-		}
-		schema, err := contract.AdjustmentSchema(h.d, c.in, axes, answers.R)
-		if len(contract.AdjustmentFields(h.d, c.in, axes, answers.R)) == 0 {
+		schema, err := contract.AdjustmentSchema(c.in)
+		if len(contract.AdjustmentFields(c.in)) == 0 {
 			require.Error(t, err, "a schema with no field to ask")
 			return
 		}
@@ -198,8 +175,8 @@ func FuzzReadAdjustment(f *testing.F) {
 		lists, err := propertyEnums(schema)
 		require.NoError(t, err)
 		got := readAdjustment(context.Background(), newScoringRun(), "CVE-2024-0000", raw, lists)
-		base := vectorLevels(h.levels(t, c, axes, answers, nil).Vector)
-		adjusted := vectorLevels(h.levels(t, c, axes, answers, &got.adjusted).Vector)
+		base := vectorLevels(h.levels(t, c, answers, nil).Vector)
+		adjusted := vectorLevels(h.levels(t, c, answers, &got.adjusted).Vector)
 
 		var fields map[string]json.RawMessage
 		clean := json.Unmarshal([]byte(raw), &fields) == nil && fields != nil && dropped([]byte(raw)) == 0
@@ -209,17 +186,16 @@ func FuzzReadAdjustment(f *testing.F) {
 				continue
 			}
 			require.True(t, clean, "%s lowered by a reply Go cannot read as written", factor)
-			name, ok := lowers[factor]
-			require.True(t, ok, "%s lowered, which no field may lower", factor)
+			require.Equal(t, contract.O, factor, "%s lowered, which no field may lower", factor)
 			var value string
-			require.NoError(t, json.Unmarshal(fields[name], &value), "%s lowered by a %s that is no string", factor, name)
-			require.Contains(t, lists[name], value, "%s lowered by a %s off its list", factor, name)
+			require.NoError(t, json.Unmarshal(fields["opportunity"], &value), "O lowered by an opportunity that is no string")
+			require.Contains(t, lists["opportunity"], value, "O lowered by an opportunity off its list")
 		}
 	})
 }
 
-// fuzzRun holds what both fuzz targets rate: two CVEs no vector floors, every
-// question asked of them under fullConfig. Readers log at WARN, which the
+// fuzzRun holds what both fuzz targets rate: two CVEs with a usable CVSS v3
+// vector, every question asked of them under fullConfig. Readers log at WARN, which the
 // fuzz targets drop.
 type fuzzRun struct {
 	d    contract.Deployment
@@ -243,9 +219,9 @@ func newFuzzRun(f *testing.F) fuzzRun {
 }
 
 // levels computes c's levels, which must rate.
-func (h fuzzRun) levels(t *testing.T, c *cve, floored [3]bool, answers contract.Answers, adjusted *contract.Adjusted) contract.Levels {
+func (h fuzzRun) levels(t *testing.T, c *cve, answers contract.Answers, adjusted *contract.Adjusted) contract.Levels {
 	t.Helper()
-	l, err := contract.Compute(h.d, c.in, floored, answers, adjusted)
+	l, err := contract.Compute(h.d, c.in, answers, adjusted)
 	require.NoError(t, err)
 	_, err = l.Vector.Rate()
 	require.NoError(t, err)
