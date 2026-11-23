@@ -158,7 +158,7 @@ How strict is your uptime target?
 | `high` | 24/7 required |
 | `critical` | Zero downtime tolerance |
 
-Since #310's C2 it moves no score and no call sends it: Loss of availability is read from the CVE's CVSS v3 vectors. The key still loads.
+It moves no score and no call sends it: Loss of availability is read from the CVE's CVSS v3 vectors. The key still loads.
 
 ### `controls` — what defenses are already in place?
 
