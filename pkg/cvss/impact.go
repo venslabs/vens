@@ -57,24 +57,25 @@ func (i Impact) Vectorless() bool {
 }
 
 // ImpactOf reads Impact over every vector of one CVE, from all its rows and
-// sources. A v3 vector is one Tier reads as 3; vectors are distinct once
-// trimmed. One is usable when it parses as Parse reads it, any CVSS: prefix
-// stating 3.0 or 3.1, and gives C, I and A each on H, L or N; any other is
-// refused whole. v2 vectors are not read, and v4 vectors are counted.
+// sources. A v3 vector is one Tier reads as 3, or one whose version is
+// another 3.x, as a Trivy V3Vector whose prefix states one gets; vectors are
+// distinct once trimmed. One is usable when its version is 3.0 or 3.1, or 3
+// alone, it parses as Parse reads it, any CVSS: prefix stating 3.0 or 3.1,
+// and it gives C, I and A each on H, L or N; any other is refused whole. v2
+// vectors are not read, and v4 vectors are counted.
 func ImpactOf(vectors []Vector) Impact {
 	var i Impact
 	var seen, seen4 []string
 	for _, v := range vectors {
 		text := strings.TrimSpace(v.Vector)
-		switch v.Tier() {
-		case 4:
+		switch {
+		case v.Tier() == 4:
 			if !slices.Contains(seen4, text) {
 				seen4 = append(seen4, text)
 				i.V4++
 			}
 			continue
-		case 3:
-		default:
+		case v.Tier() != 3 && !strings.HasPrefix(v.Version, "3."):
 			continue
 		}
 		if slices.Contains(seen, text) {
@@ -99,6 +100,9 @@ func ImpactOf(vectors []Vector) Impact {
 // impactValues returns a v3 vector's C, I and A, or why it is not usable.
 func impactValues(v Vector) ([3]string, error) {
 	var values [3]string
+	if v.Tier() != 3 {
+		return values, fmt.Errorf("CVSS version %q is neither 3.0 nor 3.1", v.Version)
+	}
 	if version, ok := PrefixVersion(v.Vector); ok && version != "3.0" && version != "3.1" {
 		return values, fmt.Errorf("prefix CVSS:%s states neither 3.0 nor 3.1", version)
 	}

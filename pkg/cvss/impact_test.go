@@ -77,6 +77,11 @@ func TestImpactOf_RejectsWhole(t *testing.T) {
 		{"prefix of v2", Vector{Source: "nvd", Version: "3.1", Vector: "CVSS:2.0/AV:N/AC:L/Au:N/C:P/I:P/A:P"}, "states neither 3.0 nor 3.1"},
 		{"prefix stating 3 alone", Vector{Source: "nvd", Version: "3", Vector: "CVSS:3/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"}, "states neither 3.0 nor 3.1"},
 		{"prefix and nothing else", Vector{Source: "nvd", Version: "3.1", Vector: "CVSS:3.1"}, "not a metric:value pair"},
+		// Trivy's V3Vector prefixed CVSS:3.2 gets the version 3.2.
+		{"another 3.x version", Vector{Source: "nvd", Version: "3.2", Vector: "CVSS:3.2/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"},
+			`CVSS version "3.2" is neither 3.0 nor 3.1`},
+		{"a 3.x version, no prefix", Vector{Source: "ghsa", Version: "3.9", Vector: "AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"},
+			`CVSS version "3.9" is neither 3.0 nor 3.1`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -101,7 +106,7 @@ func TestImpactOf_ReadsV3Alone(t *testing.T) {
 		{"no vector", nil, Impact{}},
 		{"v2 alone", []Vector{v2("AV:N/AC:L/Au:N/C:C/I:C/A:C")}, Impact{}},
 		{"v4 alone, counted, not read", []Vector{v4, v4}, Impact{V4: 1}},
-		{"an unknown version", []Vector{{Source: "nvd", Version: "3.2", Vector: "CVSS:3.2/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"}}, Impact{}},
+		{"a version vens reads no tier of", []Vector{{Source: "nvd", Version: "5.0", Vector: "CVSS:5.0/AV:N"}, {Source: "nvd", Version: "", Vector: "AV:N"}}, Impact{}},
 		{"v3 beside v2 and v4", []Vector{
 			v2("AV:N/AC:L/Au:N/C:C/I:C/A:C"),
 			v31("AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:L"),
@@ -115,5 +120,20 @@ func TestImpactOf_ReadsV3Alone(t *testing.T) {
 				t.Errorf("ImpactOf = %+v, want %+v", got, tt.want)
 			}
 		})
+	}
+}
+
+// A vector of another 3.x version is a v3 vector refused whole and counted,
+// once however many sources give it, and it leaves a usable one alone.
+func TestImpactOf_CountsAnother3xVersion(t *testing.T) {
+	v32 := Vector{Source: "nvd", Version: "3.2", Vector: "CVSS:3.2/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"}
+	again := Vector{Source: "redhat", Version: "3.2", Vector: " CVSS:3.2/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H "}
+	got := ImpactOf([]Vector{v32, again})
+	if !got.Vectorless() || len(got.Rejected) != 1 || got.Rejected[0].Vector != v32 {
+		t.Errorf("ImpactOf = %+v, want it vectorless with the 3.2 vector refused once", got)
+	}
+	got = ImpactOf([]Vector{v32, v31("AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N")})
+	if got.Values != cia("L", "N", "N") || got.Usable != 1 || len(got.Rejected) != 1 {
+		t.Errorf("ImpactOf = %+v, want L, N, N from the 3.1 vector and the 3.2 one refused", got)
 	}
 }

@@ -86,7 +86,7 @@ Type of data handled by the system. vens uses it to pick the column of Loss of c
 | `high` | PII, financial data, customer info | critical |
 | `critical` | Secrets, PHI, payment card data | critical |
 
-Loss of confidentiality, integrity and availability come from the worst value, `H` over `L` over `N`, that the CVE's usable CVSS v3 vectors give `C`, `I` and `A`, across every row and source of the scanner's report. A v3 vector is usable when it parses, any `CVSS:` prefix stating 3.0 or 3.1, and gives `C`, `I` and `A` each once on `H`, `L` or `N`; any other is refused whole. v2 and v4 vectors are not read.
+Loss of confidentiality, integrity and availability come from the worst value, `H` over `L` over `N`, that the CVE's usable CVSS v3 vectors give `C`, `I` and `A`, across every row and source of the scanner's report. A v3 vector is usable when its version is 3.0 or 3.1, it parses, any `CVSS:` prefix stating 3.0 or 3.1, and it gives `C`, `I` and `A` each once on `H`, `L` or `N`; any other, another 3.x version included, is refused whole and named by `--strict`. v2 and v4 vectors are not read.
 
 | CVSS v3 | Loss of confidentiality, non-sensitive | Loss of confidentiality, critical | Loss of integrity | Loss of availability |
 |---|---|---|---|---|

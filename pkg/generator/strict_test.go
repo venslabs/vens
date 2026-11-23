@@ -84,7 +84,9 @@ func TestGenerator_StrictPreflight(t *testing.T) {
 		{"CVE-2024-0004", []cvss.Vector{v31("redhat", "AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:X/A:N"), v31("nvd", "AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:N/A:N")}, false,
 			refused + `redhat CVSS 3.1 vector "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:X/A:N": I is absent or off H, L and N; ` +
 				`nvd CVSS 3.1 vector "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:N/A:N": metric A given twice`},
-		{"CVE-2024-0005", []cvss.Vector{{Source: "nvd", Version: "4.0", Vector: "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:N/VI:N/VA:N/SC:N/SI:N/SA:N"}}, false, noV3},
+		{"CVE-2024-0005", []cvss.Vector{{Source: "nvd", Version: "4.0", Vector: "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:N/VI:N/VA:N/SC:N/SI:N/SA:N"},
+			{Source: "nvd", Version: "3.2", Vector: "CVSS:3.2/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:N"}}, false,
+			refused + `nvd CVSS 3.2 vector "CVSS:3.2/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:N": CVSS version "3.2" is neither 3.0 nor 3.1`},
 		{"CVE-2024-0006", []cvss.Vector{v31("nvd", noImpact)}, true,
 			"no description in the scanner's report, so Motive, Opportunity and Ease of exploit are not asked and take their worst case"},
 	}
