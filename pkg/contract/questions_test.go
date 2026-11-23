@@ -60,11 +60,12 @@ func TestQuestionsInTheDeclaredOrder(t *testing.T) {
 }
 
 // What is not asked: ID when detection is undeclared or declared at one
-// level, NC when no framework is declared, PV when data_subjects caps it at
-// the lowest level, and M, O and EE when no row describes the CVE, a title
-// alone or a blank description included; one row described of two is
-// enough. Loss of confidentiality, integrity and availability are never
-// asked, and no vector stops Privacy violation.
+// level, NC when no framework is declared, PV when the CVE's usable CVSS v3
+// vectors give C:N or data_subjects caps it at the lowest level, and M, O
+// and EE when no row describes the CVE, a title alone or a blank description
+// included; one row described of two is enough. Loss of confidentiality,
+// integrity and availability are never asked, and a CVE with no usable v3
+// vector is asked Privacy violation.
 func TestQuestionsNotAsked(t *testing.T) {
 	titled := CVE{ID: "CVE-N", Rows: []Row{{PkgName: "liba", Title: "[Privilege escalation possible to other user than root]"}}}
 	blank := CVE{ID: "CVE-N", Rows: []Row{{PkgName: "liba", Description: " \n\t"}, {PkgName: "libb"}}}
@@ -94,7 +95,8 @@ func TestQuestionsNotAsked(t *testing.T) {
 		{"a blank description", declared(), blank, []Factor{M, O, EE}},
 		{"no description, nothing declared", base(), titled, []Factor{M, O, EE, ID, NC}},
 		{"one row described of two", declared(), oneOfTwo, nil},
-		{"every axis at N", declared(), impactCVE("N", "N", "N"), nil},
+		{"every axis at N", declared(), impactCVE("N", "N", "N"), []Factor{PV}},
+		{"C at N alone", declared(), impactCVE("N", "H", "H"), []Factor{PV}},
 		{"no vector", declared(), impactCVE("", "", ""), nil},
 	} {
 		want := slices.DeleteFunc(Order(), func(f Factor) bool { return slices.Contains(c.missing, f) })
@@ -225,19 +227,21 @@ func TestUndeclaredFieldsCounted(t *testing.T) {
 	if want := []string{"detection_undeclared", "traceability_missing", "data_subjects_missing"}; !slices.Equal(got, want) {
 		t.Errorf("nothing declared: counters %v, want %v", got, want)
 	}
-	// Every axis at N no longer keeps Privacy violation from asking, so
-	// data_subjects is still read.
+	// With C at N Privacy violation is not asked, so data_subjects is not
+	// read.
 	l := computeFor(t, base(), impactCVE("N", "N", "N"), answered, nil)
-	if want := []string{"detection_undeclared", "traceability_missing", "data_subjects_missing"}; !slices.Equal(l.Counters, want) {
-		t.Errorf("nothing declared, every axis at N: counters %v, want %v", l.Counters, want)
+	if want := []string{"detection_undeclared", "traceability_missing"}; !slices.Equal(l.Counters, want) {
+		t.Errorf("nothing declared, C at N: counters %v, want %v", l.Counters, want)
 	}
 	if l := compute(t, base(), answered, nil); levels(l.Vector)["ID"] != 9 || levels(l.Vector)["LAC"] != 7 {
 		t.Errorf("undeclared detection and traceability: ID %d, LAC %d, want 9 and 7", l.Vector.ID, l.Vector.LAC)
 	}
 }
 
-// The adjustment never raises a level, and moves Opportunity alone; keep,
-// cannot_tell and anything off the list leave the baseline.
+// The adjustment never raises a level, and moves Opportunity and Privacy
+// violation alone; keep, affected, cannot_tell and anything off the lists
+// leave the baselines; confidentiality not_affected gives Privacy violation
+// its floor and leaves Loss of confidentiality to the vectors.
 func TestAdjustmentNeverRaises(t *testing.T) {
 	d := declared()
 	d.DataSensitivity.Value = "critical"
@@ -247,15 +251,17 @@ func TestAdjustmentNeverRaises(t *testing.T) {
 		{O: "special_access_or_resources_required", PV: "none"},
 		{O: cannotTell, PV: cannotTell},
 	}
-	adjustments := append([]string{"", keep, "bogus", cannotTell}, ids(opportunity)...)
+	adjustments := append([]string{"", keep, "bogus", cannotTell, affected, notAffected}, ids(opportunity)...)
 	for _, a := range baselines {
 		before := levels(compute(t, d, a, nil).Vector)
 		for _, o := range adjustments {
-			adj := &Adjusted{Opportunity: o}
-			after := levels(compute(t, d, a, adj).Vector)
-			for f, b := range before {
-				if moved := after[f] != b; after[f] > b || (moved && f != "O") {
-					t.Errorf("%+v adjusted by %+v: %s went from %d to %d", a, *adj, f, b, after[f])
+			for _, c := range adjustments {
+				adj := &Adjusted{Opportunity: o, Confidentiality: c}
+				after := levels(compute(t, d, a, adj).Vector)
+				for f, b := range before {
+					if moved := after[f] != b; after[f] > b || (moved && f != "O" && f != "PV") {
+						t.Errorf("%+v adjusted by %+v: %s went from %d to %d", a, *adj, f, b, after[f])
+					}
 				}
 			}
 		}
@@ -273,8 +279,17 @@ func TestAdjustmentNeverRaises(t *testing.T) {
 			t.Errorf("%+v: O = %d, want %d", c.adj, got, c.want)
 		}
 	}
+	for c, want := range map[string]int{notAffected: 3, affected: 9, cannotTell: 9, "bogus": 9} {
+		l := compute(t, d, a, &Adjusted{Confidentiality: c})
+		if int(l.Vector.PV) != want || l.Vector.LC != compute(t, d, a, nil).Vector.LC {
+			t.Errorf("confidentiality %s: PV %d, LC %d, want PV %d and LC as computed", c, l.Vector.PV, l.Vector.LC, want)
+		}
+		if c == notAffected && l.Sources[PV] != SourceAdjustment {
+			t.Errorf("confidentiality not_affected: PV from %v", l.Sources[PV])
+		}
+	}
 	// The adjustment's own cannot_tell is not counted.
-	abstained := &Adjusted{Opportunity: cannotTell}
+	abstained := &Adjusted{Opportunity: cannotTell, Confidentiality: cannotTell}
 	if before, after := compute(t, d, a, nil).Counters, compute(t, d, a, abstained).Counters; !slices.Equal(before, after) {
 		t.Errorf("the adjustment's cannot_tell counted: %v, then %v", before, after)
 	}
@@ -356,15 +371,15 @@ func TestAdjustmentLowersACannotTellBaseline(t *testing.T) {
 
 // A question skipped because no answer could move its level ignores a junk
 // answer and the adjustment alike: ID keeps the one declared level and PV the
-// floor data_subjects sets, neither read nor counted, while Opportunity takes
-// the adjustment.
+// floor data_subjects sets, neither read nor counted, its confidentiality
+// adjustment ignored, while Opportunity takes the adjustment.
 func TestSkippedQuestionsIgnoreJunkAndTheAdjustment(t *testing.T) {
 	d := declared()
 	d.Detection = &Detection{Network: "logged_and_reviewed", Host: "logged_and_reviewed", Application: "logged_and_reviewed"}
 	d.DataSubjects = ptr("none")
 	a := Answers{M: "high_reward", O: "no_access_or_resources_required", EE: "easy", ID: []string{"bogus"},
 		LAC: "unidentified", FD: "bankruptcy", RD: "brand_damage", NC: "high_profile_violation", PV: "bogus"}
-	l := compute(t, d, a, &Adjusted{Opportunity: "special_access_or_resources_required"})
+	l := compute(t, d, a, &Adjusted{Opportunity: "special_access_or_resources_required", Confidentiality: notAffected})
 	got := levels(l.Vector)
 	for f, w := range map[string]int{"ID": 3, "PV": 3, "O": 4} {
 		if got[f] != w {
@@ -485,28 +500,49 @@ func TestTechnicalImpactsTakeTheWorstValueOverRows(t *testing.T) {
 	}
 }
 
-// Privacy violation follows no Loss of confidentiality floor: a CVE whose
-// vectors give C:N, or none, is asked it, and its answer stands under the
-// cap data_subjects sets.
-func TestPrivacyViolationFollowsNoConfidentialityFloor(t *testing.T) {
-	for _, c := range []CVE{impactCVE("N", "N", "N"), impactCVE("", "", "")} {
-		for _, subjects := range []*string{nil, ptr("thousands"), ptr("millions")} {
-			d := declared()
-			d.DataSubjects = subjects
-			q, err := Questions(d, c)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if !slices.Contains(q, PV) {
-				t.Errorf("%s, data_subjects %v: PV not asked", c.Rows[0].CVSS, subjects)
-			}
-			want := 9
-			if subjects != nil && *subjects == "thousands" {
-				want = 7
+// Privacy violation keeps its floor: a CVE with a usable CVSS v3 vector
+// whose worst C is N is not asked it and takes 3, from the floor, whatever
+// its answer, data_subjects or adjustment, counting nothing. A CVE whose
+// worst C is L or H, or with no usable v3 vector, is asked it, under the cap
+// data_subjects sets, and its adjustment's not_affected floors it.
+func TestPrivacyViolationKeepsItsFloor(t *testing.T) {
+	noC := CVE{ID: "CVE-T", Rows: []Row{{PkgName: "a", Description: "d", CVSS: []cvss.Vector{
+		v31("nvd", "AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:H"), v31("redhat", "AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:N"),
+	}}}}
+	someC := CVE{ID: "CVE-T", Rows: []Row{{PkgName: "a", Description: "d", CVSS: []cvss.Vector{
+		v31("nvd", "AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:H"), v31("redhat", "AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:L/A:N"),
+	}}}}
+	for _, subjects := range []*string{nil, ptr("thousands"), ptr("millions")} {
+		d := declared()
+		d.DataSubjects = subjects
+		l := computeFor(t, d, noC, Answers{PV: "millions"}, &Adjusted{Confidentiality: affected})
+		if l.Vector.PV != 3 || l.Sources[PV] != SourceFloor || slices.Contains(questionsOf(t, d, noC), PV) ||
+			slices.Contains(l.Counters, "privacy_cannot_tell") || slices.Contains(l.Counters, "data_subjects_missing") {
+			t.Errorf("C:N, data_subjects %v: PV %d from %v, counters %v", deref(subjects), l.Vector.PV, l.Sources[PV], l.Counters)
+		}
+		want := 9
+		if subjects != nil && *subjects == "thousands" {
+			want = 7
+		}
+		for _, c := range []CVE{someC, impactCVE("", "", "")} {
+			if !slices.Contains(questionsOf(t, d, c), PV) {
+				t.Errorf("%v: PV not asked", c.Rows[0].CVSS)
 			}
 			if l := computeFor(t, d, c, Answers{PV: "millions"}, nil); int(l.Vector.PV) != want {
-				t.Errorf("%v, data_subjects %v: PV = %d, want %d", c.Rows[0].CVSS, subjects, l.Vector.PV, want)
+				t.Errorf("%v, data_subjects %v: PV = %d, want %d", c.Rows[0].CVSS, deref(subjects), l.Vector.PV, want)
+			}
+			if l := computeFor(t, d, c, Answers{PV: "millions"}, &Adjusted{Confidentiality: notAffected}); l.Vector.PV != 3 || l.Sources[PV] != SourceAdjustment {
+				t.Errorf("%v adjusted not_affected: PV %d from %v", c.Rows[0].CVSS, l.Vector.PV, l.Sources[PV])
 			}
 		}
 	}
+}
+
+func questionsOf(t *testing.T, d Deployment, c CVE) []Factor {
+	t.Helper()
+	q, err := Questions(d, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return q
 }

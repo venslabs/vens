@@ -329,8 +329,9 @@ func readAnswers(t *testing.T, parent string) (answersJSON, string) {
 
 // answers.json holds, per factor in the vector's order, the answer as
 // replied, how Go read it, the adjustment's answer, the level and where it
-// came from, and for the three technical impacts the value the CVSS v3
-// vectors give their axis; the counters per CVE and summed, cvss_v3_missing
+// came from, for the three technical impacts the value the CVSS v3 vectors
+// give their axis, and for a Privacy violation they floor, C:N; the counters
+// per CVE and summed, cvss_v3_missing
 // for a CVE with no usable v3 vector; no declaration where no reachability
 // entry hits; and no reasoning, nor CVE text but what an answer off its list
 // holds, kept verbatim.
@@ -386,7 +387,7 @@ func TestDebugDir_AnswersJSON(t *testing.T) {
 		"FD":  "less_than_cost_to_fix|answered||1|answer|",
 		"RD":  "minimal_damage|answered||1|answer|",
 		"NC":  "minor_violation|answered||2|answer|",
-		"PV":  "millions|answered||7|config|",
+		"PV":  "<nil>|||3|floor|N",
 	}, first)
 	assert.Empty(t, got.Vulnerabilities[0].Counters)
 	assert.Nil(t, got.Vulnerabilities[0].Declared, "no reachability entry")
@@ -504,9 +505,9 @@ func adjustedCVE(t *testing.T, c fakeCall) string {
 // given before the run stopped, without levels.
 func TestDebugDir_AnswersJSONSaysHowTheAdjustmentRead(t *testing.T) {
 	replies := map[string]string{
-		"CVE-2024-0001": `{"reasoning":"r","opportunity":"special_access_or_resources_required"}`,
+		"CVE-2024-0001": `{"reasoning":"r","opportunity":"special_access_or_resources_required","confidentiality":"not_affected"}`,
 		"CVE-2024-0002": `not json`,
-		"CVE-2024-0003": `{"reasoning":"r","opportunity":"keep","opportunity":"keep"}`,
+		"CVE-2024-0003": `{"reasoning":"r","opportunity":"keep","opportunity":"keep","confidentiality":"affected"}`,
 		"CVE-2024-0004": `null`,
 	}
 	t.Run("rated", func(t *testing.T) {
@@ -561,7 +562,7 @@ func TestDebugDir_AnswersJSONSaysHowTheAdjustmentRead(t *testing.T) {
 				adjusted[f.Factor] = f.Adjusted
 			}
 		}
-		assert.Equal(t, map[string]string{"O": "special_access_or_resources_required"}, adjusted)
+		assert.Equal(t, map[string]string{"O": "special_access_or_resources_required", "PV": "not_affected"}, adjusted)
 		second := got.Vulnerabilities[1]
 		assert.Equal(t, []any{"CVE-2024-0001", true, "not_asked"}, []any{second.VulnID, second.Unrated, second.Adjustment})
 		for _, f := range second.Factors {

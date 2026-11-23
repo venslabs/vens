@@ -63,12 +63,14 @@ answer to a question read as cannot_tell, and Motive, Opportunity and Ease of ex
 with no description, count as the worst answer; undeclared, detection makes Intrusion detection 9,
 traceability makes Loss of accountability 7 or 9, and data_subjects leaves Privacy violation at the
 model's band; a CVE with no usable CVSS v3 vector has Loss of confidentiality, integrity and
-availability at 9.
+availability at 9. A CVE whose usable CVSS v3 vectors give C:N has Privacy violation at 3, not
+asked.
 
 A CVE whose description says it is disputed or not a security issue, or that the report rates low
-while NVD rates it high or critical, is flagged: one more call, the adjustment, may lower the
-Opportunity of a CVE with a description, even below the fallback. The adjustment's cannot_tell
-keeps the baseline: it is not counted and does not fail a --strict run.
+while NVD rates it high or critical, is flagged: one more call, the adjustment, when it has a field
+left to ask, may lower the Opportunity of a CVE with a description and, through a confidentiality
+question, Privacy violation, even below these fallbacks, and no other level. The adjustment's
+cannot_tell keeps the baseline: it is not counted and does not fail a --strict run.
 
 The config's reachability entries are the only source of a VEX status: an entry declaring a CVE not
 reachable, by its id or by a component covering every package the scan lists for it, publishes it

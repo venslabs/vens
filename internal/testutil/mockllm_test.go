@@ -129,7 +129,7 @@ func TestMockSkipsAndForcesCannotTell(t *testing.T) {
 // asks, an answer from that field's list.
 func TestMockAnswersTheAdjustment(t *testing.T) {
 	described := contract.CVE{ID: "CVE-X", Rows: []contract.Row{{Description: "A described vulnerability."}}}
-	schema, err := contract.AdjustmentSchema(described)
+	schema, err := contract.AdjustmentSchema(contract.Deployment{}, described)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -142,7 +142,8 @@ func TestMockAnswersTheAdjustment(t *testing.T) {
 		t.Fatal(err)
 	}
 	lists := map[string][]string{
-		"opportunity": {"no_access_or_resources_required", "some_access_or_resources_required", "special_access_or_resources_required", "full_access_or_expensive_resources_required", "keep"},
+		"opportunity":     {"no_access_or_resources_required", "some_access_or_resources_required", "special_access_or_resources_required", "full_access_or_expensive_resources_required", "keep"},
+		"confidentiality": {"affected", "not_affected"},
 	}
 	for name, list := range lists {
 		if !slices.Contains(list, got[name]) {

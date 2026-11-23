@@ -55,20 +55,24 @@ type adjustmentReply struct {
 
 // adjust makes a flagged CVE's adjustment call, after its ordinary
 // questions: it shows every row's evidence, the flags and the Opportunity
-// answer given, and may lower Opportunity, never raise it. A CVE no row
-// describes was not asked Opportunity: it makes no call. A reply Go cannot
-// read leaves the baseline.
+// answer given, and may lower Opportunity, when a row describes the CVE, and
+// Privacy violation through its confidentiality question, when the CVE was
+// asked it, never raise them. With nothing left to ask, it makes no call. A
+// reply Go cannot read leaves the baselines.
 func (g *Generator) adjust(ctx context.Context, run *scoringRun, c *cve, a *assessment) error {
-	if len(contract.AdjustmentFields(c.in)) == 0 {
-		slog.DebugContext(ctx, "no adjustment call: no description", "vuln", c.id())
+	if len(contract.AdjustmentFields(g.deployment, c.in)) == 0 {
+		slog.DebugContext(ctx, "no adjustment call: no description and Privacy violation not asked", "vuln", c.id())
 		return nil
 	}
-	given := contract.Answers{O: shownAs(contract.O, a.answers.O)}
+	var given contract.Answers
+	if c.in.Described() {
+		given.O = shownAs(contract.O, a.answers.O)
+	}
 	request, err := contract.AdjustmentRequest(g.deployment, c.in, c.flags, given)
 	if err != nil {
 		return err
 	}
-	schema, err := contract.AdjustmentSchema(c.in)
+	schema, err := contract.AdjustmentSchema(g.deployment, c.in)
 	if err != nil {
 		return err
 	}
@@ -135,7 +139,10 @@ func readAdjustment(ctx context.Context, run *scoringRun, id, raw string, lists 
 		return value
 	}
 	got := adjustmentReply{
-		adjusted:  contract.Adjusted{Opportunity: read("opportunity")},
+		adjusted: contract.Adjusted{
+			Opportunity:     read("opportunity"),
+			Confidentiality: read("confidentiality"),
+		},
 		reading:   adjustmentAnswered,
 		shown:     strings.Join(parts, ", "),
 		reasoning: reasoningOf(fields["reasoning"]),

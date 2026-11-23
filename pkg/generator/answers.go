@@ -77,14 +77,15 @@ type factorRecord struct {
 	// kept; absent when the question was not asked.
 	Answer  json.RawMessage  `json:"answer,omitempty"`
 	Reading contract.Reading `json:"reading,omitempty"`
-	// Adjusted is a flagged CVE's adjustment answer for Opportunity, as the
-	// reply gave it.
+	// Adjusted is a flagged CVE's adjustment answer as the reply gave it:
+	// Opportunity's, or for Privacy violation the confidentiality answer.
 	Adjusted string          `json:"adjusted,omitempty"`
 	Level    *int            `json:"level,omitempty"`
 	Source   contract.Source `json:"source,omitempty"`
-	// CVSS is, for Loss of confidentiality, integrity and availability, the
-	// worst value, H, L or N, the CVE's usable CVSS v3 vectors give the axis,
-	// absent when none is usable.
+	// CVSS is the worst value, H, L or N, the CVE's usable CVSS v3 vectors
+	// give the axis a level was read from: for Loss of confidentiality,
+	// integrity and availability, absent when none is usable, and for a
+	// Privacy violation they floor, N.
 	CVSS string `json:"cvss,omitempty"`
 }
 
@@ -113,11 +114,14 @@ func (run *scoringRun) rated(c *cve, a *assessment, l contract.Levels) {
 		if c.asks(f) {
 			r.Answer = rawAnswer(a, f)
 		}
-		if a.adjusted != nil && f == contract.O {
-			r.Adjusted = a.adjusted.Opportunity
+		if a.adjusted != nil {
+			r.Adjusted = adjustedAnswer(*a.adjusted, f)
 		}
 		if axis, ok := impactAxes[f]; ok {
 			r.CVSS = l.Impact.Values[axis]
+		}
+		if f == contract.PV && r.Source == contract.SourceFloor {
+			r.CVSS = l.Impact.Values[cvss.Confidentiality]
 		}
 		e.Factors = append(e.Factors, r)
 	}
@@ -136,8 +140,8 @@ func (run *scoringRun) unrated(c *cve, a *assessment) {
 	for _, f := range a.read {
 		reading, _ := contract.ReadAnswer(f, answerOf(a.answers, f)...)
 		r := factorRecord{Factor: f, Answer: rawAnswer(a, f), Reading: reading}
-		if a.adjusted != nil && f == contract.O {
-			r.Adjusted = a.adjusted.Opportunity
+		if a.adjusted != nil {
+			r.Adjusted = adjustedAnswer(*a.adjusted, f)
 		}
 		e.Factors = append(e.Factors, r)
 		if reading == contract.CannotTell || reading == contract.Invalid {
@@ -196,4 +200,17 @@ func answerOf(a contract.Answers, f contract.Factor) []string {
 		return a.ID
 	}
 	return []string{*answerField(&a, f)}
+}
+
+// adjustedAnswer is the adjustment's answer a factor's record shows:
+// Opportunity's on O, the confidentiality answer on Privacy violation, which
+// it alone corrects.
+func adjustedAnswer(a contract.Adjusted, f contract.Factor) string {
+	switch f {
+	case contract.O:
+		return a.Opportunity
+	case contract.PV:
+		return a.Confidentiality
+	}
+	return ""
 }

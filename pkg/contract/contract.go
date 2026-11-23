@@ -126,6 +126,9 @@ const (
 	// SourceConfig: the config alone, the question not asked or its answer
 	// capped.
 	SourceConfig
+	// SourceFloor: Privacy violation's floor, the CVE's usable CVSS v3
+	// vectors giving C:N, the question not asked.
+	SourceFloor
 	// SourceAdjustment: a flagged CVE's adjustment, which lowered the level.
 	SourceAdjustment
 	// SourceCVSS: the CVE's CVSS v3 vectors, crossed with data_sensitivity
@@ -136,7 +139,7 @@ const (
 
 var sourceNames = [...]string{
 	SourceAnswer: "answer", SourceConstant: "constant", SourceConfig: "config",
-	SourceAdjustment: "adjustment", SourceCVSS: "cvss",
+	SourceFloor: "floor", SourceAdjustment: "adjustment", SourceCVSS: "cvss",
 }
 
 func (s Source) String() string {

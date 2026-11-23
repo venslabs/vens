@@ -125,9 +125,10 @@ func FuzzReadReplies(f *testing.F) {
 // FuzzReadAdjustment reads an adjustment reply as Go reads one, for a CVE a
 // row describes or one none does, then rates the CVE with it, every other
 // question answered cannot_tell. Nothing panics, the vector rates, no level
-// rises, and none lowers but Opportunity, through a JSON object that writes
-// no key twice, by an opportunity field written as a string on its list. A
-// CVE no row describes has no field to ask, and no schema.
+// rises, and none lowers but Opportunity and Privacy violation, through a
+// JSON object that writes no key twice, by the field that lowers it, written
+// as a string on its list. A CVE no row describes is asked confidentiality
+// alone.
 func FuzzReadAdjustment(f *testing.F) {
 	const lower = `"opportunity":"full_access_or_expensive_resources_required"`
 	for _, seed := range []struct {
@@ -151,6 +152,8 @@ func FuzzReadAdjustment(f *testing.F) {
 		{false, `[]`},
 		{false, `{"reasoning":"r","opportunity":"keep"} {}`},
 		{true, `{"reasoning":"r",` + lower + `}`},
+		{true, `{"reasoning":"r","confidentiality":"not_affected"}`},
+		{false, `{"reasoning":"r",` + lower + `,"confidentiality":"not_affected"}`},
 	} {
 		f.Add(seed.undescribed, seed.reply)
 	}
@@ -166,8 +169,8 @@ func FuzzReadAdjustment(f *testing.F) {
 			c = &bare
 		}
 		answers := cannotTellToAll()
-		schema, err := contract.AdjustmentSchema(c.in)
-		if len(contract.AdjustmentFields(c.in)) == 0 {
+		schema, err := contract.AdjustmentSchema(h.d, c.in)
+		if len(contract.AdjustmentFields(h.d, c.in)) == 0 {
 			require.Error(t, err, "a schema with no field to ask")
 			return
 		}
@@ -186,10 +189,11 @@ func FuzzReadAdjustment(f *testing.F) {
 				continue
 			}
 			require.True(t, clean, "%s lowered by a reply Go cannot read as written", factor)
-			require.Equal(t, contract.O, factor, "%s lowered, which no field may lower", factor)
+			name, ok := map[contract.Factor]string{contract.O: "opportunity", contract.PV: "confidentiality"}[factor]
+			require.True(t, ok, "%s lowered, which no field may lower", factor)
 			var value string
-			require.NoError(t, json.Unmarshal(fields["opportunity"], &value), "O lowered by an opportunity that is no string")
-			require.Contains(t, lists["opportunity"], value, "O lowered by an opportunity off its list")
+			require.NoError(t, json.Unmarshal(fields[name], &value), "%s lowered by a %s that is no string", factor, name)
+			require.Contains(t, lists[name], value, "%s lowered by a %s off its list", factor, name)
 		}
 	})
 }

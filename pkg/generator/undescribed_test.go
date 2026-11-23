@@ -27,6 +27,7 @@ import (
 	"github.com/venslabs/vens/pkg/contract"
 	"github.com/venslabs/vens/pkg/cvss"
 	"github.com/venslabs/vens/pkg/outputhandler"
+	"github.com/venslabs/vens/pkg/riskconfig"
 )
 
 const undescribedWarning = "No description in the scanner's report; Motive, Opportunity and Ease of exploit are not asked, each at its worst level"
@@ -173,31 +174,88 @@ func contestedUndescribed() Vulnerability {
 	return v
 }
 
-// A flagged CVE no row describes has nothing left to adjust, whatever its
-// vectors: a description is a prerequisite of any Opportunity answer, the one
-// field the adjustment asks. It makes no call, keeps the levels it has, its
-// adjustment not_asked and its claim without an adjustment line.
+// The adjustment of a CVE no row describes asks confidentiality alone, for
+// Privacy violation, which it was asked: a description is a prerequisite of
+// any Opportunity answer. Its request shows no Opportunity question, baseline
+// or reply field. An Opportunity the reply gives all the same is ignored,
+// counted and logged, O staying at 9 with no adjusted answer recorded; not
+// affected floors Privacy violation, and answers.json records it there.
+func TestGenerator_AdjustmentOfAnUndescribedCVEAsksConfidentialityAlone(t *testing.T) {
+	logs := withCapturedLogs(t)
+	parent := t.TempDir()
+	at := attestation.NewBuilder(attestation.Opts{Provider: "mock", Model: "mock"})
+	m := &fakeLLM{
+		answer: func(c fakeCall, _ string) any {
+			if c.factor == contract.PV {
+				return "millions"
+			}
+			return nil
+		},
+		adjust: func(fakeCall) map[string]any {
+			return map[string]any{"reasoning": "r", "opportunity": "full_access_or_expensive_resources_required", "confidentiality": "not_affected"}
+		},
+	}
+	g := newGen(t, Opts{LLM: m, DebugDir: parent})
+	g.SetAttestor(at)
+	var emitted []outputhandler.VulnRating
+	require.NoError(t, g.GenerateRiskScore(context.Background(), []Vulnerability{contestedUndescribed()}, collect(&emitted)))
+
+	adjustment := m.calls[len(m.calls)-1]
+	require.True(t, adjustment.adjustment())
+	assert.Equal(t, map[string][]string{"confidentiality": {"affected", "not_affected", cannotTell}}, adjustment.fields)
+	assert.NotContains(t, strings.ToLower(adjustment.req.Human), "opportunit")
+	assert.NotContains(t, adjustment.req.Human, `"answers"`)
+	for f, want := range map[string]int{"O": 9, "PV": 3, "LC": 9} {
+		assert.Equal(t, want, vectorLevel(t, emitted[0].Rating.Vector, f), f)
+	}
+	warned := logs.find(slog.LevelWarn, "Adjustment reply gives a field the call did not ask; ignoring it")
+	require.Len(t, warned, 1)
+	assert.Equal(t, "opportunity", warned[0].attrs["field"])
+	lines := strings.Split(claims(t, at)[0].Reasoning, "\n")
+	assert.Equal(t, "adjustment (confidentiality: not_affected): r", lines[len(lines)-1])
+	answers, _ := readAnswers(t, parent)
+	for _, f := range answers.Vulnerabilities[0].Factors {
+		switch f.Factor {
+		case "O":
+			assert.Equal(t, []any{"", 9, "answer"}, []any{f.Adjusted, *f.Level, f.Source})
+		case "PV":
+			assert.Equal(t, []any{"not_affected", 3, "adjustment"}, []any{f.Adjusted, *f.Level, f.Source})
+		}
+	}
+}
+
+// An adjustment with nothing left to ask makes no call: a flagged CVE no row
+// describes whose usable v3 vectors give C:N, or whose Privacy violation
+// data_subjects caps, keeps the levels it has, its adjustment not_asked and
+// its claim without an adjustment line.
 func TestGenerator_NoAdjustmentWithNothingLeftToAsk(t *testing.T) {
-	for name, vectors := range map[string][]cvss.Vector{
-		"no vector":       nil,
-		"every axis at N": {v31("nvd", noImpact)},
-		"every axis at H": {v31("nvd", "AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H")},
+	capped := testConfig()
+	capped.Context.DataSubjects = ptr("none")
+	for name, tc := range map[string]struct {
+		cfg     *riskconfig.Config
+		vectors []cvss.Vector
+		asked   []string
+	}{
+		"C at N":                  {testConfig(), []cvss.Vector{v31("nvd", "AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:H")}, []string{"LAC", "FD", "RD"}},
+		"data_subjects none":      {capped, nil, []string{"LAC", "FD", "RD"}},
+		"data_subjects none, C:H": {capped, []cvss.Vector{v31("nvd", "AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H")}, []string{"LAC", "FD", "RD"}},
 	} {
 		t.Run(name, func(t *testing.T) {
 			logs := withCapturedLogs(t)
 			parent := t.TempDir()
 			at := attestation.NewBuilder(attestation.Opts{Provider: "mock", Model: "mock"})
 			m := &fakeLLM{}
-			g := newGen(t, Opts{LLM: m, DebugDir: parent})
+			g := newGen(t, Opts{LLM: m, Config: tc.cfg, DebugDir: parent})
 			g.SetAttestor(at)
 			v := contestedUndescribed()
-			v.CVSS = vectors
+			v.CVSS = tc.vectors
 			var emitted []outputhandler.VulnRating
 			require.NoError(t, g.GenerateRiskScore(context.Background(), []Vulnerability{v}, collect(&emitted)))
 
-			assert.Equal(t, []string{"LAC", "FD", "RD", "PV"}, m.log(), "no Motive, Opportunity, Ease of exploit or adjustment")
+			assert.Equal(t, tc.asked, m.log(), "no Motive, Opportunity, Ease of exploit, Privacy violation or adjustment")
 			assert.NotContains(t, runSummary(t, logs).attrs, "calls."+adjustmentCall)
 			assert.Equal(t, 9, vectorLevel(t, emitted[0].Rating.Vector, "O"))
+			assert.Equal(t, 3, vectorLevel(t, emitted[0].Rating.Vector, "PV"))
 			answers, _ := readAnswers(t, parent)
 			assert.Equal(t, "not_asked", answers.Vulnerabilities[0].Adjustment)
 			for _, line := range strings.Split(claims(t, at)[0].Reasoning, "\n") {

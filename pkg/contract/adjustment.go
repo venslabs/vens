@@ -22,15 +22,17 @@ import (
 	"strings"
 )
 
-// A flagged CVE first gets the ordinary questions; then, when a row
-// describes it, one call shows it the evidence the flag rests on and lets it
-// lower Opportunity, never raise it. Loss of confidentiality, integrity and
-// availability are read from the CVSS v3 vectors: no call asks them.
+// A flagged CVE first gets the ordinary questions; then one call shows it the
+// evidence the flag rests on and lets it lower Opportunity, when a row
+// describes the CVE, and Privacy violation, when the CVE was asked it, never
+// raise them. Loss of confidentiality, integrity and availability are read
+// from the CVSS v3 vectors: the confidentiality question corrects Privacy
+// violation alone.
 
 const adjustmentTemplate = `FLAGGED VULNERABILITY
 {entry}
 
-This vulnerability is flagged: its maintainers dispute it, or its severity sources disagree. Its entry carries the evidence: every CVSS vector published for it with its source, every vendor severity, the flag's quoted evidence, and the answer it was given without that evidence. Reconsider it from that evidence.
+This vulnerability is flagged: its maintainers dispute it, or its severity sources disagree. Its entry carries the evidence: every CVSS vector published for it with its source, every vendor severity, {given}
 
 QUESTIONS
 {questions}
@@ -38,7 +40,18 @@ QUESTIONS
 Choose cannot_tell only when the evidence does not decide.
 Reply with {"reasoning": "...", {fields}}.`
 
-const adjustOpportunityLine = `opportunity: Given this evidence, what access or resources do {group} really need to exploit it here? Answer with one of: {o_ids}; keep, if the answer it was given stands; or cannot_tell.`
+// What the entry carries besides the vectors and the severities, as the
+// adjustment's text names it: the Opportunity answer, to reconsider, when a
+// row describes the CVE; the flag's evidence alone otherwise.
+const (
+	givenAnswer  = "the flag's quoted evidence, and the answer it was given without that evidence. Reconsider it from that evidence."
+	givenNothing = "and the flag's quoted evidence."
+)
+
+const (
+	adjustOpportunityLine     = `opportunity: Given this evidence, what access or resources do {group} really need to exploit it here? Answer with one of: {o_ids}; keep, if the answer it was given stands; or cannot_tell.`
+	adjustConfidentialityLine = `confidentiality: Given this evidence, can exploiting it here affect confidentiality at all? Answer with affected, not_affected or cannot_tell.`
+)
 
 // The flags that send a CVE to the adjustment.
 const (
@@ -57,13 +70,14 @@ type Flag struct {
 // adjustmentEntry is a flagged CVE's entry with the evidence its ordinary
 // questions were not shown: every vendor severity with the packages it came
 // from, every distinct vector of every version and source, C, I and A
-// included, the flags, and the Opportunity answer the ordinary call gave.
+// included, the flags, and the Opportunity answer the ordinary call gave,
+// when a row describes the CVE.
 type adjustmentEntry struct {
 	entry
 	VendorSeverity []sourcedSeverity `json:"vendorSeverity"`
 	CVSS           []sourcedVector   `json:"cvss"`
 	Flags          []Flag            `json:"flags"`
-	Answers        shownAnswers      `json:"answers"`
+	Answers        *shownAnswers     `json:"answers,omitempty"`
 }
 
 type sourcedSeverity struct {
@@ -78,29 +92,39 @@ type sourcedVector struct {
 	Vector  string `json:"vector"`
 }
 
-// shownAnswers is the baseline the adjustment may lower: Opportunity's
-// answer.
+// shownAnswers is the baseline the adjustment may lower and shows:
+// Opportunity's answer.
 type shownAnswers struct {
 	Opportunity string `json:"opportunity"`
 }
 
-const adjustOpportunity = "opportunity"
+const (
+	adjustOpportunity     = "opportunity"
+	adjustConfidentiality = "confidentiality"
+)
 
-// AdjustmentFields lists the fields a flagged CVE's adjustment asks:
-// opportunity, when a row describes the CVE, a description being a
-// prerequisite of any Opportunity answer, ordinary or adjusted. With no field
-// left, there is no adjustment to make.
-func AdjustmentFields(c CVE) []string {
-	if c.Described() {
-		return []string{adjustOpportunity}
+// AdjustmentFields lists the fields a flagged CVE's adjustment asks, in the
+// order its request asks them: opportunity, when a row describes the CVE, a
+// description being a prerequisite of any Opportunity answer, ordinary or
+// adjusted; then confidentiality, when the CVE was asked Privacy violation,
+// which the answer not_affected lowers. With no field left, there is no
+// adjustment to make.
+func AdjustmentFields(d Deployment, c CVE) []string {
+	p := profileOf(c)
+	var fields []string
+	if p.described {
+		fields = append(fields, adjustOpportunity)
 	}
-	return nil
+	if asked(PV, d, p) {
+		fields = append(fields, adjustConfidentiality)
+	}
+	return fields
 }
 
 // AdjustmentRequest returns the request of a flagged CVE's adjustment call:
-// its entry with every row's evidence, its flags and the Opportunity answer
-// its ordinary call gave, then Opportunity's question. The call shares the
-// run's system prompt.
+// its entry with every row's evidence, its flags and, when a row describes
+// it, the Opportunity answer its ordinary call gave, then one question per
+// field AdjustmentFields lists. The call shares the run's system prompt.
 func AdjustmentRequest(d Deployment, c CVE, flags []Flag, given Answers) (string, error) {
 	if err := d.Check(); err != nil {
 		return "", err
@@ -109,31 +133,57 @@ func AdjustmentRequest(d Deployment, c CVE, flags []Flag, given Answers) (string
 	if err != nil {
 		return "", err
 	}
+	fields := AdjustmentFields(d, c)
+	if len(fields) == 0 {
+		return "", noAdjustment(c)
+	}
 	e, err := json.Marshal(entry)
 	if err != nil {
 		return "", err
 	}
+	shown := givenNothing
+	if entry.Answers != nil {
+		shown = givenAnswer
+	}
+	var questions, replied []string
+	for _, name := range fields {
+		line := adjustConfidentialityLine
+		if name == adjustOpportunity {
+			line = fill(adjustOpportunityLine, "{group}", group(d), "{o_ids}", strings.Join(lowerable(), ", "))
+		}
+		questions = append(questions, line)
+		replied = append(replied, `"`+name+`": "..."`)
+	}
 	return fill(adjustmentTemplate,
 		"{entry}", string(e),
-		"{questions}", fill(adjustOpportunityLine, "{group}", group(d), "{o_ids}", strings.Join(lowerable(), ", ")),
-		"{fields}", `"`+adjustOpportunity+`": "..."`,
+		"{given}", shown,
+		"{questions}", strings.Join(questions, "\n"),
+		"{fields}", strings.Join(replied, ", "),
 	), nil
 }
 
 // AdjustmentSchema returns the JSON Schema of a flagged CVE's adjustment
-// call: the reasoning, then Opportunity's answer, keep or cannot_tell.
-func AdjustmentSchema(c CVE) (json.RawMessage, error) {
-	if len(AdjustmentFields(c)) == 0 {
+// call: the reasoning; then, for each field AdjustmentFields lists,
+// Opportunity's answer, keep or cannot_tell, or confidentiality's affected,
+// not_affected or cannot_tell.
+func AdjustmentSchema(d Deployment, c CVE) (json.RawMessage, error) {
+	fields := AdjustmentFields(d, c)
+	if len(fields) == 0 {
 		return nil, noAdjustment(c)
 	}
-	return json.Marshal(object(
-		property{"reasoning", &schema{Type: "string"}},
-		property{adjustOpportunity, enum(append(lowerable(), keep, cannotTell)...)},
-	))
+	ps := []property{{"reasoning", &schema{Type: "string"}}}
+	for _, name := range fields {
+		answers := enum(affected, notAffected, cannotTell)
+		if name == adjustOpportunity {
+			answers = enum(append(lowerable(), keep, cannotTell)...)
+		}
+		ps = append(ps, property{name, answers})
+	}
+	return json.Marshal(object(ps...))
 }
 
 func noAdjustment(c CVE) error {
-	return fmt.Errorf("%s has nothing to adjust: no row describes it", c.ID)
+	return fmt.Errorf("%s has nothing to adjust: no row describes it and it was not asked %s", c.ID, PV)
 }
 
 // lowerable returns Opportunity's answers besides cannot_tell, the ones an
@@ -143,9 +193,9 @@ func lowerable() []string {
 	return slices.Clone(ids[:len(ids)-1])
 }
 
-// newAdjustmentEntry writes a flagged CVE's entry, its evidence and the
-// Opportunity answer its ordinary call gave, which is the baseline the
-// adjustment may lower.
+// newAdjustmentEntry writes a flagged CVE's entry, its evidence and, when a
+// row describes it, the Opportunity answer its ordinary call gave, which is
+// the baseline the adjustment may lower.
 func newAdjustmentEntry(c CVE, flags []Flag, given Answers) (adjustmentEntry, error) {
 	if err := checkCVE(c); err != nil {
 		return adjustmentEntry{}, err
@@ -161,7 +211,9 @@ func newAdjustmentEntry(c CVE, flags []Flag, given Answers) (adjustmentEntry, er
 		VendorSeverity: vendorSeverities(c),
 		CVSS:           []sourcedVector{},
 		Flags:          flags,
-		Answers:        shownAnswers{Opportunity: given.O},
+	}
+	if c.Described() {
+		e.Answers = &shownAnswers{Opportunity: given.O}
 	}
 	for _, v := range c.vectors() {
 		sv := sourcedVector{Source: v.Source, Version: v.Version, Vector: v.Vector}
@@ -216,12 +268,13 @@ func CheckFlags(flags []Flag, c CVE) error {
 
 // checkGiven checks the baseline the adjustment shows: the Opportunity
 // answer of a CVE a row describes, one its question lists, cannot_tell
-// included. A CVE no row describes is not adjusted.
+// included. A CVE no row describes was not asked Opportunity and has no
+// answer.
 func checkGiven(c CVE, given Answers) error {
 	switch {
-	case !c.Described():
-		return noAdjustment(c)
-	case !slices.Contains(table[O].ids, given.O):
+	case !c.Described() && given.O != "":
+		return fmt.Errorf("%s was not asked, %s described by no row, yet has the answer %q", O, c.ID, given.O)
+	case c.Described() && !slices.Contains(table[O].ids, given.O):
 		return fmt.Errorf("%s's answer %q is not one its question lists", O, given.O)
 	}
 	return nil

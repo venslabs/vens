@@ -117,6 +117,15 @@ var frameFlagged = CVE{ID: "CVE-F", Rows: []Row{{PkgName: "libexample", Installe
 
 var frameFlags = []Flag{{Name: MaintainerDisputed, Evidence: "...", Package: "libexample"}}
 
+// frameUndescribed is the flagged CVE no row describes whose adjustment the
+// frames show: it asks confidentiality alone, for Privacy violation.
+var frameUndescribed = CVE{ID: "CVE-U", Rows: []Row{{PkgName: "libexample", InstalledVersion: "1.0.0", Severity: "LOW",
+	Title:            "[Privilege escalation possible to other user than root]",
+	CVSS:             []cvss.Vector{v31("nvd", "AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H")},
+	VendorSeverities: []VendorSeverity{{Source: "debian", Severity: "LOW"}, {Source: "nvd", Severity: "HIGH"}}}}}
+
+var frameUndescribedFlags = []Flag{{Name: SeverityContested, Evidence: "...", Package: "libexample"}}
+
 var frameGiven = Answers{O: "some_access_or_resources_required"}
 
 // frameNumbers keeps each question's file number from the 12 questions of
@@ -135,8 +144,8 @@ func elide(t *testing.T, text, part, placeholder string) string {
 
 // frames renders what one deployment sends, file by file: the system prompt,
 // each question's request and schema over the two CVEs, Non-compliance's
-// only with a framework, and a flagged CVE's adjustment. The CVE entries are
-// elided.
+// only with a framework, and the adjustment of a flagged CVE a row describes
+// and of one none does. The CVE entries are elided.
 func frames(t *testing.T, d Deployment) map[string]string {
 	t.Helper()
 	text, data := text(t), data(t)
@@ -156,7 +165,14 @@ func frames(t *testing.T, d Deployment) map[string]string {
 		t.Fatal(err)
 	}
 	out["13-adjustment.request.txt"] = elide(t, request, data(json.Marshal(e)), "[entry]")
-	out["13-adjustment.schema.json"] = data(AdjustmentSchema(frameFlagged))
+	out["13-adjustment.schema.json"] = data(AdjustmentSchema(d, frameFlagged))
+	request = text(AdjustmentRequest(d, frameUndescribed, frameUndescribedFlags, Answers{}))
+	e, err = newAdjustmentEntry(frameUndescribed, frameUndescribedFlags, Answers{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out["13-adjustment-undescribed.request.txt"] = elide(t, request, data(json.Marshal(e)), "[entry]")
+	out["13-adjustment-undescribed.schema.json"] = data(AdjustmentSchema(d, frameUndescribed))
 	return out
 }
 

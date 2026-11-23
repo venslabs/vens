@@ -36,7 +36,8 @@ func generatedSchemas(t *testing.T) map[string]any {
 	for _, f := range Order() {
 		decode(string(f), data(t)(Schema(f, []string{"CVE-A", "CVE-B"})))
 	}
-	decode("adjustment", data(t)(AdjustmentSchema(describedCVE)))
+	decode("adjustment", data(t)(AdjustmentSchema(base(), describedCVE)))
+	decode("undescribed adjustment", data(t)(AdjustmentSchema(base(), CVE{ID: "CVE-N", Rows: []Row{{PkgName: "liba"}}})))
 	return out
 }
 

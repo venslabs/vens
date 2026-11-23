@@ -522,7 +522,7 @@ func TestGenerator_ClaimReasoningJoinsEachAnswer(t *testing.T) {
 		"FD (less_than_cost_to_fix): because of CVE-2024-0000",
 		"RD (minimal_damage): because of CVE-2024-0000",
 		"PV (none): because of CVE-2024-0000",
-		"adjustment (opportunity: keep): the evidence",
+		"adjustment (opportunity: keep, confidentiality: affected): the evidence",
 	}, lines)
 	score := *emitted[0].Rating.Score
 	assert.Equal(t, fmt.Sprintf("CVE-2024-0000 on pkg  assessed at OWASP risk %.2f (%s)", score, emitted[0].Rating.Severity), got[0].Predicate)
@@ -540,7 +540,7 @@ func TestGenerator_ClaimReasoningKeepsOneLinePerAnswer(t *testing.T) {
 			}
 		},
 		adjust: func(fakeCall) map[string]any {
-			return map[string]any{"reasoning": "\nThe dispute\r\nstands.  ", "opportunity": "keep"}
+			return map[string]any{"reasoning": "\nThe dispute\r\nstands.  ", "opportunity": "keep", "confidentiality": "affected"}
 		},
 	}
 	g := newGen(t, Opts{LLM: m})
@@ -550,14 +550,15 @@ func TestGenerator_ClaimReasoningKeepsOneLinePerAnswer(t *testing.T) {
 	lines := strings.Split(claims(t, at)[0].Reasoning, "\n")
 	require.Len(t, lines, len(questionsUndeclared)+1)
 	assert.Equal(t, "M (low_or_no_reward): It holds the keys. An attacker wants them. Enough.", lines[0])
-	assert.Equal(t, "adjustment (opportunity: keep): The dispute stands.", lines[len(lines)-1])
+	assert.Equal(t, "adjustment (opportunity: keep, confidentiality: affected): The dispute stands.", lines[len(lines)-1])
 }
 
 // Outside a strict run, a CVE no row describes is not asked Motive,
 // Opportunity and Ease of exploit, its vector holding cannot_tell's level for
 // each: its claim says so in their place, with no answer, and the lines of
-// the questions it is asked read as ever. Its flag makes no adjustment call:
-// Opportunity, the one field the adjustment asks, needs a description.
+// the questions it is asked read as ever. Its adjustment asks
+// confidentiality alone, for Privacy violation: Opportunity needs a
+// description.
 func TestGenerator_ClaimSaysWhatAnUndescribedCVEIsNotAsked(t *testing.T) {
 	at := attestation.NewBuilder(attestation.Opts{Provider: "mock", Model: "mock"})
 	g := newGen(t, Opts{LLM: &fakeLLM{}})
@@ -584,6 +585,7 @@ func TestGenerator_ClaimSaysWhatAnUndescribedCVEIsNotAsked(t *testing.T) {
 		"FD (less_than_cost_to_fix): because of CVE-2024-0000",
 		"RD (minimal_damage): because of CVE-2024-0000",
 		"PV (none): because of CVE-2024-0000",
+		"adjustment (confidentiality: affected): the evidence",
 	}, lines)
 	assert.NotContains(t, got[1].Reasoning, "not asked", "a described CVE is asked them")
 }

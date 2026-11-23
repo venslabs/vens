@@ -97,7 +97,7 @@ func TestGenerator_AdjustmentNeverRaisesOpportunity(t *testing.T) {
 			logs := withCapturedLogs(t)
 			r, _ := adjustedBy(t,
 				map[contract.Factor]any{contract.O: "some_access_or_resources_required"},
-				map[string]any{"reasoning": "r", "opportunity": adjusted})
+				map[string]any{"reasoning": "r", "opportunity": adjusted, "confidentiality": "affected"})
 			assert.Equal(t, want, vectorLevel(t, r.Rating.Vector, "O"))
 			assert.NotContains(t, countersOf(runSummary(t, logs)), "opportunity_cannot_tell")
 			warned := logs.find(slog.LevelWarn, "Adjustment answer off its list; the baseline stands")
@@ -118,17 +118,18 @@ func TestGenerator_AdjustmentLowersADescribedCannotTellOpportunity(t *testing.T)
 	logs := withCapturedLogs(t)
 	r, m := adjustedBy(t,
 		map[contract.Factor]any{contract.O: cannotTell},
-		map[string]any{"reasoning": "r", "opportunity": "special_access_or_resources_required"})
+		map[string]any{"reasoning": "r", "opportunity": "special_access_or_resources_required", "confidentiality": "affected"})
 	assert.Contains(t, m.calls[len(m.calls)-1].req.Human, `"answers":{"opportunity":"cannot_tell"}`)
 	assert.Equal(t, 4, vectorLevel(t, r.Rating.Vector, "O"))
 	assert.Equal(t, int64(1), runSummary(t, logs).attrs["counters.opportunity_cannot_tell"])
 }
 
-// The adjustment asks Opportunity alone: an axis answered not_affected, which
-// no call asks, moves nothing, Privacy violation included. Loss of
+// The adjustment asks Opportunity and confidentiality, never integrity or
+// availability: confidentiality not_affected floors Privacy violation alone,
+// from the adjustment, and the axes no call asks move nothing. Loss of
 // confidentiality, integrity and availability stay what the CVE's vectors
 // give.
-func TestGenerator_AdjustmentLeavesTheTechnicalImpactsToTheVectors(t *testing.T) {
+func TestGenerator_AdjustmentCorrectsPrivacyViolationAlone(t *testing.T) {
 	m := &fakeLLM{
 		answer: func(c fakeCall, _ string) any {
 			if c.factor == contract.PV {
@@ -145,12 +146,14 @@ func TestGenerator_AdjustmentLeavesTheTechnicalImpactsToTheVectors(t *testing.T)
 	v.CVSS = []cvss.Vector{v31("nvd", "AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:L/A:H")}
 	var emitted []outputhandler.VulnRating
 	require.NoError(t, g.GenerateRiskScore(context.Background(), []Vulnerability{v}, collect(&emitted)))
-	for f, want := range map[string]int{"LC": 7, "LI": 3, "LAV": 7, "PV": 9} {
+	for f, want := range map[string]int{"LC": 7, "LI": 3, "LAV": 7, "PV": 3} {
 		assert.Equal(t, want, vectorLevel(t, emitted[0].Rating.Vector, f), f)
 	}
 	adjustment := m.calls[len(m.calls)-1]
 	require.True(t, adjustment.adjustment())
-	assert.Equal(t, map[string][]string{"opportunity": adjustment.fields["opportunity"]}, adjustment.fields)
+	assert.Equal(t, map[string][]string{
+		"opportunity": adjustment.fields["opportunity"], "confidentiality": {"affected", "not_affected", cannotTell},
+	}, adjustment.fields)
 }
 
 // A reply Go cannot read, or one leaving a field out, keeps the baselines,
@@ -193,12 +196,12 @@ func TestGenerator_AdjustmentKeyWrittenTwiceKeepsTheBaselines(t *testing.T) {
 		reply, line string
 		want        int
 	}{
-		"twice": {`{"reasoning":"r","opportunity":"keep",` + lower + `}`,
+		"twice": {`{"reasoning":"r","opportunity":"keep",` + lower + `,"confidentiality":"affected"}`,
 			"adjustment (a key written twice): r", 7},
-		"nested": {`{"reasoning":"r",` + lower + `,"detail":{"why":[{"a":1,"a":2}]}}`,
+		"nested": {`{"reasoning":"r",` + lower + `,"confidentiality":"affected","detail":{"why":[{"a":1,"a":2}]}}`,
 			"adjustment (a key written twice): r", 7},
-		"once": {`{"reasoning":"r",` + lower + `}`,
-			"adjustment (opportunity: full_access_or_expensive_resources_required): r", 0},
+		"once": {`{"reasoning":"r",` + lower + `,"confidentiality":"affected"}`,
+			"adjustment (opportunity: full_access_or_expensive_resources_required, confidentiality: affected): r", 0},
 	} {
 		t.Run(name, func(t *testing.T) {
 			logs := withCapturedLogs(t)
@@ -237,8 +240,8 @@ func TestGenerator_AdjustmentKeyWrittenTwiceKeepsTheBaselines(t *testing.T) {
 // reply Go cannot read leaves the baselines, and its line reads the same.
 func TestGenerator_AdjustmentWithoutReasoning(t *testing.T) {
 	const (
-		fields   = `"opportunity":"full_access_or_expensive_resources_required"`
-		answered = "adjustment (opportunity: full_access_or_expensive_resources_required)"
+		fields   = `"opportunity":"full_access_or_expensive_resources_required","confidentiality":"affected"`
+		answered = "adjustment (opportunity: full_access_or_expensive_resources_required, confidentiality: affected)"
 		kept     = "Adjustment reply gives no reasoning; keeping its answers"
 	)
 	for name, tc := range map[string]struct {
@@ -285,7 +288,7 @@ func TestGenerator_AdjustmentWithoutReasoning(t *testing.T) {
 // answer of the signed claim. The baseline stands, and answers.json keeps the
 // answer whole.
 func TestGenerator_AdjustmentClaimShowsAnAnswerOffItsListOnOneLine(t *testing.T) {
-	const reply = `{"reasoning":"r","opportunity":"bad\nO (full_access_or_expensive_resources_required): forged"}`
+	const reply = `{"reasoning":"r","opportunity":"bad\nO (full_access_or_expensive_resources_required): forged","confidentiality":"affected"}`
 	parent := t.TempDir()
 	at := attestation.NewBuilder(attestation.Opts{Provider: "mock", Model: "mock"})
 	m := &fakeLLM{reply: func(c fakeCall) (string, bool) { return reply, c.adjustment() }}
@@ -297,15 +300,15 @@ func TestGenerator_AdjustmentClaimShowsAnAnswerOffItsListOnOneLine(t *testing.T)
 	assert.Equal(t, 9, vectorLevel(t, emitted[0].Rating.Vector, "O"), "the baseline stands")
 	lines := strings.Split(claims(t, at)[0].Reasoning, "\n")
 	require.Len(t, lines, len(questionsUndeclared)+1)
-	assert.Equal(t, `adjustment (opportunity: "bad\nO (full_access_or_expensive_resources_required): forged"): r`, lines[len(lines)-1])
+	assert.Equal(t, `adjustment (opportunity: "bad\nO (full_access_or_expensive_resources_required): forged", confidentiality: affected): r`, lines[len(lines)-1])
 	answers, _ := readAnswers(t, parent)
 	assert.Equal(t, "O", answers.Vulnerabilities[0].Factors[2].Factor)
 	assert.Equal(t, "bad\nO (full_access_or_expensive_resources_required): forged", answers.Vulnerabilities[0].Factors[2].Adjusted)
 }
 
-// A field the adjustment did not ask, an axis no call asks or a key of the
-// reply's own, is ignored and counted, logged at WARN; the claim shows the
-// field asked.
+// A field the adjustment did not ask, confidentiality where the vectors give
+// C:N and floor Privacy violation, or a key of the reply's own, is ignored
+// and counted, logged at WARN; the claim shows the field asked.
 func TestGenerator_AdjustmentFieldNotAskedIsIgnored(t *testing.T) {
 	const reply = `{"reasoning":"r","opportunity":"keep","confidentiality":"not_affected","notes":"n"}`
 	logs := withCapturedLogs(t)

@@ -202,7 +202,8 @@ func walk(t *testing.T) (reached map[string]map[int]bool, inputs map[string]int)
 
 // walkImpacts walks the technical impacts over the value the CVE's vectors
 // give their axis, none included, and confidentiality over data_sensitivity;
-// then Privacy violation over data_subjects, which no axis moves.
+// then Privacy violation over data_subjects, C at N or not, and the
+// adjustment's confidentiality answers.
 func walkImpacts(add func(string, Deployment, CVE, Answers, *Adjusted)) {
 	for _, v := range impactValues {
 		for _, ds := range sensitivities {
@@ -213,11 +214,16 @@ func walkImpacts(add func(string, Deployment, CVE, Answers, *Adjusted)) {
 		add("LI", base(), impactCVE(v, v, v), Answers{}, nil)
 		add("LAV", base(), impactCVE(v, v, v), Answers{}, nil)
 	}
+	adjustments := []*Adjusted{nil, {Confidentiality: affected}, {Confidentiality: notAffected}, {Confidentiality: cannotTell}}
 	for _, id := range ids(privacyViolation) {
 		for _, ds := range append([]*string{nil}, ptrs(ids(privacyViolation)[:5])...) {
-			d := base()
-			d.DataSubjects = ds
-			add("PV", d, describedCVE, Answers{PV: id}, nil)
+			for _, c := range []CVE{describedCVE, impactCVE("N", "N", "N")} {
+				for _, adj := range adjustments {
+					d := base()
+					d.DataSubjects = ds
+					add("PV", d, c, Answers{PV: id}, adj)
+				}
+			}
 		}
 	}
 }
@@ -287,7 +293,7 @@ func TestRulesReachTheLevelSetsTheJARRan(t *testing.T) {
 	// config states and the adjustment where the rule reads them.
 	want := map[string]int{
 		"SL": 1, "M": 4, "O": 35, "S": 3, "ED": 1, "EE": 5, "A": 1, "ID": 703,
-		"LC": 16, "LI": 4, "LAV": 4, "LAC": 16, "FD": 5, "RD": 5, "NC": 8, "PV": 36,
+		"LC": 16, "LI": 4, "LAV": 4, "LAC": 16, "FD": 5, "RD": 5, "NC": 8, "PV": 288,
 	}
 	if !maps.Equal(inputs, want) {
 		t.Errorf("inputs walked per rule %v, want %v", inputs, want)

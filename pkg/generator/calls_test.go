@@ -45,11 +45,11 @@ func fullConfig() *riskconfig.Config {
 	return cfg
 }
 
-// A batch asks in the declared order, each question of the CVEs that get
-// it, whatever the first CVE's vectors: the order never depends on the first
-// CVE's questions, and no call asks Loss of confidentiality, integrity or
-// availability. The debug files and the evidence's prompt hashes follow the
-// calls.
+// A batch whose first CVE's vectors give C:N, which floors its Privacy
+// violation, still asks in the declared order, each question of the CVEs
+// that get it: the order never depends on the first CVE's questions, and no
+// call asks Loss of confidentiality, integrity or availability. The debug
+// files and the evidence's prompt hashes follow the calls.
 func TestGenerator_AsksInTheDeclaredOrder(t *testing.T) {
 	parent := t.TempDir()
 	m := &fakeLLM{}
@@ -73,7 +73,7 @@ func TestGenerator_AsksInTheDeclaredOrder(t *testing.T) {
 		{"FD", []string{"CVE-2024-0000", "CVE-2024-0001"}},
 		{"RD", []string{"CVE-2024-0000", "CVE-2024-0001"}},
 		{"NC", []string{"CVE-2024-0000", "CVE-2024-0001"}},
-		{"PV", []string{"CVE-2024-0000", "CVE-2024-0001"}},
+		{"PV", []string{"CVE-2024-0001"}},
 	}
 	require.Len(t, m.calls, len(want))
 	dirs, err := filepath.Glob(filepath.Join(parent, "run-*"))
@@ -91,8 +91,8 @@ func TestGenerator_AsksInTheDeclaredOrder(t *testing.T) {
 }
 
 // Non-compliance is asked only with a framework; Intrusion detection only
-// with detection at levels that differ; Privacy violation only when
-// data_subjects is unset or caps above 3, whatever the vectors give C. A
+// with detection at levels that differ; Privacy violation only when the
+// vectors do not give C:N and data_subjects is unset or caps above 3. A
 // question not asked takes the level Go decides and counts no cannot_tell,
 // however every asked question is answered.
 func TestGenerator_QuestionsNotAsked(t *testing.T) {
@@ -107,8 +107,8 @@ func TestGenerator_QuestionsNotAsked(t *testing.T) {
 		{
 			name:     "every axis at N",
 			cvss:     []cvss.Vector{v31("nvd", noImpact)},
-			notAsked: []string{"LC", "LI", "LAV", "ID", "NC"},
-			levels:   map[string]int{"LC": 2, "LI": 1, "LAV": 1, "PV": 9},
+			notAsked: []string{"LC", "LI", "LAV", "PV", "ID", "NC"},
+			levels:   map[string]int{"LC": 2, "LI": 1, "LAV": 1, "PV": 3},
 		},
 		{
 			name:     "no framework, no detection",
@@ -192,8 +192,9 @@ func TestGenerator_QuestionsNotAsked(t *testing.T) {
 
 // Loss of confidentiality, integrity and availability come from the CVE's
 // own vectors, every vector of every row, the worst value per axis, and from
-// no answer: no call asks them, and Privacy violation is asked whatever the
-// vectors give C. A CVE with no vector takes 9 for each, counted once.
+// no answer: no call asks them. Privacy violation takes its floor, not asked,
+// where they give C:N. A CVE with no vector takes 9 for each, counted once,
+// and is asked Privacy violation.
 func TestGenerator_TechnicalImpactsFromTheCVEsOwnVectors(t *testing.T) {
 	logs := withCapturedLogs(t)
 	vulns := []Vulnerability{
@@ -213,10 +214,10 @@ func TestGenerator_TechnicalImpactsFromTheCVEsOwnVectors(t *testing.T) {
 	var emitted []outputhandler.VulnRating
 	require.NoError(t, g.GenerateRiskScore(context.Background(), vulns, collect(&emitted)))
 
-	assert.Equal(t, []string{"CVE-2024-0001", "CVE-2024-0002", "CVE-2024-0003"}, m.of(contract.PV)[0].ids)
+	assert.Equal(t, []string{"CVE-2024-0002", "CVE-2024-0003"}, m.of(contract.PV)[0].ids)
 	got := byID(emitted)
 	for id, want := range map[string]map[string]int{
-		"CVE-2024-0001": {"LC": 2, "LI": 1, "LAV": 1, "PV": 9},
+		"CVE-2024-0001": {"LC": 2, "LI": 1, "LAV": 1, "PV": 3},
 		"CVE-2024-0002": {"LC": 7, "LI": 3, "LAV": 7, "PV": 9},
 		"CVE-2024-0003": {"LC": 9, "LI": 9, "LAV": 9, "PV": 9},
 	} {
@@ -346,7 +347,8 @@ func TestGenerator_ConflictingRows(t *testing.T) {
 
 	adjustment := m.calls[len(m.calls)-1]
 	assert.Equal(t, map[string][]string{
-		"opportunity": {"no_access_or_resources_required", "some_access_or_resources_required", "special_access_or_resources_required", "full_access_or_expensive_resources_required", "keep", cannotTell},
+		"opportunity":     {"no_access_or_resources_required", "some_access_or_resources_required", "special_access_or_resources_required", "full_access_or_expensive_resources_required", "keep", cannotTell},
+		"confidentiality": {"affected", "not_affected", cannotTell},
 	}, adjustment.fields)
 	var shown struct {
 		Packages []struct {

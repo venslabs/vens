@@ -135,24 +135,27 @@ func TestProviderAcceptanceGate(t *testing.T) {
 		}}, "calls.M: 2, want 1"},
 		"an unreadable adjustment": {&fakeLLM{reply: adjustment(`not json`)}, "defects.adjustment_unreadable: 1"},
 		"an adjustment key written twice": {&fakeLLM{reply: adjustment(
-			`{"reasoning":"r","opportunity":"keep","opportunity":"keep"}`,
+			`{"reasoning":"r","opportunity":"keep","opportunity":"keep","confidentiality":"affected"}`,
 		)}, "defects.adjustment_key_written_twice: 1"},
 		"an adjustment answer off its list": {&fakeLLM{reply: adjustment(
-			`{"reasoning":"r","opportunity":"bogus"}`,
+			`{"reasoning":"r","opportunity":"bogus","confidentiality":"affected"}`,
 		)}, "defects.adjustment_off_list: 1"},
+		"two adjustment answers off their lists, counted per field": {&fakeLLM{reply: adjustment(
+			`{"reasoning":"r","opportunity":"bogus","confidentiality":"bogus"}`,
+		)}, "defects.adjustment_off_list: 2"},
 		"an adjustment field not asked": {&fakeLLM{reply: adjustment(
-			`{"reasoning":"r","opportunity":"keep","notes":"n"}`,
+			`{"reasoning":"r","opportunity":"keep","confidentiality":"affected","notes":"n"}`,
 		)}, "defects.adjustment_field_not_asked: 1"},
 		"two axes no call asks, counted per field": {&fakeLLM{reply: adjustment(
-			`{"reasoning":"r","opportunity":"keep","confidentiality":"not_affected","integrity":"bogus"}`,
+			`{"reasoning":"r","opportunity":"keep","confidentiality":"affected","integrity":"not_affected","availability":"bogus"}`,
 		)}, "defects.adjustment_field_not_asked: 2"},
 		"an adjustment field left out": {&fakeLLM{reply: adjustment(
-			`{"reasoning":"r"}`,
+			`{"reasoning":"r","opportunity":"keep"}`,
 		)}, "defects.adjustment_off_list: 1"},
-		"an adjustment without reasoning": {&fakeLLM{reply: adjustment(`{"opportunity":"keep"}`)},
+		"an adjustment without reasoning": {&fakeLLM{reply: adjustment(`{"opportunity":"keep","confidentiality":"affected"}`)},
 			"defects.adjustment_without_reasoning: 1"},
 		"an adjustment reasoning that is a list": {&fakeLLM{reply: adjustment(
-			`{"reasoning":["r"],"opportunity":"keep"}`,
+			`{"reasoning":["r"],"opportunity":"keep","confidentiality":"affected"}`,
 		)}, "defects.adjustment_without_reasoning: 1"},
 	} {
 		t.Run(name, func(t *testing.T) {

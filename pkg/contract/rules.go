@@ -90,9 +90,26 @@ var detectionLevels = map[string]owasp.IntrusionDetection{
 	activeInApplication:   owasp.IntrusionDetectionActiveDetectionInApplication,
 }
 
-// privacyFloor is Privacy violation's lowest level, which none and
-// one_individual cap it at.
+// privacyFloor is Privacy violation's lowest level: a CVE whose usable CVSS
+// v3 vectors give C:N takes it, and none and one_individual cap it at it.
 const privacyFloor = owasp.PrivacyViolationOneIndividual
+
+// profile is what the rules read of a CVE besides its answers: whether a row
+// describes it, and what its CVSS v3 vectors give the technical impacts.
+type profile struct {
+	described bool
+	impact    cvss.Impact
+}
+
+func profileOf(c CVE) profile {
+	return profile{described: c.Described(), impact: cvss.ImpactOf(c.vectors())}
+}
+
+// noConfidentiality reports whether the CVE has a usable CVSS v3 vector and
+// the worst C they give is N: Privacy violation then takes its floor.
+func (p profile) noConfidentiality() bool {
+	return !p.impact.Vectorless() && p.impact.Values[cvss.Confidentiality] == "N"
+}
 
 // isBand reports whether s is one of Privacy violation's bands.
 func isBand(s string) bool {
@@ -110,12 +127,12 @@ func band(s string) owasp.PrivacyViolation {
 // asked reports whether a CVE gets factor f's question. A question is not
 // asked where Go has decided the level, so the model cannot contradict Go,
 // nor where no answer could move it.
-func asked(f Factor, d Deployment, described bool) bool {
+func asked(f Factor, d Deployment, p profile) bool {
 	switch f {
 	case M, O, EE:
 		// A description is a prerequisite of their answers: a CVE no row
 		// describes takes cannot_tell's level for each.
-		return described
+		return p.described
 	case ID:
 		// Undeclared, every channel is the worst case; declared at one level,
 		// every set of channels gives that level.
@@ -127,15 +144,16 @@ func asked(f Factor, d Deployment, described bool) bool {
 	case NC:
 		return len(d.Frameworks) > 0
 	case PV:
-		// none and one_individual cap it at the lowest level; undeclared caps
-		// nothing.
-		return d.DataSubjects == nil || band(*d.DataSubjects) > privacyFloor
+		// C:N on every usable v3 vector floors it; none and one_individual cap
+		// it at the floor; undeclared caps nothing.
+		return !p.noConfidentiality() && (d.DataSubjects == nil || band(*d.DataSubjects) > privacyFloor)
 	}
 	return true
 }
 
 // Questions returns the questions a CVE gets, in the order the calls ask
-// them, from the deployment and whether a row describes the CVE.
+// them, from the deployment, whether a row describes the CVE and what its
+// CVSS v3 vectors give confidentiality.
 func Questions(d Deployment, c CVE) ([]Factor, error) {
 	if err := d.Check(); err != nil {
 		return nil, err
@@ -143,9 +161,10 @@ func Questions(d Deployment, c CVE) ([]Factor, error) {
 	if err := checkCVE(c); err != nil {
 		return nil, err
 	}
+	p := profileOf(c)
 	var questions []Factor
 	for _, f := range order {
-		if asked(f, d, c.Described()) {
+		if asked(f, d, p) {
 			questions = append(questions, f)
 		}
 	}
@@ -163,14 +182,21 @@ type Answers struct {
 
 // The adjustment's answers besides Opportunity's own. Its cannot_tell is an
 // abstention: it leaves the baseline and is not counted.
-const keep = "keep"
+const (
+	keep        = "keep"
+	affected    = "affected"
+	notAffected = "not_affected"
+)
 
-// Adjusted is a flagged CVE's adjustment reply, empty when the call did not
-// ask Opportunity or the reply left it out. Only an answer below the
-// baseline of a CVE a row describes moves the level: keep, cannot_tell and
-// anything off the list leave the baseline.
+// Adjusted is a flagged CVE's adjustment reply. A field the call did not ask,
+// or the reply left out, is empty. Only an Opportunity answer below the
+// baseline of a CVE a row describes, or confidentiality answered
+// not_affected for a CVE asked Privacy violation, moves a level, and the
+// second moves Privacy violation alone: keep, affected, cannot_tell and
+// anything off the lists leave the baselines.
 type Adjusted struct {
-	Opportunity string
+	Opportunity     string
+	Confidentiality string
 }
 
 // Levels is a CVE's 16 levels and what Go read to reach them.
@@ -193,12 +219,14 @@ type Levels struct {
 
 // Compute applies the 16 rules to one CVE: the deployment, the CVE's rows
 // and their CVSS vectors, its answers, and for a flagged CVE its adjustment,
-// nil otherwise. The adjustment never raises Opportunity, and leaves the
-// Opportunity of a CVE no row describes at cannot_tell's level, whatever it
-// answers. Loss of confidentiality, integrity and availability are read from
-// the worst value each axis takes over the CVE's usable CVSS v3 vectors, the
-// first crossed with data_sensitivity; with none usable, each takes its
-// worst level, counted.
+// nil otherwise. The adjustment never raises a level, leaves the Opportunity
+// of a CVE no row describes at cannot_tell's level, whatever it answers, and
+// through its confidentiality answer lowers Privacy violation alone. Loss of
+// confidentiality, integrity and availability are read from the worst value
+// each axis takes over the CVE's usable CVSS v3 vectors, the first crossed
+// with data_sensitivity; with none usable, each takes its worst level,
+// counted. A CVE whose usable v3 vectors give C:N has Privacy violation at
+// its floor, not asked.
 func Compute(d Deployment, c CVE, a Answers, adjusted *Adjusted) (Levels, error) {
 	if err := d.Check(); err != nil {
 		return Levels{}, err
@@ -206,8 +234,9 @@ func Compute(d Deployment, c CVE, a Answers, adjusted *Adjusted) (Levels, error)
 	if err := checkCVE(c); err != nil {
 		return Levels{}, err
 	}
-	s := &scorer{d: d, described: c.Described(), levels: Levels{
-		Sources: map[Factor]Source{}, Readings: map[Factor]Reading{}, Impact: cvss.ImpactOf(c.vectors()),
+	p := profileOf(c)
+	s := &scorer{d: d, p: p, levels: Levels{
+		Sources: map[Factor]Source{}, Readings: map[Factor]Reading{}, Impact: p.impact,
 	}}
 	if adjusted == nil {
 		adjusted = &Adjusted{}
@@ -228,15 +257,15 @@ func Compute(d Deployment, c CVE, a Answers, adjusted *Adjusted) (Levels, error)
 	v.FD = answered(s, financialDamage, a.FD)
 	v.RD = answered(s, reputationDamage, a.RD)
 	v.NC = s.nonCompliance(a.NC)
-	v.PV = s.privacy(a.PV)
+	v.PV = s.privacy(a.PV, adjusted.Confidentiality)
 	s.levels.Vector = v
 	return s.levels, nil
 }
 
 type scorer struct {
-	d         Deployment
-	described bool
-	levels    Levels
+	d      Deployment
+	p      profile
+	levels Levels
 }
 
 func (s *scorer) count(counter string) {
@@ -267,7 +296,7 @@ func answered[V any](s *scorer, c contract[V], id string) V {
 // no row describes is not asked them, a description being a prerequisite of
 // their answers: each takes cannot_tell's level, counted, whatever id holds.
 func likelihood[L ~int](s *scorer, c contract[L], id string) L {
-	if asked(c.factor, s.d, s.described) {
+	if asked(c.factor, s.d, s.p) {
 		return answered(s, c, id)
 	}
 	level, _ := c.read(cannotTell)
@@ -312,7 +341,7 @@ func (s *scorer) technicalImpacts() (owasp.LossOfConfidentiality, owasp.LossOfIn
 // not the call asked it.
 func (s *scorer) opportunity(id, adjusted string) owasp.Opportunity {
 	level := likelihood(s, opportunity, id)
-	if lower, r := opportunity.read(adjusted); r == Answered && asked(O, s.d, s.described) {
+	if lower, r := opportunity.read(adjusted); r == Answered && asked(O, s.d, s.p) {
 		return lowered(s, O, level, lower)
 	}
 	return level
@@ -324,7 +353,7 @@ func (s *scorer) intrusionDetection(chosen []string) owasp.IntrusionDetection {
 		return from(s, ID, SourceConfig, owasp.IntrusionDetectionNotLogged)
 	}
 	levels := s.d.Detection.levels()
-	if !asked(ID, s.d, s.described) {
+	if !asked(ID, s.d, s.p) {
 		return from(s, ID, SourceConfig, levels[0])
 	}
 	level, r := readChannels(chosen, levels)
@@ -412,16 +441,21 @@ func (s *scorer) accountability(id string) owasp.LossOfAccountability {
 
 // nonCompliance is OWASP's lowest level, a floor, when no framework applies.
 func (s *scorer) nonCompliance(id string) owasp.NonCompliance {
-	if !asked(NC, s.d, s.described) {
+	if !asked(NC, s.d, s.p) {
 		return from(s, NC, SourceConfig, owasp.NonComplianceMinorViolation)
 	}
 	return answered(s, nonCompliance, id)
 }
 
-// privacy is the lower of the answer's band and the declared population's;
-// undeclared, the population caps nothing.
-func (s *scorer) privacy(id string) owasp.PrivacyViolation {
-	if !asked(PV, s.d, s.described) {
+// privacy is the lower of the answer's band and the declared population's,
+// undeclared capping nothing, and the floor when the adjustment answered
+// confidentiality not_affected; the floor, not asked, when the CVE's usable
+// CVSS v3 vectors give C:N.
+func (s *scorer) privacy(id, adjustedConfidentiality string) owasp.PrivacyViolation {
+	switch {
+	case s.p.noConfidentiality():
+		return from(s, PV, SourceFloor, privacyFloor)
+	case !asked(PV, s.d, s.p):
 		// data_subjects declares none or one individual: the cap is the floor.
 		return from(s, PV, SourceConfig, privacyFloor)
 	}
@@ -430,6 +464,9 @@ func (s *scorer) privacy(id string) owasp.PrivacyViolation {
 		s.count("data_subjects_missing")
 	} else if limit := band(*s.d.DataSubjects); limit < level {
 		level = from(s, PV, SourceConfig, limit)
+	}
+	if adjustedConfidentiality == notAffected {
+		return lowered(s, PV, level, privacyFloor)
 	}
 	return level
 }

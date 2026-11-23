@@ -169,7 +169,7 @@ New in v0.7.0. How many distinct people's personal data this service can read: w
 | `thousands` | 1,000 to 999,999 | 7 |
 | `millions` | 1,000,000 or more | 9 |
 
-vens reads this field alone; no call sends it. The Privacy violation question asks the model for the band of people whose data an exploit could disclose, and the declared band caps that answer. With `none` or `one_individual`, Privacy violation is 3 and the question is not asked.
+vens reads this field alone; no call sends it. The Privacy violation question asks the model for the band of people whose data an exploit could disclose, and the declared band caps that answer. With `none` or `one_individual`, Privacy violation is 3 and the question is not asked; so it is for a CVE whose usable CVSS v3 vectors give `C:N` (see [`data_sensitivity`](#contextdata_sensitivity)). A flagged CVE's adjustment asks confidentiality again from the flag's evidence, and `not_affected` lowers Privacy violation to 3.
 
 Left out, nothing caps the model's answer: each CVE asked Privacy violation adds one to the `data_subjects_missing` counter, vens warns at load (W5), and `--strict` refuses the run.
 

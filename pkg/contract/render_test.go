@@ -282,7 +282,8 @@ var digit = regexp.MustCompile(`[0-9]`)
 func TestNoLevelIsShown(t *testing.T) {
 	for _, s := range []string{
 		systemTemplate, projectLine, descriptionLine, exposureLine, listenerLine, notesLine,
-		requestTemplate, cvssSentence, adjustmentTemplate, adjustOpportunityLine,
+		requestTemplate, cvssSentence, adjustmentTemplate, adjustOpportunityLine, adjustConfidentialityLine,
+		givenAnswer, givenNothing,
 	} {
 		if digit.MatchString(s) {
 			t.Errorf("a frame holds a digit: %q", s)
@@ -401,44 +402,82 @@ func TestAdjustmentEntryListsEveryRowsEvidence(t *testing.T) {
 	}
 }
 
-// The adjustment asks Opportunity alone, when a row describes the CVE, in
-// its request, its reply line and its schema alike: Loss of confidentiality,
-// integrity and availability are Go's, whatever the CVE's vectors. A CVE no
-// row describes has nothing to adjust: the request and the schema are
-// refused.
-func TestAdjustmentAsksOpportunityAlone(t *testing.T) {
-	undescribed := CVE{ID: "CVE-N", Rows: []Row{{PkgName: "libfoo", Title: "Overflow in libfoo", Severity: "LOW"}}}
-	if got := AdjustmentFields(undescribed); got != nil {
-		t.Errorf("a CVE no row describes: fields %v", got)
-	}
-	if _, err := AdjustmentRequest(base(), undescribed, adjustFlags, Answers{}); err == nil {
-		t.Error("a request for a CVE no row describes")
-	}
-	if _, err := AdjustmentSchema(undescribed); err == nil {
-		t.Error("a schema for a CVE no row describes")
-	}
-	if got := AdjustmentFields(conflicting); !slices.Equal(got, []string{"opportunity"}) {
-		t.Errorf("a described CVE: fields %v", got)
-	}
-	request := text(t)(AdjustmentRequest(base(), conflicting, adjustFlags, adjustGiven))
-	questions := strings.Split(strings.Split(request, "\nQUESTIONS\n")[1], "\n\n")[0]
-	if !strings.HasPrefix(questions, "opportunity: ") || strings.Contains(questions, "\n") {
-		t.Errorf("asks %q", questions)
-	}
-	if !strings.HasSuffix(request, `Reply with {"reasoning": "...", "opportunity": "..."}.`) {
-		t.Errorf("ends %q", request[strings.LastIndex(request, "\n")+1:])
-	}
-	for _, word := range []string{"confidentiality:", "integrity", "availability", "not_affected", "reachab"} {
-		if strings.Contains(request, word) {
-			t.Errorf("the request shows %q:\n%s", word, request)
-		}
-	}
-	var s struct{ Required []string }
-	if err := json.Unmarshal([]byte(data(t)(AdjustmentSchema(conflicting))), &s); err != nil {
-		t.Fatal(err)
-	}
-	if !slices.Equal(s.Required, []string{"reasoning", "opportunity"}) {
-		t.Errorf("the schema requires %v", s.Required)
+// The adjustment asks Opportunity, when a row describes the CVE, then
+// confidentiality, when the CVE was asked Privacy violation, in its request,
+// its reply line and its schema alike, never integrity or availability: Loss
+// of confidentiality, integrity and availability are Go's, and the
+// confidentiality answer corrects Privacy violation alone. A CVE no row
+// describes is shown no Opportunity and no answer; with nothing left to ask,
+// the request and the schema are refused.
+func TestAdjustmentAsksOpportunityAndConfidentiality(t *testing.T) {
+	undescribed := CVE{ID: "CVE-N", Rows: []Row{{PkgName: "libfoo", Title: "Overflow in libfoo", Severity: "LOW",
+		CVSS: []cvss.Vector{v31("nvd", "AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N")}}}}
+	noConfidentiality := CVE{ID: "CVE-Z", Rows: []Row{{PkgName: "libfoo", Description: "Described.",
+		CVSS: []cvss.Vector{v31("nvd", "AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:H")}}}}
+	capped := base()
+	capped.DataSubjects = ptr("one_individual")
+	both := []string{"opportunity", "confidentiality"}
+	for name, c := range map[string]struct {
+		d     Deployment
+		cve   CVE
+		given Answers
+		want  []string
+	}{
+		"described, Privacy violation asked":         {base(), conflicting, adjustGiven, both},
+		"undescribed, Privacy violation asked":       {base(), undescribed, Answers{}, []string{"confidentiality"}},
+		"described, Privacy violation capped":        {capped, conflicting, adjustGiven, []string{"opportunity"}},
+		"described, C:N on every usable v3 vector":   {base(), noConfidentiality, adjustGiven, []string{"opportunity"}},
+		"undescribed, Privacy violation capped":      {capped, undescribed, Answers{}, nil},
+		"undescribed, C:N on every usable v3 vector": {base(), CVE{ID: "CVE-Y", Rows: []Row{{PkgName: "a", CVSS: noConfidentiality.Rows[0].CVSS}}}, Answers{}, nil},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if got := AdjustmentFields(c.d, c.cve); !slices.Equal(got, c.want) {
+				t.Fatalf("fields %v, want %v", got, c.want)
+			}
+			if c.want == nil {
+				if _, err := AdjustmentRequest(c.d, c.cve, adjustFlags, c.given); err == nil {
+					t.Error("a request with nothing to ask")
+				}
+				if _, err := AdjustmentSchema(c.d, c.cve); err == nil {
+					t.Error("a schema with nothing to ask")
+				}
+				return
+			}
+			flags := adjustFlags
+			if !c.cve.Described() {
+				flags = []Flag{{SeverityContested, "LOW from debian, NVD says HIGH", "libfoo"}}
+			}
+			request := text(t)(AdjustmentRequest(c.d, c.cve, flags, c.given))
+			questions := strings.Split(strings.Split(request, "\nQUESTIONS\n")[1], "\n\n")[0]
+			var asked []string
+			for _, line := range strings.Split(questions, "\n") {
+				name, _, _ := strings.Cut(line, ":")
+				asked = append(asked, name)
+			}
+			var s struct{ Required []string }
+			if err := json.Unmarshal([]byte(data(t)(AdjustmentSchema(c.d, c.cve))), &s); err != nil {
+				t.Fatal(err)
+			}
+			reply := `Reply with {"reasoning": "...", "` + strings.Join(c.want, `": "...", "`) + `": "..."}.`
+			if !slices.Equal(asked, c.want) || !slices.Equal(s.Required, append([]string{"reasoning"}, c.want...)) || !strings.HasSuffix(request, reply) {
+				t.Errorf("asks %v, requires %v, ends %q", asked, s.Required, request[strings.LastIndex(request, "\n")+1:])
+			}
+			for _, word := range []string{"integrity", "availability", "reachab"} {
+				if strings.Contains(request, word) {
+					t.Errorf("the request shows %q:\n%s", word, request)
+				}
+			}
+			if c.cve.Described() {
+				if !strings.Contains(request, "every vendor severity, the flag's quoted evidence, and the answer it was given without that evidence. Reconsider it from that evidence.\n") {
+					t.Errorf("the text before the questions:\n%s", request)
+				}
+				return
+			}
+			if strings.Contains(strings.ToLower(request), "opportunit") || strings.Contains(request, `"answers"`) ||
+				!strings.Contains(request, "every vendor severity, and the flag's quoted evidence.\n") {
+				t.Errorf("the request of a CVE no row describes:\n%s", request)
+			}
+		})
 	}
 }
 
@@ -584,19 +623,20 @@ func TestAdjustmentRefusesWhatItCannotShow(t *testing.T) {
 	if _, err := AdjustmentRequest(base(), conflicting, adjustFlags, Answers{O: cannotTell}); err != nil {
 		t.Errorf("a cannot_tell baseline: %v", err)
 	}
-	// A CVE no row describes was not asked Opportunity: nothing to adjust.
+	// A CVE no row describes was not asked Opportunity.
 	undescribed := CVE{ID: "CVE-N", Rows: []Row{{PkgName: "libfoo"}}}
-	for _, given := range []Answers{adjustGiven, {}} {
-		if _, err := AdjustmentRequest(base(), undescribed, adjustFlags, given); err == nil {
-			t.Errorf("an adjustment of a CVE no row describes, given %+v", given)
-		}
+	if _, err := AdjustmentRequest(base(), undescribed, adjustFlags, adjustGiven); err == nil {
+		t.Error("an Opportunity answer for a CVE no row describes was shown")
+	}
+	if _, err := AdjustmentRequest(base(), undescribed, adjustFlags, Answers{}); err != nil {
+		t.Errorf("no Opportunity answer for a CVE no row describes: %v", err)
 	}
 }
 
 // A description is a prerequisite of any Opportunity answer, the
-// adjustment's too. A flagged CVE no row describes makes no adjustment call,
-// and Compute leaves its O at cannot_tell's 9 whatever an adjustment would
-// answer. A described CVE is shown the answer Go keeps, which keep keeps and
+// adjustment's too. A flagged CVE no row describes is shown no Opportunity
+// baseline, and Compute leaves its O at cannot_tell's 9 whatever the
+// adjustment answers. A described CVE is shown the answer Go keeps, which keep keeps and
 // a lower answer lowers, a cannot_tell baseline included: there the model
 // abstained, and Go set nothing aside.
 func TestAdjustmentLowersTheOpportunityOfADescribedCVEOnly(t *testing.T) {

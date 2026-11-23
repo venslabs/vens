@@ -33,7 +33,8 @@ import (
 // Opportunity and Ease of exploit are asked only of a CVE a row describes,
 // and no adjustment lowers the Opportunity of one no row describes; Loss of
 // confidentiality, integrity and availability are the vectors' whatever the
-// answers and the adjustment; and the readings are the questions asked, and
+// answers and the adjustment; Privacy violation sits at its floor, not asked,
+// where the vectors give C:N; and the readings are the questions asked, and
 // for a CVE no row describes the likelihood questions it is not asked for
 // want of a description.
 func FuzzCompute(f *testing.F) {
@@ -90,7 +91,10 @@ func FuzzCompute(f *testing.F) {
 		}
 		var adjusted *Adjusted
 		if next()%2 == 1 {
-			adjusted = &Adjusted{Opportunity: pick(append([]string{keep}, ids(opportunity)...))}
+			adjusted = &Adjusted{
+				Opportunity:     pick(append([]string{keep}, ids(opportunity)...)),
+				Confidentiality: pick([]string{affected, notAffected, cannotTell}),
+			}
 		}
 
 		l, err := Compute(d, c, a, adjusted)
@@ -130,6 +134,9 @@ func FuzzCompute(f *testing.F) {
 		}
 		if l.Vector.LC != plain.Vector.LC || l.Vector.LI != plain.Vector.LI || l.Vector.LAV != plain.Vector.LAV {
 			t.Errorf("answers %+v and adjustment %+v moved the technical impacts: %+v, the vectors give %+v", a, adjusted, l.Vector, plain.Vector)
+		}
+		if profileOf(c).noConfidentiality() && (l.Vector.PV != privacyFloor || l.Sources[PV] != SourceFloor || slices.Contains(asked, PV)) {
+			t.Errorf("C at N: PV %d from %v, asked %v", l.Vector.PV, l.Sources[PV], asked)
 		}
 	})
 }
