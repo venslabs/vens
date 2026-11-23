@@ -136,6 +136,9 @@ func FuzzCompute(f *testing.F) {
 		if l.Vector.LC != plain.Vector.LC || l.Vector.LI != plain.Vector.LI || l.Vector.LAV != plain.Vector.LAV {
 			t.Errorf("answers %+v and adjustment %+v moved the technical impacts: %+v, the vectors give %+v", a, adjusted, l.Vector, plain.Vector)
 		}
+		if l.ImpactFallback != slices.Contains(l.Counters, vectorMissing) || l.ImpactFallback != l.Impact.Vectorless() {
+			t.Errorf("fallback %v, counters %v, vectorless %v: the fallback is the event cvss_v3_missing counts", l.ImpactFallback, l.Counters, l.Impact.Vectorless())
+		}
 		if profileOf(c).noConfidentiality() && (l.Vector.PV != privacyFloor || l.Sources[PV] != SourceFloor || slices.Contains(asked, PV)) {
 			t.Errorf("C at N: PV %d from %v, asked %v", l.Vector.PV, l.Sources[PV], asked)
 		}

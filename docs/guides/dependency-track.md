@@ -139,5 +139,6 @@ Over the API, `GET /api/v1/finding/project/$PROJECT` returns the vector and the 
 ## Known limits
 
 - **Ranking still follows CVSS.** Dependency-Track stores and displays the OWASP score, but severity, the findings list and the dashboards are still driven by CVSS. Two projects with very different contextual scores show the same severity breakdown.
+- **No "impact unknown" list.** Dependency-Track 5.1 reads neither the VEX's `vens:impact-provenance` property nor vens's order (severity, then score, then identifier among impact-assessed findings). A CVE whose impacts the missing-input rule set to 9 shows as an ordinary critical or high finding; keep those apart yourself, as **[Get your top 10](prioritize-cves.md#step-4-get-your-top-10)** shows.
 - **The 16-factor panel is not on the finding.** Dependency-Track's OWASP Risk Rating panel lives on the global vulnerability page and reads that vulnerability's own vector, which a VEX import does not touch.
 - **The scores come from an LLM.** They are a ranking aid, not a verdict. See [Limitations](../concepts/limitations.md), and pass [`--attest`](../reference/generate.md#-attest) to keep the per-CVE reasoning as audit evidence.

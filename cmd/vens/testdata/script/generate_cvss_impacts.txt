@@ -13,6 +13,13 @@ stderr 'Scoring run finished.* counters.cvss_v3_missing=8 '
 vex-vectors out.cdx.json 45
 cvss-impacts dbg sensitive primary
 
+# Each vulnerability of the VEX says where its three impacts came from:
+# missing-cvss-v3-fallback exactly for the eight CVEs counted
+# cvss_v3_missing, cvss-v3 for the 37 others; vens enrich copies it.
+impact-marker out.cdx.json dbg
+exec vens enrich --vex out.cdx.json --output enriched.json $QUICKSTART/reports/python-slim.trivy.json
+impact-marker out.cdx.json dbg enriched.json
+
 # The system prompt no longer defines reachability, and no request asks it
 # or lists an answer below an impact scale; CVE descriptions may still say
 # "reachable".

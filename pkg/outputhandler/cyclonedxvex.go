@@ -154,15 +154,19 @@ func (c *cycloneDxVexWriter) Close() error {
 		}
 
 		vulnMap[g.VulnID] = &cyclonedx.Vulnerability{
-			ID:      g.VulnID,
-			Source:  g.Source,
-			Ratings: &[]cyclonedx.VulnerabilityRating{g.Rating},
-			Affects: &[]cyclonedx.Affects{{Ref: bomLink}},
+			ID:         g.VulnID,
+			Source:     g.Source,
+			Ratings:    &[]cyclonedx.VulnerabilityRating{g.Rating},
+			Affects:    &[]cyclonedx.Affects{{Ref: bomLink}},
+			Properties: &[]cyclonedx.Property{{Name: ImpactProvenanceProperty, Value: g.ImpactProvenance}},
 		}
 		affectsSet[g.VulnID] = map[string]bool{bomLink: true}
 	}
 
 	if err := UnreferencedError("cannot emit VEX", unreferenced); err != nil {
+		return err
+	}
+	if err := provenanceError("cannot emit VEX", c.r); err != nil {
 		return err
 	}
 
@@ -207,4 +211,32 @@ func jsonSchemaFor(v cyclonedx.SpecVersion) string {
 	default:
 		return ""
 	}
+}
+
+// provenanceError names, after prefix, each vulnerability a rating gives no
+// impact provenance vens writes, or whose rows give two; nil when each one
+// has exactly one. Without it a consumer cannot tell an impact read from the
+// CVSS v3 vectors from the missing-input rule's worst case, so Close writes
+// no VEX, as for a missing component.
+func provenanceError(prefix string, ratings []VulnRating) error {
+	first := map[string]string{}
+	var problems []string
+	for _, g := range ratings {
+		p, seen := first[g.VulnID]
+		switch {
+		case g.ImpactProvenance != ImpactFromCVSSv3 && g.ImpactProvenance != ImpactFromFallback:
+			problems = append(problems, fmt.Sprintf("%s: impact provenance %q is not %s or %s",
+				g.VulnID, g.ImpactProvenance, ImpactFromCVSSv3, ImpactFromFallback))
+		case !seen:
+			first[g.VulnID] = g.ImpactProvenance
+		case p != g.ImpactProvenance:
+			problems = append(problems, fmt.Sprintf("%s: rows rated with impact provenance %s and %s",
+				g.VulnID, p, g.ImpactProvenance))
+		}
+	}
+	if len(problems) == 0 {
+		return nil
+	}
+	slices.Sort(problems)
+	return fmt.Errorf("%s: %s", prefix, strings.Join(slices.Compact(problems), "; "))
 }

@@ -31,8 +31,9 @@ func TestCycloneDxVexWriter_Close_SerialNumber(t *testing.T) {
 	score := 42.0
 	err := h.HandleVulnRatings([]VulnRating{
 		{
-			VulnID: "CVE-2024-1234",
-			BOMRef: "pkg:npm/foo@1.0.0",
+			VulnID:           "CVE-2024-1234",
+			BOMRef:           "pkg:npm/foo@1.0.0",
+			ImpactProvenance: ImpactFromCVSSv3,
 			Rating: cyclonedx.VulnerabilityRating{
 				Method:   cyclonedx.ScoringMethodOWASP,
 				Score:    &score,
@@ -135,8 +136,9 @@ func TestCycloneDxVexWriter_Close_VulnerabilitySource(t *testing.T) {
 	score := 42.0
 	err := h.HandleVulnRatings([]VulnRating{
 		{
-			VulnID: "CVE-2024-1234",
-			BOMRef: "pkg:npm/foo@1.0.0",
+			VulnID:           "CVE-2024-1234",
+			BOMRef:           "pkg:npm/foo@1.0.0",
+			ImpactProvenance: ImpactFromCVSSv3,
 			Rating: cyclonedx.VulnerabilityRating{
 				Method:   cyclonedx.ScoringMethodOWASP,
 				Score:    &score,
@@ -145,8 +147,9 @@ func TestCycloneDxVexWriter_Close_VulnerabilitySource(t *testing.T) {
 			Source: &cyclonedx.Source{Name: "NVD", URL: "https://nvd.nist.gov/vuln/detail/CVE-2024-1234"},
 		},
 		{
-			VulnID: "GHSA-abcd-efgh-ijkl",
-			BOMRef: "pkg:npm/bar@2.0.0",
+			VulnID:           "GHSA-abcd-efgh-ijkl",
+			BOMRef:           "pkg:npm/bar@2.0.0",
+			ImpactProvenance: ImpactFromCVSSv3,
 			Rating: cyclonedx.VulnerabilityRating{
 				Method:   cyclonedx.ScoringMethodOWASP,
 				Score:    &score,
@@ -221,8 +224,9 @@ func TestCycloneDxVexWriter_Close_MergesDuplicateVulnIDs(t *testing.T) {
 	score := 42.0
 	err := h.HandleVulnRatings([]VulnRating{
 		{
-			VulnID: "CVE-2024-1234",
-			BOMRef: "pkg:npm/foo@1.0.0",
+			VulnID:           "CVE-2024-1234",
+			BOMRef:           "pkg:npm/foo@1.0.0",
+			ImpactProvenance: ImpactFromCVSSv3,
 			Rating: cyclonedx.VulnerabilityRating{
 				Method:   cyclonedx.ScoringMethodOWASP,
 				Score:    &score,
@@ -231,8 +235,9 @@ func TestCycloneDxVexWriter_Close_MergesDuplicateVulnIDs(t *testing.T) {
 			Source: &cyclonedx.Source{Name: "NVD", URL: "https://nvd.nist.gov"},
 		},
 		{
-			VulnID: "CVE-2024-1234",
-			BOMRef: "pkg:npm/bar@2.0.0",
+			VulnID:           "CVE-2024-1234",
+			BOMRef:           "pkg:npm/bar@2.0.0",
+			ImpactProvenance: ImpactFromCVSSv3,
 			Rating: cyclonedx.VulnerabilityRating{
 				Method:   cyclonedx.ScoringMethodOWASP,
 				Score:    &score,
@@ -241,8 +246,9 @@ func TestCycloneDxVexWriter_Close_MergesDuplicateVulnIDs(t *testing.T) {
 			Source: &cyclonedx.Source{Name: "NVD", URL: "https://nvd.nist.gov"},
 		},
 		{
-			VulnID: "CVE-2024-5678",
-			BOMRef: "pkg:npm/baz@3.0.0",
+			VulnID:           "CVE-2024-5678",
+			BOMRef:           "pkg:npm/baz@3.0.0",
+			ImpactProvenance: ImpactFromCVSSv3,
 			Rating: cyclonedx.VulnerabilityRating{
 				Method:   cyclonedx.ScoringMethodOWASP,
 				Score:    &score,
@@ -297,8 +303,9 @@ func TestCycloneDxVexWriter_Close_DeduplicatesAffectsRefs(t *testing.T) {
 	score := 42.0
 	err := h.HandleVulnRatings([]VulnRating{
 		{
-			VulnID: "CVE-2024-1234",
-			BOMRef: "pkg:npm/foo@1.0.0",
+			VulnID:           "CVE-2024-1234",
+			BOMRef:           "pkg:npm/foo@1.0.0",
+			ImpactProvenance: ImpactFromCVSSv3,
 			Rating: cyclonedx.VulnerabilityRating{
 				Method:   cyclonedx.ScoringMethodOWASP,
 				Score:    &score,
@@ -307,8 +314,9 @@ func TestCycloneDxVexWriter_Close_DeduplicatesAffectsRefs(t *testing.T) {
 			Source: &cyclonedx.Source{Name: "NVD", URL: "https://nvd.nist.gov"},
 		},
 		{
-			VulnID: "CVE-2024-1234",
-			BOMRef: "pkg:npm/foo@1.0.0",
+			VulnID:           "CVE-2024-1234",
+			BOMRef:           "pkg:npm/foo@1.0.0",
+			ImpactProvenance: ImpactFromCVSSv3,
 			Rating: cyclonedx.VulnerabilityRating{
 				Method:   cyclonedx.ScoringMethodOWASP,
 				Score:    &score,
@@ -409,8 +417,9 @@ func TestCycloneDxVexWriter_Close_SpecVersion(t *testing.T) {
 			const vector = "SL:7/M:7/O:7/S:7/ED:6/EE:6/A:6/ID:3/LC:7/LI:7/LAV:7/LAC:7/FD:7/RD:7/NC:7/PV:7"
 			if err := h.HandleVulnRatings([]VulnRating{
 				{
-					VulnID: "CVE-2024-1234",
-					BOMRef: "pkg:npm/foo@1.0.0",
+					VulnID:           "CVE-2024-1234",
+					BOMRef:           "pkg:npm/foo@1.0.0",
+					ImpactProvenance: ImpactFromCVSSv3,
 					Rating: cyclonedx.VulnerabilityRating{
 						Method:   cyclonedx.ScoringMethodOWASP,
 						Score:    &score,
@@ -477,8 +486,9 @@ func TestCycloneDxVexWriter_Close_KeepsZeroOWASPScore(t *testing.T) {
 			const vector = "SL:1/M:1/O:1/S:1/ED:0/EE:0/A:0/ID:9/LC:0/LI:0/LAV:0/LAC:0/FD:0/RD:0/NC:0/PV:0"
 			if err := h.HandleVulnRatings([]VulnRating{
 				{
-					VulnID: "CVE-2026-8376",
-					BOMRef: "pkg:deb/debian/perl-base@5.36.0",
+					VulnID:           "CVE-2026-8376",
+					BOMRef:           "pkg:deb/debian/perl-base@5.36.0",
+					ImpactProvenance: ImpactFromCVSSv3,
 					Rating: cyclonedx.VulnerabilityRating{
 						Method:   cyclonedx.ScoringMethodOWASP,
 						Score:    &score,
@@ -546,9 +556,9 @@ func TestCycloneDxVexWriter_Close_FailsOnUnreferencedVuln(t *testing.T) {
 		Severity: cyclonedx.SeverityHigh,
 	}
 	if err := h.HandleVulnRatings([]VulnRating{
-		{VulnID: "CVE-1", BOMRef: "pkg:npm/foo@1.0.0", Rating: rating},
-		{VulnID: "CVE-2", BOMRef: "", Rating: rating},
-		{VulnID: "CVE-3", BOMRef: "", Rating: rating},
+		{VulnID: "CVE-1", BOMRef: "pkg:npm/foo@1.0.0", Rating: rating, ImpactProvenance: ImpactFromCVSSv3},
+		{VulnID: "CVE-2", BOMRef: "", Rating: rating, ImpactProvenance: ImpactFromCVSSv3},
+		{VulnID: "CVE-3", BOMRef: "", Rating: rating, ImpactProvenance: ImpactFromCVSSv3},
 	}); err != nil {
 		t.Fatalf("HandleVulnRatings: %v", err)
 	}
@@ -573,12 +583,12 @@ func TestCycloneDxVexWriter_Close_DeterministicVulnerabilityOrder(t *testing.T) 
 		Severity: cyclonedx.SeverityHigh,
 	}
 	ratings := []VulnRating{
-		{VulnID: "CVE-2024-9999", BOMRef: "pkg:npm/zebra@1.0.0", Rating: rating},
-		{VulnID: "CVE-2024-0001", BOMRef: "pkg:npm/alpha@1.0.0", Rating: rating},
-		{VulnID: "CVE-2024-1234", BOMRef: "pkg:npm/foo@1.0.0", Rating: rating},
-		{VulnID: "CVE-2024-1234", BOMRef: "pkg:npm/bar@2.0.0", Rating: rating},
-		{VulnID: "CVE-2024-1234", BOMRef: "pkg:npm/baz@3.0.0", Rating: rating},
-		{VulnID: "CVE-2024-5678", BOMRef: "pkg:npm/qux@4.0.0", Rating: rating},
+		{VulnID: "CVE-2024-9999", BOMRef: "pkg:npm/zebra@1.0.0", Rating: rating, ImpactProvenance: ImpactFromCVSSv3},
+		{VulnID: "CVE-2024-0001", BOMRef: "pkg:npm/alpha@1.0.0", Rating: rating, ImpactProvenance: ImpactFromCVSSv3},
+		{VulnID: "CVE-2024-1234", BOMRef: "pkg:npm/foo@1.0.0", Rating: rating, ImpactProvenance: ImpactFromCVSSv3},
+		{VulnID: "CVE-2024-1234", BOMRef: "pkg:npm/bar@2.0.0", Rating: rating, ImpactProvenance: ImpactFromCVSSv3},
+		{VulnID: "CVE-2024-1234", BOMRef: "pkg:npm/baz@3.0.0", Rating: rating, ImpactProvenance: ImpactFromCVSSv3},
+		{VulnID: "CVE-2024-5678", BOMRef: "pkg:npm/qux@4.0.0", Rating: rating, ImpactProvenance: ImpactFromCVSSv3},
 	}
 
 	encode := func(rs []VulnRating) *cyclonedx.BOM {
@@ -619,5 +629,83 @@ func TestCycloneDxVexWriter_Close_DeterministicVulnerabilityOrder(t *testing.T) 
 		if !slices.Equal(got, want) {
 			t.Errorf("vulnerabilities[] order = %v, want sorted %v", got, want)
 		}
+	}
+}
+
+// Each vulnerability carries exactly one vens:impact-provenance property,
+// its rows' provenance, whatever the number of rows merged into it.
+func TestCycloneDxVexWriter_Close_ImpactProvenance(t *testing.T) {
+	score := 42.0
+	rating := cyclonedx.VulnerabilityRating{Method: cyclonedx.ScoringMethodOWASP, Score: &score, Severity: cyclonedx.SeverityHigh}
+	var buf bytes.Buffer
+	h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 1, "", cyclonedx.SpecVersion1_6)
+	if err := h.HandleVulnRatings([]VulnRating{
+		{VulnID: "CVE-1", BOMRef: "pkg:npm/a@1", Rating: rating, ImpactProvenance: ImpactFromCVSSv3},
+		{VulnID: "CVE-1", BOMRef: "pkg:npm/b@1", Rating: rating, ImpactProvenance: ImpactFromCVSSv3},
+		{VulnID: "CVE-2", BOMRef: "pkg:npm/a@1", Rating: rating, ImpactProvenance: ImpactFromFallback},
+		{VulnID: "CVE-2", BOMRef: "pkg:npm/c@1", Rating: rating, ImpactProvenance: ImpactFromFallback},
+	}); err != nil {
+		t.Fatalf("HandleVulnRatings: %v", err)
+	}
+	if err := h.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+	var doc struct {
+		Vulnerabilities []struct {
+			ID         string `json:"id"`
+			Properties []struct {
+				Name  string `json:"name"`
+				Value string `json:"value"`
+			} `json:"properties"`
+		} `json:"vulnerabilities"`
+	}
+	if err := json.Unmarshal(buf.Bytes(), &doc); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	want := map[string]string{"CVE-1": "cvss-v3", "CVE-2": "missing-cvss-v3-fallback"}
+	if len(doc.Vulnerabilities) != len(want) {
+		t.Fatalf("got %d vulnerabilities, want %d", len(doc.Vulnerabilities), len(want))
+	}
+	for _, v := range doc.Vulnerabilities {
+		if len(v.Properties) != 1 || v.Properties[0].Name != "vens:impact-provenance" || v.Properties[0].Value != want[v.ID] {
+			t.Errorf("%s: properties %+v, want one vens:impact-provenance %s", v.ID, v.Properties, want[v.ID])
+		}
+	}
+}
+
+// A rating without one of the two provenances, or a CVE whose rows disagree
+// on it, fails the run: no VEX is written short of the marker.
+func TestCycloneDxVexWriter_Close_FailsOnMissingOrConflictingProvenance(t *testing.T) {
+	score := 42.0
+	rating := cyclonedx.VulnerabilityRating{Method: cyclonedx.ScoringMethodOWASP, Score: &score, Severity: cyclonedx.SeverityHigh}
+	for name, c := range map[string]struct {
+		ratings []VulnRating
+		want    string
+	}{
+		"missing": {[]VulnRating{
+			{VulnID: "CVE-1", BOMRef: "pkg:npm/a@1", Rating: rating, ImpactProvenance: ImpactFromCVSSv3},
+			{VulnID: "CVE-2", BOMRef: "pkg:npm/a@1", Rating: rating},
+		}, `cannot emit VEX: CVE-2: impact provenance "" is not cvss-v3 or missing-cvss-v3-fallback`},
+		"off the list": {[]VulnRating{
+			{VulnID: "CVE-1", BOMRef: "pkg:npm/a@1", Rating: rating, ImpactProvenance: "cvss-v4"},
+		}, `cannot emit VEX: CVE-1: impact provenance "cvss-v4" is not cvss-v3 or missing-cvss-v3-fallback`},
+		"conflicting": {[]VulnRating{
+			{VulnID: "CVE-1", BOMRef: "pkg:npm/a@1", Rating: rating, ImpactProvenance: ImpactFromCVSSv3},
+			{VulnID: "CVE-1", BOMRef: "pkg:npm/b@1", Rating: rating, ImpactProvenance: ImpactFromFallback},
+		}, "cannot emit VEX: CVE-1: rows rated with impact provenance cvss-v3 and missing-cvss-v3-fallback"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			var buf bytes.Buffer
+			h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 1, "", cyclonedx.SpecVersion1_6)
+			if err := h.HandleVulnRatings(c.ratings); err != nil {
+				t.Fatalf("HandleVulnRatings: %v", err)
+			}
+			if err := h.Close(); err == nil || err.Error() != c.want {
+				t.Errorf("Close() = %v, want %q", err, c.want)
+			}
+			if buf.Len() != 0 {
+				t.Errorf("no VEX should be written when Close fails, got %d bytes", buf.Len())
+			}
+		})
 	}
 }

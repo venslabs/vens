@@ -448,8 +448,8 @@ func TestTechnicalImpactsFromCVSS(t *testing.T) {
 			t.Errorf("%s read %v: no question asks it", f, l.Readings[f])
 		}
 	}
-	if len(l.Counters) != 0 || l.Impact.Values != [3]string{"H", "L", "N"} {
-		t.Errorf("counters %v, impact %+v", l.Counters, l.Impact)
+	if len(l.Counters) != 0 || l.Impact.Values != [3]string{"H", "L", "N"} || l.ImpactFallback {
+		t.Errorf("counters %v, impact %+v, fallback %v", l.Counters, l.Impact, l.ImpactFallback)
 	}
 }
 
@@ -538,6 +538,9 @@ func TestTechnicalImpactsWithoutAUsableVector(t *testing.T) {
 			}
 			if n := len(slices.DeleteFunc(slices.Clone(l.Counters), func(c string) bool { return c != vectorMissing })); n != 1 {
 				t.Errorf("%s, %s: counters %v, want %s once", name, ds, l.Counters, vectorMissing)
+			}
+			if !l.ImpactFallback {
+				t.Errorf("%s, %s: the missing-input rule supplied the three, yet no fallback is reported", name, ds)
 			}
 			for _, f := range []Factor{LC, LI, LAV} {
 				if l.Sources[f] != SourceCVSS {

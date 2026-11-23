@@ -244,7 +244,7 @@ func (g *Generator) rate(ctx context.Context, run *scoringRun, c *cve, a *assess
 			"severity", rating.Severity,
 			"vector", rating.Vector,
 		)
-		out = append(out, vulnRating(c.id(), v, rating))
+		out = append(out, vulnRating(c.id(), v, rating, levels.ImpactFallback))
 		if g.attestor != nil {
 			g.attestor.AddClaim(a.evidence, attestation.ClaimInput{
 				VulnID:      c.id(),
@@ -261,12 +261,18 @@ func (g *Generator) rate(ctx context.Context, run *scoringRun, c *cve, a *assess
 	return out, nil
 }
 
-func vulnRating(id string, v Vulnerability, r owasp.Rating) outputhandler.VulnRating {
+// vulnRating is one row's rating; fallback says the missing-input rule
+// supplied the CVE's three technical impacts, which the VEX marks.
+func vulnRating(id string, v Vulnerability, r owasp.Rating, fallback bool) outputhandler.VulnRating {
 	source := vuln.Source(id)
 	if v.SourceName != "" {
 		source = &cyclonedx.Source{Name: v.SourceName, URL: v.SourceURL}
 	}
 	score := r.Score
+	provenance := outputhandler.ImpactFromCVSSv3
+	if fallback {
+		provenance = outputhandler.ImpactFromFallback
+	}
 	return outputhandler.VulnRating{
 		VulnID: id,
 		BOMRef: v.BOMRef,
@@ -276,6 +282,7 @@ func vulnRating(id string, v Vulnerability, r owasp.Rating) outputhandler.VulnRa
 			Severity: cyclonedx.Severity(r.Severity),
 			Vector:   r.Vector,
 		},
-		Source: source,
+		Source:           source,
+		ImpactProvenance: provenance,
 	}
 }

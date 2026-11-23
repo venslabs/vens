@@ -34,7 +34,16 @@ type VEXEnricher struct {
 	// The band is what downstream gates should read; the raw score is on a
 	// vens-internal scale.
 	OWASPSeverityPerVulnID map[string]string
+	// Map of VulnerabilityID to the vens:impact-provenance property of the
+	// vulnerability whose OWASP rating is kept: cvss-v3, or
+	// missing-cvss-v3-fallback when the missing-input rule supplied the three
+	// technical impacts. Absent when the VEX carries none.
+	ImpactProvenancePerVulnID map[string]string
 }
+
+// impactProvenanceProperty is the property vens generate writes on each VEX
+// vulnerability (outputhandler.ImpactProvenanceProperty).
+const impactProvenanceProperty = "vens:impact-provenance"
 
 // New creates a new VEXEnricher from VEX data
 func New(vexData []byte) (*VEXEnricher, error) {
@@ -44,9 +53,10 @@ func New(vexData []byte) (*VEXEnricher, error) {
 	}
 
 	enricher := &VEXEnricher{
-		OWASPScorePerVulnID:    make(map[string]float64),
-		OWASPVectorPerVulnID:   make(map[string]string),
-		OWASPSeverityPerVulnID: make(map[string]string),
+		OWASPScorePerVulnID:       make(map[string]float64),
+		OWASPVectorPerVulnID:      make(map[string]string),
+		OWASPSeverityPerVulnID:    make(map[string]string),
+		ImpactProvenancePerVulnID: make(map[string]string),
 	}
 
 	// Parse VEX vulnerabilities - extract OWASP ratings by Vulnerability ID
@@ -68,6 +78,11 @@ func New(vexData []byte) (*VEXEnricher, error) {
 				enricher.OWASPScorePerVulnID[vuln.ID] = *rating.Score
 				enricher.OWASPVectorPerVulnID[vuln.ID] = rating.Vector
 				enricher.OWASPSeverityPerVulnID[vuln.ID] = string(rating.Severity)
+				if p := propertyValue(vuln, impactProvenanceProperty); p != "" {
+					enricher.ImpactProvenancePerVulnID[vuln.ID] = p
+				} else {
+					delete(enricher.ImpactProvenancePerVulnID, vuln.ID)
+				}
 			}
 		}
 	}
@@ -94,7 +109,8 @@ func (e *VEXEnricher) EnrichReport(ctx context.Context, reportData []byte) (*tri
 			if score, ok := e.OWASPScorePerVulnID[vuln.VulnerabilityID]; ok {
 				vector := e.OWASPVectorPerVulnID[vuln.VulnerabilityID]
 				severity := e.OWASPSeverityPerVulnID[vuln.VulnerabilityID]
-				if e.applyRating(vuln, score, vector, severity) {
+				provenance := e.ImpactProvenancePerVulnID[vuln.VulnerabilityID]
+				if e.applyRating(vuln, score, vector, severity, provenance) {
 					enrichedCount++
 				}
 			}
@@ -109,8 +125,9 @@ func (e *VEXEnricher) EnrichReport(ctx context.Context, reportData []byte) (*tri
 }
 
 // applyRating sets the OWASP score (and, if present, the OWASP Risk Rating
-// vector and severity band) in the vulnerability's Custom field
-func (e *VEXEnricher) applyRating(vuln *trivytypes.DetectedVulnerability, score float64, vector string, severity string) bool {
+// vector, severity band and impact provenance) in the vulnerability's Custom
+// field
+func (e *VEXEnricher) applyRating(vuln *trivytypes.DetectedVulnerability, score float64, vector, severity, provenance string) bool {
 	if vuln.Custom == nil {
 		vuln.Custom = make(map[string]interface{})
 	}
@@ -137,5 +154,25 @@ func (e *VEXEnricher) applyRating(vuln *trivytypes.DetectedVulnerability, score 
 	} else {
 		delete(customMap, "owasp_severity")
 	}
+	// Whether the rating's impact was assessed or is the missing-input
+	// rule's worst case, as the VEX says: a consumer keeps the second apart.
+	if provenance != "" {
+		customMap["owasp_impact_provenance"] = provenance
+	} else {
+		delete(customMap, "owasp_impact_provenance")
+	}
 	return true
+}
+
+// propertyValue is the value of vuln's property name, "" when it has none.
+func propertyValue(vuln cdx.Vulnerability, name string) string {
+	if vuln.Properties == nil {
+		return ""
+	}
+	for _, p := range *vuln.Properties {
+		if p.Name == name {
+			return p.Value
+		}
+	}
+	return ""
 }

@@ -222,6 +222,11 @@ type Levels struct {
 	// Impact is what the CVE's CVSS v3 vectors gave Loss of
 	// confidentiality, integrity and availability.
 	Impact cvss.Impact
+	// ImpactFallback reports that the missing-input rule supplied Loss of
+	// confidentiality, integrity and availability, the CVE having no usable
+	// CVSS v3 vector: set where cvss_v3_missing is counted, never read from
+	// the levels.
+	ImpactFallback bool
 	// Counters names, in factor order, each counter the CVE adds one to: a
 	// cannot_tell, or an answer read as one, each undeclared field a rule fell
 	// back on, and cvss_v3_missing.
@@ -329,10 +334,11 @@ func lowered[L ~int](s *scorer, f Factor, baseline, adjusted L) L {
 // CVE's usable CVSS v3 vectors, confidentiality's in data_sensitivity's
 // column, availability's in availability_requirement's, the primary one when
 // it is undeclared, counted. With no usable v3 vector, each is OWASP's worst
-// level, and the CVE is counted once.
+// level, the CVE is counted once and marked as the fallback's.
 func (s *scorer) technicalImpacts() (owasp.LossOfConfidentiality, owasp.LossOfIntegrity, owasp.LossOfAvailability) {
 	if s.levels.Impact.Vectorless() {
 		s.count(vectorMissing)
+		s.levels.ImpactFallback = true
 		return from(s, LC, SourceCVSS, owasp.LossOfConfidentialityAllDataDisclosed),
 			from(s, LI, SourceCVSS, owasp.LossOfIntegrityAllDataTotallyCorrupt),
 			from(s, LAV, SourceCVSS, owasp.LossOfAvailabilityAllServicesCompletelyLost)

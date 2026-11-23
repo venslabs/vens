@@ -371,6 +371,18 @@ BOM-Link `version` number used alongside `--sbom-serial-number`. Default: `1`.
 
 ---
 
+## The VEX document
+
+Each vulnerability holds one OWASP rating (vector, severity and score), the BOM-Link `affects` of every package the CVE was found in, and exactly one property:
+
+```json
+"properties": [{ "name": "vens:impact-provenance", "value": "cvss-v3" }]
+```
+
+`cvss-v3` means Loss of confidentiality, integrity and availability were read from the CVE's usable CVSS v3 vectors. `missing-cvss-v3-fallback` means the CVE has none, so the missing-input rule set the three to 9: the same CVEs the run summary counts in `cvss_v3_missing`, which `--strict` refuses. The value follows that rule, never the levels. Keep the second kind in a separate "impact unknown" list and order the first by severity, then score, then identifier: see **[Get your top 10](../guides/prioritize-cves.md#step-4-get-your-top-10)**. A run that would write a vulnerability without the property, or with two values for one CVE, fails and writes no VEX.
+
+---
+
 ## The run summary
 
 A run that reaches scoring ends with one `INFO` line, `Scoring run finished`, also when it fails during scoring. From a mock run (`--llm=mock`) on `examples/quickstart`'s Trivy report with `data_subjects`, `detection` and `traceability` removed from its `config.yaml`, so their fallbacks are counted:

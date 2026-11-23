@@ -110,6 +110,7 @@ func TestScript(t *testing.T) {
 			"envsubst":      envsubstCmd,
 			"vex-vectors":   vexVectorsCmd,
 			"cvss-impacts":  cvssImpactsCmd,
+			"impact-marker": impactMarkerCmd,
 			"gen-ec-key":    genECKeyCmd,
 			"jsf-verify":    jsfVerifyCmd,
 		},
@@ -251,6 +252,98 @@ func truncate(s string, maxLen int) string {
 		return s
 	}
 	return s[:maxLen] + "\n... (truncated)"
+}
+
+// impactMarkerCmd checks the VEX's vens:impact-provenance against the run's
+// answers.json under a --debug-dir: every vulnerability carries exactly one,
+// missing-cvss-v3-fallback when its CVE counts cvss_v3_missing and cvss-v3
+// otherwise, and each row of the enriched report, if given, carries its
+// CVE's. The run must have both values.
+func impactMarkerCmd(ts *testscript.TestScript, neg bool, args []string) {
+	if neg || (len(args) != 2 && len(args) != 3) {
+		ts.Fatalf("usage: impact-marker vex.json debug-dir [enriched.json]")
+	}
+	runs, err := filepath.Glob(filepath.Join(ts.MkAbs(args[1]), "run-*", "answers.json"))
+	ts.Check(err)
+	if len(runs) != 1 {
+		ts.Fatalf("%s holds %d answers.json, want one", args[1], len(runs))
+	}
+	answers, err := os.ReadFile(runs[0])
+	ts.Check(err)
+	enriched := ""
+	if len(args) == 3 {
+		enriched = ts.ReadFile(args[2])
+	}
+	ts.Check(checkImpactMarker([]byte(ts.ReadFile(args[0])), answers, []byte(enriched)))
+}
+
+func checkImpactMarker(vexData, answersData, enrichedData []byte) error {
+	var vex struct {
+		Vulnerabilities []struct {
+			ID         string `json:"id"`
+			Properties []struct {
+				Name  string `json:"name"`
+				Value string `json:"value"`
+			} `json:"properties"`
+		} `json:"vulnerabilities"`
+	}
+	var answers struct {
+		Vulnerabilities []struct {
+			VulnID   string   `json:"vulnId"`
+			Counters []string `json:"counters"`
+		} `json:"vulnerabilities"`
+	}
+	if err := json.Unmarshal(vexData, &vex); err != nil {
+		return err
+	}
+	if err := json.Unmarshal(answersData, &answers); err != nil {
+		return err
+	}
+	fallback := map[string]bool{}
+	for _, e := range answers.Vulnerabilities {
+		fallback[e.VulnID] = slices.Contains(e.Counters, "cvss_v3_missing")
+	}
+	marked, seen := map[string]string{}, map[bool]bool{}
+	for _, v := range vex.Vulnerabilities {
+		counted, ok := fallback[v.ID]
+		if !ok {
+			return fmt.Errorf("%s: not in answers.json", v.ID)
+		}
+		want := "cvss-v3"
+		if counted {
+			want = "missing-cvss-v3-fallback"
+		}
+		if len(v.Properties) != 1 || v.Properties[0].Name != "vens:impact-provenance" || v.Properties[0].Value != want {
+			return fmt.Errorf("%s: properties %+v, want one vens:impact-provenance %s", v.ID, v.Properties, want)
+		}
+		marked[v.ID] = want
+		seen[counted] = true
+	}
+	if len(marked) != len(fallback) || !seen[true] || !seen[false] {
+		return fmt.Errorf("%d CVEs marked of %d in answers.json, values seen %v: want every CVE, both values", len(marked), len(fallback), seen)
+	}
+	if len(enrichedData) == 0 {
+		return nil
+	}
+	var report struct {
+		Results []struct {
+			Vulnerabilities []struct {
+				VulnerabilityID string         `json:"VulnerabilityID"`
+				Custom          map[string]any `json:"Custom"`
+			} `json:"Vulnerabilities"`
+		} `json:"Results"`
+	}
+	if err := json.Unmarshal(enrichedData, &report); err != nil {
+		return err
+	}
+	for _, r := range report.Results {
+		for _, row := range r.Vulnerabilities {
+			if got := row.Custom["owasp_impact_provenance"]; got != marked[row.VulnerabilityID] {
+				return fmt.Errorf("enriched %s: owasp_impact_provenance %v, want %s", row.VulnerabilityID, got, marked[row.VulnerabilityID])
+			}
+		}
+	}
+	return nil
 }
 
 // The OWASP calculator's vector pattern (OwaspRiskRating.java:34).

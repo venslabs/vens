@@ -22,6 +22,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -187,6 +188,41 @@ func TestGenerator_QuestionsNotAsked(t *testing.T) {
 				assert.Equal(t, int64(1), summary.attrs["counters."+name])
 			}
 		})
+	}
+}
+
+// Every row's rating says where its CVE's Loss of confidentiality, integrity
+// and availability came from: missing-cvss-v3-fallback for each CVE the
+// missing-input rule supplied them for, the CVEs answers.json counts
+// cvss_v3_missing, and cvss-v3 for every other.
+func TestGenerator_ImpactProvenance(t *testing.T) {
+	parent := t.TempDir()
+	vulns := []Vulnerability{
+		{VulnID: "CVE-2024-0001", PkgName: "a", Description: "d", BOMRef: "a1", CVSS: []cvss.Vector{v31("nvd", noImpact)}},
+		{VulnID: "CVE-2024-0001", PkgName: "b", Description: "d", BOMRef: "a2", CVSS: []cvss.Vector{v31("redhat", noImpact)}},
+		{VulnID: "CVE-2024-0002", PkgName: "a", Description: "d", BOMRef: "b1", CVSS: []cvss.Vector{
+			v31("nvd", "AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H")}},
+		{VulnID: "CVE-2024-0003", PkgName: "a", Description: "d", BOMRef: "c1"},
+		{VulnID: "CVE-2024-0003", PkgName: "b", Description: "d", BOMRef: "c2", CVSS: []cvss.Vector{
+			v31("nvd", "AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H")}},
+	}
+	g := newGen(t, Opts{LLM: &fakeLLM{}, DebugDir: parent})
+	var emitted []outputhandler.VulnRating
+	require.NoError(t, g.GenerateRiskScore(context.Background(), vulns, collect(&emitted)))
+
+	got, _ := readAnswers(t, parent)
+	counted := map[string]bool{}
+	for _, e := range got.Vulnerabilities {
+		counted[e.VulnID] = slices.Contains(e.Counters, "cvss_v3_missing")
+	}
+	assert.Equal(t, map[string]bool{"CVE-2024-0001": false, "CVE-2024-0002": false, "CVE-2024-0003": true}, counted)
+	require.Len(t, emitted, len(vulns))
+	for _, r := range emitted {
+		want := outputhandler.ImpactFromCVSSv3
+		if counted[r.VulnID] {
+			want = outputhandler.ImpactFromFallback
+		}
+		assert.Equal(t, want, r.ImpactProvenance, "%s on %s", r.VulnID, r.BOMRef)
 	}
 }
 

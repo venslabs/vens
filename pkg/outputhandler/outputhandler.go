@@ -26,10 +26,25 @@ type OutputHandler interface {
 	Close() error
 }
 
+// ImpactProvenanceProperty names the property each VEX vulnerability carries
+// once: where its Loss of confidentiality, integrity and availability came
+// from, ImpactFromCVSSv3 or ImpactFromFallback.
+const (
+	ImpactProvenanceProperty = "vens:impact-provenance"
+	// ImpactFromCVSSv3: read from the CVE's usable CVSS v3 vectors.
+	ImpactFromCVSSv3 = "cvss-v3"
+	// ImpactFromFallback: supplied by the missing-input rule, the CVE having
+	// no usable CVSS v3 vector, as cvss_v3_missing counts it.
+	ImpactFromFallback = "missing-cvss-v3-fallback"
+)
+
 // VulnRating carries a single CycloneDX rating for one vulnerability ID.
 type VulnRating struct {
 	VulnID string
 	BOMRef string
 	Rating cyclonedx.VulnerabilityRating
 	Source *cyclonedx.Source
+	// ImpactProvenance is ImpactFromCVSSv3 or ImpactFromFallback, the same on
+	// every row of a vulnerability ID.
+	ImpactProvenance string
 }
