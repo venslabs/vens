@@ -18,14 +18,14 @@ Your CI gate fails the build on it, and [Dependency-Track 5.1+](https://venslabs
 
 ## Why vens?
 
-OWASP Risk Rating reflects your system's exposure, data, records and controls — not just generic CVE severity. For each CVE, the LLM answers closed questions on up to 12 of the 16 OWASP factors in your context; vens computes every level, the severity from OWASP's likelihood × impact matrix, and a 0-81 score to sort CVEs within a severity:
+OWASP Risk Rating reflects your system's exposure, data, records and controls — not just generic CVE severity. For each CVE, the LLM answers closed questions on up to 9 of the 16 OWASP factors in your context; vens reads the losses of confidentiality, integrity and availability from the CVE's CVSS v3 vectors, computes every level, the severity from OWASP's likelihood × impact matrix, and a 0-81 score to sort CVEs within a severity:
 
 | Scenario | CVSS base | OWASP (Contextual) | Why? |
 |-----|----------------|-------------------|------|
 | Denial of service in a library function your internal service never calls | 7.5 HIGH | **low** (14.1) ⬇️ | Reaching it takes full access; the CVSS vectors rule out data loss |
 | Info leak in a PII handler running under GDPR | 5.3 MEDIUM | **critical** (54.4) ⬆️ | Thousands of people's data and a GDPR violation: the business impact is HIGH |
 
-*Ratings above are illustrative — actual ratings depend on your `config.yaml` and the LLM model. Code that never runs can lower the likelihood through the model's answers, never below MEDIUM, so an unreachable RCE with a HIGH impact still rates `high` or `critical`: see [Limitations](https://venslabs.github.io/vens/concepts/limitations/).*
+*Ratings above are illustrative — actual ratings depend on your `config.yaml` and the LLM model. The model is not asked whether code runs: declare a CVE not reachable under `reachability` in `config.yaml`, with where that comes from, and the VEX publishes it `not_affected`, `code_not_reachable`, beside its unchanged rating; see [Limitations](https://venslabs.github.io/vens/concepts/limitations/).*
 
 ## Installation
 

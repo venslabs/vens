@@ -126,7 +126,7 @@ The run goes on: vens uses the fallback the warning states and counts each use i
 A `--strict` run refused to use a worst-case fallback. It writes no VEX and no attestation, and leaves the files an earlier run wrote as they were. Three causes:
 
 - **`strict: context.data_subjects, context.detection, context.traceability not declared`** — at load, before any LLM call. Declare the fields it names.
-- **`strict: N vulnerabilities would fall back to a worst case, so no LLM call is made`** — the scan holds CVEs with no CVSS vector in the scanner's report, a vector that does not parse or lacks an axis metric, or no description. The error lists each CVE and its cause. This comes from the scanner's report, not from your config, and vens cannot fix it: such a scan cannot pass `--strict`. Run without `--strict` and watch the `applicability_missing` counter, or use a scanner database that carries the vectors.
+- **`strict: N vulnerabilities would fall back to a worst case, so no LLM call is made`** — the scan holds CVEs with no usable CVSS v3 vector (none in the scanner's report, or each one refused: it does not parse, states another version than 3.0 or 3.1, or lacks `C`, `I` or `A`), or no description. The error lists each CVE and its cause, each refused vector with why. This comes from the scanner's report, not from your config, and vens cannot fix it: such a scan cannot pass `--strict`. Run without `--strict` and watch the `cvss_v3_missing` counter, or use a scanner database that carries the vectors.
 - **`strict: the answer to ... reads as cannot_tell ... stopping the run`** — the model could not decide one question for one CVE, or answered off its list. Read that call's `.response` in `--debug-dir`: the model's reasoning says what was missing, often something `notes` can state.
 
 See **[`--strict`](reference/generate.md#-strict)**.
@@ -137,9 +137,9 @@ See **[`--strict`](reference/generate.md#-strict)**.
 
 A run that reaches scoring ends with a `Scoring run finished` line, also when it fails during scoring. Its `counters.*` count, per CVE, each fallback the run used:
 
-- `<factor>_cannot_tell` (such as `privacy_cannot_tell`) — the model answered `cannot_tell`, or off its list, so the question's worst answer applied: the factor's worst level, unless `detection` or `data_subjects` limits it or a flagged CVE's adjustment lowers it. A CVE with no description is not asked Motive, Opportunity and Ease of exploit, nor Opportunity in its adjustment, a description being a prerequisite of their answers, and counts in `motive_cannot_tell`, and, read as reachable, in `opportunity_cannot_tell` and `ease_of_exploit_cannot_tell`. `reachability_cannot_tell` counts a reachability answer read as `cannot_tell`: the CVE is read as reachable.
+- `<factor>_cannot_tell` (such as `privacy_cannot_tell`) — the model answered `cannot_tell`, or off its list, so the question's worst answer applied: the factor's worst level, unless `detection` or `data_subjects` limits it or a flagged CVE's adjustment lowers it. A CVE with no description is not asked Motive, Opportunity and Ease of exploit, nor Opportunity in its adjustment, a description being a prerequisite of their answers, and counts in `motive_cannot_tell`, `opportunity_cannot_tell` and `ease_of_exploit_cannot_tell`.
 - `detection_undeclared`, `traceability_missing`, `data_subjects_missing` — a field left out of `config.yaml`. Declare it.
-- `applicability_missing` — the CVE's CVSS vectors could not rule out a loss, so the loss was asked instead of floored.
+- `cvss_v3_missing` — the CVE has no usable CVSS v3 vector, so Loss of confidentiality, integrity and availability took 9.
 
 A counter that is high for one question across most CVEs points at missing context: read a few of that question's replies in `--debug-dir`. The full list, with `calls.*` and `defects.*`, is in **[The run summary](reference/generate.md#the-run-summary)**; `answers.json` gives the counters per CVE.
 

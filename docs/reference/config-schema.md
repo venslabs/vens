@@ -546,8 +546,9 @@ What each schema-1 key does once `schema_version: 2` is added and nothing else:
 |---|---|---|
 | `project.name`, `project.description`, `notes` | shown to the model in every call | nothing |
 | `exposure` | sets Size and the attacker group every question names | nothing |
-| `data_sensitivity` | picks the column of Loss of confidentiality; shown to the Motive, Loss of integrity and Privacy violation questions | nothing |
-| `business_criticality`, `availability_requirement` | shown to the questions they concern | nothing |
+| `data_sensitivity` | picks the column in which Loss of confidentiality is read from the CVSS v3 vectors; shown to the Motive and Privacy violation questions | nothing |
+| `business_criticality` | shown to the questions it concerns | nothing |
+| `availability_requirement` | moves no score: Loss of availability is read from the CVSS v3 vectors | nothing |
 | `compliance_requirements` | Non-compliance is asked only when the list is not empty; no fixed amount is added | nothing |
 | `audit_requirement` | moves no score; W1 while `traceability` is left out | declare `traceability` for what is recorded, not what is required: `audit_requirement: high` does not mean `per_individual` |
 | `controls.waf`, `ddos_protection`, `segmentation`, `zero_trust`, `antivirus` | shown with their scope to the Ease of exploit question | nothing |
@@ -556,6 +557,7 @@ What each schema-1 key does once `schema_version: 2` is added and nothing else:
 | `data_subjects` (new) | left out, nothing caps Privacy violation; W5 | declare the band |
 | `detection` (new) | left out, Intrusion detection is 9 on every finding; W2 or W4 | declare the three channels |
 | `traceability` (new) | left out, Loss of accountability takes the `none` column, 7 or 9; W1 or W3 | declare it |
+| `reachability` (new) | left out, no VEX status is published | declare a CVE not reachable, with its provenance, where a tool or a review shows it |
 
 Declaring the worst case (`traceability: none`, every channel `not_logged`, `data_subjects: millions`) gives the same levels as leaving the field out, without the warning or the counter, and passes the config check of `--strict`.
 

@@ -96,7 +96,7 @@ vens generate \
 
 `--sbom-serial-number` is required — pass the `serialNumber` of the CycloneDX SBOM paired with this scan so each `affects` in the VEX resolves back to that SBOM via BOM-Link.
 
-Runtime grows with the number of distinct CVEs: each batch of 10 makes one call per question, up to 13, and the run summary counts every call.
+Runtime grows with the number of distinct CVEs: each batch of 10 makes one call per question, up to 9, and the run summary counts every call.
 
 ---
 

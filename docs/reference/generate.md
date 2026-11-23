@@ -13,7 +13,7 @@ For a walkthrough, see **[Quickstart](../getting-started/quickstart.md)**.
 vens generate --config-file CONFIG --sbom-serial-number urn:uuid:<uuid> INPUT OUTPUT [flags]
 ```
 
-Generate a CycloneDX VEX document from a Trivy or Grype vulnerability report, with an OWASP risk rating for each CVE in your deployment. The LLM answers closed questions about each CVE; vens computes every level, the severity and the score. See **[How vens rates a CVE](../concepts/cvss-vs-owasp.md#how-vens-rates-a-cve)**.
+Generate a CycloneDX VEX document from a Trivy or Grype vulnerability report, with an OWASP risk rating for each CVE in your deployment. The LLM answers closed questions about each CVE; vens reads the losses of confidentiality, integrity and availability from the CVE's CVSS v3 vectors, computes every level, the severity and the score, and publishes a VEX status only where a [`reachability`](config-schema.md#reachability) entry of `config.yaml` declares a CVE not reachable. See **[How vens rates a CVE](../concepts/cvss-vs-owasp.md#how-vens-rates-a-cve)**.
 
 ---
 
@@ -77,7 +77,7 @@ vens generate --llm openai --config-file c.yaml --sbom-serial-number "$SBOM_UUID
 
 Number of distinct CVEs in a batch. Default: `10`. A CVE found in several packages counts once.
 
-Each batch gets one call per question, in a fixed order, about the batch's CVEs that get that question: up to 13 calls per batch. The first asks whether each CVE is reachable here; a CVE answered not reachable is left out of Opportunity's, Ease of exploit's and the four technical impacts' calls, each at its lowest level. Each flagged CVE then gets one more call of its own, the adjustment, when it has a field left to ask; answered not reachable, it is asked only whether confidentiality can be affected, and only when it was asked Privacy violation. So a CVE is sent once per question asked about it, and the batch size sets how many CVEs share each call, not how many calls a CVE gets.
+Each batch gets one call per question, in a fixed order, about the batch's CVEs that get that question: up to 9 calls per batch. No call asks whether a CVE is reachable, nor its losses of confidentiality, integrity and availability, which come from its CVSS v3 vectors. Each flagged CVE then gets one more call of its own, the adjustment, when it has a field left to ask: Opportunity, when a row describes the CVE, and whether confidentiality can be affected, when it was asked Privacy violation. So a CVE is sent once per question asked about it, and the batch size sets how many CVEs share each call, not how many calls a CVE gets.
 
 - Lower values (e.g. `5`) — fewer CVEs per call, more calls, safer for small context windows.
 - Higher values (e.g. `20`) — fewer calls, more tokens per call.
@@ -164,7 +164,7 @@ Each run adds a new `run-*` directory, and nothing deletes the old ones. Remove 
     Listener: present (this deployment accepts connections that other parties open: it listens on a port or socket, as a server or as a peer others connect to).
     Notes: Customer-facing REST API built with FastAPI/Flask ...
 
-    Judge each vulnerability from its own entry and this deployment. A vulnerability is reachable here when this deployment, as it is deployed, runs its vulnerable code where some input or action could trigger it, whatever access or effort that takes ... Choose cannot_tell only when the facts given do not decide between the other answers ...
+    Judge each vulnerability from its own entry and this deployment. Choose cannot_tell only when the facts given do not decide between the other answers. In reasoning, state in one sentence the fact that decides the answer, before giving it.
     ```
 
 - `batch-NNNNN.human.prompt` — the request: the CVE entries of that call as JSON (vuln id, title, description, severity, packages), then one question, the config fields that question shows, and its closed list of answers. An adjustment call holds one flagged CVE with the evidence of its flag. Shape (truncated):
@@ -194,7 +194,7 @@ The JSON Schema of each reply is sent to the provider with the call, not written
 
 Numbers count LLM calls, not `--llm-batch-size` batches: each batch makes one call per question, a call the provider truncates is retried in two halves, and the CVEs a reply leaves out or leaves without a readable answer are asked again in one more call, each with its own number.
 
-Each run also writes **`answers.json`**: for each CVE, its reachability answer and how vens read it (`reachability`), then each of the 16 factors in the vector's order with the answer as the reply wrote it (when the question was asked), how vens read it (`answered`, `cannot_tell`, `invalid` for an answer off its list, `no_description`), the level, and where the level came from (`answer`, `constant`, `config`, `floor`, `adjustment`, `reachability` for the six a not reachable answer sets); whether the adjustment was made and how it read; the CVE's counters; the run's counters summed; and the run's `defects`: each kind the [run summary](#the-run-summary)'s `defects.*` counts, under the same name and with the same total, only those found (`{}` when the replies held none). For a CVE with no description, `M`, `O` and `EE`, which are not asked, carry the source `answer` with no `answer` key and the reading `no_description`, `O` and `EE` only when it is read as reachable. A run that fails also lists, marked `unrated` and without levels, the CVEs of the batch it failed in that already had answers, and its `defects` are those counted before it stopped. It holds no reasoning and no CVE text, but keeps each answer verbatim. From a mock run (`--llm=mock`) on `examples/quickstart`'s Trivy report with `data_subjects`, `detection` and `traceability` removed from its `config.yaml`, so their fallbacks are counted:
+Each run also writes **`answers.json`**: for each CVE, each of the 16 factors in the vector's order with the answer as the reply wrote it (when the question was asked), how vens read it (`answered`, `cannot_tell`, `invalid` for an answer off its list, `no_description`), the level, and where the level came from (`answer`, `constant`, `config`, `cvss` for the three technical impacts, `floor` for a Privacy violation the vectors floor, `adjustment`), with `cvss`, the value the usable CVSS v3 vectors give the axis, on the three technical impacts and on a floored Privacy violation; the adjustment's answer on `O` and, for its confidentiality question, on `PV`; whether the adjustment was made and how it read; the `reachability` entries that hit the CVE (`declared`: their indexes, those declaring it not reachable, reachable, and reachable without provenance, `unresolved`, and the VEX `analysis` they publish); the CVE's counters; the run's counters summed; and the run's `defects`: each kind the [run summary](#the-run-summary)'s `defects.*` counts, under the same name and with the same total, only those found (`{}` when the replies held none). For a CVE with no description, `M`, `O` and `EE`, which are not asked, carry the source `answer` with no `answer` key and the reading `no_description`. A run that fails also lists, marked `unrated` and without levels, the CVEs of the batch it failed in that already had answers, and its `defects` are those counted before it stopped. It holds no reasoning and no CVE text, but keeps each answer verbatim. From a mock run (`--llm=mock`) on `examples/quickstart`'s Trivy report with `data_subjects`, `detection` and `traceability` removed from its `config.yaml`, so their fallbacks are counted:
 
 ```json
 {
@@ -202,17 +202,20 @@ Each run also writes **`answers.json`**: for each CVE, its reachability answer a
     {
       "vulnId": "CVE-2011-3374",
       "adjustment": "not_asked",
-      "reachability": { "factor": "R", "answer": "not_reachable", "reading": "answered" },
       "factors": [
         { "factor": "SL", "level": 9, "source": "constant" },
         { "factor": "M", "answer": "possible_reward", "reading": "answered", "level": 4, "source": "answer" },
         ...
+        { "factor": "LC", "level": 2, "source": "cvss", "cvss": "N" },
+        { "factor": "LI", "level": 3, "source": "cvss", "cvss": "L" },
+        ...
+        { "factor": "PV", "level": 3, "source": "floor", "cvss": "N" }
       ],
       "counters": ["detection_undeclared", "traceability_missing"]
     },
     ...
   ],
-  "counters": { "applicability_missing": 5, "data_subjects_missing": 25, "detection_undeclared": 45, "ease_of_exploit_cannot_tell": 4, "motive_cannot_tell": 4, "opportunity_cannot_tell": 4, "traceability_missing": 45 },
+  "counters": { "cvss_v3_missing": 8, "data_subjects_missing": 26, "detection_undeclared": 45, "ease_of_exploit_cannot_tell": 4, "motive_cannot_tell": 4, "opportunity_cannot_tell": 4, "traceability_missing": 45 },
   "defects": {}
 }
 ```
@@ -340,15 +343,15 @@ A strict run fails at the first of three checks that finds one, with exit code 1
     strict: context.data_subjects, context.detection, context.traceability not declared, so each would fall back to its worst case
     ```
 
-2. **Before any LLM call**: a CVE whose CVSS vectors leave an axis undecided (no CVSS vector in the scanner's report, a vector that does not parse, one that lacks an axis metric or gives one a value off its scale), or a CVE with no description. One error lists every such CVE with its causes:
+2. **Before any LLM call**: a CVE with no usable CVSS v3 vector (none in the scanner's report, or each one refused: it does not parse, states another version than 3.0 or 3.1, or lacks `C`, `I` or `A` on `H`, `L` or `N`), or a CVE with no description. One error lists every such CVE with its causes, each refused vector with why:
 
     ```text
     failed to generate risk scores: strict: 2 vulnerabilities would fall back to a worst case, so no LLM call is made:
-      CVE-2026-2673: applicability_missing: no CVSS vector in the scanner's report
-      CVE-2026-3184: applicability_missing: no CVSS vector in the scanner's report; no description in the scanner's report, so Motive, Opportunity and Ease of exploit are not asked and take their worst case
+      CVE-2026-2673: cvss_v3_missing: no CVSS v3 vector in the scanner's report, so Loss of confidentiality, integrity and availability take their worst level
+      CVE-2026-3184: cvss_v3_missing: no CVSS v3 vector in the scanner's report, so Loss of confidentiality, integrity and availability take their worst level; no description in the scanner's report, so Motive, Opportunity and Ease of exploit are not asked and take their worst case
     ```
 
-    Here the cause is the scan, not your config. A scan holding a CVE with no CVSS vector in the scanner's report cannot pass `--strict`, and nothing in vens fixes it: the vector has to come from the scanner. Without `--strict`, such a CVE has its losses asked instead of floored, and counts in `applicability_missing`.
+    Here the cause is the scan, not your config. A scan holding a CVE with no usable CVSS v3 vector cannot pass `--strict`, and nothing in vens fixes it: the vector has to come from the scanner. Without `--strict`, such a CVE has Loss of confidentiality, integrity and availability at 9, and counts in `cvss_v3_missing`.
 
 3. **During the run**: the first answer to a question that reads as `cannot_tell`, an answer off its list included. The run stops after that call:
 
@@ -373,23 +376,22 @@ BOM-Link `version` number used alongside `--sbom-serial-number`. Default: `1`.
 A run that reaches scoring ends with one `INFO` line, `Scoring run finished`, also when it fails during scoring. From a mock run (`--llm=mock`) on `examples/quickstart`'s Trivy report with `data_subjects`, `detection` and `traceability` removed from its `config.yaml`, so their fallbacks are counted:
 
 ```text
-level=INFO msg="Scoring run finished" rows=107 cves=45 llm_calls=64 asked_again=0 splits=0 calls.R=5 calls.M=5 calls.O=5 ... calls.adjustment=4 counters.applicability_missing=5 counters.data_subjects_missing=25 counters.detection_undeclared=45 counters.ease_of_exploit_cannot_tell=4 counters.motive_cannot_tell=4 counters.opportunity_cannot_tell=4 counters.traceability_missing=45 failed=false
+level=INFO msg="Scoring run finished" rows=107 cves=45 llm_calls=46 asked_again=0 splits=0 calls.M=5 calls.O=5 calls.EE=5 ... calls.adjustment=6 counters.cvss_v3_missing=8 counters.data_subjects_missing=26 counters.detection_undeclared=45 counters.ease_of_exploit_cannot_tell=4 counters.motive_cannot_tell=4 counters.opportunity_cannot_tell=4 counters.traceability_missing=45 failed=false
 ```
 
 - `rows` and `cves` — the scanner's findings, and the distinct CVEs among them.
 - `llm_calls`, `asked_again`, `splits` — every call made, the calls that asked again for CVEs a reply left without an answer, out of it or unreadable, and the calls split in half after the provider truncated them.
-- `calls.<factor>` — the calls of each question (`R`, reachability, then `M`, `O`, `EE`, `ID`, `LC`, `LI`, `LAV`, `LAC`, `FD`, `RD`, `NC`, `PV`), and `calls.adjustment`. A question no CVE needs makes no call.
+- `calls.<factor>` — the calls of each question (`M`, `O`, `EE`, `ID`, `LAC`, `FD`, `RD`, `NC`, `PV`), and `calls.adjustment`. A question no CVE needs makes no call.
 - `counters.*` — one per CVE that used a fallback, shown when not zero:
-    - `reachability_cannot_tell` — the reachability answer read as `cannot_tell`, or an answer off its list: the CVE is read as reachable, the worst case, and asked the six questions it decides.
-    - `<factor>_cannot_tell` (`motive_cannot_tell`, `opportunity_cannot_tell`, `ease_of_exploit_cannot_tell`, `intrusion_detection_cannot_tell`, `confidentiality_cannot_tell`, `integrity_cannot_tell`, `availability_cannot_tell`, `accountability_cannot_tell`, `financial_damage_cannot_tell`, `reputation_cannot_tell`, `non_compliance_cannot_tell`, `privacy_cannot_tell`) — the answer read as `cannot_tell`, or an answer off its list, so the question's worst answer applied. That is the factor's worst level, except where a rule still limits it: Intrusion detection takes the worst channel `detection` declares, `data_subjects` caps Privacy violation, and a flagged CVE's adjustment can lower Opportunity, a loss or Privacy violation. A CVE with no description is not asked Motive, Opportunity and Ease of exploit, nor Opportunity in its adjustment, a description being a prerequisite of their answers, and counts in `motive_cannot_tell`, and, read as reachable, in `opportunity_cannot_tell` and `ease_of_exploit_cannot_tell`.
+    - `<factor>_cannot_tell` (`motive_cannot_tell`, `opportunity_cannot_tell`, `ease_of_exploit_cannot_tell`, `intrusion_detection_cannot_tell`, `accountability_cannot_tell`, `financial_damage_cannot_tell`, `reputation_cannot_tell`, `non_compliance_cannot_tell`, `privacy_cannot_tell`) — the answer read as `cannot_tell`, or an answer off its list, so the question's worst answer applied. That is the factor's worst level, except where a rule still limits it: Intrusion detection takes the worst channel `detection` declares, `data_subjects` caps Privacy violation, and a flagged CVE's adjustment can lower Opportunity or Privacy violation. A CVE with no description is not asked Motive, Opportunity and Ease of exploit, nor Opportunity in its adjustment, a description being a prerequisite of their answers, and counts in `motive_cannot_tell`, `opportunity_cannot_tell` and `ease_of_exploit_cannot_tell`.
     - `detection_undeclared`, `traceability_missing`, `data_subjects_missing` — the fallback of a field left out of `config.yaml`.
-    - `applicability_missing` — the CVE's CVSS vectors left an axis undecided, so its loss was asked instead of floored.
+    - `cvss_v3_missing` — the CVE has no usable CVSS v3 vector, so Loss of confidentiality, integrity and availability took 9.
     - `severity_contested_unavailable` — no record in the report to check the CVE's severity against NVD's, so a contested severity could not be flagged.
     - `reasoning_missing` — a reply gave no reasoning for one of the CVE's answers; the answer is kept.
 - `defects.*` — replies that break the schema or the instructions, counted by kind: `answer_off_list`, `answer_key_written_twice`, `answer_without_reasoning`, `answer_cve_not_asked`, `answer_cve_repeated`, `reply_unreadable` (a reply that is not the JSON asked for, or holds an answer that is not a JSON object, counted once per reply: the CVEs it leaves without an answer are asked again), and for the adjustment `adjustment_unreadable`, `adjustment_key_written_twice`, `adjustment_off_list`, `adjustment_field_not_asked`, `adjustment_without_reasoning`. A provider that honours the schema and the prompt writes none.
 - `failed` — whether the run failed.
 
-A run that fails `--strict`'s check before any LLM call (a CVE without a usable CVSS vector or without a description) logs it too, with `llm_calls=0`, no counters and `failed=true`. A run that stops earlier logs no summary, such as one whose config fails to load or fails `--strict`'s config check (`data_subjects`, `detection` or `traceability` left out); a report with no vulnerabilities logs none either.
+A run that fails `--strict`'s check before any LLM call (a CVE without a usable CVSS v3 vector or without a description) logs it too, with `llm_calls=0`, no counters and `failed=true`. A run that stops earlier logs no summary, such as one whose config fails to load or fails `--strict`'s config check (`data_subjects`, `detection` or `traceability` left out); a report with no vulnerabilities logs none either.
 
 `--debug-dir` writes the same counters, per CVE, and the same defects to `answers.json`.
 

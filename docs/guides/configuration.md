@@ -158,7 +158,7 @@ How strict is your uptime target?
 | `high` | 24/7 required |
 | `critical` | Zero downtime tolerance |
 
-The Loss of availability question shows it; if omitted, that question shows `business_criticality` instead. Set it explicitly only when availability needs differ from business criticality (e.g. an internal tool that absolutely cannot go down during trading hours).
+Since #310's C2 it moves no score and no call sends it: Loss of availability is read from the CVE's CVSS v3 vectors. The key still loads.
 
 ### `controls` — what defenses are already in place?
 
@@ -187,7 +187,7 @@ notes: |
   Container runs as non-root. Secrets from AWS Secrets Manager.
 ```
 
-Anything an engineer would say in a threat modeling session. Every question shows it, with the rest of the deployment, and the model uses it on ambiguous CVEs. A reachability verdict written here reaches the rating only through the model's answers.
+Anything an engineer would say in a threat modeling session. Every question shows it, with the rest of the deployment, and the model uses it on ambiguous CVEs. A reachability verdict written here publishes no VEX status, and no question asks whether a CVE is reachable: declare it under [`reachability`](../reference/config-schema.md#reachability), with where it comes from.
 
 !!! warning "What goes in notes leaves your network"
     When you use a cloud LLM provider, the `notes` field is sent **verbatim** to that provider in every call. Do not paste secrets, credentials, customer data, PHI, PII, or information your NDA/classification policy would forbid sharing with a third party. If any of that could reasonably appear in your `notes`, [use Ollama locally](../getting-started/installation.md#configure-an-llm-provider) — nothing leaves your network. See [Privacy and data flow](../concepts/privacy-and-data-flow.md) for the full list of what is (and isn't) sent to the LLM.

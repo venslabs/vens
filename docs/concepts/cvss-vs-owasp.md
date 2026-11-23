@@ -54,35 +54,36 @@ Same CVE, same base score, two different risks. The model answered the questions
 OWASP's Risk Rating Methodology rates a vulnerability from 16 factors, each with a few named levels from 0 to 9. vens sets each factor in one of three ways:
 
 1. **Set by vens (4 factors).** Skill level, Ease of discovery and Awareness are 9 for every finding: each finding is a published CVE that a scanner matched, so vens takes OWASP's worst case for them. Size comes from your declared `exposure`.
-2. **Read from the model's answer (8 factors).** The model gets one question per call, about a batch of CVEs, and picks one named answer from a closed list that always includes `cannot_tell`. vens maps the answer to the factor's level; `cannot_tell` maps to the worst case and is counted.
-3. **An answer combined with a declared field (4 factors).** vens crosses the model's answer with a field of `config.yaml` the question does not show: Intrusion detection with `detection`, Loss of confidentiality with `data_sensitivity`, Loss of accountability with `traceability`, Privacy violation with `data_subjects`.
+2. **Read from the CVSS v3 vectors (3 factors).** Loss of confidentiality, integrity and availability come from the worst value, `H` over `L` over `N`, that the CVE's usable CVSS v3 vectors give `C`, `I` and `A`, across every row and source of the scanner's report; confidentiality is crossed with `data_sensitivity`. No question asks them. A CVE with no usable v3 vector takes 9 for each, counted as `cvss_v3_missing`.
+3. **Read from the model's answer (6 factors).** The model gets one question per call, about a batch of CVEs, and picks one named answer from a closed list that always includes `cannot_tell`. vens maps the answer to the factor's level; `cannot_tell` maps to the worst case and is counted.
+4. **An answer combined with a declared field (3 factors).** vens crosses the model's answer with a field of `config.yaml` the question does not show: Intrusion detection with `detection`, Loss of accountability with `traceability`, Privacy violation with `data_subjects`.
 
-Four factors also have a CVSS floor: when every CVSS vector of the CVE rates the axis as no impact, vens asks no question and sets Loss of confidentiality to 2, Loss of integrity to 1 and Loss of availability to 1, and Privacy violation, which follows confidentiality, to 3.
+Privacy violation also has a CVSS floor: when the CVE's usable CVSS v3 vectors give `C:N`, vens asks no question and sets it to 3.
 
-Before any factor, every CVE gets one question of its own: whether the vulnerable code is reachable in this deployment. Its answer decides once, for six factors: `not_reachable`, when the facts given show that the vulnerable code is not reachable here, sets Opportunity to 0, Ease of exploit to 1, Loss of confidentiality to 2, Loss of integrity and availability to 1 and Loss of accountability to the lowest level your `traceability` gives, and vens asks none of their six questions. `reachable`, and `cannot_tell`, which counts and takes the worst case, leave the six to their own questions, none of which can say "not reachable" again. Loss of confidentiality, integrity and availability also list `no_impact`, when exploiting it has no such impact, which takes the factor's lowest level, 2, 1 and 1; on Loss of accountability `identified`, its no accountability loss, takes the lowest level your `traceability` gives. They are answers, not `cannot_tell`, which says only that the facts given do not decide and still takes the worst case.
+No question asks whether a CVE is reachable. vens publishes a VEX status only from a `reachability` entry of `config.yaml`: an entry declaring the CVE not reachable, by its id or by a component naming every package the scan lists for it, gives the CVE `analysis.state: not_affected`, `justification: code_not_reachable` and a `detail` citing the entry, unless an entry declaring it reachable vetoes it. The rating stays the one the answers give: the status lowers no level and caps no severity. A reachability verdict in `notes` publishes nothing. On Loss of accountability, `identified`, its no accountability loss, takes the lowest level your `traceability` gives: it is an answer, not `cannot_tell`, which says only that the facts given do not decide and takes the worst case.
 
-A description is a prerequisite of three answers: when no row of the scanner's report describes the CVE, a title alone included, vens does not ask Motive, Opportunity and Ease of exploit, and sets each to its worst level, 9, counted as `cannot_tell`; Opportunity and Ease of exploit still take their lowest levels when the CVE is answered not reachable.
+A description is a prerequisite of three answers: when no row of the scanner's report describes the CVE, a title alone included, vens does not ask Motive, Opportunity and Ease of exploit, and sets each to its worst level, 9, counted as `cannot_tell`.
 
-A question is asked only when the factor's contract requires it: at most 13 questions per CVE, reachability's included. A CVE whose description says it is disputed or not a security issue, or that the scanner rates low while NVD rates it high or critical, is flagged: it gets one more call, the adjustment, when it has a field left to ask, which can lower Opportunity (not for a CVE with no description), a loss the CVSS vectors did not floor, and Privacy violation, and never raises a level. A flagged CVE answered not reachable has Opportunity and the losses at their lowest already: its adjustment shows that answer and asks only whether confidentiality can be affected, when it was asked Privacy violation, which `not_affected` lowers to its floor.
+A question is asked only when the factor's contract requires it: at most 9 questions per CVE. A CVE whose description says it is disputed or not a security issue, or that the scanner rates low while NVD rates it high or critical, is flagged: it gets one more call, the adjustment, when it has a field left to ask. It can lower Opportunity (not for a CVE with no description) and, asking whether confidentiality can be affected at all, Privacy violation (when it was asked), which `not_affected` lowers to its floor; it never raises a level and moves no technical impact.
 
 | Factor | Group | Way | What sets the level |
 |---|---|---|---|
 | Skill level (SL) | likelihood | set by vens | always 9 |
 | Motive (M) | likelihood | answer | the reward an exploit brings; shows `business_criticality` and `data_sensitivity`; 9, not asked, when the CVE has no description |
-| Opportunity (O) | likelihood | answer | the access or resources an exploit needs; shows the CVSS AV, AT, PR and UI metrics; 0, not asked, when the CVE is not reachable; 9, not asked, when it has no description |
+| Opportunity (O) | likelihood | answer | the access or resources an exploit needs; shows the CVSS AV, AT, PR and UI metrics; 9, not asked, when the CVE has no description |
 | Size (S) | likelihood | set by vens | `exposure`: `internal` 4, `private` 6, `internet` 9 |
 | Ease of discovery (ED) | likelihood | set by vens | always 9 |
-| Ease of exploit (EE) | likelihood | answer | how easy the exploit is here; shows the CVSS AC, AT, PR and UI metrics and five of the controls, when set to `true`; 1, not asked, when the CVE is not reachable; 9, not asked, when it has no description |
+| Ease of exploit (EE) | likelihood | answer | how easy the exploit is here; shows the CVSS AC, AT, PR and UI metrics and five of the controls, when set to `true`; 9, not asked, when the CVE has no description |
 | Awareness (A) | likelihood | set by vens | always 9 |
 | Intrusion detection (ID) | likelihood | answer and `detection` | the lowest declared level among the channels the model picks; 9 when `detection` is left out |
-| Loss of confidentiality (LC) | technical impact | answer and `data_sensitivity` | how much data an exploit could read, crossed with the sensitivity; 2 when the CVSS vectors floor it, the CVE is not reachable or the answer is no impact |
-| Loss of integrity (LI) | technical impact | answer | how much data an exploit could corrupt; 1 when the CVSS vectors floor it, the CVE is not reachable or the answer is no impact |
-| Loss of availability (LAV) | technical impact | answer | how much of the service an exploit could interrupt; 1 when the CVSS vectors floor it, the CVE is not reachable or the answer is no impact |
-| Loss of accountability (LAC) | technical impact | answer and `traceability` | whether the attacker must authenticate, and, apart, whether the exploit defeats attribution, crossed with what is recorded; the column's lowest level when the CVE is not reachable |
+| Loss of confidentiality (LC) | technical impact | CVSS v3 and `data_sensitivity` | the worst `C`: `N` 2; `L` 2, or 6 on high or critical data; `H` 6, or 7; 9 with no usable v3 vector |
+| Loss of integrity (LI) | technical impact | CVSS v3 | the worst `I`: `N` 1, `L` 3, `H` 7; 9 with no usable v3 vector |
+| Loss of availability (LAV) | technical impact | CVSS v3 | the worst `A`: `N` 1, `L` 5, `H` 7; 9 with no usable v3 vector |
+| Loss of accountability (LAC) | technical impact | answer and `traceability` | whether the attacker must authenticate, and, apart, whether the exploit defeats attribution, crossed with what is recorded |
 | Financial damage (FD) | business impact | answer | shows `business_criticality` |
 | Reputation damage (RD) | business impact | answer | shows `business_criticality` |
 | Non-compliance (NC) | business impact | answer | how serious a violation of the declared frameworks; 2, not asked, when none is declared |
-| Privacy violation (PV) | business impact | answer and `data_subjects` | how many people's data could be disclosed, capped by the declared band; 3 when the CVSS vectors floor confidentiality |
+| Privacy violation (PV) | business impact | answer and `data_subjects` | how many people's data could be disclosed, capped by the declared band; 3, not asked, when the usable v3 vectors give `C:N` |
 
 Each field's effect is in the **[config.yaml reference](../reference/config-schema.md)**.
 
@@ -124,8 +125,9 @@ This explains the mechanism; it is not a measurement of accuracy.
 | | Up to v0.6 | Since v0.7.0 |
 |---|---|---|
 | What the model returns | four numbers from 0 to 9 per CVE: threat agent, vulnerability, technical impact, business impact | one named answer per question, from a closed list; never a number |
-| Calls | one call per batch of CVEs | one call per question per batch, at most 13 questions per CVE, reachability's first, and one adjustment call per flagged CVE with a field left to ask |
-| The 16 levels in the vector | each of the four numbers repeated over its group's four factors | 4 set by vens, 8 read from an answer, 4 from an answer combined with a declared field |
+| Calls | one call per batch of CVEs | one call per question per batch, at most 9 questions per CVE, and one adjustment call per flagged CVE with a field left to ask |
+| The 16 levels in the vector | each of the four numbers repeated over its group's four factors | 4 set by vens, 3 from the CVSS v3 vectors, 6 read from an answer, 3 from an answer combined with a declared field |
+| VEX status | none | `not_affected`, `code_not_reachable`, only where a `reachability` entry of `config.yaml` declares it, beside the rating |
 | Impact | the average of the technical and the business impact | the larger of the two |
 | Severity | bands of the score: 0–4 `info`, 5–19 `low`, 20–39 `medium`, 40–59 `high`, 60–81 `critical` | OWASP's matrix of the likelihood and impact levels; never `info` |
 | Score | likelihood × impact | the same product, which no longer sets the severity |
