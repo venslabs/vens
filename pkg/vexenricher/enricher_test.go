@@ -470,3 +470,39 @@ func TestEnrichReport_NotAffectedCountsInNoBand(t *testing.T) {
 	plain := enriched.Results[0].Vulnerabilities[1].Custom.(map[string]interface{})
 	assert.Equal(t, map[string]interface{}{"owasp_score": score, "owasp_vector": "SL:9/M:9", "owasp_severity": "high"}, plain)
 }
+
+// A not_affected entry with no OWASP rating still removes the finding's
+// severity band and writes vex_state: not_affected, adding no score; an
+// entry with neither leaves its finding alone.
+func TestEnrichReport_NotAffectedWithoutRating(t *testing.T) {
+	vex := cdx.BOM{
+		SpecVersion: cdx.SpecVersion1_6,
+		Vulnerabilities: &[]cdx.Vulnerability{
+			{ID: "CVE-2024-0001", Analysis: &cdx.VulnerabilityAnalysis{State: cdx.IASNotAffected, Justification: cdx.IAJCodeNotReachable}},
+			{ID: "CVE-2024-0002"},
+		},
+	}
+	vexData, err := json.Marshal(vex)
+	require.NoError(t, err)
+	report := trivytypes.Report{
+		Results: trivytypes.Results{
+			{
+				Target: "test-target",
+				Vulnerabilities: []trivytypes.DetectedVulnerability{
+					{VulnerabilityID: "CVE-2024-0001", PkgName: "a", Custom: map[string]interface{}{"owasp_severity": "critical", "owasp_score": 50.0}},
+					{VulnerabilityID: "CVE-2024-0002", PkgName: "b", Custom: map[string]interface{}{"owasp_severity": "low"}},
+				},
+			},
+		},
+	}
+	reportData, err := json.Marshal(report)
+	require.NoError(t, err)
+
+	enricher, err := New(vexData)
+	require.NoError(t, err)
+	enriched, err := enricher.EnrichReport(context.Background(), reportData)
+	require.NoError(t, err)
+
+	assert.Equal(t, map[string]interface{}{"owasp_score": 50.0, "vex_state": "not_affected"}, enriched.Results[0].Vulnerabilities[0].Custom)
+	assert.Equal(t, map[string]interface{}{"owasp_severity": "low"}, enriched.Results[0].Vulnerabilities[1].Custom)
+}

@@ -102,12 +102,16 @@ func (e *VEXEnricher) EnrichReport(ctx context.Context, reportData []byte) (*tri
 		for j := range result.Vulnerabilities {
 			vuln := &result.Vulnerabilities[j]
 
+			notAffected := e.NotAffected[vuln.VulnerabilityID]
 			if score, ok := e.OWASPScorePerVulnID[vuln.VulnerabilityID]; ok {
 				vector := e.OWASPVectorPerVulnID[vuln.VulnerabilityID]
 				severity := e.OWASPSeverityPerVulnID[vuln.VulnerabilityID]
-				if e.applyRating(vuln, score, vector, severity, e.NotAffected[vuln.VulnerabilityID]) {
+				if e.applyRating(vuln, score, vector, severity, notAffected) {
 					enrichedCount++
 				}
+			} else if notAffected && markNotAffected(vuln) {
+				// A status without an OWASP rating still counts in no band.
+				enrichedCount++
 			}
 		}
 	}
@@ -145,18 +149,31 @@ func (e *VEXEnricher) applyRating(vuln *trivytypes.DetectedVulnerability, score 
 	}
 	// The severity band is the field vens commits to for downstream gates:
 	// the raw score lives on a vens-internal scale.
-	switch {
-	case notAffected:
-		delete(customMap, "owasp_severity")
-	case severity != "":
-		customMap["owasp_severity"] = severity
-	default:
-		delete(customMap, "owasp_severity")
-	}
 	if notAffected {
-		customMap[vexState] = string(cdx.IASNotAffected)
-	} else {
-		delete(customMap, vexState)
+		return markNotAffected(vuln)
 	}
+	if severity != "" {
+		customMap["owasp_severity"] = severity
+	} else {
+		delete(customMap, "owasp_severity")
+	}
+	delete(customMap, vexState)
+	return true
+}
+
+// markNotAffected removes the finding's severity band, an earlier
+// enrichment's included, and writes vex_state: not_affected, whether or not
+// the VEX rates it. It reports false, leaving it as it is, when its Custom
+// field is not a map.
+func markNotAffected(vuln *trivytypes.DetectedVulnerability) bool {
+	if vuln.Custom == nil {
+		vuln.Custom = make(map[string]interface{})
+	}
+	customMap, ok := vuln.Custom.(map[string]interface{})
+	if !ok {
+		return false
+	}
+	delete(customMap, "owasp_severity")
+	customMap[vexState] = string(cdx.IASNotAffected)
 	return true
 }
