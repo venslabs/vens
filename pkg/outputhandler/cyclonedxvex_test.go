@@ -739,3 +739,81 @@ func TestCycloneDxVexWriter_Close_FailsOnMissingOrConflictingMarkers(t *testing.
 		})
 	}
 }
+
+// The VEX's metadata carries exactly one property, vens:rating-policy 2,
+// whatever the spec version and with no vulnerability too.
+func TestCycloneDxVexWriter_Close_RatingPolicy(t *testing.T) {
+	score := 42.0
+	rating := cyclonedx.VulnerabilityRating{Method: cyclonedx.ScoringMethodOWASP, Score: &score, Severity: cyclonedx.SeverityHigh}
+	rated := []VulnRating{
+		{VulnID: "CVE-1", BOMRef: "pkg:npm/a@1", Rating: rating, ImpactProvenance: ImpactFromCVSSv3, ImpactBasis: owasp.BasisTechnical},
+		{VulnID: "CVE-2", BOMRef: "pkg:npm/a@1", Rating: rating, ImpactProvenance: ImpactFromFallback, ImpactBasis: owasp.BasisBusiness},
+	}
+	type property struct {
+		Name  string `json:"name"`
+		Value string `json:"value"`
+	}
+	for _, spec := range SupportedSpecVersions {
+		version, err := ParseSpecVersion(spec)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, ratings := range [][]VulnRating{nil, rated} {
+			var buf bytes.Buffer
+			h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 1, "", version)
+			if err := h.HandleVulnRatings(ratings); err != nil {
+				t.Fatalf("HandleVulnRatings: %v", err)
+			}
+			if err := h.Close(); err != nil {
+				t.Fatalf("Close: %v", err)
+			}
+			var doc struct {
+				Metadata struct {
+					Properties []property `json:"properties"`
+				} `json:"metadata"`
+			}
+			if err := json.Unmarshal(buf.Bytes(), &doc); err != nil {
+				t.Fatalf("unmarshal: %v", err)
+			}
+			if want := []property{{"vens:rating-policy", "2"}}; !slices.Equal(doc.Metadata.Properties, want) {
+				t.Errorf("%s, %d ratings: metadata properties %+v, want %+v", spec, len(ratings), doc.Metadata.Properties, want)
+			}
+		}
+	}
+}
+
+// Metadata that does not carry the rating policy once, at 2, is refused like
+// a vulnerability short of a marker. Close always writes it, so its check is
+// reached here through markerError.
+func TestMarkerError_RatingPolicy(t *testing.T) {
+	ratings := []VulnRating{{VulnID: "CVE-1", BOMRef: "pkg:npm/a@1", ImpactProvenance: ImpactFromCVSSv3, ImpactBasis: owasp.BasisTechnical}}
+	carrying := func(properties ...cyclonedx.Property) *cyclonedx.Metadata {
+		return &cyclonedx.Metadata{Properties: &properties}
+	}
+	policy := func(value string) cyclonedx.Property {
+		return cyclonedx.Property{Name: RatingPolicyProperty, Value: value}
+	}
+	for name, c := range map[string]struct {
+		metadata *cyclonedx.Metadata
+		ratings  []VulnRating
+		want     string
+	}{
+		"no metadata":   {nil, ratings, `cannot emit VEX: rating policy "" is not 2`},
+		"no properties": {&cyclonedx.Metadata{}, ratings, `cannot emit VEX: rating policy "" is not 2`},
+		"missing":       {carrying(cyclonedx.Property{Name: "vens:policy", Value: "2"}), ratings, `cannot emit VEX: rating policy "" is not 2`},
+		"empty":         {carrying(policy("")), ratings, `cannot emit VEX: rating policy "" is not 2`},
+		"wrong":         {carrying(policy("1")), ratings, `cannot emit VEX: rating policy "1" is not 2`},
+		"twice":         {carrying(policy("2"), policy("2")), ratings, `cannot emit VEX: rating policy "2, 2" is not 2`},
+		"with a basis missing": {carrying(policy("3")), []VulnRating{{VulnID: "CVE-1", ImpactProvenance: ImpactFromCVSSv3}},
+			`cannot emit VEX: CVE-1: impact basis "" is not technical or business; rating policy "3" is not 2`},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if err := markerError("cannot emit VEX", c.metadata, c.ratings); err == nil || err.Error() != c.want {
+				t.Errorf("markerError() = %v, want %q", err, c.want)
+			}
+		})
+	}
+	if err := markerError("cannot emit VEX", carrying(policy(RatingPolicy)), ratings); err != nil {
+		t.Errorf("markerError() = %v, want nil", err)
+	}
+}

@@ -128,6 +128,7 @@ func (c *cycloneDxVexWriter) Close() error {
 				},
 			},
 		},
+		Properties: &[]cyclonedx.Property{{Name: RatingPolicyProperty, Value: RatingPolicy}},
 	}
 
 	vulnMap := make(map[string]*cyclonedx.Vulnerability)
@@ -170,7 +171,7 @@ func (c *cycloneDxVexWriter) Close() error {
 	if err := UnreferencedError("cannot emit VEX", unreferenced); err != nil {
 		return err
 	}
-	if err := markerError("cannot emit VEX", c.r); err != nil {
+	if err := markerError("cannot emit VEX", bom.Metadata, c.r); err != nil {
 		return err
 	}
 
@@ -230,14 +231,26 @@ var markers = []struct {
 		func(g VulnRating) string { return string(g.ImpactBasis) }},
 }
 
-// markerError names, after prefix, each vulnerability a rating gives no value
-// vens writes for a marker, or whose rows give two; nil when each one has
-// exactly one of each. Without the provenance a consumer cannot tell an
-// impact read from the CVSS v3 vectors from the missing-input rule's worst
-// case, and without the basis it cannot recompute the severity from the
-// vector, so Close writes no VEX, as for a missing component.
-func markerError(prefix string, ratings []VulnRating) error {
-	var problems []string
+// markerError names, after prefix, metadata that does not carry RatingPolicy
+// once, and each vulnerability a rating gives no value vens writes for a
+// marker, or whose rows give two; nil when there is none. Without the policy
+// a consumer cannot tell which rules the ratings follow, without the
+// provenance it cannot tell an impact read from the CVSS v3 vectors from the
+// missing-input rule's worst case, and without the basis it cannot recompute
+// the severity from the vector, so Close writes no VEX, as for a missing
+// component.
+func markerError(prefix string, metadata *cyclonedx.Metadata, ratings []VulnRating) error {
+	var policies, problems []string
+	if metadata != nil && metadata.Properties != nil {
+		for _, p := range *metadata.Properties {
+			if p.Name == RatingPolicyProperty {
+				policies = append(policies, p.Value)
+			}
+		}
+	}
+	if !slices.Equal(policies, []string{RatingPolicy}) {
+		problems = append(problems, fmt.Sprintf("rating policy %q is not %s", strings.Join(policies, ", "), RatingPolicy))
+	}
 	for _, m := range markers {
 		first := map[string]string{}
 		for _, g := range ratings {

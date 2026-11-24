@@ -11,7 +11,7 @@
 vens enrich --vex VEX_FILE [--output PATH] REPORT_FILE
 ```
 
-`vens enrich` takes a Trivy JSON report and annotates every vulnerability the VEX document scored, adding `Custom.owasp_score`, `Custom.owasp_severity`, `Custom.owasp_vector` and, when the VEX vulnerability carries the `vens:impact-provenance` property, `Custom.owasp_impact_provenance` with its value (`cvss-v3` or `missing-cvss-v3-fallback`), and when it carries `vens:impact-basis`, `Custom.owasp_impact_basis` with its value (`technical` or `business`, the impact the severity and the score are read on); see **[The VEX document](generate.md#the-vex-document)**. Matching is on the vulnerability ID alone, and only ratings whose method is OWASP are read. Trivy's own `Severity` and CVSS fields stay as they are, and nothing else in the report changes.
+`vens enrich` takes a Trivy JSON report and annotates every vulnerability the VEX document scored, adding `Custom.owasp_score`, `Custom.owasp_severity`, `Custom.owasp_vector` and, when the VEX vulnerability carries the `vens:impact-provenance` property, `Custom.owasp_impact_provenance` with its value (`cvss-v3` or `missing-cvss-v3-fallback`), and when it carries `vens:impact-basis`, `Custom.owasp_impact_basis` with its value (`technical` or `business`, the impact the severity and the score are read on), and when the VEX's metadata carries `vens:rating-policy`, `Custom.owasp_rating_policy` with its value (`2`, the version of the rules the ratings follow); see **[The VEX document](generate.md#the-vex-document)**. Matching is on the vulnerability ID alone, and only ratings whose method is OWASP are read. Trivy's own `Severity` and CVSS fields stay as they are, and nothing else in the report changes.
 
 !!! note "From v0.6.0"
     `owasp_severity` is written from v0.6.0 on. v0.5.0 and earlier don't emit it.
@@ -23,6 +23,7 @@ vens enrich --vex VEX_FILE [--output PATH] REPORT_FILE
   "Custom": {
     "owasp_impact_basis": "technical",
     "owasp_impact_provenance": "cvss-v3",
+    "owasp_rating_policy": "2",
     "owasp_score": 39.1875,
     "owasp_severity": "high",
     "owasp_vector": "SL:9/M:4/O:9/S:9/ED:9/EE:9/A:9/ID:8/LC:2/LI:7/LAV:1/LAC:9/FD:7/RD:5/NC:7/PV:3"

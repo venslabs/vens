@@ -323,10 +323,11 @@ func checkImpactMarker(vexData, answersData, enrichedData []byte) error {
 	return checkEnriched(enrichedData, "owasp_impact_provenance", func(id string) string { return marked[id] })
 }
 
-// impactBasisCmd checks the VEX's vens:impact-basis: every vulnerability
-// carries two properties, its impact provenance and its impact basis, the
-// basis the second argument names, and each row of the enriched report, if
-// given, carries it.
+// impactBasisCmd checks the VEX's vens:impact-basis and vens:rating-policy:
+// every vulnerability carries two properties, its impact provenance and its
+// impact basis, the basis the second argument names, the metadata one, the
+// rating policy 2, and each row of the enriched report, if given, carries the
+// basis and the policy.
 func impactBasisCmd(ts *testscript.TestScript, neg bool, args []string) {
 	if neg || (len(args) != 2 && len(args) != 3) || (args[1] != "technical" && args[1] != "business") {
 		ts.Fatalf("usage: impact-basis vex.json technical|business [enriched.json]")
@@ -340,6 +341,9 @@ func impactBasisCmd(ts *testscript.TestScript, neg bool, args []string) {
 
 func checkImpactBasis(vexData []byte, basis string, enrichedData []byte) error {
 	var vex struct {
+		Metadata struct {
+			Properties []vexProperty `json:"properties"`
+		} `json:"metadata"`
 		Vulnerabilities []struct {
 			ID         string        `json:"id"`
 			Properties []vexProperty `json:"properties"`
@@ -351,13 +355,19 @@ func checkImpactBasis(vexData []byte, basis string, enrichedData []byte) error {
 	if len(vex.Vulnerabilities) == 0 {
 		return fmt.Errorf("the VEX holds no vulnerability")
 	}
+	if got, ok := oneProperty(vex.Metadata.Properties, "vens:rating-policy"); !ok || got != "2" || len(vex.Metadata.Properties) != 1 {
+		return fmt.Errorf("metadata properties %+v, want vens:rating-policy 2", vex.Metadata.Properties)
+	}
 	for _, v := range vex.Vulnerabilities {
 		_, provenance := oneProperty(v.Properties, "vens:impact-provenance")
 		if got, ok := oneProperty(v.Properties, "vens:impact-basis"); !ok || got != basis || !provenance || len(v.Properties) != 2 {
 			return fmt.Errorf("%s: properties %+v, want vens:impact-provenance and vens:impact-basis %s", v.ID, v.Properties, basis)
 		}
 	}
-	return checkEnriched(enrichedData, "owasp_impact_basis", func(string) string { return basis })
+	if err := checkEnriched(enrichedData, "owasp_impact_basis", func(string) string { return basis }); err != nil {
+		return err
+	}
+	return checkEnriched(enrichedData, "owasp_rating_policy", func(string) string { return "2" })
 }
 
 type vexProperty struct {

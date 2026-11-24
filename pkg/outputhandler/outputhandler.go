@@ -44,6 +44,17 @@ const (
 // owasp.BasisBusiness. The vector alone does not say which.
 const ImpactBasisProperty = "vens:impact-basis"
 
+// RatingPolicyProperty names the property a VEX carries once, in its
+// metadata: the version of the rules its ratings follow, RatingPolicy. A VEX
+// without it predates version 2.
+const (
+	RatingPolicyProperty = "vens:rating-policy"
+	// RatingPolicy 2: the impact is read on vens:impact-basis, and Financial
+	// damage and Reputation damage are set from business_criticality at the
+	// CVE's technical impact.
+	RatingPolicy = "2"
+)
+
 // VulnRating carries a single CycloneDX rating for one vulnerability ID.
 type VulnRating struct {
 	VulnID string

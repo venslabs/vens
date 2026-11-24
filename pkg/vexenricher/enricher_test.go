@@ -468,3 +468,47 @@ func TestEnrichReport_ImpactMarkers(t *testing.T) {
 	assert.NotContains(t, custom(2), "owasp_impact_provenance")
 	assert.NotContains(t, custom(2), "owasp_impact_basis")
 }
+
+// The VEX's vens:rating-policy metadata property is copied, as written, onto
+// every row it rates; a VEX without one leaves no key, a stale one cleared,
+// and a row it does not rate is left alone.
+func TestEnrichReport_RatingPolicy(t *testing.T) {
+	score := 12.0
+	vulns := &[]cdx.Vulnerability{{ID: "CVE-1", Ratings: &[]cdx.VulnerabilityRating{{Method: cdx.ScoringMethodOWASP, Score: &score}}}}
+	row := func(id string, custom map[string]interface{}) trivytypes.DetectedVulnerability {
+		return trivytypes.DetectedVulnerability{VulnerabilityID: id, PkgName: "lib", Custom: custom}
+	}
+	reportData, _ := json.Marshal(trivytypes.Report{Results: trivytypes.Results{{Target: "t", Vulnerabilities: []trivytypes.DetectedVulnerability{
+		row("CVE-1", map[string]interface{}{"owasp_rating_policy": "1"}),
+		row("CVE-1", nil),
+		row("CVE-2", nil),
+	}}}})
+	for name, c := range map[string]struct {
+		metadata *cdx.Metadata
+		want     string
+	}{
+		"policy":      {&cdx.Metadata{Properties: &[]cdx.Property{{Name: "other", Value: "x"}, {Name: "vens:rating-policy", Value: "2"}}}, "2"},
+		"no metadata": {nil, ""},
+		"no policy":   {&cdx.Metadata{Properties: &[]cdx.Property{{Name: "other", Value: "2"}}}, ""},
+	} {
+		t.Run(name, func(t *testing.T) {
+			vexData, _ := json.Marshal(cdx.BOM{SpecVersion: cdx.SpecVersion1_6, Metadata: c.metadata, Vulnerabilities: vulns})
+			enricher, err := New(vexData)
+			require.NoError(t, err)
+			assert.Equal(t, c.want, enricher.RatingPolicy)
+			enrichedReport, err := enricher.EnrichReport(context.Background(), reportData)
+			require.NoError(t, err)
+
+			rows := enrichedReport.Results[0].Vulnerabilities
+			for _, rated := range rows[:2] {
+				custom := rated.Custom.(map[string]interface{})
+				if c.want == "" {
+					assert.NotContains(t, custom, "owasp_rating_policy")
+				} else {
+					assert.Equal(t, c.want, custom["owasp_rating_policy"])
+				}
+			}
+			assert.Nil(t, rows[2].Custom)
+		})
+	}
+}

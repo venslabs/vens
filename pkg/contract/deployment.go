@@ -70,8 +70,8 @@ type Deployment struct {
 // the deployment owner's truth: business_criticality is required and no
 // compliance framework declared reads as none applying, so data_subjects is
 // the one business input whose absence leaves the business unknown. Declared,
-// the config holds the business information OWASP asks for and the basis is
-// business; undeclared, technical (OWASP_Risk_Rating_Methodology.md:142-145,
+// it is taken as the business information OWASP's rule asks for and the basis
+// is business; undeclared, technical (OWASP_Risk_Rating_Methodology.md:142-145,
 // :305-307).
 func (d Deployment) ImpactBasis() owasp.Basis {
 	if d.DataSubjects != nil {

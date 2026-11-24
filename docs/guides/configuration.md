@@ -36,7 +36,7 @@ Your `config.yaml` fields work in two ways. A field **shown to the model** is co
 | Field | How it is used | Why it matters |
 |---|---|---|
 | `exposure` | vens sets Size from it; every question names the attacker group it gives | An internet-facing service has more attackers than an internal tool. |
-| `data_sensitivity` | vens picks Loss of confidentiality's column from it; shown to Motive, Loss of integrity, Privacy violation | Leaking PII is worse than leaking debug logs. |
+| `data_sensitivity` | vens picks Loss of confidentiality's column from it; shown to Motive and Privacy violation | Leaking PII is worse than leaking debug logs. |
 | `business_criticality` | vens reads it alone, at the CVE's technical impact, for Financial damage and Reputation damage; shown to Motive | A breach of checkout can cost far more than one of a dashboard. |
 | `compliance_requirements` | the Non-compliance question names them | A GDPR violation raises the stakes. |
 | `traceability` | vens reads it alone, for Loss of accountability | An attacker who leaves no trace is worse. |
@@ -128,7 +128,7 @@ Declare the three channels, or leave the key out. `logged` means recorded and no
 
 Count what the service stores, what passes through it, and what it can fetch with its own access. The band caps Privacy violation: the model's answer stands up to it. Nothing is inferred from `data_sensitivity`.
 
-vens takes what you declare as true. With `data_subjects` declared, `config.yaml` holds the business information OWASP asks for, and vens rates every finding on its business impact, as OWASP does when the business is known; left out, on its technical impact. See **[How vens rates a CVE](../concepts/cvss-vs-owasp.md#how-vens-rates-a-cve)**.
+vens takes what you declare as true, so a declared `data_subjects` is taken as the business information OWASP's rule asks for, and vens rates every finding on its business impact; left out, on its technical impact. See **[How vens rates a CVE](../concepts/cvss-vs-owasp.md#how-vens-rates-a-cve)**.
 
 ### `listener` — does it accept connections?
 

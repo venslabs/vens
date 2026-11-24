@@ -391,6 +391,16 @@ Each vulnerability holds one OWASP rating (vector, severity and score), the BOM-
 
 A run that would write a vulnerability without one of the two properties, or with two values of one for a CVE, fails and writes no VEX.
 
+The VEX's `metadata` holds one property:
+
+```json
+"properties": [
+  { "name": "vens:rating-policy", "value": "2" }
+]
+```
+
+`vens:rating-policy` is the version of the rules the ratings follow. Version `2` reads the impact on `vens:impact-basis`, business when `config.yaml` declares `data_subjects` and technical otherwise, and sets Financial damage and Reputation damage from what `business_criticality` declares at the CVE's technical impact. A VEX without the property predates version 2: its ratings follow earlier rules.
+
 ---
 
 ## The run summary

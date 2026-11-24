@@ -33,7 +33,7 @@ context:
   #   - high: PII, financial data, customer info
   #   - critical: Secrets, PHI, payment card data
   # Impact: Picks the column of Loss of confidentiality (low and medium non-sensitive, high and critical critical);
-  #         shown to the Motive, Loss of integrity and Privacy violation questions
+  #         shown to the Motive and Privacy violation questions
   data_sensitivity: "high"
 
   # BUSINESS CRITICALITY: The worst an exploit of this service could cost the business
