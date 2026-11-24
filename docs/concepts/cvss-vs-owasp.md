@@ -85,7 +85,7 @@ A question is asked only when the factor's contract requires it: at most 7 quest
 | Financial damage (FD) | business impact | `business_criticality` and the technical impact | what the declared value states at the band of the highest of LC, LI and LAV, high with no usable v3 vector |
 | Reputation damage (RD) | business impact | `business_criticality` and the technical impact | the same |
 | Non-compliance (NC) | business impact | answer | how serious a violation of the declared frameworks; 2, not asked, when none is declared |
-| Privacy violation (PV) | business impact | answer and `data_subjects` | how many people's data could be disclosed, capped by the declared band; 3, not asked, when the usable v3 vectors give `C:N` |
+| Privacy violation (PV) | business impact | answer and `data_subjects` | how many people's data could be disclosed, capped by the declared band; 3, not asked, when the usable v3 vectors give `C:N` or `data_subjects` is `none` or `one_individual` |
 
 Each field's effect is in the **[config.yaml reference](../reference/config-schema.md)**.
 
@@ -158,7 +158,7 @@ A CVE has a base score of 7.5 but:
 - The model judges, from the CVE description and your `notes`, that the vulnerable code path is not used in your build, and answers Opportunity and Ease of exploit accordingly
 - The model judges that a control set to `true` stands in the way of this exploit, and answers Ease of exploit accordingly
 - The CVSS vectors give no confidentiality or integrity impact, so vens floors those losses
-- Your `data_sensitivity` is `low` or `medium`, so vens reads the model's Loss of confidentiality answer in the non-sensitive column, or the declared `data_subjects` caps Privacy violation
+- Your `data_sensitivity` is `low` or `medium`, so vens reads Loss of confidentiality from the CVSS `C` in the non-sensitive column, or the declared `data_subjects` caps Privacy violation
 - Your `business_criticality` declares a small worst case, or the CVSS vectors give a low technical impact, so vens sets Financial damage and Reputation damage low
 
 A generic 7.5 can come out `low` or `medium`. That rating is an input to your review, not a verdict: how well it matches real risk is not measured, and vens runs no reachability check of its own (see [Limitations](limitations.md)).
