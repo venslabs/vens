@@ -534,8 +534,22 @@ func TestReferenceMeaningsEqualTheTable(t *testing.T) {
 		}
 	}
 	checkBandLevels(t, sectionFor(t, sections, DataSubjects.Path()).table("Value"))
+	checkDeclarations(t, sectionFor(t, sections, BusinessCriticality.Path()).table("Value"))
 	checkChannelMeanings(t, sectionFor(t, sections, Detection.Path()).table("Field"))
 	checkControlScopes(t, sectionFor(t, sections, "context.controls").table("Field"))
+}
+
+// checkDeclarations checks what each business_criticality value declares,
+// in the column after its meaning.
+func checkDeclarations(t *testing.T, rows [][]string) {
+	t.Helper()
+	for _, v := range BusinessCriticality.Values() {
+		d, _ := DeclaredDamage(v)
+		i := slices.IndexFunc(rows, func(row []string) bool { return row[0] == v })
+		if i < 0 || len(rows[i]) < 3 || rows[i][2] != d.Declares() {
+			t.Errorf("%s: business_criticality %q should declare %q", reference, v, d.Declares())
+		}
+	}
 }
 
 func checkBandLevels(t *testing.T, rows [][]string) {

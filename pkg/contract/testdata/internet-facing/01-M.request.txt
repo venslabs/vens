@@ -5,7 +5,7 @@ QUESTION
 How motivated are anonymous Internet users to find and exploit this vulnerability in this service? Judge by the reward that exploiting it here would bring them: what a successful exploit gives an attacker, and what this service is and holds.
 
 FOR THIS QUESTION
-Business criticality: critical (Revenue-critical, compliance-required)
+Business criticality: critical (Revenue-critical)
 Data sensitivity: critical (Secrets, PHI, payment card data)
 
 ANSWERS

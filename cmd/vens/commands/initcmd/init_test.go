@@ -157,10 +157,18 @@ func TestInitAsksTheSchema2Fields(t *testing.T) {
 }
 
 // promptTexts are what the prompts must show, in the reference's words: what
-// each explained field and value means, the levels only the application
-// channel takes marked as such, and each control's description and scope.
+// each explained field and value means, what each business_criticality value
+// declares, the levels only the application channel takes marked as such,
+// and each control's description and scope.
 func promptTexts() []string {
-	texts := []string{"Listener: Does this deployment accept connections others open?\n"}
+	texts := []string{
+		"Listener: Does this deployment accept connections others open?\n",
+		"\nBusiness criticality: " + riskconfig.BusinessCriticality.About() + "\n",
+	}
+	for _, c := range riskconfig.BusinessCriticality.Choices() {
+		d, _ := riskconfig.DeclaredDamage(c.Value)
+		texts = append(texts, "  "+c.Value+": "+c.Meaning+". "+d.Declares()+"\n")
+	}
 	for _, f := range []riskconfig.Field{riskconfig.Traceability, riskconfig.Listener, riskconfig.DataSubjects, riskconfig.Detection} {
 		texts = append(texts, f.About())
 		for _, c := range f.Choices() {

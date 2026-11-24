@@ -23,6 +23,7 @@ import (
 	"unicode"
 
 	"github.com/venslabs/vens/pkg/cvss"
+	"github.com/venslabs/vens/pkg/riskconfig"
 )
 
 func v31(source, metrics string) cvss.Vector {
@@ -219,7 +220,7 @@ func TestFactsPerQuestion(t *testing.T) {
 	labels := map[Factor][]string{
 		M:  {"Business criticality: high", "Data sensitivity: low"},
 		EE: {"Controls in front of this deployment: waf (Web Application Firewall; scope: SQL injection, XSS, path traversal); zero_trust ("},
-		FD: {"Business criticality: high"}, RD: {"Business criticality: high"}, PV: {"Data sensitivity: low"},
+		PV: {"Data sensitivity: low"},
 	}
 	for _, f := range Order() {
 		got := background(f, d)
@@ -276,6 +277,40 @@ func TestHiddenFieldsAreNeverSent(t *testing.T) {
 	}
 }
 
+// business_criticality reaches the model through Motive alone: deployments
+// that differ only in it send the same system prompt, the same adjustment
+// and the same request for every other question, and Motive's differs in
+// the value and its meaning alone.
+func TestBusinessCriticalityIsShownToMotiveAlone(t *testing.T) {
+	shown := func(criticality string) Setting {
+		return Setting{Value: criticality, Meaning: riskconfig.BusinessCriticality.Meaning(criticality)}
+	}
+	render := func(criticality string) map[string]string {
+		d := declared()
+		d.BusinessCriticality = shown(criticality)
+		out := map[string]string{
+			"system":     text(t)(SystemPrompt(d)),
+			"adjustment": text(t)(AdjustmentRequest(d, conflicting, adjustFlags, adjustGiven)),
+		}
+		for _, f := range Order() {
+			out[string(f)] = text(t)(Request(f, d, cvssBatch))
+		}
+		return out
+	}
+	low := render("low")
+	for _, criticality := range riskconfig.BusinessCriticality.Values()[1:] {
+		for name, sent := range render(criticality) {
+			want := low[name]
+			if name == string(M) {
+				want = strings.Replace(want, setting("Business criticality", shown("low")), setting("Business criticality", shown(criticality)), 1)
+			}
+			if sent != want {
+				t.Errorf("business_criticality %s changed what %s sends", criticality, name)
+			}
+		}
+	}
+}
+
 var digit = regexp.MustCompile(`[0-9]`)
 
 // No factor level and no 0-9 scale reaches the model from what vens writes:
@@ -318,7 +353,7 @@ func TestNoLevelIsShown(t *testing.T) {
 func TestOneTable(t *testing.T) {
 	maps := map[Factor][]string{
 		M: ids(motive), O: ids(opportunity), EE: ids(easeOfExploit), ID: ids(intrusionDetection), LAC: ids(accountability),
-		FD: ids(financialDamage), RD: ids(reputationDamage), NC: ids(nonCompliance), PV: ids(privacyViolation),
+		NC: ids(nonCompliance), PV: ids(privacyViolation),
 	}
 	d := base()
 	d.Frameworks = []string{"PCI-DSS"}
@@ -533,6 +568,10 @@ func TestRenderRefusesWhatItCannotSend(t *testing.T) {
 	bad.Exposure.Value = "public"
 	for name, err := range map[string]error{
 		"a factor with no question": second(Request("SL", base(), cvssBatch)),
+		"Financial damage":          second(Request(FD, base(), cvssBatch)),
+		"Reputation damage":         second(Request(RD, base(), cvssBatch)),
+		"a schema for FD":           second(Schema(FD, []string{"CVE-C"})),
+		"a schema for RD":           second(Schema(RD, []string{"CVE-C"})),
 		"NC with no framework":      second(Request(NC, base(), cvssBatch)),
 		"an empty batch":            second(Request(M, base(), nil)),
 		"a CVE twice":               second(Request(M, base(), []CVE{conflicting, conflicting})),

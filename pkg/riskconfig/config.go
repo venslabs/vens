@@ -71,8 +71,9 @@ type ContextHints struct {
 	// Motive and Privacy violation.
 	DataSensitivity string `yaml:"data_sensitivity"`
 
-	// BusinessCriticality is low, medium, high or critical: background to
-	// Motive, Financial damage and Reputation damage.
+	// BusinessCriticality is low, medium, high or critical: the worst
+	// Financial damage and Reputation damage an exploit could cost, which Go
+	// reads at the CVE's technical impact; background to Motive.
 	BusinessCriticality string `yaml:"business_criticality"`
 
 	// AvailabilityRequirement is low, medium, high or critical: the column in

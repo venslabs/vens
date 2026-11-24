@@ -40,9 +40,10 @@ Vector:   SL:9/M:4/O:9/S:9/ED:9/EE:5/A:9/ID:8/LC:2/LI:1/LAV:7/LAC:7/FD:7/RD:5/NC
 Severity: high     (likelihood 7.75 HIGH, impact 4.25 MEDIUM)
 Score:    32.94
 Why:      The model answers that the CSV upload is open to anonymous
-          Internet users, so no access is needed, and that an outage stops
-          what the service exists to do, with a significant effect on
-          annual profit.
+          Internet users, so no access is needed. The CVSS vectors give an
+          outage of the service's primary function, a high technical
+          impact, at which its declared business_criticality, high, states
+          a significant effect on annual profit and a loss of goodwill.
 ```
 
 Same CVE, same base score, two different risks. The model answered the questions; vens computed every level, the severity and the score.
@@ -51,12 +52,13 @@ Same CVE, same base score, two different risks. The model answered the questions
 
 ## How vens rates a CVE
 
-OWASP's Risk Rating Methodology rates a vulnerability from 16 factors, each with a few named levels from 0 to 9. vens sets each factor in one of three ways:
+OWASP's Risk Rating Methodology rates a vulnerability from 16 factors, each with a few named levels from 0 to 9. vens sets each factor in one of five ways:
 
 1. **Set by vens (4 factors).** Skill level is 9 for every finding: no field declares the attackers' skill, so vens takes OWASP's worst-case threat agent. Ease of discovery and Awareness are 9 for every finding: each finding is a published CVE that a scanner matched, so vens takes OWASP's worst case for them. Size comes from your declared `exposure`.
-2. **Read from the CVSS v3 vectors (3 factors).** Loss of confidentiality, integrity and availability come from the worst value, `H` over `L` over `N`, that the CVE's usable CVSS v3 vectors give `C`, `I` and `A`, across every row and source of the scanner's report; confidentiality is crossed with `data_sensitivity`, availability with `availability_requirement`, unset reading primary. No question asks them. A CVE with no usable v3 vector takes 9 for each, counted as `cvss_v3_missing` and marked `missing-cvss-v3-fallback` in the VEX. The impact levels supplied by the missing-input rule are fail-safe gate values, not evidence of relative impact or urgency; on the business impact basis (below), they do not reach the severity.
-3. **Read from the model's answer (6 factors).** The model gets one question per call, about a batch of CVEs, and picks one named answer from a closed list that always includes `cannot_tell`. vens maps the answer to the factor's level; `cannot_tell` maps to the worst case and is counted.
-4. **An answer combined with a declared field (3 factors).** vens crosses the model's answer with a field of `config.yaml` the question does not show: Intrusion detection with `detection`, Loss of accountability with `traceability`, Privacy violation with `data_subjects`.
+2. **Read from the CVSS v3 vectors (3 factors).** Loss of confidentiality, integrity and availability come from the worst value, `H` over `L` over `N`, that the CVE's usable CVSS v3 vectors give `C`, `I` and `A`, across every row and source of the scanner's report; confidentiality is crossed with `data_sensitivity`, availability with `availability_requirement`, unset reading primary. No question asks them. A CVE with no usable v3 vector takes 9 for each, counted as `cvss_v3_missing` and marked `missing-cvss-v3-fallback` in the VEX. The impact levels supplied by the missing-input rule are fail-safe gate values, not evidence of relative impact or urgency; on the business impact basis (below), they reach the severity only through Financial damage and Reputation damage, which then take your declared worst case.
+3. **Read from your declared `business_criticality` (2 factors).** Financial damage and Reputation damage are not asked: each value of `business_criticality` declares the worst an exploit of the service could cost, and vens reads that declaration at the CVE's technical impact (below).
+4. **Read from the model's answer (4 factors).** The model gets one question per call, about a batch of CVEs, and picks one named answer from a closed list that always includes `cannot_tell`. vens maps the answer to the factor's level; `cannot_tell` maps to the worst case and is counted.
+5. **An answer combined with a declared field (3 factors).** vens crosses the model's answer with a field of `config.yaml` the question does not show: Intrusion detection with `detection`, Loss of accountability with `traceability`, Privacy violation with `data_subjects`.
 
 Privacy violation also has a CVSS floor: when the CVE's usable CVSS v3 vectors give `C:N`, vens asks no question and sets it to 3.
 
@@ -64,7 +66,7 @@ vens does not handle reachability. No question asks whether a CVE is reachable, 
 
 A description is a prerequisite of three answers: when no row of the scanner's report describes the CVE, a title alone included, vens does not ask Motive, Opportunity and Ease of exploit, and sets each to its worst level, 9, counted as `cannot_tell`.
 
-A question is asked only when the factor's contract requires it: at most 9 questions per CVE. A CVE whose description says it is disputed or not a security issue, or that the scanner rates low while NVD rates it high or critical, is flagged: it gets one more call, the adjustment, when it has a field left to ask. It can lower Opportunity (not for a CVE with no description) and, asking whether confidentiality can be affected at all, Privacy violation (when it was asked), which `not_affected` lowers to its floor; it never raises a level and moves no technical impact.
+A question is asked only when the factor's contract requires it: at most 7 questions per CVE. A CVE whose description says it is disputed or not a security issue, or that the scanner rates low while NVD rates it high or critical, is flagged: it gets one more call, the adjustment, when it has a field left to ask. It can lower Opportunity (not for a CVE with no description) and, asking whether confidentiality can be affected at all, Privacy violation (when it was asked), which `not_affected` lowers to its floor; it never raises a level and moves no technical impact.
 
 | Factor | Group | Way | What sets the level |
 |---|---|---|---|
@@ -80,12 +82,23 @@ A question is asked only when the factor's contract requires it: at most 9 quest
 | Loss of integrity (LI) | technical impact | CVSS v3 | the worst `I`: `N` 1, `L` 3, `H` 7; 9 with no usable v3 vector |
 | Loss of availability (LAV) | technical impact | CVSS v3 and `availability_requirement` | the worst `A`: `N` 1; `L` 1, or 5 on primary services (high, critical or unset); `H` 5, or 7; 9 with no usable v3 vector |
 | Loss of accountability (LAC) | technical impact | answer and `traceability` | whether the attacker must authenticate, and, apart, whether the exploit defeats attribution, crossed with what is recorded |
-| Financial damage (FD) | business impact | answer | shows `business_criticality` |
-| Reputation damage (RD) | business impact | answer | shows `business_criticality` |
+| Financial damage (FD) | business impact | `business_criticality` and the technical impact | what the declared value states at the band of the highest of LC, LI and LAV, high with no usable v3 vector |
+| Reputation damage (RD) | business impact | `business_criticality` and the technical impact | the same |
 | Non-compliance (NC) | business impact | answer | how serious a violation of the declared frameworks; 2, not asked, when none is declared |
 | Privacy violation (PV) | business impact | answer and `data_subjects` | how many people's data could be disclosed, capped by the declared band; 3, not asked, when the usable v3 vectors give `C:N` |
 
 Each field's effect is in the **[config.yaml reference](../reference/config-schema.md)**.
+
+OWASP says "The business impact stems from the technical impact", and leaves what is important to the business to the business itself. `business_criticality` is that classification: each value declares, in OWASP's options, the worst Financial damage and Reputation damage an exploit of the service could cost with a low, a medium and a high technical impact (its **[declarations](../reference/config-schema.md#contextbusiness_criticality)**). vens reads it at the band of the highest of Loss of confidentiality, integrity and availability: under 3 low, 3 to under 6 medium, 6 and up high, and high with no usable CVSS v3 vector.
+
+| `business_criticality` | Financial damage at low / medium / high | Reputation damage at low / medium / high |
+|---|---|---|
+| `low` | 1 / 1 / 1 | 1 / 1 / 1 |
+| `medium` | 1 / 1 / 3 | 1 / 1 / 4 |
+| `high` | 1 / 3 / 7 | 1 / 4 / 5 |
+| `critical` | 3 / 7 / 9 | 4 / 5 / 9 |
+
+The high column is your declared worst case. The steps down to medium and low are vens's customization of OWASP's options, which OWASP allows and would tune against ratings by a team of experts; no such comparison has been made, so they are not calibrated. Their direction follows OWASP's sentence above: a smaller technical impact never states a larger cost.
 
 From the 16 levels, vens computes, in Go:
 
@@ -125,8 +138,9 @@ This explains the mechanism; it is not a measurement of accuracy.
 | | Up to v0.6 | Since v0.7.0 |
 |---|---|---|
 | What the model returns | four numbers from 0 to 9 per CVE: threat agent, vulnerability, technical impact, business impact | one named answer per question, from a closed list; never a number |
-| Calls | one call per batch of CVEs | one call per question per batch, at most 9 questions per CVE, and one adjustment call per flagged CVE with a field left to ask |
-| The 16 levels in the vector | each of the four numbers repeated over its group's four factors | 4 set by vens, 3 from the CVSS v3 vectors, 6 read from an answer, 3 from an answer combined with a declared field |
+| Calls | one call per batch of CVEs | one call per question per batch, at most 7 questions per CVE, and one adjustment call per flagged CVE with a field left to ask |
+| The 16 levels in the vector | each of the four numbers repeated over its group's four factors | 4 set by vens, 3 from the CVSS v3 vectors, 2 from `business_criticality` at the CVE's technical impact, 4 read from an answer, 3 from an answer combined with a declared field |
+| `business_criticality` | shown to the model | declares the worst Financial damage and Reputation damage an exploit could cost, which vens reads at the CVE's technical impact; shown to Motive. `critical` no longer says compliance-required |
 | Impact | the average of the technical and the business impact | the business impact with `data_subjects` declared, the technical impact without |
 | Severity | bands of the score: 0–4 `info`, 5–19 `low`, 20–39 `medium`, 40–59 `high`, 60–81 `critical` | OWASP's matrix of the likelihood and impact levels; never `info` |
 | Score | likelihood × impact | the same product, which no longer sets the severity |
@@ -145,7 +159,7 @@ A CVE has a base score of 7.5 but:
 - The model judges that a control set to `true` stands in the way of this exploit, and answers Ease of exploit accordingly
 - The CVSS vectors give no confidentiality or integrity impact, so vens floors those losses
 - Your `data_sensitivity` is `low` or `medium`, so vens reads the model's Loss of confidentiality answer in the non-sensitive column, or the declared `data_subjects` caps Privacy violation
-- The model reads a low `business_criticality` and answers Financial damage and Reputation damage accordingly
+- Your `business_criticality` declares a small worst case, or the CVSS vectors give a low technical impact, so vens sets Financial damage and Reputation damage low
 
 A generic 7.5 can come out `low` or `medium`. That rating is an input to your review, not a verdict: how well it matches real risk is not measured, and vens runs no reachability check of its own (see [Limitations](limitations.md)).
 
@@ -157,6 +171,7 @@ A CVE has a base score of 5.3, "medium", but:
 
 - The model answers that an exploit discloses data, and your `data_sensitivity` is `high` or `critical`, so vens reads that answer in the critical-data column
 - You declared GDPR or PCI-DSS, and the model judges a breach a high profile violation
+- Your `business_criticality` declares a large worst case and the CVSS vectors give a high technical impact, so vens sets Financial damage and Reputation damage high
 - You declared `exposure: internet`, which sets Size to 9, and `listener: present`, which the model reads
 - The model answers that many people's personal data could be disclosed, within the declared `data_subjects`
 
@@ -167,6 +182,7 @@ A generic 5.3 can come out `high` or `critical`, which moves the CVE from deep i
 ## Before you use a rating
 
 ✅ You've described your context honestly and precisely in `config.yaml`
+✅ Your `business_criticality` declares the worst an exploit of this service could cost, as its table states it
 ✅ You declared `traceability`, `detection` and `data_subjects` for what is in place
 ✅ Your `controls` reflect reality (no wishful thinking)
 ✅ You've added architectural detail in `notes` for non-obvious systems

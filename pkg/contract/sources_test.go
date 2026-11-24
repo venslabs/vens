@@ -24,17 +24,18 @@ import (
 // declaring the attacking group's skill, ED and A are constants and Size is
 // the config's; Loss of confidentiality, integrity and availability are
 // the CVSS vectors', whatever the answers, the adjustment or the vectors
-// give; Privacy violation takes its floor where the usable v3 vectors give
-// C:N; a question not asked takes the config's level; an answer read,
-// crossed with the config where Go crosses it, is the answer's, unless the
-// config's cap or the adjustment lowers it.
+// give; Financial damage and Reputation damage are what business_criticality
+// declares, whatever the vectors give; Privacy violation takes its floor
+// where the usable v3 vectors give C:N; a question not asked takes the
+// config's level; an answer read, crossed with the config where Go crosses
+// it, is the answer's, unless the config's cap or the adjustment lowers it.
 func TestSources(t *testing.T) {
 	answered := Answers{M: "possible_reward", O: "some_access_or_resources_required", EE: "easy", ID: []string{"network"},
-		LAC: "identified", FD: "bankruptcy", RD: "minimal_damage", NC: "clear_violation", PV: "thousands"}
+		LAC: "identified", NC: "clear_violation", PV: "thousands"}
 	everyAnswer := map[Factor]Source{
 		SL: SourceWorstCase, M: SourceAnswer, O: SourceAnswer, S: SourceConfig, ED: SourceConstant, EE: SourceAnswer,
 		A: SourceConstant, ID: SourceAnswer, LC: SourceCVSS, LI: SourceCVSS, LAV: SourceCVSS, LAC: SourceAnswer,
-		FD: SourceAnswer, RD: SourceAnswer, NC: SourceAnswer, PV: SourceAnswer,
+		FD: SourceCriticality, RD: SourceCriticality, NC: SourceAnswer, PV: SourceAnswer,
 	}
 	but := func(changes map[Factor]Source) map[Factor]Source {
 		out := maps.Clone(everyAnswer)
@@ -78,11 +79,11 @@ func changed(a Answers, change func(*Answers)) Answers {
 }
 
 func TestSourcesWriteTheirNames(t *testing.T) {
-	got, err := json.Marshal(map[Factor]Source{SL: SourceWorstCase, ED: SourceConstant, O: SourceAdjustment, LC: SourceCVSS, PV: SourceFloor, S: SourceConfig, M: SourceAnswer})
+	got, err := json.Marshal(map[Factor]Source{SL: SourceWorstCase, ED: SourceConstant, O: SourceAdjustment, LC: SourceCVSS, PV: SourceFloor, S: SourceConfig, M: SourceAnswer, FD: SourceCriticality})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := `{"ED":"constant","LC":"cvss","M":"answer","O":"adjustment","PV":"floor","S":"config","SL":"worst_case"}`; string(got) != want {
+	if want := `{"ED":"constant","FD":"criticality","LC":"cvss","M":"answer","O":"adjustment","PV":"floor","S":"config","SL":"worst_case"}`; string(got) != want {
 		t.Errorf("%s, want %s", got, want)
 	}
 	if got := Source(0).String(); got != "unknown" {

@@ -75,7 +75,7 @@ func TestDeploymentOf(t *testing.T) {
 	d := deploymentOf(richConfig())
 	assert.Equal(t, contract.Setting{Value: "internet", Meaning: "Publicly accessible"}, d.Exposure)
 	assert.Equal(t, contract.Setting{Value: "high", Meaning: "PII, financial data, customer info"}, d.DataSensitivity)
-	assert.Equal(t, contract.Setting{Value: "critical", Meaning: "Revenue-critical, compliance-required"}, d.BusinessCriticality)
+	assert.Equal(t, contract.Setting{Value: "critical", Meaning: "Revenue-critical"}, d.BusinessCriticality)
 	assert.Equal(t, riskconfig.Listener.Meaning("present"), d.Listener.Meaning)
 	assert.Equal(t, []contract.Control{
 		{Key: "waf", Description: "Web Application Firewall", Scope: "SQL injection, XSS, path traversal"},

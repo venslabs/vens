@@ -36,13 +36,20 @@ context:
   #         shown to the Motive, Loss of integrity and Privacy violation questions
   data_sensitivity: "high"
 
-  # BUSINESS CRITICALITY: How critical is this system for business?
+  # BUSINESS CRITICALITY: The worst an exploit of this service could cost the business
   # Values: low | medium | high | critical
   #   - low: Dev / test / sandbox
   #   - medium: Internal tools
   #   - high: Customer-facing, important operations
-  #   - critical: Revenue-critical, compliance-required
-  # Impact: Shown to the Motive, Financial damage and Reputation damage questions
+  #   - critical: Revenue-critical
+  # Each value declares Financial damage (FD) and Reputation damage (RD) at a
+  # high / medium / low technical impact, in OWASP's options:
+  #   - low: FD 1/1/1, RD 1/1/1 (less than the cost to fix, minimal damage)
+  #   - medium: FD 3/1/1, RD 4/1/1 (up to a minor effect on annual profit, loss of major accounts)
+  #   - high: FD 7/3/1, RD 5/4/1 (up to a significant effect on annual profit, loss of goodwill)
+  #   - critical: FD 9/7/3, RD 9/5/4 (up to bankruptcy, brand damage)
+  # Impact: Sets Financial damage and Reputation damage at the CVE's technical impact;
+  #         shown to the Motive question
   business_criticality: "high"
 
   # ============================================================================

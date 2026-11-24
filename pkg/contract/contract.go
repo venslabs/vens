@@ -26,10 +26,11 @@ package contract
 import "slices"
 
 // Factor is one of the 16 factors, named by the abbreviation the vector
-// writes. Nine are model-answered, each through a question of its own; Skill
-// level, Size, Ease of discovery and Awareness are Go's alone, and so are
-// Loss of confidentiality, integrity and availability, read from the CVE's
-// CVSS v3 vectors.
+// writes. Seven are model-answered, each through a question of its own;
+// Skill level, Size, Ease of discovery and Awareness are Go's alone, and so
+// are Loss of confidentiality, integrity and availability, read from the
+// CVE's CVSS v3 vectors, and Financial damage and Reputation damage, read
+// from what business_criticality declares.
 type Factor string
 
 const (
@@ -53,9 +54,9 @@ const (
 
 // order is the order the calls of a batch ask the questions in. It never
 // depends on which questions the batch's first CVE gets.
-var order = [...]Factor{M, O, EE, ID, LAC, FD, RD, NC, PV}
+var order = [...]Factor{M, O, EE, ID, LAC, NC, PV}
 
-// Order returns the nine model-answered factors in the order the calls of a
+// Order returns the seven model-answered factors in the order the calls of a
 // batch ask them.
 func Order() []Factor {
 	return slices.Clone(order[:])
@@ -139,12 +140,16 @@ const (
 	// declares, the attacking group's skill: Skill level
 	// (OWASP_Risk_Rating_Methodology.md:87-89, :111).
 	SourceWorstCase
+	// SourceCriticality: what business_criticality declares, at the band of
+	// the CVE's highest technical impact read from its CVSS v3 vectors, high
+	// with no usable v3 vector: Financial damage and Reputation damage.
+	SourceCriticality
 )
 
 var sourceNames = [...]string{
 	SourceAnswer: "answer", SourceConstant: "constant", SourceConfig: "config",
 	SourceFloor: "floor", SourceAdjustment: "adjustment", SourceCVSS: "cvss",
-	SourceWorstCase: "worst_case",
+	SourceWorstCase: "worst_case", SourceCriticality: "criticality",
 }
 
 func (s Source) String() string {

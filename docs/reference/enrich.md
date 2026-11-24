@@ -25,7 +25,7 @@ vens enrich --vex VEX_FILE [--output PATH] REPORT_FILE
     "owasp_impact_provenance": "cvss-v3",
     "owasp_score": 39.1875,
     "owasp_severity": "high",
-    "owasp_vector": "SL:9/M:4/O:9/S:9/ED:9/EE:9/A:9/ID:8/LC:2/LI:7/LAV:1/LAC:9/FD:3/RD:5/NC:7/PV:3"
+    "owasp_vector": "SL:9/M:4/O:9/S:9/ED:9/EE:9/A:9/ID:8/LC:2/LI:7/LAV:1/LAC:9/FD:7/RD:5/NC:7/PV:3"
   }
 }
 ```

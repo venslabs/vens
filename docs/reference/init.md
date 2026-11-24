@@ -35,7 +35,7 @@ Ask a short series of questions about the system being scored and write the answ
 | Security controls | No | `y` / `n` for each of `waf`, `ddos_protection`, `segmentation`, `zero_trust`, `antivirus` |
 | Notes | No | Free text |
 
-Before traceability, listener, data subjects and detection, the wizard prints what the field and each value mean, in the words of the **[config.yaml reference](config-schema.md)**; each control is asked with its scope. An invalid answer is re-prompted instead of failing. The generated file starts with `schema_version: 2` and is validated before it is written: `vens init` parses the final file (header included) and refuses to write a config `vens generate` would reject.
+Before business criticality, the wizard prints what the field declares and, for each value, its meaning and the worst Financial damage and Reputation damage it declares; before traceability, listener, data subjects and detection, what the field and each value mean. Both are in the words of the **[config.yaml reference](config-schema.md)**; each control is asked with its scope. An invalid answer is re-prompted instead of failing. The generated file starts with `schema_version: 2` and is validated before it is written: `vens init` parses the final file (header included) and refuses to write a config `vens generate` would reject.
 
 Traceability, data subjects or detection skipped with Enter is left out of the file. `vens generate` then warns at load and uses that field's fallback, and `--strict` refuses the file: see **[Load errors and warnings](config-schema.md#load-errors)**.
 
@@ -72,6 +72,12 @@ Project name: my-api
 Project description (optional, Enter to skip): Backend API
 Exposure [internal/private/internet]: internet
 Data sensitivity [low/medium/high/critical]: high
+
+Business criticality: Choosing a value declares the worst an exploit of this service could cost the business, as OWASP's Financial damage and Reputation damage, with a low, a medium and a high technical impact: the highest of the CVE's Loss of confidentiality, integrity and availability, low under 3, medium from 3 to under 6, high from 6, and high with no usable CVSS v3 vector. vens sets both factors from it; no question asks them. With a high technical impact it is your worst case; the steps down to medium and low are vens's customization of OWASP's options, not calibrated against experts' ratings, in the direction OWASP gives: the business impact stems from the technical impact.
+  low: Dev / test / sandbox. With a high technical impact, less than the cost to fix the vulnerability (FD 1) and minimal damage (RD 1); medium, less than the cost to fix the vulnerability (1) and minimal damage (1); low, less than the cost to fix the vulnerability (1) and minimal damage (1).
+  medium: Internal tools. With a high technical impact, a minor effect on annual profit (FD 3) and loss of major accounts (RD 4); medium, less than the cost to fix the vulnerability (1) and minimal damage (1); low, less than the cost to fix the vulnerability (1) and minimal damage (1).
+  high: Customer-facing, important operations. With a high technical impact, a significant effect on annual profit (FD 7) and loss of goodwill (RD 5); medium, a minor effect on annual profit (3) and loss of major accounts (4); low, less than the cost to fix the vulnerability (1) and minimal damage (1).
+  critical: Revenue-critical. With a high technical impact, bankruptcy (FD 9) and brand damage (RD 9); medium, a significant effect on annual profit (7) and loss of goodwill (5); low, a minor effect on annual profit (3) and loss of major accounts (4).
 Business criticality [low/medium/high/critical]: critical
 Availability requirement (optional) [low/medium/high/critical]: high
 Compliance requirements, comma-separated (optional) [PCI-DSS, HIPAA, GDPR, SOX, ISO27001, FedRAMP, NIST, CCPA, SOC2, FISMA, ITAR, CMMC]: GDPR

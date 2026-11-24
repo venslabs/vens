@@ -20,6 +20,7 @@ import (
 	"slices"
 
 	"github.com/venslabs/vens/pkg/owasp"
+	"github.com/venslabs/vens/pkg/riskconfig"
 )
 
 // Deployment is the config as the contracts read it. A value the model is
@@ -36,7 +37,10 @@ type Deployment struct {
 	Exposure Setting
 	// Listener is shown when present or absent, and not when unknown or
 	// empty.
-	Listener            Setting
+	Listener Setting
+	// BusinessCriticality is low, medium, high or critical: Motive shows it,
+	// and Go reads Financial damage and Reputation damage from what it
+	// declares.
 	BusinessCriticality Setting
 	// DataSensitivity is low, medium, high or critical, which also picks
 	// Loss of confidentiality's column.
@@ -139,8 +143,8 @@ func (d Deployment) Check() error {
 	if _, ok := critical[d.DataSensitivity.Value]; !ok {
 		fail("data_sensitivity %q is not low, medium, high or critical", d.DataSensitivity.Value)
 	}
-	if d.BusinessCriticality.Value == "" {
-		fail("business_criticality has no value")
+	if _, ok := riskconfig.DeclaredDamage(d.BusinessCriticality.Value); !ok {
+		fail("business_criticality %q is not low, medium, high or critical", d.BusinessCriticality.Value)
 	}
 	switch d.Listener.Value {
 	case "", listenerUnknown, listenerPresent, listenerAbsent:

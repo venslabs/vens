@@ -183,6 +183,11 @@ func (p *prompter) askContext() (riskconfig.ContextHints, error) {
 	if h.DataSensitivity, err = p.askChoice("Data sensitivity", riskconfig.DataSensitivity.Values()); err != nil {
 		return h, err
 	}
+	// Each value declares the worst an exploit could cost, which vens rates
+	// on: the owner reads the declaration before choosing.
+	if err := p.explain("Business criticality", riskconfig.BusinessCriticality.About(), criticalityDeclarations()); err != nil {
+		return h, err
+	}
 	if h.BusinessCriticality, err = p.askChoice("Business criticality", riskconfig.BusinessCriticality.Values()); err != nil {
 		return h, err
 	}
@@ -211,6 +216,17 @@ func (p *prompter) askContext() (riskconfig.ContextHints, error) {
 		return h, err
 	}
 	return h, nil
+}
+
+// criticalityDeclarations returns business_criticality's values, each with
+// its meaning and what choosing it declares.
+func criticalityDeclarations() []riskconfig.Choice {
+	choices := riskconfig.BusinessCriticality.Choices()
+	for i, c := range choices {
+		d, _ := riskconfig.DeclaredDamage(c.Value)
+		choices[i].Meaning += ". " + d.Declares()
+	}
+	return choices
 }
 
 // askOptionalField asks an optional field, showing what the field and each

@@ -157,7 +157,7 @@ func (a *assessment) reasoning(readings map[contract.Factor]contract.Reading) st
 func answerField(a *contract.Answers, f contract.Factor) *string {
 	return map[contract.Factor]*string{
 		contract.M: &a.M, contract.O: &a.O, contract.EE: &a.EE, contract.LAC: &a.LAC,
-		contract.FD: &a.FD, contract.RD: &a.RD, contract.NC: &a.NC, contract.PV: &a.PV,
+		contract.NC: &a.NC, contract.PV: &a.PV,
 	}[f]
 }
 

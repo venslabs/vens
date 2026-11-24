@@ -91,8 +91,8 @@ func TestGenerator_Attestor_OneEvidencePerCall(t *testing.T) {
 	g.SetAttestor(at)
 
 	require.NoError(t, g.GenerateRiskScore(context.Background(), testVulns(15), nil))
-	require.Len(t, m.calls, 14, "two batches, seven questions each")
-	require.Equal(t, 14, at.BatchCount())
+	require.Len(t, m.calls, 10, "two batches, five questions each")
+	require.Equal(t, 10, at.BatchCount())
 }
 
 type failingLLM struct{}
@@ -525,8 +525,6 @@ func TestGenerator_ClaimReasoningJoinsEachAnswer(t *testing.T) {
 		"EE (theoretical): because of CVE-2024-0000",
 		"ID (network, host): because of CVE-2024-0000",
 		"LAC (identified): because of CVE-2024-0000",
-		"FD (less_than_cost_to_fix): because of CVE-2024-0000",
-		"RD (minimal_damage): because of CVE-2024-0000",
 		"PV (none): because of CVE-2024-0000",
 		"adjustment (opportunity: keep, confidentiality: affected): the evidence",
 	}, lines)
@@ -588,8 +586,6 @@ func TestGenerator_ClaimSaysWhatAnUndescribedCVEIsNotAsked(t *testing.T) {
 		"O (not asked: no description)",
 		"EE (not asked: no description)",
 		"LAC (identified): because of CVE-2024-0000",
-		"FD (less_than_cost_to_fix): because of CVE-2024-0000",
-		"RD (minimal_damage): because of CVE-2024-0000",
 		"PV (none): because of CVE-2024-0000",
 		"adjustment (confidentiality: affected): the evidence",
 	}, lines)

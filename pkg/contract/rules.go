@@ -20,6 +20,7 @@ import (
 
 	"github.com/venslabs/vens/pkg/cvss"
 	"github.com/venslabs/vens/pkg/owasp"
+	"github.com/venslabs/vens/pkg/riskconfig"
 )
 
 // exposures holds, per exposure, the attacker group the questions name, the
@@ -137,7 +138,8 @@ func band(s string) owasp.PrivacyViolation {
 
 // asked reports whether a CVE gets factor f's question. A question is not
 // asked where Go has decided the level, so the model cannot contradict Go,
-// nor where no answer could move it.
+// nor where no answer could move it. Financial damage and Reputation damage
+// have no question: business_criticality decides them.
 func asked(f Factor, d Deployment, p profile) bool {
 	switch f {
 	case M, O, EE:
@@ -152,6 +154,8 @@ func asked(f Factor, d Deployment, p profile) bool {
 		}
 		l := d.Detection.levels()
 		return l[0] != l[1] || l[1] != l[2]
+	case LAC:
+		return true
 	case NC:
 		return len(d.Frameworks) > 0
 	case PV:
@@ -159,7 +163,7 @@ func asked(f Factor, d Deployment, p profile) bool {
 		// it at the floor; undeclared caps nothing.
 		return !p.noConfidentiality() && (d.DataSubjects == nil || band(*d.DataSubjects) > privacyFloor)
 	}
-	return true
+	return false
 }
 
 // Questions returns the questions a CVE gets, in the order the calls ask
@@ -186,7 +190,7 @@ func Questions(d Deployment, c CVE) ([]Factor, error) {
 // factor's answer only when the CVE was asked its question; any other value
 // is read as cannot_tell.
 type Answers struct {
-	M, O, EE, LAC, FD, RD, NC, PV string
+	M, O, EE, LAC, NC, PV string
 	// ID is the set of channels Intrusion detection's answer chose.
 	ID []string
 }
@@ -241,8 +245,10 @@ type Levels struct {
 // confidentiality, integrity and availability are read from the worst value
 // each axis takes over the CVE's usable CVSS v3 vectors, the first crossed
 // with data_sensitivity, the last with availability_requirement; with none
-// usable, each takes its worst level, counted. A CVE whose usable v3 vectors
-// give C:N has Privacy violation at its floor, not asked.
+// usable, each takes its worst level, counted. Financial damage and
+// Reputation damage are what business_criticality declares at the band of
+// the highest of the three. A CVE whose usable v3 vectors give C:N has
+// Privacy violation at its floor, not asked.
 func Compute(d Deployment, c CVE, a Answers, adjusted *Adjusted) (Levels, error) {
 	if err := d.Check(); err != nil {
 		return Levels{}, err
@@ -272,8 +278,7 @@ func Compute(d Deployment, c CVE, a Answers, adjusted *Adjusted) (Levels, error)
 	v.ID = s.intrusionDetection(a.ID)
 	v.LC, v.LI, v.LAV = s.technicalImpacts()
 	v.LAC = s.accountability(a.LAC)
-	v.FD = answered(s, financialDamage, a.FD)
-	v.RD = answered(s, reputationDamage, a.RD)
+	v.FD, v.RD = s.damage(v.LC, v.LI, v.LAV)
 	v.NC = s.nonCompliance(a.NC)
 	v.PV = s.privacy(a.PV, adjusted.Confidentiality)
 	s.levels.Vector = v
@@ -463,6 +468,18 @@ func (s *scorer) accountability(id string) owasp.LossOfAccountability {
 		t = slices.Index(traceabilities[:], *s.d.Traceability)
 	}
 	return from(s, LAC, SourceAnswer, accountabilityLevels[a][t])
+}
+
+// damage is Financial damage's and Reputation damage's levels: what
+// business_criticality declares, the owner's classification of what an
+// exploit could cost (OWASP_Risk_Rating_Methodology.md:170-173), at OWASP's
+// band of the highest technical impact, since the business impact stems
+// from the technical impact (:165). With no usable v3 vector the three are
+// 9, so the band is high: the declared worst case.
+func (s *scorer) damage(lc owasp.LossOfConfidentiality, li owasp.LossOfIntegrity, lav owasp.LossOfAvailability) (owasp.FinancialDamage, owasp.ReputationDamage) {
+	declared, _ := riskconfig.DeclaredDamage(s.d.BusinessCriticality.Value)
+	t := owasp.Band(float64(max(int(lc), int(li), int(lav))))
+	return from(s, FD, SourceCriticality, declared.FD[t]), from(s, RD, SourceCriticality, declared.RD[t])
 }
 
 // nonCompliance is OWASP's lowest level, a floor, when no framework applies.

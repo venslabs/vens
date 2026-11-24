@@ -92,6 +92,7 @@ func ids[V any](c contract[V]) []string {
 }
 
 var (
+	criticalities       = []string{"low", "medium", "high", "critical"}
 	sensitivities       = []string{"low", "medium", "high", "critical"}
 	availabilities      = []string{"low", "medium", "high", "critical"}
 	detectionLevelNames = []string{"not_logged", "logged", "logged_and_reviewed", activeInApplication}
@@ -164,12 +165,7 @@ func walk(t *testing.T) (reached map[string]map[int]bool, inputs map[string]int)
 	for _, id := range ids(easeOfExploit) {
 		add("EE", base(), describedCVE, Answers{EE: id}, nil)
 	}
-	for _, id := range ids(financialDamage) {
-		add("FD", base(), describedCVE, Answers{FD: id}, nil)
-	}
-	for _, id := range ids(reputationDamage) {
-		add("RD", base(), describedCVE, Answers{RD: id}, nil)
-	}
+	walkDamages(add)
 	for _, id := range ids(opportunity) {
 		add("O", base(), describedCVE, Answers{O: id}, nil)
 		for _, adj := range append([]string{keep}, ids(opportunity)...) {
@@ -234,6 +230,39 @@ func walkImpacts(add func(string, Deployment, CVE, Answers, *Adjusted)) {
 	}
 }
 
+// walkDamages walks Financial damage and Reputation damage over
+// business_criticality and every technical impact the vectors can give: each
+// C, I and A value, none included, under every data_sensitivity and
+// availability_requirement, unset included.
+func walkDamages(add func(string, Deployment, CVE, Answers, *Adjusted)) {
+	for _, bc := range criticalities {
+		for _, ds := range sensitivities {
+			for _, ar := range append([]*string{nil}, ptrs(availabilities)...) {
+				for _, c := range impactCVEs() {
+					d := base()
+					d.BusinessCriticality.Value, d.DataSensitivity.Value, d.AvailabilityRequirement = bc, ds, ar
+					add("FD", d, c, Answers{}, nil)
+					add("RD", d, c, Answers{}, nil)
+				}
+			}
+		}
+	}
+}
+
+// impactCVEs are a CVE for each of the 27 values C, I and A take together,
+// then one with no vector.
+func impactCVEs() []CVE {
+	var out []CVE
+	for _, c := range impactValues[:3] {
+		for _, i := range impactValues[:3] {
+			for _, a := range impactValues[:3] {
+				out = append(out, impactCVE(c, i, a))
+			}
+		}
+	}
+	return append(out, impactCVE("", "", ""))
+}
+
 func ptrs(ss []string) []*string {
 	out := make([]*string, len(ss))
 	for i := range ss {
@@ -296,10 +325,12 @@ func TestRulesReachTheLevelSetsTheJARRan(t *testing.T) {
 		}
 	}
 	// Each domain's size: the answers or the vectors' values, times the
-	// config states and the adjustment where the rule reads them.
+	// config states and the adjustment where the rule reads them; for the
+	// damages, 4 criticalities × 4 sensitivities × 5 availability states ×
+	// 28 vector states.
 	want := map[string]int{
 		"SL": 1, "M": 4, "O": 35, "S": 3, "ED": 1, "EE": 5, "A": 1, "ID": 703,
-		"LC": 16, "LI": 4, "LAV": 20, "LAC": 16, "FD": 5, "RD": 5, "NC": 8, "PV": 288,
+		"LC": 16, "LI": 4, "LAV": 20, "LAC": 16, "FD": 2240, "RD": 2240, "NC": 8, "PV": 288,
 	}
 	if !maps.Equal(inputs, want) {
 		t.Errorf("inputs walked per rule %v, want %v", inputs, want)
@@ -337,8 +368,6 @@ func TestRulesDirection(t *testing.T) {
 	}{
 		{"M", func(a *Answers, id string) { a.M = id }, ids(motive)},
 		{"EE", func(a *Answers, id string) { a.EE = id }, ids(easeOfExploit)},
-		{"FD", func(a *Answers, id string) { a.FD = id }, ids(financialDamage)},
-		{"RD", func(a *Answers, id string) { a.RD = id }, ids(reputationDamage)},
 		{"NC", func(a *Answers, id string) { a.NC = id }, ids(nonCompliance)},
 		{"PV", func(a *Answers, id string) { a.PV = id }, ids(privacyViolation)},
 		{"LAC", func(a *Answers, id string) { a.LAC = id }, ids(accountability)},

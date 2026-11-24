@@ -39,7 +39,7 @@ import (
 func ptr(s string) *string { return &s }
 
 // fullConfig declares a framework and detection at levels that differ, so
-// that a CVE no vector floors gets all thirteen questions.
+// that a CVE no vector floors gets all seven questions.
 func fullConfig() *riskconfig.Config {
 	cfg := testConfig()
 	cfg.Context.ComplianceRequirements = []string{"GDPR"}
@@ -72,8 +72,6 @@ func TestGenerator_AsksInTheDeclaredOrder(t *testing.T) {
 		{"EE", []string{"CVE-2024-0000", "CVE-2024-0001"}},
 		{"ID", []string{"CVE-2024-0000", "CVE-2024-0001"}},
 		{"LAC", []string{"CVE-2024-0000", "CVE-2024-0001"}},
-		{"FD", []string{"CVE-2024-0000", "CVE-2024-0001"}},
-		{"RD", []string{"CVE-2024-0000", "CVE-2024-0001"}},
 		{"NC", []string{"CVE-2024-0000", "CVE-2024-0001"}},
 		{"PV", []string{"CVE-2024-0001"}},
 	}

@@ -236,9 +236,9 @@ func TestGenerator_NoAdjustmentWithNothingLeftToAsk(t *testing.T) {
 		vectors []cvss.Vector
 		asked   []string
 	}{
-		"C at N":                  {testConfig(), []cvss.Vector{v31("nvd", "AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:H")}, []string{"LAC", "FD", "RD"}},
-		"data_subjects none":      {capped, nil, []string{"LAC", "FD", "RD"}},
-		"data_subjects none, C:H": {capped, []cvss.Vector{v31("nvd", "AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H")}, []string{"LAC", "FD", "RD"}},
+		"C at N":                  {testConfig(), []cvss.Vector{v31("nvd", "AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:H")}, []string{"LAC"}},
+		"data_subjects none":      {capped, nil, []string{"LAC"}},
+		"data_subjects none, C:H": {capped, []cvss.Vector{v31("nvd", "AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H")}, []string{"LAC"}},
 	} {
 		t.Run(name, func(t *testing.T) {
 			logs := withCapturedLogs(t)

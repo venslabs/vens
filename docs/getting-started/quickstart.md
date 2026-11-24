@@ -97,9 +97,9 @@ You will see progress logs as Vens asks the LLM its questions, batch by batch. W
 ```
 INFO Config loaded schema_version=2 project=my-python-api exposure=internet ... undeclared=""
 INFO Processing vulnerabilities count=107
-INFO Scored vulnerability vuln=CVE-... score=37.125 severity=high vector=SL:9/M:4/O:9/S:9/...
+INFO Scored vulnerability vuln=CVE-... score=35.0625 severity=high vector=SL:9/M:4/O:9/S:9/...
 ...
-INFO Scoring run finished rows=107 cves=45 llm_calls=51 asked_again=0 splits=0 calls.M=5 ... calls.adjustment=6 ... failed=false
+INFO Scoring run finished rows=107 cves=45 llm_calls=41 asked_again=0 splits=0 calls.M=5 ... calls.adjustment=6 ... failed=false
 ```
 
 Your own scan gives other counts, and your model's answers set the scores. Each batch of up to 10 CVEs makes one call per question, so runtime grows with the number of distinct CVEs and depends on the LLM provider. The last line counts the calls and any fallback the run used: see [The run summary](../reference/generate.md#the-run-summary).
@@ -124,9 +124,9 @@ Open `output.vex.json`. It is a CycloneDX 1.6 BOM (1.6 is the default; pass `--c
       "ratings": [
         {
           "method": "OWASP",
-          "score": 37.125,
+          "score": 35.0625,
           "severity": "high",
-          "vector": "SL:9/M:4/O:9/S:9/ED:9/EE:9/A:9/ID:8/LC:2/LI:9/LAV:1/LAC:9/FD:3/RD:5/NC:7/PV:3"
+          "vector": "SL:9/M:4/O:9/S:9/ED:9/EE:9/A:9/ID:8/LC:2/LI:3/LAV:1/LAC:9/FD:3/RD:4/NC:7/PV:3"
         }
       ],
       "affects": [{ "ref": "urn:cdx:.../1#pkg:..." }]

@@ -30,9 +30,10 @@ var severities = [3][3]string{
 	{"medium", "high", "critical"},
 }
 
-// band is OWASP's level of a likelihood or an impact: under 3 LOW, 3 to
-// under 6 MEDIUM, 6 and up HIGH.
-func band(x float64) int {
+// Band is OWASP's level of a value on its 0 to 9 scale, a likelihood, an
+// impact or a factor's level: 0 LOW under 3, 1 MEDIUM from 3 to under 6, 2
+// HIGH from 6 (OWASP_Risk_Rating_Methodology.md:188-207).
+func Band(x float64) int {
 	switch {
 	case x < 3:
 		return 0
@@ -59,5 +60,5 @@ func rate(likelihood, technical, business float64, basis Basis) (severity string
 	if basis == BasisBusiness {
 		impact = business
 	}
-	return severities[band(likelihood)][band(impact)], likelihood * impact
+	return severities[Band(likelihood)][Band(impact)], likelihood * impact
 }

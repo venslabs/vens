@@ -19,7 +19,7 @@ import (
 	"github.com/venslabs/vens/pkg/riskconfig"
 )
 
-// The nine questions and their answers. A question names the attacker group
+// The seven questions and their answers. A question names the attacker group
 // as {group}; Non-compliance's names the declared frameworks as {frameworks}.
 // cannot_tell means only that the facts given do not decide: a model answer
 // has no documented default, so it maps to the factor's worst legal level.
@@ -119,32 +119,6 @@ var accountability = contract[actor]{
 	counter: "accountability_cannot_tell",
 }
 
-var financialDamage = contract[owasp.FinancialDamage]{
-	factor:   FD,
-	question: "If {group} exploited this vulnerability in this service, how much financial damage would result?",
-	answers: []answer[owasp.FinancialDamage]{
-		{"less_than_cost_to_fix", "Less than the cost to fix the vulnerability.", owasp.FinancialDamageLessThanTheCostToFixTheVulnerability},
-		{"minor_effect_on_annual_profit", "A minor effect on annual profit.", owasp.FinancialDamageMinorEffectOnAnnualProfit},
-		{"significant_effect_on_annual_profit", "A significant effect on annual profit.", owasp.FinancialDamageSignificantEffectOnAnnualProfit},
-		{"bankruptcy", "Bankruptcy.", owasp.FinancialDamageBankruptcy},
-		{cannotTell, cannotTellText, owasp.FinancialDamageBankruptcy},
-	},
-	counter: "financial_damage_cannot_tell",
-}
-
-var reputationDamage = contract[owasp.ReputationDamage]{
-	factor:   RD,
-	question: "If {group} exploited this vulnerability in this service and it became known, how much would it harm the business's reputation?",
-	answers: []answer[owasp.ReputationDamage]{
-		{"minimal_damage", "Minimal damage: few would notice or care.", owasp.ReputationDamageMinimalDamage},
-		{"loss_of_major_accounts", "Loss of major accounts: important customers or partners would leave or reconsider.", owasp.ReputationDamageLossOfMajorAccounts},
-		{"loss_of_goodwill", "Loss of goodwill: customers or the public would trust the business less.", owasp.ReputationDamageLossOfGoodwill},
-		{"brand_damage", "Brand damage: lasting, public harm to the brand.", owasp.ReputationDamageBrandDamage},
-		{cannotTell, cannotTellText, owasp.ReputationDamageBrandDamage},
-	},
-	counter: "reputation_cannot_tell",
-}
-
 var nonCompliance = contract[owasp.NonCompliance]{
 	factor:   NC,
 	question: "This service must comply with {frameworks}. If {group} exploited this vulnerability here, how serious a violation of those frameworks would it cause?",
@@ -195,8 +169,6 @@ var table = map[Factor]shown{
 	EE:  easeOfExploit.shown(),
 	ID:  intrusionDetection.shown(),
 	LAC: accountability.shown(),
-	FD:  financialDamage.shown(),
-	RD:  reputationDamage.shown(),
 	NC:  nonCompliance.shown(),
 	PV:  privacyViolation.shown(),
 }

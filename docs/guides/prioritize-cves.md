@@ -96,7 +96,7 @@ vens generate \
 
 `--sbom-serial-number` is required — pass the `serialNumber` of the CycloneDX SBOM paired with this scan so each `affects` in the VEX resolves back to that SBOM via BOM-Link.
 
-Runtime grows with the number of distinct CVEs: each batch of 10 makes one call per question, up to 9, and the run summary counts every call.
+Runtime grows with the number of distinct CVEs: each batch of 10 makes one call per question, up to 7, and the run summary counts every call.
 
 ---
 
@@ -122,11 +122,11 @@ jq '[.vulnerabilities[] | {
 
 A VEX from an older vens carries no marker; the filter fails on it instead of dropping the finding.
 
-A consumer implementing vens prioritisation must present separate lists: impact-assessed findings, and "impact unknown — manual triage required." Findings marked `missing-cvss-v3-fallback` belong in the latter. The lists have no cross-list urgency order. Unknown-impact findings retain their numerical ratings, severity (the worst case on the technical impact basis), gate contributions and totals; their identifiers order presentation only. Legitimately vector-derived maximum-impact values remain impact-assessed.
+A consumer implementing vens prioritisation must present separate lists: impact-assessed findings, and "impact unknown — manual triage required." Findings marked `missing-cvss-v3-fallback` belong in the latter. The lists have no cross-list urgency order. Unknown-impact findings retain their numerical ratings, severity (the worst case on the technical impact basis, and on the business basis Financial damage and Reputation damage at the worst case `business_criticality` declares), gate contributions and totals; their identifiers order presentation only. Legitimately vector-derived maximum-impact values remain impact-assessed.
 
 Among impact-assessed findings, priority is matrix severity descending, then L×I descending, then published vulnerability identifier ascending by UTF-8 bytes; equal severity and product mean equal assessed urgency, and the identifier orders presentation only. The severity comes from OWASP's matrix, not from the score, so a `high` can score below a `medium`. The impact levels the missing-input rule supplies are fail-safe gate values, not evidence of relative impact or urgency: a fallback CVE's `critical` says its impact is unknown, not that it outranks an assessed one.
 
-Each vulnerability also names, in its `vens:impact-basis` property, the impact its severity and score are read on, the same for the whole run: `business` here, the `config.yaml` above declaring `data_subjects`, and `technical` for a config that does not (see **[How vens rates a CVE](../concepts/cvss-vs-owasp.md#how-vens-rates-a-cve)**). On the business basis, the 9s the missing-input rule sets do not reach the severity.
+Each vulnerability also names, in its `vens:impact-basis` property, the impact its severity and score are read on, the same for the whole run: `business` here, the `config.yaml` above declaring `data_subjects`, and `technical` for a config that does not (see **[How vens rates a CVE](../concepts/cvss-vs-owasp.md#how-vens-rates-a-cve)**). On the business basis, the 9s the missing-input rule sets reach the severity only as a high technical impact, at which Financial damage and Reputation damage take the worst case `business_criticality` declares.
 
 Example output (illustrative):
 
@@ -136,25 +136,25 @@ Example output (illustrative):
     {
       "id": "CVE-XXXX-YYYY",
       "impact": "cvss-v3",
-      "score": 66,
+      "score": 70.125,
       "severity": "critical",
-      "vector": "SL:9/M:9/O:9/S:9/ED:9/EE:9/A:9/ID:3/LC:7/LI:7/LAV:7/LAC:9/FD:7/RD:9/NC:7/PV:9"
+      "vector": "SL:9/M:9/O:9/S:9/ED:9/EE:9/A:9/ID:3/LC:7/LI:7/LAV:7/LAC:9/FD:9/RD:9/NC:7/PV:9"
     },
     {
       "id": "CVE-XXXX-ZZZZ",
       "impact": "cvss-v3",
       "score": 33.125,
       "severity": "high",
-      "vector": "SL:9/M:4/O:7/S:9/ED:9/EE:3/A:9/ID:3/LC:7/LI:1/LAV:1/LAC:1/FD:3/RD:5/NC:5/PV:7"
+      "vector": "SL:9/M:4/O:7/S:9/ED:9/EE:3/A:9/ID:3/LC:2/LI:3/LAV:5/LAC:1/FD:7/RD:5/NC:5/PV:3"
     }
   ],
   "impact_unknown": [
     {
       "id": "CVE-XXXX-WWWW",
       "impact": "missing-cvss-v3-fallback",
-      "score": 35.0625,
-      "severity": "high",
-      "vector": "SL:9/M:4/O:9/S:9/ED:9/EE:9/A:9/ID:8/LC:9/LI:9/LAV:9/LAC:9/FD:3/RD:5/NC:2/PV:7"
+      "score": 55.6875,
+      "severity": "critical",
+      "vector": "SL:9/M:4/O:9/S:9/ED:9/EE:9/A:9/ID:8/LC:9/LI:9/LAV:9/LAC:9/FD:9/RD:9/NC:2/PV:7"
     }
   ]
 }

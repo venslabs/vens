@@ -44,15 +44,13 @@ func TestTableAnswersAndLevels(t *testing.T) {
 		EE:  "theoretical=1 difficult=3 easy=5 automated_tools_available=9 cannot_tell=9",
 		ID:  "network host application cannot_tell",
 		LAC: "identified unidentified defeats_attribution cannot_tell",
-		FD:  "less_than_cost_to_fix=1 minor_effect_on_annual_profit=3 significant_effect_on_annual_profit=7 bankruptcy=9 cannot_tell=9",
-		RD:  "minimal_damage=1 loss_of_major_accounts=4 loss_of_goodwill=5 brand_damage=9 cannot_tell=9",
 		NC:  "minor_violation=2 clear_violation=5 high_profile_violation=7 cannot_tell=7",
 		PV:  "none=3 one_individual=3 hundreds=5 thousands=7 millions=9 cannot_tell=9",
 	}
 	got := map[Factor]string{
 		M: leveled(motive), O: leveled(opportunity), EE: leveled(easeOfExploit),
 		ID: strings.Join(ids(intrusionDetection), " "), LAC: strings.Join(ids(accountability), " "),
-		FD: leveled(financialDamage), RD: leveled(reputationDamage), NC: leveled(nonCompliance), PV: leveled(privacyViolation),
+		NC: leveled(nonCompliance), PV: leveled(privacyViolation),
 	}
 	for _, f := range Order() {
 		if got[f] != want[f] {
@@ -61,13 +59,13 @@ func TestTableAnswersAndLevels(t *testing.T) {
 	}
 }
 
-// The table holds the nine questions, each under its own factor, with its
+// The table holds the seven questions, each under its own factor, with its
 // counter, distinct ids and cannot_tell last.
-func TestTableHoldsTheNineQuestions(t *testing.T) {
+func TestTableHoldsTheSevenQuestions(t *testing.T) {
 	counters := map[Factor]string{
 		M: "motive_cannot_tell", O: "opportunity_cannot_tell", EE: "ease_of_exploit_cannot_tell",
-		ID: "intrusion_detection_cannot_tell", LAC: "accountability_cannot_tell", FD: "financial_damage_cannot_tell",
-		RD: "reputation_cannot_tell", NC: "non_compliance_cannot_tell", PV: "privacy_cannot_tell",
+		ID: "intrusion_detection_cannot_tell", LAC: "accountability_cannot_tell",
+		NC: "non_compliance_cannot_tell", PV: "privacy_cannot_tell",
 	}
 	if got := slices.Sorted(maps.Keys(table)); !slices.Equal(got, slices.Sorted(slices.Values(Order()))) {
 		t.Fatalf("the table holds %v, the calls ask %v", got, Order())
@@ -223,7 +221,7 @@ func TestNoQuestionJudgesReachability(t *testing.T) {
 			t.Errorf("%s lists %v", f, q.ids)
 		}
 	}
-	for _, f := range []Factor{"R", LC, LI, LAV} {
+	for _, f := range []Factor{"R", LC, LI, LAV, FD, RD} {
 		if _, ok := table[f]; ok {
 			t.Errorf("the table asks %s", f)
 		}

@@ -130,8 +130,9 @@ var frameGiven = Answers{O: "some_access_or_resources_required"}
 
 // frameNumbers keeps each question's file number from the 12 questions of
 // b7c0435, so that a frame keeps its name: Loss of confidentiality, integrity
-// and availability, 05 to 07, are no longer asked.
-var frameNumbers = map[Factor]int{M: 1, O: 2, EE: 3, ID: 4, LAC: 8, FD: 9, RD: 10, NC: 11, PV: 12}
+// and availability, 05 to 07, and Financial damage and Reputation damage, 09
+// and 10, are no longer asked.
+var frameNumbers = map[Factor]int{M: 1, O: 2, EE: 3, ID: 4, LAC: 8, NC: 11, PV: 12}
 
 // elide replaces the one occurrence of part in text by its placeholder.
 func elide(t *testing.T, text, part, placeholder string) string {

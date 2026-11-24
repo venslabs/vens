@@ -93,7 +93,7 @@ On cloud, the benchmark-backed picks are `claude-sonnet-4-6` (most accurate and 
 
 Vens makes LLM calls and does not know how much they cost. There is no `--max-spend` flag, no per-run budget, no rate-limit other than the provider's. Monitor billing on your provider dashboard, and start with small batches in CI before scaling out.
 
-Since v0.7.0 each batch makes one call per question, so a run makes several calls per batch: on the quickstart example (45 CVEs, batches of 10), 51 calls before any retry, 9 questions in each of 5 batches and 6 adjustments, as the mock model makes them. The run summary counts every call, per question.
+Since v0.7.0 each batch makes one call per question, so a run makes several calls per batch: on the quickstart example (45 CVEs, batches of 10), 41 calls before any retry, 7 questions in each of 5 batches and 6 adjustments, as the mock model makes them. The run summary counts every call, per question.
 
 ---
 
@@ -117,13 +117,29 @@ vens sets Skill level to 9 for every finding, OWASP's worst-case threat agent, s
 
 ## 11. The impact basis follows your declared context
 
-OWASP rates on the business impact when the assessor has good business impact information, and on the technical impact otherwise. vens takes your declared context as true: with `data_subjects` declared, `config.yaml` holds the business information OWASP asks for, and vens rates every finding on its business impact; without it, on its technical impact. Nothing checks that declaration, and the four business levels are the model's answers on the context you declared, Privacy violation capped by `data_subjects`. On the business basis, a business impact lower than the technical impact lowers the severity, as on OWASP's own worked example, High on the technical impact and Low on the business impact; and the 9s the missing-input rule sets for a CVE with no usable CVSS v3 vector do not reach it.
+OWASP rates on the business impact when the assessor has good business impact information, and on the technical impact otherwise. vens takes your declared context as true: with `data_subjects` declared, `config.yaml` holds the business information OWASP asks for, and vens rates every finding on its business impact; without it, on its technical impact. Nothing checks that declaration. Of the four business levels, Financial damage and Reputation damage are what `business_criticality` declares at the CVE's technical impact (limitation 12), and Non-compliance and Privacy violation are the model's answers on the context you declared, Privacy violation capped by `data_subjects`. On the business basis, a business impact lower than the technical impact lowers the severity, as on OWASP's own worked example, High on the technical impact and Low on the business impact; and the 9s the missing-input rule sets for a CVE with no usable CVSS v3 vector reach it only as a high technical impact, at which Financial damage and Reputation damage take your declared worst case.
 
 Each VEX vulnerability names its basis in the `vens:impact-basis` property. The vector does not say which impact the severity and the score were read on, so a tool that recomputes them from the vector alone must read that property, or it can disagree with vens. Dependency-Track 5.1 does not read it.
 
 ---
 
-## 12. Pre-1.0 — API surface may change
+## 12. Financial damage and Reputation damage follow one declaration
+
+vens does not ask the model what an exploit would cost the business. `business_criticality` declares it: each value states, in OWASP's options, the worst Financial damage and Reputation damage an exploit of the service could cost with a low, a medium and a high technical impact, and vens reads the declaration at the CVE's technical impact (see **[How vens rates a CVE](cvss-vs-owasp.md#how-vens-rates-a-cve)**). What follows:
+
+- With a high technical impact the declaration is your worst case. The steps down to medium and low are vens's customization of OWASP's options, not calibrated against experts' ratings: their direction is OWASP's, "The business impact stems from the technical impact", their sizes are not.
+- One value sets both factors: a service whose financial and reputational consequences differ cannot declare them apart.
+- `notes` and the CVE's description no longer reach Financial damage or Reputation damage: the value you choose is the only lever.
+- With no compliance framework declared, Non-compliance is 2, and a HIGH business impact needs `critical`, a high technical impact and `data_subjects` of `hundreds` or more.
+- A `high` service with no framework tops out at a business impact of 5.75, MEDIUM: (7 + 5 + 2 + 9) / 4.
+- A `low` service never reaches a HIGH business impact.
+- On a `critical` service, a `C:H` CVE gets Financial damage 9 and Reputation damage 9 even on public data: OWASP rates extensive non-sensitive data disclosed 6, a high technical impact.
+- A CVE with no usable CVSS v3 vector counts as a high technical impact, so on the business basis it takes the declared worst case.
+- Motive is shown `business_criticality` with its meaning, and `critical` no longer says compliance-required. On a `critical` service the Motive request differs from the one earlier builds sent, so answers recorded with them replay exactly for the impact, not for Motive.
+
+---
+
+## 13. Pre-1.0 — API surface may change
 
 Vens is under active development and has not reached a 1.0 release yet. The CLI flags and `config.yaml` schema may evolve between minor versions. Pin a specific version in CI (`go install github.com/venslabs/vens/cmd/vens@vX.Y.Z`) and read the release notes before upgrading.
 

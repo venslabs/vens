@@ -47,10 +47,10 @@ func TestQuestionsInTheDeclaredOrder(t *testing.T) {
 	if got := questions(t, declared()); !slices.Equal(got, Order()) {
 		t.Errorf("every field declared: %v, want %v", got, Order())
 	}
-	if got, want := questions(t, base()), []Factor{M, O, EE, LAC, FD, RD, PV}; !slices.Equal(got, want) {
+	if got, want := questions(t, base()), []Factor{M, O, EE, LAC, PV}; !slices.Equal(got, want) {
 		t.Errorf("nothing declared: %v, want %v", got, want)
 	}
-	if want := []Factor{M, O, EE, ID, LAC, FD, RD, NC, PV}; !slices.Equal(Order(), want) {
+	if want := []Factor{M, O, EE, ID, LAC, NC, PV}; !slices.Equal(Order(), want) {
 		t.Errorf("Order() = %v, want %v", Order(), want)
 	}
 	order := Order()
@@ -115,7 +115,7 @@ func TestQuestionsNotAsked(t *testing.T) {
 // fed an answer that would count.
 func TestNotAskedTakesGosLevelAndCountsNothing(t *testing.T) {
 	all := Answers{M: "high_reward", O: cannotTell, EE: cannotTell, ID: []string{cannotTell},
-		LAC: cannotTell, FD: cannotTell, RD: cannotTell, NC: cannotTell, PV: cannotTell}
+		LAC: cannotTell, NC: cannotTell, PV: cannotTell}
 	d := declared()
 	d.Detection = &Detection{Network: "logged", Host: "logged", Application: "logged"}
 	d.DataSubjects = ptr("one_individual")
@@ -155,8 +155,6 @@ func TestCannotTellLevelsAndCounters(t *testing.T) {
 		{EE, func(a *Answers, s string) { a.EE = s }, 9, "ease_of_exploit_cannot_tell"},
 		{ID, func(a *Answers, s string) { a.ID = []string{s} }, 9, "intrusion_detection_cannot_tell"},
 		{LAC, func(a *Answers, s string) { a.LAC = s }, 9, "accountability_cannot_tell"},
-		{FD, func(a *Answers, s string) { a.FD = s }, 9, "financial_damage_cannot_tell"},
-		{RD, func(a *Answers, s string) { a.RD = s }, 9, "reputation_cannot_tell"},
 		{NC, func(a *Answers, s string) { a.NC = s }, 7, "non_compliance_cannot_tell"},
 		{PV, func(a *Answers, s string) { a.PV = s }, 9, "privacy_cannot_tell"},
 	}
@@ -220,7 +218,7 @@ func TestIntrusionDetectionSets(t *testing.T) {
 // where the rule reads it.
 func TestUndeclaredFieldsCounted(t *testing.T) {
 	answered := Answers{M: "possible_reward", O: "some_access_or_resources_required", EE: "easy", ID: []string{"network"},
-		LAC: "identified", FD: "bankruptcy", RD: "minimal_damage", NC: "clear_violation", PV: "hundreds"}
+		LAC: "identified", NC: "clear_violation", PV: "hundreds"}
 	if got := compute(t, declared(), answered, nil).Counters; len(got) != 0 {
 		t.Errorf("every field declared and every answer listed: counters %v", got)
 	}
@@ -332,7 +330,7 @@ func TestReadingsHoldEveryQuestionAsked(t *testing.T) {
 // takes cannot_tell's 9, counted once. The rest reads as usual.
 func TestNoDescriptionReadsTheLikelihoodAnswersAsCannotTell(t *testing.T) {
 	answers := Answers{M: "low_or_no_reward", O: "full_access_or_expensive_resources_required", EE: cannotTell,
-		LAC: "identified", FD: "bankruptcy", RD: "minimal_damage"}
+		LAC: "identified"}
 	for _, rows := range [][]Row{
 		{{PkgName: "liba"}},
 		{{PkgName: "liba", Description: " \n"}, {PkgName: "libb"}},
@@ -349,8 +347,8 @@ func TestNoDescriptionReadsTheLikelihoodAnswersAsCannotTell(t *testing.T) {
 				t.Errorf("%s counted %d times: %v", counter, n, l.Counters)
 			}
 		}
-		if got["FD"] != 9 || l.Readings[FD] != Answered {
-			t.Errorf("FD = %d read %v, want its answer's 9", got["FD"], l.Readings[FD])
+		if got["LAC"] != 7 || l.Readings[LAC] != Answered {
+			t.Errorf("LAC = %d read %v, want its answer's 7", got["LAC"], l.Readings[LAC])
 		}
 	}
 	// One row with a description is enough to read the answers.
@@ -385,7 +383,7 @@ func TestSkippedQuestionsIgnoreJunkAndTheAdjustment(t *testing.T) {
 	d.Detection = &Detection{Network: "logged_and_reviewed", Host: "logged_and_reviewed", Application: "logged_and_reviewed"}
 	d.DataSubjects = ptr("none")
 	a := Answers{M: "high_reward", O: "no_access_or_resources_required", EE: "easy", ID: []string{"bogus"},
-		LAC: "unidentified", FD: "bankruptcy", RD: "brand_damage", NC: "high_profile_violation", PV: "bogus"}
+		LAC: "unidentified", NC: "high_profile_violation", PV: "bogus"}
 	l := compute(t, d, a, &Adjusted{Opportunity: "special_access_or_resources_required", Confidentiality: notAffected})
 	got := levels(l.Vector)
 	for f, w := range map[string]int{"ID": 3, "PV": 3, "O": 4} {
@@ -422,7 +420,7 @@ func TestTechnicalImpactsFromCVSS(t *testing.T) {
 	li := map[string]int{"N": 1, "L": 3, "H": 7}
 	lav := map[string]int{"N": 1, "L": 5, "H": 7}
 	answered := Answers{M: "possible_reward", O: "some_access_or_resources_required", EE: "easy", ID: []string{"network"},
-		LAC: "identified", FD: "bankruptcy", RD: "minimal_damage", NC: "clear_violation", PV: "hundreds"}
+		LAC: "identified", NC: "clear_violation", PV: "hundreds"}
 	for _, value := range []string{"N", "L", "H"} {
 		for _, ds := range sensitivities {
 			d := declared()
@@ -470,7 +468,7 @@ func TestLossOfAvailabilityCrossedWithTheRequirement(t *testing.T) {
 		"":  {"low": 9, "medium": 9, "high": 9, "critical": 9, unset: 9},
 	}
 	answered := Answers{M: "possible_reward", O: "some_access_or_resources_required", EE: "easy", ID: []string{"network"},
-		LAC: "identified", FD: "bankruptcy", RD: "minimal_damage", NC: "clear_violation", PV: "hundreds"}
+		LAC: "identified", NC: "clear_violation", PV: "hundreds"}
 	for _, a := range impactValues {
 		c := impactCVE("L", "H", a)
 		if a == "" {

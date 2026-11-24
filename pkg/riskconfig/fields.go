@@ -15,6 +15,7 @@
 package riskconfig
 
 import (
+	"fmt"
 	"slices"
 
 	"github.com/venslabs/vens/pkg/owasp"
@@ -69,6 +70,55 @@ type Control struct {
 const (
 	listenerUnknown     = "unknown"
 	activeInApplication = "active_in_application"
+)
+
+// Damage is what a business_criticality value declares: the worst Financial
+// damage and Reputation damage an exploit of the service could cost with a
+// low, a medium and a high technical impact, in that order.
+type Damage struct {
+	FD [3]owasp.FinancialDamage
+	RD [3]owasp.ReputationDamage
+}
+
+// damages are business_criticality's declarations, on OWASP's options
+// (OWASP_Risk_Rating_Methodology.md:178, :180). The high column is the
+// owner's worst case. The steps down to medium and low are vens's
+// customization of the options (:376-382), not calibrated against experts'
+// ratings; their direction is OWASP's: the business impact stems from the
+// technical impact (:165).
+var damages = map[string]Damage{
+	"low": {
+		FD: [3]owasp.FinancialDamage{owasp.FinancialDamageLessThanTheCostToFixTheVulnerability, owasp.FinancialDamageLessThanTheCostToFixTheVulnerability, owasp.FinancialDamageLessThanTheCostToFixTheVulnerability},
+		RD: [3]owasp.ReputationDamage{owasp.ReputationDamageMinimalDamage, owasp.ReputationDamageMinimalDamage, owasp.ReputationDamageMinimalDamage},
+	},
+	"medium": {
+		FD: [3]owasp.FinancialDamage{owasp.FinancialDamageLessThanTheCostToFixTheVulnerability, owasp.FinancialDamageLessThanTheCostToFixTheVulnerability, owasp.FinancialDamageMinorEffectOnAnnualProfit},
+		RD: [3]owasp.ReputationDamage{owasp.ReputationDamageMinimalDamage, owasp.ReputationDamageMinimalDamage, owasp.ReputationDamageLossOfMajorAccounts},
+	},
+	"high": {
+		FD: [3]owasp.FinancialDamage{owasp.FinancialDamageLessThanTheCostToFixTheVulnerability, owasp.FinancialDamageMinorEffectOnAnnualProfit, owasp.FinancialDamageSignificantEffectOnAnnualProfit},
+		RD: [3]owasp.ReputationDamage{owasp.ReputationDamageMinimalDamage, owasp.ReputationDamageLossOfMajorAccounts, owasp.ReputationDamageLossOfGoodwill},
+	},
+	"critical": {
+		FD: [3]owasp.FinancialDamage{owasp.FinancialDamageMinorEffectOnAnnualProfit, owasp.FinancialDamageSignificantEffectOnAnnualProfit, owasp.FinancialDamageBankruptcy},
+		RD: [3]owasp.ReputationDamage{owasp.ReputationDamageLossOfMajorAccounts, owasp.ReputationDamageLossOfGoodwill, owasp.ReputationDamageBrandDamage},
+	},
+}
+
+// OWASP's words for each option, as the declarations quote them.
+var (
+	financialDamageWords = map[owasp.FinancialDamage]string{
+		owasp.FinancialDamageLessThanTheCostToFixTheVulnerability: "less than the cost to fix the vulnerability",
+		owasp.FinancialDamageMinorEffectOnAnnualProfit:            "a minor effect on annual profit",
+		owasp.FinancialDamageSignificantEffectOnAnnualProfit:      "a significant effect on annual profit",
+		owasp.FinancialDamageBankruptcy:                           "bankruptcy",
+	}
+	reputationDamageWords = map[owasp.ReputationDamage]string{
+		owasp.ReputationDamageMinimalDamage:       "minimal damage",
+		owasp.ReputationDamageLossOfMajorAccounts: "loss of major accounts",
+		owasp.ReputationDamageLossOfGoodwill:      "loss of goodwill",
+		owasp.ReputationDamageBrandDamage:         "brand damage",
+	}
 )
 
 // bands are exhaustive and disjoint over whole numbers of people. OWASP names
@@ -127,12 +177,17 @@ var fieldDocs = map[Field]fieldDoc{
 		{"high", "PII, financial data, customer info"},
 		{"critical", "Secrets, PHI, payment card data"},
 	}},
-	BusinessCriticality: {choices: []Choice{
-		{"low", "Dev / test / sandbox"},
-		{"medium", "Internal tools"},
-		{"high", "Customer-facing, important operations"},
-		{"critical", "Revenue-critical, compliance-required"},
-	}},
+	BusinessCriticality: {
+		about: "Choosing a value declares the worst an exploit of this service could cost the business, as OWASP's Financial damage and Reputation damage, with a low, a medium and a high technical impact: the highest of the CVE's Loss of confidentiality, integrity and availability, low under 3, medium from 3 to under 6, high from 6, and high with no usable CVSS v3 vector. vens sets both factors from it; no question asks them. With a high technical impact it is your worst case; the steps down to medium and low are vens's customization of OWASP's options, not calibrated against experts' ratings, in the direction OWASP gives: the business impact stems from the technical impact.",
+		choices: []Choice{
+			{"low", "Dev / test / sandbox"},
+			{"medium", "Internal tools"},
+			{"high", "Customer-facing, important operations"},
+			// Compliance is Non-compliance's, which compliance_requirements
+			// declares.
+			{"critical", "Revenue-critical"},
+		},
+	},
 	AvailabilityRequirement: {choices: []Choice{
 		{"low", "Best-effort uptime"},
 		{"medium", "Business-hours SLA"},
@@ -226,6 +281,22 @@ func (f Field) About() string {
 
 func (f Field) accepts(value string) bool {
 	return slices.ContainsFunc(fieldDocs[f].choices, func(c Choice) bool { return c.Value == value })
+}
+
+// DeclaredDamage returns what a business_criticality value declares, false
+// for a value the field does not accept.
+func DeclaredDamage(criticality string) (Damage, bool) {
+	d, ok := damages[criticality]
+	return d, ok
+}
+
+// Declares states the declaration in OWASP's words, from the high technical
+// impact down.
+func (d Damage) Declares() string {
+	return fmt.Sprintf("With a high technical impact, %s (FD %d) and %s (RD %d); medium, %s (%d) and %s (%d); low, %s (%d) and %s (%d).",
+		financialDamageWords[d.FD[2]], d.FD[2], reputationDamageWords[d.RD[2]], d.RD[2],
+		financialDamageWords[d.FD[1]], d.FD[1], reputationDamageWords[d.RD[1]], d.RD[1],
+		financialDamageWords[d.FD[0]], d.FD[0], reputationDamageWords[d.RD[0]], d.RD[0])
 }
 
 // DataSubjectsBands returns Privacy violation's bands, the smallest

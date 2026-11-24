@@ -736,6 +736,30 @@ func keys(controls []Control) []string {
 	return out
 }
 
+// Each business_criticality value, and no other, declares a Financial damage
+// and a Reputation damage. critical's reads as the decision of 24/11/2026
+// writes it, and its meaning no longer says compliance, which is
+// Non-compliance's.
+func TestDeclaredDamages(t *testing.T) {
+	values := BusinessCriticality.Values()
+	for _, v := range values {
+		if _, ok := DeclaredDamage(v); !ok {
+			t.Errorf("business_criticality %q declares nothing", v)
+		}
+	}
+	if _, ok := DeclaredDamage(""); ok || len(damages) != len(values) {
+		t.Errorf("%d declarations for the %d values, or one for no value", len(damages), len(values))
+	}
+	critical, _ := DeclaredDamage("critical")
+	want := "With a high technical impact, bankruptcy (FD 9) and brand damage (RD 9); medium, a significant effect on annual profit (7) and loss of goodwill (5); low, a minor effect on annual profit (3) and loss of major accounts (4)."
+	if got := critical.Declares(); got != want {
+		t.Errorf("critical declares %q, want %q", got, want)
+	}
+	if got := BusinessCriticality.Meaning("critical"); got != "Revenue-critical" {
+		t.Errorf("critical means %q", got)
+	}
+}
+
 func TestBands(t *testing.T) {
 	want := []Band{
 		{"none", "0", owasp.PrivacyViolationOneIndividual},

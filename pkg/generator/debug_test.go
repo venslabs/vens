@@ -376,8 +376,8 @@ func TestDebugDir_AnswersJSON(t *testing.T) {
 		"LI":  "<nil>|||7|cvss|H",
 		"LAV": "<nil>|||5|cvss|L",
 		"LAC": "identified|answered||1|answer|",
-		"FD":  "less_than_cost_to_fix|answered||1|answer|",
-		"RD":  "minimal_damage|answered||1|answer|",
+		"FD":  "<nil>|||9|criticality|",
+		"RD":  "<nil>|||9|criticality|",
 		"NC":  "minor_violation|answered||2|answer|",
 		"PV":  "<nil>|||3|floor|N",
 	}, first)
@@ -393,6 +393,8 @@ func TestDebugDir_AnswersJSON(t *testing.T) {
 			assert.Equal(t, []any{"millions", 7, "config"}, []any{f.Answer, *f.Level, f.Source}, "capped by thousands")
 		case "LC", "LI", "LAV":
 			assert.Equal(t, []any{nil, 9, "cvss", ""}, []any{f.Answer, *f.Level, f.Source, f.CVSS}, "no vector: %s", f.Factor)
+		case "FD", "RD":
+			assert.Equal(t, []any{nil, 9, "criticality"}, []any{f.Answer, *f.Level, f.Source}, "no vector, critical: %s", f.Factor)
 		}
 	}
 	assert.Equal(t, []string{"ease_of_exploit_cannot_tell", "cvss_v3_missing"}, second.Counters)

@@ -96,14 +96,18 @@ No default is documented for a CVE with no usable v3 vector: the three take 9, t
 
 ### `context.business_criticality`
 
-How critical the system is to the business. No level reads it directly. The Motive, Financial damage and Reputation damage questions show it, with its meaning.
+Choosing a value declares the worst an exploit of this service could cost the business, as OWASP's Financial damage and Reputation damage, with a low, a medium and a high technical impact: the highest of the CVE's Loss of confidentiality, integrity and availability, low under 3, medium from 3 to under 6, high from 6, and high with no usable CVSS v3 vector. vens sets both factors from it; no question asks them. With a high technical impact it is your worst case; the steps down to medium and low are vens's customization of OWASP's options, not calibrated against experts' ratings, in the direction OWASP gives: the business impact stems from the technical impact.
 
-| Value | Meaning |
-|---|---|
-| `low` | Dev / test / sandbox |
-| `medium` | Internal tools |
-| `high` | Customer-facing, important operations |
-| `critical` | Revenue-critical, compliance-required |
+| Value | Meaning | What choosing it declares |
+|---|---|---|
+| `low` | Dev / test / sandbox | With a high technical impact, less than the cost to fix the vulnerability (FD 1) and minimal damage (RD 1); medium, less than the cost to fix the vulnerability (1) and minimal damage (1); low, less than the cost to fix the vulnerability (1) and minimal damage (1). |
+| `medium` | Internal tools | With a high technical impact, a minor effect on annual profit (FD 3) and loss of major accounts (RD 4); medium, less than the cost to fix the vulnerability (1) and minimal damage (1); low, less than the cost to fix the vulnerability (1) and minimal damage (1). |
+| `high` | Customer-facing, important operations | With a high technical impact, a significant effect on annual profit (FD 7) and loss of goodwill (RD 5); medium, a minor effect on annual profit (3) and loss of major accounts (4); low, less than the cost to fix the vulnerability (1) and minimal damage (1). |
+| `critical` | Revenue-critical | With a high technical impact, bankruptcy (FD 9) and brand damage (RD 9); medium, a significant effect on annual profit (7) and loss of goodwill (5); low, a minor effect on annual profit (3) and loss of major accounts (4). |
+
+The meaning is what the Motive question shows with the value; the declaration is never sent. Its words are OWASP's options: Financial damage, less than the cost to fix the vulnerability (1), a minor effect on annual profit (3), a significant effect on annual profit (7), bankruptcy (9); Reputation damage, minimal damage (1), loss of major accounts (4), loss of goodwill (5), brand damage (9). OWASP takes the business factors from "an asset classification guide and/or a business impact reference", and lets the tester change the options' scores, best by comparing the ratings with those of a team of experts; vens's steps down are such a change, and no such comparison has been made. Compliance is not part of the value: `compliance_requirements` declares it, for Non-compliance. One value sets both factors: a service whose financial and reputational consequences differ cannot declare them apart.
+
+Since v0.7.0 the values are the same and their meaning is new: `critical` no longer says compliance-required, and each value declares the worst case vens rates on. Reconfirm yours: see **[Migrating from vens v0.6](#migrating)**.
 
 ---
 
@@ -467,12 +471,13 @@ It loads with three warnings (W3, W4, W5), and `--strict` refuses it.
 
 ## Migrating from vens v0.6 { #migrating }
 
-vens v0.7.0 reads schema 2 only. A file without `schema_version` is refused with E1, and `schema_version: 1` with E2. Every key of schema 1 keeps its name, its values and its validation.
+vens v0.7.0 reads schema 2 only. A file without `schema_version` is refused with E1, and `schema_version: 1` with E2. Every key of schema 1 keeps its name, its values and its validation; `business_criticality` keeps its values with a new meaning.
 
 1. Add `schema_version: 2` at the top of the file.
-2. Declare `traceability`, `detection` and `data_subjects` for what is in place. vens does not derive them from `audit_requirement` or `controls`: a logging requirement is not a record, and an IDS or a SIEM does not show that this service's attempts are recorded.
-3. Set `listener: absent` for a job or a client that accepts no connection, `present` for a service that does.
-4. Run once and read the warnings. Fix any key refused as unknown (E3): schema 1 ignored a misspelled key, so `compliance_requirement:` (singular) used to drop your frameworks without a word.
+2. Reconfirm `business_criticality` against what each value now declares, the worst an exploit of the service could cost as Financial damage and Reputation damage (see [its table](#contextbusiness_criticality)): vens sets both factors from it. `critical` no longer means compliance-required; frameworks go in `compliance_requirements`.
+3. Declare `traceability`, `detection` and `data_subjects` for what is in place. vens does not derive them from `audit_requirement` or `controls`: a logging requirement is not a record, and an IDS or a SIEM does not show that this service's attempts are recorded.
+4. Set `listener: absent` for a job or a client that accepts no connection, `present` for a service that does.
+5. Run once and read the warnings. Fix any key refused as unknown (E3): schema 1 ignored a misspelled key, so `compliance_requirement:` (singular) used to drop your frameworks without a word.
 
 What each schema-1 key does once `schema_version: 2` is added and nothing else:
 
@@ -481,7 +486,7 @@ What each schema-1 key does once `schema_version: 2` is added and nothing else:
 | `project.name`, `project.description`, `notes` | shown to the model in every call | nothing |
 | `exposure` | sets Size and the attacker group every question names | nothing |
 | `data_sensitivity` | picks the column in which Loss of confidentiality is read from the CVSS v3 vectors; shown to the Motive and Privacy violation questions | nothing |
-| `business_criticality` | shown to the questions it concerns | nothing |
+| `business_criticality` | same values, new meaning: each declares the worst Financial damage and Reputation damage an exploit could cost, which vens sets at the CVE's technical impact; shown to the Motive question | reconfirm the value against its declaration |
 | `availability_requirement` | picks the column in which Loss of availability is read from the CVSS v3 vectors: `low` and `medium` secondary services, `high` and `critical` primary | nothing |
 | `compliance_requirements` | Non-compliance is asked only when the list is not empty; no fixed amount is added | nothing |
 | `audit_requirement` | moves no score; W1 while `traceability` is left out | declare `traceability` for what is recorded, not what is required: `audit_requirement: high` does not mean `per_individual` |

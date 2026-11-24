@@ -36,10 +36,6 @@ func answersFor(f Factor, answer []string) Answers {
 		a.ID = answer
 	case LAC:
 		a.LAC = one
-	case FD:
-		a.FD = one
-	case RD:
-		a.RD = one
 	case NC:
 		a.NC = one
 	case PV:
@@ -93,7 +89,7 @@ func TestReadAnswerShapes(t *testing.T) {
 			t.Errorf("ReadAnswer(%s, %q) = %v, %v; want %v", c.f, c.answer, got, err, c.want)
 		}
 	}
-	for _, f := range []Factor{SL, S, ED, A, LC, LI, LAV, "R", "X"} {
+	for _, f := range []Factor{SL, S, ED, A, LC, LI, LAV, FD, RD, "R", "X"} {
 		if _, err := ReadAnswer(f, "high_reward"); err == nil {
 			t.Errorf("ReadAnswer(%s) read an answer to a question no call asks", f)
 		}

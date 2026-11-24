@@ -171,8 +171,6 @@ func background(f Factor, d Deployment) []string {
 		}
 	case PV:
 		return []string{setting("Data sensitivity", d.DataSensitivity)}
-	case FD, RD:
-		return []string{setting("Business criticality", d.BusinessCriticality)}
 	}
 	return nil
 }

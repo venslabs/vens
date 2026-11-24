@@ -33,8 +33,10 @@ import (
 // basis the deployment gives; Motive, Opportunity and Ease of exploit are
 // asked only of a CVE a row describes, and no adjustment lowers the
 // Opportunity of one no row describes; Loss of
-// confidentiality, integrity and availability are the vectors' whatever the
-// answers and the adjustment; Privacy violation sits at its floor, not asked,
+// confidentiality, integrity and availability are the vectors', and
+// Financial damage and Reputation damage what business_criticality declares
+// at their band, whatever the answers and the adjustment; Privacy violation
+// sits at its floor, not asked,
 // where the vectors give C:N; and the readings are the questions asked, and
 // for a CVE no row describes the likelihood questions it is not asked for
 // want of a description.
@@ -69,6 +71,7 @@ func FuzzCompute(f *testing.F) {
 		}
 		d := base()
 		d.Exposure.Value = []string{"internal", "private", "internet"}[next()%3]
+		d.BusinessCriticality.Value = criticalities[next()%len(criticalities)]
 		d.DataSensitivity.Value = sensitivities[next()%len(sensitivities)]
 		d.Traceability = optional(traceabilities[:])
 		d.DataSubjects = optional(ids(privacyViolation)[:5])
@@ -85,8 +88,7 @@ func FuzzCompute(f *testing.F) {
 		}
 		a := Answers{
 			M: pick(ids(motive)), O: pick(ids(opportunity)), EE: pick(ids(easeOfExploit)),
-			LAC: pick(ids(accountability)), FD: pick(ids(financialDamage)), RD: pick(ids(reputationDamage)),
-			NC: pick(ids(nonCompliance)), PV: pick(ids(privacyViolation)),
+			LAC: pick(ids(accountability)), NC: pick(ids(nonCompliance)), PV: pick(ids(privacyViolation)),
 		}
 		for range next() % 5 {
 			a.ID = append(a.ID, pick(ids(intrusionDetection)))
@@ -134,8 +136,9 @@ func FuzzCompute(f *testing.F) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if l.Vector.LC != plain.Vector.LC || l.Vector.LI != plain.Vector.LI || l.Vector.LAV != plain.Vector.LAV {
-			t.Errorf("answers %+v and adjustment %+v moved the technical impacts: %+v, the vectors give %+v", a, adjusted, l.Vector, plain.Vector)
+		if l.Vector.LC != plain.Vector.LC || l.Vector.LI != plain.Vector.LI || l.Vector.LAV != plain.Vector.LAV ||
+			l.Vector.FD != plain.Vector.FD || l.Vector.RD != plain.Vector.RD {
+			t.Errorf("answers %+v and adjustment %+v moved the technical impacts or the damages: %+v, the vectors and business_criticality give %+v", a, adjusted, l.Vector, plain.Vector)
 		}
 		if l.ImpactFallback != slices.Contains(l.Counters, vectorMissing) || l.ImpactFallback != l.Impact.Vectorless() {
 			t.Errorf("fallback %v, counters %v, vectorless %v: the fallback is the event cvss_v3_missing counts", l.ImpactFallback, l.Counters, l.Impact.Vectorless())

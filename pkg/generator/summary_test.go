@@ -73,7 +73,7 @@ func TestGenerator_LogsBatchCompositionAndRunSummary(t *testing.T) {
 	summary := runSummary(t, logs)
 	require.Equal(t, int64(4), summary.attrs["rows"])
 	require.Equal(t, int64(4), summary.attrs["cves"])
-	require.Equal(t, int64(14), summary.attrs["llm_calls"])
+	require.Equal(t, int64(10), summary.attrs["llm_calls"])
 	require.Equal(t, int64(0), summary.attrs["asked_again"])
 	require.Equal(t, int64(0), summary.attrs["splits"])
 	require.Equal(t, false, summary.attrs["failed"])
