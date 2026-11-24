@@ -37,7 +37,7 @@ Your `config.yaml` fields work in two ways. A field **shown to the model** is co
 |---|---|---|
 | `exposure` | vens sets Size from it; every question names the attacker group it gives | An internet-facing service has more attackers than an internal tool. |
 | `data_sensitivity` | vens picks Loss of confidentiality's column from it; shown to Motive and Privacy violation | Leaking PII is worse than leaking debug logs. |
-| `business_criticality` | vens reads it alone, at the CVE's technical impact, for Financial damage and Reputation damage; shown to Motive | A breach of checkout can cost far more than one of a dashboard. |
+| `business_criticality` | vens reads it alone, at the CVE's worst technical loss, for Financial damage and Reputation damage; shown to Motive | A breach of checkout can cost far more than one of a dashboard. |
 | `compliance_requirements` | the Non-compliance question names them | A GDPR violation raises the stakes. |
 | `traceability` | vens reads it alone, for Loss of accountability | An attacker who leaves no trace is worse. |
 | `detection` | vens reads it alone, for Intrusion detection | An attempt nobody records goes unseen. |
@@ -74,18 +74,18 @@ Your `config.yaml` fields work in two ways. A field **shown to the model** is co
 
 ### `business_criticality` — what could an exploit cost the business?
 
-Choosing a value declares the worst an exploit of this service could cost, in OWASP's words for Financial damage and Reputation damage, with a low, a medium and a high technical impact. vens sets both factors from it, at the band of the highest of the CVE's Loss of confidentiality, integrity and availability (high with no usable CVSS v3 vector); no question asks them.
+Choosing a value declares the worst an exploit of this service could cost, in OWASP's words for Financial damage and Reputation damage, at a low, a medium and a high worst technical loss. vens sets both factors from it, at the CVE's worst technical loss: the band of the highest of its Loss of confidentiality, integrity and availability (high with no usable CVSS v3 vector), not OWASP's technical impact, which averages four factors; no question asks them.
 
 | Value | Meaning | What choosing it declares |
 |---|---|---|
-| `low` | Dev / test / sandbox | With a high technical impact, less than the cost to fix the vulnerability (FD 1) and minimal damage (RD 1); medium, less than the cost to fix the vulnerability (1) and minimal damage (1); low, less than the cost to fix the vulnerability (1) and minimal damage (1). |
-| `medium` | Internal tools | With a high technical impact, a minor effect on annual profit (FD 3) and loss of major accounts (RD 4); medium, less than the cost to fix the vulnerability (1) and minimal damage (1); low, less than the cost to fix the vulnerability (1) and minimal damage (1). |
-| `high` | Customer-facing, important operations | With a high technical impact, a significant effect on annual profit (FD 7) and loss of goodwill (RD 5); medium, a minor effect on annual profit (3) and loss of major accounts (4); low, less than the cost to fix the vulnerability (1) and minimal damage (1). |
-| `critical` | Revenue-critical | With a high technical impact, bankruptcy (FD 9) and brand damage (RD 9); medium, a significant effect on annual profit (7) and loss of goodwill (5); low, a minor effect on annual profit (3) and loss of major accounts (4). |
+| `low` | Dev / test / sandbox | At a high worst technical loss, less than the cost to fix the vulnerability (FD 1) and minimal damage (RD 1); medium, less than the cost to fix the vulnerability (1) and minimal damage (1); low, less than the cost to fix the vulnerability (1) and minimal damage (1). |
+| `medium` | Internal tools | At a high worst technical loss, a minor effect on annual profit (FD 3) and loss of major accounts (RD 4); medium, less than the cost to fix the vulnerability (1) and minimal damage (1); low, less than the cost to fix the vulnerability (1) and minimal damage (1). |
+| `high` | Customer-facing, important operations | At a high worst technical loss, a significant effect on annual profit (FD 7) and loss of goodwill (RD 5); medium, a minor effect on annual profit (3) and loss of major accounts (4); low, less than the cost to fix the vulnerability (1) and minimal damage (1). |
+| `critical` | Revenue-critical | At a high worst technical loss, bankruptcy (FD 9) and brand damage (RD 9); medium, a significant effect on annual profit (7) and loss of goodwill (5); low, a minor effect on annual profit (3) and loss of major accounts (4). |
 
-**Rule of thumb:** read the high technical impact first and pick the row whose worst case is yours. Could a breach of this service bankrupt the business or damage the brand? That is `critical`.
+**Rule of thumb:** read the high worst technical loss first and pick the row whose worst case is yours. Could a breach of this service bankrupt the business or damage the brand? That is `critical`.
 
-With a high technical impact, the row is your worst case. The steps down to medium and low are vens's customization of OWASP's options, not calibrated against experts' ratings; their direction is OWASP's: "The business impact stems from the technical impact". Compliance is not part of the value: declare frameworks in `compliance_requirements`. Since v0.7.0 the values keep their names with this meaning, and `critical` no longer says compliance-required: reconfirm yours.
+At a high worst technical loss, the row is your worst case. The steps down to medium and low are vens's customization of OWASP's options, not calibrated against experts' ratings; their direction is OWASP's: "The business impact stems from the technical impact". Compliance is not part of the value: declare frameworks in `compliance_requirements`. Since v0.7.0 the values keep their names with this meaning, and `critical` no longer says compliance-required: reconfirm yours.
 
 The meanings in these tables are the words the model is shown with each value; the Motive question shows `business_criticality` with its meaning, and no call sends the declaration.
 

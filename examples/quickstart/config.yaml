@@ -43,12 +43,13 @@ context:
   #   - high: Customer-facing, important operations
   #   - critical: Revenue-critical
   # Each value declares Financial damage (FD) and Reputation damage (RD) at a
-  # high / medium / low technical impact, in OWASP's options:
+  # high / medium / low worst technical loss (the highest of the CVE's Loss of
+  # confidentiality, integrity and availability), in OWASP's options:
   #   - low: FD 1/1/1, RD 1/1/1 (less than the cost to fix, minimal damage)
   #   - medium: FD 3/1/1, RD 4/1/1 (up to a minor effect on annual profit, loss of major accounts)
   #   - high: FD 7/3/1, RD 5/4/1 (up to a significant effect on annual profit, loss of goodwill)
   #   - critical: FD 9/7/3, RD 9/5/4 (up to bankruptcy, brand damage)
-  # Impact: Sets Financial damage and Reputation damage at the CVE's technical impact;
+  # Impact: Sets Financial damage and Reputation damage at the CVE's worst technical loss;
   #         shown to the Motive question
   business_criticality: "high"
 

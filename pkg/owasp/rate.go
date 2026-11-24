@@ -30,9 +30,11 @@ var severities = [3][3]string{
 	{"medium", "high", "critical"},
 }
 
-// Band is OWASP's level of a value on its 0 to 9 scale, a likelihood, an
-// impact or a factor's level: 0 LOW under 3, 1 MEDIUM from 3 to under 6, 2
-// HIGH from 6 (OWASP_Risk_Rating_Methodology.md:188-207).
+// Band is the level of a value on OWASP's 0 to 9 scale: 0 LOW under 3, 1
+// MEDIUM from 3 to under 6, 2 HIGH from 6. OWASP's "Likelihood and Impact
+// Levels" table splits a likelihood and an impact this way
+// (OWASP_Risk_Rating_Methodology.md:188-207); reading a single factor's level
+// on it, as the worst technical loss does, is vens's choice, not OWASP's.
 func Band(x float64) int {
 	switch {
 	case x < 3:

@@ -472,10 +472,12 @@ func (s *scorer) accountability(id string) owasp.LossOfAccountability {
 
 // damage is Financial damage's and Reputation damage's levels: what
 // business_criticality declares, the owner's classification of what an
-// exploit could cost (OWASP_Risk_Rating_Methodology.md:170-173), at OWASP's
-// band of the highest technical impact, since the business impact stems
-// from the technical impact (:165). With no usable v3 vector the three are
-// 9, so the band is high: the declared worst case.
+// exploit could cost (OWASP_Risk_Rating_Methodology.md:170-173), at the
+// CVE's worst technical loss, since the business impact stems from the
+// technical impact (:165). The worst technical loss is the band of the
+// highest of LC, LI and LAV; reading one factor's level on OWASP's bands is
+// vens's choice (owasp.Band). With no usable v3 vector the three are 9, so
+// the band is high: the declared worst case.
 func (s *scorer) damage(lc owasp.LossOfConfidentiality, li owasp.LossOfIntegrity, lav owasp.LossOfAvailability) (owasp.FinancialDamage, owasp.ReputationDamage) {
 	declared, _ := riskconfig.DeclaredDamage(s.d.BusinessCriticality.Value)
 	t := owasp.Band(float64(max(int(lc), int(li), int(lav))))

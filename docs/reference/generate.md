@@ -387,7 +387,7 @@ Each vulnerability holds one OWASP rating (vector, severity and score), the BOM-
 
 `vens:impact-provenance`: `cvss-v3` means Loss of confidentiality, integrity and availability were read from the CVE's usable CVSS v3 vectors. `missing-cvss-v3-fallback` means the CVE has none, so the missing-input rule set the three to 9: the same CVEs the run summary counts in `cvss_v3_missing`, which `--strict` refuses. The value follows that rule, never the levels. Keep the second kind in a separate "impact unknown" list and order the first by severity, then score, then identifier: see **[Get your top 10](../guides/prioritize-cves.md#step-4-get-your-top-10)**.
 
-`vens:impact-basis` is the impact the severity and the score are read on, the same for every vulnerability of a run: `business` when `config.yaml` declares `data_subjects`, `technical` when it does not (see **[How vens rates a CVE](../concepts/cvss-vs-owasp.md#how-vens-rates-a-cve)**). On the business basis, the 9s the missing-input rule sets reach the severity only as a high technical impact, at which Financial damage and Reputation damage take the worst case `business_criticality` declares. The vector does not say which impact was read: a tool that recomputes the severity or the score from the vector must read this property, or it can disagree with vens.
+`vens:impact-basis` is the impact the severity and the score are read on, the same for every vulnerability of a run: `business` when `config.yaml` declares `data_subjects`, `technical` when it does not (see **[How vens rates a CVE](../concepts/cvss-vs-owasp.md#how-vens-rates-a-cve)**). On the business basis, the 9s the missing-input rule sets reach the severity only as a high worst technical loss, at which Financial damage and Reputation damage take the worst case `business_criticality` declares. The vector does not say which impact was read: a tool that recomputes the severity or the score from the vector must read this property, or it can disagree with vens.
 
 A run that would write a vulnerability without one of the two properties, or with two values of one for a CVE, fails and writes no VEX.
 
@@ -399,7 +399,7 @@ The VEX's `metadata` holds one property:
 ]
 ```
 
-`vens:rating-policy` is the version of the rules the ratings follow. Version `2` reads the impact on `vens:impact-basis`, business when `config.yaml` declares `data_subjects` and technical otherwise, and sets Financial damage and Reputation damage from what `business_criticality` declares at the CVE's technical impact. A VEX without the property predates version 2: its ratings follow earlier rules.
+`vens:rating-policy` is the version of the rules the ratings follow. Version `2` reads the impact on `vens:impact-basis`, business when `config.yaml` declares `data_subjects` and technical otherwise, and sets Financial damage and Reputation damage from what `business_criticality` declares at the CVE's worst technical loss, the highest of its Loss of confidentiality, integrity and availability. A VEX without the property predates version 2: its ratings follow earlier rules.
 
 ---
 

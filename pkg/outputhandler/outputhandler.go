@@ -51,7 +51,7 @@ const (
 	RatingPolicyProperty = "vens:rating-policy"
 	// RatingPolicy 2: the impact is read on vens:impact-basis, and Financial
 	// damage and Reputation damage are set from business_criticality at the
-	// CVE's technical impact.
+	// CVE's worst technical loss.
 	RatingPolicy = "2"
 )
 

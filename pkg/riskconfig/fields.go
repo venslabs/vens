@@ -73,8 +73,8 @@ const (
 )
 
 // Damage is what a business_criticality value declares: the worst Financial
-// damage and Reputation damage an exploit of the service could cost with a
-// low, a medium and a high technical impact, in that order.
+// damage and Reputation damage an exploit of the service could cost at a
+// low, a medium and a high worst technical loss, in that order.
 type Damage struct {
 	FD [3]owasp.FinancialDamage
 	RD [3]owasp.ReputationDamage
@@ -178,7 +178,7 @@ var fieldDocs = map[Field]fieldDoc{
 		{"critical", "Secrets, PHI, payment card data"},
 	}},
 	BusinessCriticality: {
-		about: "Choosing a value declares the worst an exploit of this service could cost the business, as OWASP's Financial damage and Reputation damage, with a low, a medium and a high technical impact: the highest of the CVE's Loss of confidentiality, integrity and availability, low under 3, medium from 3 to under 6, high from 6, and high with no usable CVSS v3 vector. vens sets both factors from it; no question asks them. With a high technical impact it is your worst case; the steps down to medium and low are vens's customization of OWASP's options, not calibrated against experts' ratings, in the direction OWASP gives: the business impact stems from the technical impact.",
+		about: "Choosing a value declares the worst an exploit of this service could cost the business, as OWASP's Financial damage and Reputation damage, at a low, a medium and a high worst technical loss. The CVE's worst technical loss is the highest of its Loss of confidentiality, integrity and availability, low under 3, medium from 3 to under 6, high from 6, and high with no usable CVSS v3 vector; it is not OWASP's technical impact, the average of four factors. vens sets both factors from the value; no question asks them. At a high worst technical loss the value is your worst case; the steps down to medium and low are vens's customization of OWASP's options, not calibrated against experts' ratings, in the direction OWASP gives: the business impact stems from the technical impact.",
 		choices: []Choice{
 			{"low", "Dev / test / sandbox"},
 			{"medium", "Internal tools"},
@@ -290,10 +290,10 @@ func DeclaredDamage(criticality string) (Damage, bool) {
 	return d, ok
 }
 
-// Declares states the declaration in OWASP's words, from the high technical
-// impact down.
+// Declares states the declaration in OWASP's words, from the high worst
+// technical loss down.
 func (d Damage) Declares() string {
-	return fmt.Sprintf("With a high technical impact, %s (FD %d) and %s (RD %d); medium, %s (%d) and %s (%d); low, %s (%d) and %s (%d).",
+	return fmt.Sprintf("At a high worst technical loss, %s (FD %d) and %s (RD %d); medium, %s (%d) and %s (%d); low, %s (%d) and %s (%d).",
 		financialDamageWords[d.FD[2]], d.FD[2], reputationDamageWords[d.RD[2]], d.RD[2],
 		financialDamageWords[d.FD[1]], d.FD[1], reputationDamageWords[d.RD[1]], d.RD[1],
 		financialDamageWords[d.FD[0]], d.FD[0], reputationDamageWords[d.RD[0]], d.RD[0])

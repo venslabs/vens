@@ -751,7 +751,7 @@ func TestDeclaredDamages(t *testing.T) {
 		t.Errorf("%d declarations for the %d values, or one for no value", len(damages), len(values))
 	}
 	critical, _ := DeclaredDamage("critical")
-	want := "With a high technical impact, bankruptcy (FD 9) and brand damage (RD 9); medium, a significant effect on annual profit (7) and loss of goodwill (5); low, a minor effect on annual profit (3) and loss of major accounts (4)."
+	want := "At a high worst technical loss, bankruptcy (FD 9) and brand damage (RD 9); medium, a significant effect on annual profit (7) and loss of goodwill (5); low, a minor effect on annual profit (3) and loss of major accounts (4)."
 	if got := critical.Declares(); got != want {
 		t.Errorf("critical declares %q, want %q", got, want)
 	}

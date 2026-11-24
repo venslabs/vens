@@ -73,7 +73,7 @@ type ContextHints struct {
 
 	// BusinessCriticality is low, medium, high or critical: the worst
 	// Financial damage and Reputation damage an exploit could cost, which Go
-	// reads at the CVE's technical impact; background to Motive.
+	// reads at the CVE's worst technical loss; background to Motive.
 	BusinessCriticality string `yaml:"business_criticality"`
 
 	// AvailabilityRequirement is low, medium, high or critical: the column in

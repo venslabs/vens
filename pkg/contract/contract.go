@@ -140,9 +140,11 @@ const (
 	// declares, the attacking group's skill: Skill level
 	// (OWASP_Risk_Rating_Methodology.md:87-89, :111).
 	SourceWorstCase
-	// SourceCriticality: what business_criticality declares, at the band of
-	// the CVE's highest technical impact read from its CVSS v3 vectors, high
-	// with no usable v3 vector: Financial damage and Reputation damage.
+	// SourceCriticality: what business_criticality declares at the CVE's
+	// worst technical loss, the band of the highest of Loss of
+	// confidentiality, integrity and availability read from its CVSS v3
+	// vectors, high with no usable v3 vector: Financial damage and Reputation
+	// damage.
 	SourceCriticality
 )
 
