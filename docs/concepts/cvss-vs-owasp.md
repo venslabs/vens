@@ -26,7 +26,7 @@ Two services both contain `libfoo-1.2.3` with a hypothetical CVE `CVE-XXXX-YYYY`
 **Vens says, for service A (internal dashboard, no CSV parsing in production):**
 ```
 Vector:   SL:9/M:1/O:0/S:4/ED:9/EE:1/A:9/ID:8/LC:2/LI:1/LAV:1/LAC:7/FD:1/RD:1/NC:2/PV:3
-Severity: low      (likelihood 5.13 MEDIUM, impact 2.75 LOW)
+Severity: low      (likelihood 5.13 MEDIUM, technical impact 2.75 LOW: no data_subjects declared)
 Score:    14.09
 Why:      The model answers that reaching the parser takes full access to the
           host and that exploiting it is theoretical here; an outage would
@@ -53,8 +53,8 @@ Same CVE, same base score, two different risks. The model answered the questions
 
 OWASP's Risk Rating Methodology rates a vulnerability from 16 factors, each with a few named levels from 0 to 9. vens sets each factor in one of three ways:
 
-1. **Set by vens (4 factors).** Skill level, Ease of discovery and Awareness are 9 for every finding: each finding is a published CVE that a scanner matched, so vens takes OWASP's worst case for them. Size comes from your declared `exposure`.
-2. **Read from the CVSS v3 vectors (3 factors).** Loss of confidentiality, integrity and availability come from the worst value, `H` over `L` over `N`, that the CVE's usable CVSS v3 vectors give `C`, `I` and `A`, across every row and source of the scanner's report; confidentiality is crossed with `data_sensitivity`, availability with `availability_requirement`, unset reading primary. No question asks them. A CVE with no usable v3 vector takes 9 for each, counted as `cvss_v3_missing` and marked `missing-cvss-v3-fallback` in the VEX. The impact levels supplied by the missing-input rule are fail-safe gate values, not evidence of relative impact or urgency.
+1. **Set by vens (4 factors).** Skill level is 9 for every finding: no field declares the attackers' skill, so vens takes OWASP's worst-case threat agent. Ease of discovery and Awareness are 9 for every finding: each finding is a published CVE that a scanner matched, so vens takes OWASP's worst case for them. Size comes from your declared `exposure`.
+2. **Read from the CVSS v3 vectors (3 factors).** Loss of confidentiality, integrity and availability come from the worst value, `H` over `L` over `N`, that the CVE's usable CVSS v3 vectors give `C`, `I` and `A`, across every row and source of the scanner's report; confidentiality is crossed with `data_sensitivity`, availability with `availability_requirement`, unset reading primary. No question asks them. A CVE with no usable v3 vector takes 9 for each, counted as `cvss_v3_missing` and marked `missing-cvss-v3-fallback` in the VEX. The impact levels supplied by the missing-input rule are fail-safe gate values, not evidence of relative impact or urgency; on the business impact basis (below), they do not reach the severity.
 3. **Read from the model's answer (6 factors).** The model gets one question per call, about a batch of CVEs, and picks one named answer from a closed list that always includes `cannot_tell`. vens maps the answer to the factor's level; `cannot_tell` maps to the worst case and is counted.
 4. **An answer combined with a declared field (3 factors).** vens crosses the model's answer with a field of `config.yaml` the question does not show: Intrusion detection with `detection`, Loss of accountability with `traceability`, Privacy violation with `data_subjects`.
 
@@ -93,7 +93,7 @@ From the 16 levels, vens computes, in Go:
 Likelihood       = average of SL, M, O, S, ED, EE, A, ID
 Technical impact = average of LC, LI, LAV, LAC
 Business impact  = average of FD, RD, NC, PV
-Impact           = the larger of the technical and the business impact
+Impact           = the business impact if data_subjects is declared, the technical impact if not
 Severity         = OWASP's matrix of the likelihood level and the impact level
 Score            = Likelihood × Impact
 ```
@@ -108,11 +108,11 @@ A value below 3 is LOW, 3 to under 6 MEDIUM, 6 and up HIGH. The severity is OWAS
 
 With Skill level, Ease of discovery and Awareness at 9, the likelihood never falls below 4.25, so it is never LOW and `info` never occurs: a `low` severity needs a LOW impact.
 
-OWASP rates the impact on the business impact when the assessor holds good business information, and on the technical impact otherwise. vens cannot establish that per finding, so it takes the larger of the two: see **[Limitations](limitations.md)**.
+OWASP rates on the business impact when the assessor has good business impact information; with no information about the business, the technical impact is the next best thing. vens takes your declared context as true. With `data_subjects` declared, `config.yaml` holds the business information OWASP asks for (`business_criticality` is required, and `compliance_requirements` left out means no framework applies), so vens rates every finding on its business impact; without it, on its technical impact. Each VEX vulnerability names the impact in its `vens:impact-basis` property, `business` or `technical`. A tool that recomputes the severity from the vector alone must read that property, or it can disagree with vens: see **[Limitations](limitations.md)**.
 
 The score is a vens extension: OWASP's method stops at the severity. It is likelihood × impact, each from 0 to 9, so it lies on a 0 to 81 scale, and it is published in `ratings[].score` to sort CVEs within a severity. The severity does not come from the score: a `high` can score lower than a `medium`, so sort by severity first.
 
-The VEX carries, per CVE, `ratings[].method` `OWASP`, the 16 levels in `ratings[].vector`, the severity and the score. Anyone can recompute the severity and the score from the vector.
+The VEX carries, per CVE, `ratings[].method` `OWASP`, the 16 levels in `ratings[].vector`, the severity, the score and the `vens:impact-basis` property. Anyone can recompute the severity and the score from the vector and that property.
 
 Full OWASP methodology: [owasp.org/www-community/OWASP_Risk_Rating_Methodology](https://owasp.org/www-community/OWASP_Risk_Rating_Methodology).
 
@@ -127,7 +127,7 @@ This explains the mechanism; it is not a measurement of accuracy.
 | What the model returns | four numbers from 0 to 9 per CVE: threat agent, vulnerability, technical impact, business impact | one named answer per question, from a closed list; never a number |
 | Calls | one call per batch of CVEs | one call per question per batch, at most 9 questions per CVE, and one adjustment call per flagged CVE with a field left to ask |
 | The 16 levels in the vector | each of the four numbers repeated over its group's four factors | 4 set by vens, 3 from the CVSS v3 vectors, 6 read from an answer, 3 from an answer combined with a declared field |
-| Impact | the average of the technical and the business impact | the larger of the two |
+| Impact | the average of the technical and the business impact | the business impact with `data_subjects` declared, the technical impact without |
 | Severity | bands of the score: 0–4 `info`, 5–19 `low`, 20–39 `medium`, 40–59 `high`, 60–81 `critical` | OWASP's matrix of the likelihood and impact levels; never `info` |
 | Score | likelihood × impact | the same product, which no longer sets the severity |
 | Compliance frameworks | the model was told to add 2 for a compliance violation | the Non-compliance question names them and the model judges the violation |
@@ -177,7 +177,7 @@ A generic 5.3 can come out `high` or `critical`, which moves the CVE from deep i
 ## When to be cautious
 
 ⚠️ Generic or sparse `config.yaml` → the questions get generic answers
-⚠️ Fields left out → their fallback: Intrusion detection 9 and Loss of accountability's `none` column on every finding, no cap on Privacy violation; the run summary counts them
+⚠️ Fields left out → their fallback: Intrusion detection 9 and Loss of accountability's `none` column on every finding, no cap on Privacy violation and every finding rated on its technical impact; the run summary counts them
 ⚠️ For the five controls the Ease of exploit question shows (`waf`, `ddos_protection`, `segmentation`, `zero_trust`, `antivirus`), claiming one as present when it is absent can lower ratings through the model's answer
 ⚠️ The LLM has no information about a very recent CVE (< 2 weeks) → its answers rest on the description alone, and `cannot_tell` takes the worst case
 ⚠️ Deeply custom internal CVEs → the LLM may not know the specifics; review manually

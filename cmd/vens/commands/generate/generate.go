@@ -54,7 +54,8 @@ a closed list of named answers. vens sets the others from the scan report, the c
 level, Loss of confidentiality, integrity and availability from the worst C, I and A of the CVE's
 CVSS v3 vectors, then computes every level, the OWASP vector and the rating:
   Likelihood = the average of the 8 threat agent and vulnerability factors
-  Impact     = the larger of the technical and the business impact, each the average of its 4 factors
+  Impact     = the business impact when data_subjects is declared, the technical impact otherwise,
+               each the average of its 4 factors; each VEX vulnerability names it in vens:impact-basis
   Severity   = OWASP's matrix of the likelihood and impact levels
   Score      = Likelihood × Impact, a vens number, not OWASP's
 
@@ -62,10 +63,11 @@ A missing input takes a fallback, counted in the run summary, unless --strict fa
 answer to a question read as cannot_tell, and Motive, Opportunity and Ease of exploit for a CVE
 with no description, count as the worst answer; undeclared, detection makes Intrusion detection 9,
 traceability makes Loss of accountability 7 or 9, and data_subjects leaves Privacy violation at the
-model's band; a CVE with no usable CVSS v3 vector has Loss of confidentiality, integrity and
-availability at 9. Unset, availability_requirement reads Loss of availability in the primary
-services column, counted as availability_requirement_missing, and --strict does not fail the run
-for it. A CVE whose usable CVSS v3 vectors give C:N has Privacy violation at 3, not asked.
+model's band and every finding rated on its technical impact; a CVE with no usable CVSS v3 vector
+has Loss of confidentiality, integrity and availability at 9. Unset, availability_requirement reads
+Loss of availability in the primary services column, counted as availability_requirement_missing,
+and --strict does not fail the run for it. A CVE whose usable CVSS v3 vectors give C:N has Privacy
+violation at 3, not asked.
 
 A CVE whose description says it is disputed or not a security issue, or that the report rates low
 while NVD rates it high or critical, is flagged: one more call, the adjustment, when it has a field

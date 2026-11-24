@@ -36,7 +36,7 @@ Vens emits a **CycloneDX 1.6 VEX BOM** (1.6 is the default so Dependency-Track c
   - `method: "OWASP"`
   - `score` — likelihood × impact on a 0–81 scale, a vens extension to rank CVEs within a severity
   - `severity` — `low` / `medium` / `high` / `critical`, from OWASP's likelihood × impact matrix
-  - `vector` — the 16 OWASP factor levels the severity and the score are computed from (e.g. `SL:9/M:4/O:9/...`)
+  - `vector` — the 16 OWASP factor levels the severity and the score are computed from (e.g. `SL:9/M:4/O:9/...`), on the impact the vulnerability's `vens:impact-basis` property names, `business` or `technical`
 - `affects[]` — BOM-Link references to the vulnerable components
 
 Vens does **not** set a CycloneDX `analysis` block (`state`, `justification`, `detail`). It deliberately leaves it out, which keeps the VEX focused on scoring information. The model's reasoning for each CVE is in the replies that `--debug-dir` writes and in the claims of the attestation that `--attest` writes; the log on stderr carries each rating, not its reasoning.

@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/CycloneDX/cyclonedx-go"
+	"github.com/venslabs/vens/pkg/owasp"
 )
 
 func TestCycloneDxVexWriter_Close_SerialNumber(t *testing.T) {
@@ -34,6 +35,7 @@ func TestCycloneDxVexWriter_Close_SerialNumber(t *testing.T) {
 			VulnID:           "CVE-2024-1234",
 			BOMRef:           "pkg:npm/foo@1.0.0",
 			ImpactProvenance: ImpactFromCVSSv3,
+			ImpactBasis:      owasp.BasisTechnical,
 			Rating: cyclonedx.VulnerabilityRating{
 				Method:   cyclonedx.ScoringMethodOWASP,
 				Score:    &score,
@@ -139,6 +141,7 @@ func TestCycloneDxVexWriter_Close_VulnerabilitySource(t *testing.T) {
 			VulnID:           "CVE-2024-1234",
 			BOMRef:           "pkg:npm/foo@1.0.0",
 			ImpactProvenance: ImpactFromCVSSv3,
+			ImpactBasis:      owasp.BasisTechnical,
 			Rating: cyclonedx.VulnerabilityRating{
 				Method:   cyclonedx.ScoringMethodOWASP,
 				Score:    &score,
@@ -150,6 +153,7 @@ func TestCycloneDxVexWriter_Close_VulnerabilitySource(t *testing.T) {
 			VulnID:           "GHSA-abcd-efgh-ijkl",
 			BOMRef:           "pkg:npm/bar@2.0.0",
 			ImpactProvenance: ImpactFromCVSSv3,
+			ImpactBasis:      owasp.BasisTechnical,
 			Rating: cyclonedx.VulnerabilityRating{
 				Method:   cyclonedx.ScoringMethodOWASP,
 				Score:    &score,
@@ -227,6 +231,7 @@ func TestCycloneDxVexWriter_Close_MergesDuplicateVulnIDs(t *testing.T) {
 			VulnID:           "CVE-2024-1234",
 			BOMRef:           "pkg:npm/foo@1.0.0",
 			ImpactProvenance: ImpactFromCVSSv3,
+			ImpactBasis:      owasp.BasisTechnical,
 			Rating: cyclonedx.VulnerabilityRating{
 				Method:   cyclonedx.ScoringMethodOWASP,
 				Score:    &score,
@@ -238,6 +243,7 @@ func TestCycloneDxVexWriter_Close_MergesDuplicateVulnIDs(t *testing.T) {
 			VulnID:           "CVE-2024-1234",
 			BOMRef:           "pkg:npm/bar@2.0.0",
 			ImpactProvenance: ImpactFromCVSSv3,
+			ImpactBasis:      owasp.BasisTechnical,
 			Rating: cyclonedx.VulnerabilityRating{
 				Method:   cyclonedx.ScoringMethodOWASP,
 				Score:    &score,
@@ -249,6 +255,7 @@ func TestCycloneDxVexWriter_Close_MergesDuplicateVulnIDs(t *testing.T) {
 			VulnID:           "CVE-2024-5678",
 			BOMRef:           "pkg:npm/baz@3.0.0",
 			ImpactProvenance: ImpactFromCVSSv3,
+			ImpactBasis:      owasp.BasisTechnical,
 			Rating: cyclonedx.VulnerabilityRating{
 				Method:   cyclonedx.ScoringMethodOWASP,
 				Score:    &score,
@@ -306,6 +313,7 @@ func TestCycloneDxVexWriter_Close_DeduplicatesAffectsRefs(t *testing.T) {
 			VulnID:           "CVE-2024-1234",
 			BOMRef:           "pkg:npm/foo@1.0.0",
 			ImpactProvenance: ImpactFromCVSSv3,
+			ImpactBasis:      owasp.BasisTechnical,
 			Rating: cyclonedx.VulnerabilityRating{
 				Method:   cyclonedx.ScoringMethodOWASP,
 				Score:    &score,
@@ -317,6 +325,7 @@ func TestCycloneDxVexWriter_Close_DeduplicatesAffectsRefs(t *testing.T) {
 			VulnID:           "CVE-2024-1234",
 			BOMRef:           "pkg:npm/foo@1.0.0",
 			ImpactProvenance: ImpactFromCVSSv3,
+			ImpactBasis:      owasp.BasisTechnical,
 			Rating: cyclonedx.VulnerabilityRating{
 				Method:   cyclonedx.ScoringMethodOWASP,
 				Score:    &score,
@@ -420,6 +429,7 @@ func TestCycloneDxVexWriter_Close_SpecVersion(t *testing.T) {
 					VulnID:           "CVE-2024-1234",
 					BOMRef:           "pkg:npm/foo@1.0.0",
 					ImpactProvenance: ImpactFromCVSSv3,
+					ImpactBasis:      owasp.BasisTechnical,
 					Rating: cyclonedx.VulnerabilityRating{
 						Method:   cyclonedx.ScoringMethodOWASP,
 						Score:    &score,
@@ -489,6 +499,7 @@ func TestCycloneDxVexWriter_Close_KeepsZeroOWASPScore(t *testing.T) {
 					VulnID:           "CVE-2026-8376",
 					BOMRef:           "pkg:deb/debian/perl-base@5.36.0",
 					ImpactProvenance: ImpactFromCVSSv3,
+					ImpactBasis:      owasp.BasisTechnical,
 					Rating: cyclonedx.VulnerabilityRating{
 						Method:   cyclonedx.ScoringMethodOWASP,
 						Score:    &score,
@@ -556,9 +567,9 @@ func TestCycloneDxVexWriter_Close_FailsOnUnreferencedVuln(t *testing.T) {
 		Severity: cyclonedx.SeverityHigh,
 	}
 	if err := h.HandleVulnRatings([]VulnRating{
-		{VulnID: "CVE-1", BOMRef: "pkg:npm/foo@1.0.0", Rating: rating, ImpactProvenance: ImpactFromCVSSv3},
-		{VulnID: "CVE-2", BOMRef: "", Rating: rating, ImpactProvenance: ImpactFromCVSSv3},
-		{VulnID: "CVE-3", BOMRef: "", Rating: rating, ImpactProvenance: ImpactFromCVSSv3},
+		{VulnID: "CVE-1", BOMRef: "pkg:npm/foo@1.0.0", Rating: rating, ImpactProvenance: ImpactFromCVSSv3, ImpactBasis: owasp.BasisTechnical},
+		{VulnID: "CVE-2", BOMRef: "", Rating: rating, ImpactProvenance: ImpactFromCVSSv3, ImpactBasis: owasp.BasisTechnical},
+		{VulnID: "CVE-3", BOMRef: "", Rating: rating, ImpactProvenance: ImpactFromCVSSv3, ImpactBasis: owasp.BasisTechnical},
 	}); err != nil {
 		t.Fatalf("HandleVulnRatings: %v", err)
 	}
@@ -583,12 +594,12 @@ func TestCycloneDxVexWriter_Close_DeterministicVulnerabilityOrder(t *testing.T) 
 		Severity: cyclonedx.SeverityHigh,
 	}
 	ratings := []VulnRating{
-		{VulnID: "CVE-2024-9999", BOMRef: "pkg:npm/zebra@1.0.0", Rating: rating, ImpactProvenance: ImpactFromCVSSv3},
-		{VulnID: "CVE-2024-0001", BOMRef: "pkg:npm/alpha@1.0.0", Rating: rating, ImpactProvenance: ImpactFromCVSSv3},
-		{VulnID: "CVE-2024-1234", BOMRef: "pkg:npm/foo@1.0.0", Rating: rating, ImpactProvenance: ImpactFromCVSSv3},
-		{VulnID: "CVE-2024-1234", BOMRef: "pkg:npm/bar@2.0.0", Rating: rating, ImpactProvenance: ImpactFromCVSSv3},
-		{VulnID: "CVE-2024-1234", BOMRef: "pkg:npm/baz@3.0.0", Rating: rating, ImpactProvenance: ImpactFromCVSSv3},
-		{VulnID: "CVE-2024-5678", BOMRef: "pkg:npm/qux@4.0.0", Rating: rating, ImpactProvenance: ImpactFromCVSSv3},
+		{VulnID: "CVE-2024-9999", BOMRef: "pkg:npm/zebra@1.0.0", Rating: rating, ImpactProvenance: ImpactFromCVSSv3, ImpactBasis: owasp.BasisTechnical},
+		{VulnID: "CVE-2024-0001", BOMRef: "pkg:npm/alpha@1.0.0", Rating: rating, ImpactProvenance: ImpactFromCVSSv3, ImpactBasis: owasp.BasisTechnical},
+		{VulnID: "CVE-2024-1234", BOMRef: "pkg:npm/foo@1.0.0", Rating: rating, ImpactProvenance: ImpactFromCVSSv3, ImpactBasis: owasp.BasisTechnical},
+		{VulnID: "CVE-2024-1234", BOMRef: "pkg:npm/bar@2.0.0", Rating: rating, ImpactProvenance: ImpactFromCVSSv3, ImpactBasis: owasp.BasisTechnical},
+		{VulnID: "CVE-2024-1234", BOMRef: "pkg:npm/baz@3.0.0", Rating: rating, ImpactProvenance: ImpactFromCVSSv3, ImpactBasis: owasp.BasisTechnical},
+		{VulnID: "CVE-2024-5678", BOMRef: "pkg:npm/qux@4.0.0", Rating: rating, ImpactProvenance: ImpactFromCVSSv3, ImpactBasis: owasp.BasisTechnical},
 	}
 
 	encode := func(rs []VulnRating) *cyclonedx.BOM {
@@ -632,67 +643,86 @@ func TestCycloneDxVexWriter_Close_DeterministicVulnerabilityOrder(t *testing.T) 
 	}
 }
 
-// Each vulnerability carries exactly one vens:impact-provenance property,
-// its rows' provenance, whatever the number of rows merged into it.
-func TestCycloneDxVexWriter_Close_ImpactProvenance(t *testing.T) {
+// Each vulnerability carries exactly two properties, vens:impact-provenance
+// then vens:impact-basis, its rows' values, whatever the number of rows
+// merged into it.
+func TestCycloneDxVexWriter_Close_ImpactMarkers(t *testing.T) {
 	score := 42.0
 	rating := cyclonedx.VulnerabilityRating{Method: cyclonedx.ScoringMethodOWASP, Score: &score, Severity: cyclonedx.SeverityHigh}
 	var buf bytes.Buffer
 	h := NewCycloneDxVexOutputHandler(&buf, "test-uuid", 1, "", cyclonedx.SpecVersion1_6)
 	if err := h.HandleVulnRatings([]VulnRating{
-		{VulnID: "CVE-1", BOMRef: "pkg:npm/a@1", Rating: rating, ImpactProvenance: ImpactFromCVSSv3},
-		{VulnID: "CVE-1", BOMRef: "pkg:npm/b@1", Rating: rating, ImpactProvenance: ImpactFromCVSSv3},
-		{VulnID: "CVE-2", BOMRef: "pkg:npm/a@1", Rating: rating, ImpactProvenance: ImpactFromFallback},
-		{VulnID: "CVE-2", BOMRef: "pkg:npm/c@1", Rating: rating, ImpactProvenance: ImpactFromFallback},
+		{VulnID: "CVE-1", BOMRef: "pkg:npm/a@1", Rating: rating, ImpactProvenance: ImpactFromCVSSv3, ImpactBasis: owasp.BasisTechnical},
+		{VulnID: "CVE-1", BOMRef: "pkg:npm/b@1", Rating: rating, ImpactProvenance: ImpactFromCVSSv3, ImpactBasis: owasp.BasisTechnical},
+		{VulnID: "CVE-2", BOMRef: "pkg:npm/a@1", Rating: rating, ImpactProvenance: ImpactFromFallback, ImpactBasis: owasp.BasisBusiness},
+		{VulnID: "CVE-2", BOMRef: "pkg:npm/c@1", Rating: rating, ImpactProvenance: ImpactFromFallback, ImpactBasis: owasp.BasisBusiness},
 	}); err != nil {
 		t.Fatalf("HandleVulnRatings: %v", err)
 	}
 	if err := h.Close(); err != nil {
 		t.Fatalf("Close: %v", err)
 	}
+	type property struct {
+		Name  string `json:"name"`
+		Value string `json:"value"`
+	}
 	var doc struct {
 		Vulnerabilities []struct {
-			ID         string `json:"id"`
-			Properties []struct {
-				Name  string `json:"name"`
-				Value string `json:"value"`
-			} `json:"properties"`
+			ID         string     `json:"id"`
+			Properties []property `json:"properties"`
 		} `json:"vulnerabilities"`
 	}
 	if err := json.Unmarshal(buf.Bytes(), &doc); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
-	want := map[string]string{"CVE-1": "cvss-v3", "CVE-2": "missing-cvss-v3-fallback"}
+	want := map[string][]property{
+		"CVE-1": {{"vens:impact-provenance", "cvss-v3"}, {"vens:impact-basis", "technical"}},
+		"CVE-2": {{"vens:impact-provenance", "missing-cvss-v3-fallback"}, {"vens:impact-basis", "business"}},
+	}
 	if len(doc.Vulnerabilities) != len(want) {
 		t.Fatalf("got %d vulnerabilities, want %d", len(doc.Vulnerabilities), len(want))
 	}
 	for _, v := range doc.Vulnerabilities {
-		if len(v.Properties) != 1 || v.Properties[0].Name != "vens:impact-provenance" || v.Properties[0].Value != want[v.ID] {
-			t.Errorf("%s: properties %+v, want one vens:impact-provenance %s", v.ID, v.Properties, want[v.ID])
+		if !slices.Equal(v.Properties, want[v.ID]) {
+			t.Errorf("%s: properties %+v, want %+v", v.ID, v.Properties, want[v.ID])
 		}
 	}
 }
 
-// A rating without one of the two provenances, or a CVE whose rows disagree
-// on it, fails the run: no VEX is written short of the marker.
-func TestCycloneDxVexWriter_Close_FailsOnMissingOrConflictingProvenance(t *testing.T) {
+// A rating without one of the two values of a marker, or a CVE whose rows
+// disagree on it, fails the run: no VEX is written short of either marker.
+func TestCycloneDxVexWriter_Close_FailsOnMissingOrConflictingMarkers(t *testing.T) {
 	score := 42.0
 	rating := cyclonedx.VulnerabilityRating{Method: cyclonedx.ScoringMethodOWASP, Score: &score, Severity: cyclonedx.SeverityHigh}
+	marked := func(id, ref, provenance string, basis owasp.Basis) VulnRating {
+		return VulnRating{VulnID: id, BOMRef: ref, Rating: rating, ImpactProvenance: provenance, ImpactBasis: basis}
+	}
 	for name, c := range map[string]struct {
 		ratings []VulnRating
 		want    string
 	}{
-		"missing": {[]VulnRating{
-			{VulnID: "CVE-1", BOMRef: "pkg:npm/a@1", Rating: rating, ImpactProvenance: ImpactFromCVSSv3},
-			{VulnID: "CVE-2", BOMRef: "pkg:npm/a@1", Rating: rating},
+		"provenance missing": {[]VulnRating{
+			marked("CVE-1", "pkg:npm/a@1", ImpactFromCVSSv3, owasp.BasisTechnical),
+			marked("CVE-2", "pkg:npm/a@1", "", owasp.BasisTechnical),
 		}, `cannot emit VEX: CVE-2: impact provenance "" is not cvss-v3 or missing-cvss-v3-fallback`},
-		"off the list": {[]VulnRating{
-			{VulnID: "CVE-1", BOMRef: "pkg:npm/a@1", Rating: rating, ImpactProvenance: "cvss-v4"},
+		"provenance off the list": {[]VulnRating{
+			marked("CVE-1", "pkg:npm/a@1", "cvss-v4", owasp.BasisTechnical),
 		}, `cannot emit VEX: CVE-1: impact provenance "cvss-v4" is not cvss-v3 or missing-cvss-v3-fallback`},
-		"conflicting": {[]VulnRating{
-			{VulnID: "CVE-1", BOMRef: "pkg:npm/a@1", Rating: rating, ImpactProvenance: ImpactFromCVSSv3},
-			{VulnID: "CVE-1", BOMRef: "pkg:npm/b@1", Rating: rating, ImpactProvenance: ImpactFromFallback},
+		"provenance conflicting": {[]VulnRating{
+			marked("CVE-1", "pkg:npm/a@1", ImpactFromCVSSv3, owasp.BasisTechnical),
+			marked("CVE-1", "pkg:npm/b@1", ImpactFromFallback, owasp.BasisTechnical),
 		}, "cannot emit VEX: CVE-1: rows rated with impact provenance cvss-v3 and missing-cvss-v3-fallback"},
+		"basis missing": {[]VulnRating{
+			marked("CVE-1", "pkg:npm/a@1", ImpactFromCVSSv3, owasp.BasisBusiness),
+			marked("CVE-2", "pkg:npm/a@1", ImpactFromCVSSv3, ""),
+		}, `cannot emit VEX: CVE-2: impact basis "" is not technical or business`},
+		"basis off the list": {[]VulnRating{
+			marked("CVE-1", "pkg:npm/a@1", ImpactFromCVSSv3, "max"),
+		}, `cannot emit VEX: CVE-1: impact basis "max" is not technical or business`},
+		"basis conflicting": {[]VulnRating{
+			marked("CVE-1", "pkg:npm/a@1", ImpactFromCVSSv3, owasp.BasisBusiness),
+			marked("CVE-1", "pkg:npm/b@1", ImpactFromCVSSv3, owasp.BasisTechnical),
+		}, "cannot emit VEX: CVE-1: rows rated with impact basis business and technical"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			var buf bytes.Buffer

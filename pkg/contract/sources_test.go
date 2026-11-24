@@ -20,8 +20,9 @@ import (
 	"testing"
 )
 
-// Where each of the 16 levels came from: SL, ED and A are constants and Size
-// is the config's; Loss of confidentiality, integrity and availability are
+// Where each of the 16 levels came from: SL is the worst case, no field
+// declaring the attacking group's skill, ED and A are constants and Size is
+// the config's; Loss of confidentiality, integrity and availability are
 // the CVSS vectors', whatever the answers, the adjustment or the vectors
 // give; Privacy violation takes its floor where the usable v3 vectors give
 // C:N; a question not asked takes the config's level; an answer read,
@@ -31,7 +32,7 @@ func TestSources(t *testing.T) {
 	answered := Answers{M: "possible_reward", O: "some_access_or_resources_required", EE: "easy", ID: []string{"network"},
 		LAC: "identified", FD: "bankruptcy", RD: "minimal_damage", NC: "clear_violation", PV: "thousands"}
 	everyAnswer := map[Factor]Source{
-		SL: SourceConstant, M: SourceAnswer, O: SourceAnswer, S: SourceConfig, ED: SourceConstant, EE: SourceAnswer,
+		SL: SourceWorstCase, M: SourceAnswer, O: SourceAnswer, S: SourceConfig, ED: SourceConstant, EE: SourceAnswer,
 		A: SourceConstant, ID: SourceAnswer, LC: SourceCVSS, LI: SourceCVSS, LAV: SourceCVSS, LAC: SourceAnswer,
 		FD: SourceAnswer, RD: SourceAnswer, NC: SourceAnswer, PV: SourceAnswer,
 	}
@@ -77,11 +78,11 @@ func changed(a Answers, change func(*Answers)) Answers {
 }
 
 func TestSourcesWriteTheirNames(t *testing.T) {
-	got, err := json.Marshal(map[Factor]Source{SL: SourceConstant, O: SourceAdjustment, LC: SourceCVSS, PV: SourceFloor, S: SourceConfig, M: SourceAnswer})
+	got, err := json.Marshal(map[Factor]Source{SL: SourceWorstCase, ED: SourceConstant, O: SourceAdjustment, LC: SourceCVSS, PV: SourceFloor, S: SourceConfig, M: SourceAnswer})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := `{"LC":"cvss","M":"answer","O":"adjustment","PV":"floor","S":"config","SL":"constant"}`; string(got) != want {
+	if want := `{"ED":"constant","LC":"cvss","M":"answer","O":"adjustment","PV":"floor","S":"config","SL":"worst_case"}`; string(got) != want {
 		t.Errorf("%s, want %s", got, want)
 	}
 	if got := Source(0).String(); got != "unknown" {

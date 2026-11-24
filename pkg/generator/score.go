@@ -220,16 +220,16 @@ func (g *Generator) askBatch(ctx context.Context, run *scoringRun, batch []*cve,
 	return nil
 }
 
-// rate computes a CVE's 16 levels and their rating, records them for the run,
-// and returns one rating per row, each with its attestation claim. A vector
-// off the calculator's levels stops the run: the rules' tests keep that from
-// happening.
+// rate computes a CVE's 16 levels and their rating on the deployment's impact
+// basis, records them for the run, and returns one rating per row, each with
+// its attestation claim. A vector off the calculator's levels stops the run:
+// the rules' tests keep that from happening.
 func (g *Generator) rate(ctx context.Context, run *scoringRun, c *cve, a *assessment) ([]outputhandler.VulnRating, error) {
 	levels, err := contract.Compute(g.deployment, c.in, a.answers, a.adjusted)
 	if err != nil {
 		return nil, err
 	}
-	rating, err := levels.Vector.Rate()
+	rating, err := levels.Vector.Rate(g.deployment.ImpactBasis())
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", c.id(), err)
 	}
@@ -262,7 +262,8 @@ func (g *Generator) rate(ctx context.Context, run *scoringRun, c *cve, a *assess
 }
 
 // vulnRating is one row's rating; fallback says the missing-input rule
-// supplied the CVE's three technical impacts, which the VEX marks.
+// supplied the CVE's three technical impacts, which the VEX marks, as it
+// marks the rating's basis.
 func vulnRating(id string, v Vulnerability, r owasp.Rating, fallback bool) outputhandler.VulnRating {
 	source := vuln.Source(id)
 	if v.SourceName != "" {
@@ -284,5 +285,6 @@ func vulnRating(id string, v Vulnerability, r owasp.Rating, fallback bool) outpu
 		},
 		Source:           source,
 		ImpactProvenance: provenance,
+		ImpactBasis:      r.Basis,
 	}
 }

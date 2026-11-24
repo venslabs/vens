@@ -14,6 +14,14 @@
 
 package owasp
 
+// Basis is the impact a rating is read on, written as vens publishes it.
+type Basis string
+
+const (
+	BasisTechnical Basis = "technical"
+	BasisBusiness  Basis = "business"
+)
+
 // OWASP's Step 4, likelihood band by impact band, in lower case; its Note is
 // CycloneDX's info.
 var severities = [3][3]string{
@@ -35,15 +43,21 @@ func band(x float64) int {
 	}
 }
 
-// rate takes the larger of the technical and business impacts (#340). OWASP
-// rates on the business impact when the assessor holds good business
-// information, and vens cannot tell that its business levels are that, so it
-// takes the worse of OWASP's two choices.
+// rate reads the severity and the score on the business impact when basis is
+// BasisBusiness, on the technical impact otherwise. OWASP holds the business
+// impact the more important and rates on it when the assessor has good
+// business impact information; without it, the technical impact is the next
+// best thing (OWASP_Risk_Rating_Methodology.md:142-145, :305-307). Which one
+// holds is the deployment owner's declaration, read from the config, not a
+// judgment of vens's.
 //
 // From integer levels the averages are k/8 and j/4 and the score k*j/32, all
 // exact in float64, so nothing here is rounded and a published score always
-// recomputes from its own vector (#358).
-func rate(likelihood, technical, business float64) (severity string, score float64) {
-	impact := max(technical, business)
+// recomputes from its own vector and basis (#358).
+func rate(likelihood, technical, business float64, basis Basis) (severity string, score float64) {
+	impact := technical
+	if basis == BasisBusiness {
+		impact = business
+	}
 	return severities[band(likelihood)][band(impact)], likelihood * impact
 }

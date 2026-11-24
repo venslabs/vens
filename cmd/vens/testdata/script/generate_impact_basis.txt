@@ -1,0 +1,20 @@
+# Every rating is read on the business impact when config.yaml declares
+# data_subjects, as the quickstart's does, and on the technical impact when
+# it does not, which the load warning says. Each vulnerability of the VEX
+# names its basis in vens:impact-basis, its severity and score recompute
+# from its vector on that basis, and vens enrich copies it.
+exec vens generate --llm=mock --config-file=$QUICKSTART/config.yaml --sbom-serial-number=urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79 $QUICKSTART/reports/python-slim.trivy.json business.cdx.json
+! stderr 'context.data_subjects is not declared'
+vex-vectors business.cdx.json 45
+impact-basis business.cdx.json business
+exec vens enrich --vex business.cdx.json --output business.json $QUICKSTART/reports/python-slim.trivy.json
+impact-basis business.cdx.json business business.json
+
+exec sh -c 'grep -v "^  data_subjects:" "$QUICKSTART/config.yaml" > technical.yaml'
+! grep '^  data_subjects:' technical.yaml
+exec vens generate --llm=mock --config-file=technical.yaml --sbom-serial-number=urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79 $QUICKSTART/reports/python-slim.trivy.json technical.cdx.json
+stderr 'level=WARN msg="context.data_subjects is not declared: .*, and every finding is rated on its technical impact. Declared, it completes the business information OWASP asks for, and every finding is rated on its business impact."'
+vex-vectors technical.cdx.json 45
+impact-basis technical.cdx.json technical
+exec vens enrich --vex technical.cdx.json --output technical.json $QUICKSTART/reports/python-slim.trivy.json
+impact-basis technical.cdx.json technical technical.json

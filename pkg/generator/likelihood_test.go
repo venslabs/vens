@@ -111,7 +111,9 @@ func TestMinimumLikelihood(t *testing.T) {
 	corner.SL = owasp.SkillLevelNoTechnicalSkills
 	t.Logf("Skill level and Size at their lowest, %d and %d: likelihood %.3f", corner.SL, corner.S, likelihood(corner))
 	assert.Equal(t, 3.0, likelihood(corner))
-	rating, err := corner.Rate()
-	require.NoError(t, err)
-	assert.NotEqual(t, "info", rating.Severity, "a MEDIUM likelihood never rates info")
+	for _, basis := range []owasp.Basis{owasp.BasisTechnical, owasp.BasisBusiness} {
+		rating, err := corner.Rate(basis)
+		require.NoError(t, err)
+		assert.NotEqual(t, "info", rating.Severity, "a MEDIUM likelihood never rates info, on the %s impact", basis)
+	}
 }

@@ -350,40 +350,43 @@ func TestGenerator_TemperatureReachesRequest(t *testing.T) {
 	}
 }
 
-// Every published rating recomputes from its own vector: likelihood and the
-// two impacts are the averages of their levels, the impact the larger, the
-// severity OWASP's matrix cell, never info, and the score likelihood ×
-// impact.
+// Every published rating recomputes from its own vector and basis:
+// likelihood and the two impacts are the averages of their levels, the
+// impact the one the basis names, business with data_subjects declared and
+// technical without, the severity OWASP's matrix cell, never info, and the
+// score likelihood × impact.
 func TestGenerator_ScoreRecomputesFromItsVector(t *testing.T) {
-	cfg := testConfig()
-	cfg.Context.ComplianceRequirements = []string{"PCI-DSS"}
-	cfg.Context.Detection = &riskconfig.DetectionCoverage{Network: "logged", Host: "not_logged", Application: "active_in_application"}
-	traceability, subjects := "per_request", "thousands"
-	cfg.Context.Traceability, cfg.Context.DataSubjects = &traceability, &subjects
-	vulns := testVulns(40)
-	for i := range vulns {
-		vulns[i].CVSS = []cvss.Vector{v31("nvd", fmt.Sprintf("AV:N/AC:L/PR:N/UI:N/S:U/C:%s/I:%s/A:%s",
-			[]string{"N", "L", "H"}[i%3], []string{"N", "H"}[i%2], []string{"H", "N", "L", "N"}[i%4]))}
-	}
-	g := newGen(t, Opts{LLM: testutil.NewMockLLM(), Config: cfg})
+	for basis, subjects := range map[string]*string{"business": ptr("thousands"), "technical": nil} {
+		cfg := testConfig()
+		cfg.Context.ComplianceRequirements = []string{"PCI-DSS"}
+		cfg.Context.Detection = &riskconfig.DetectionCoverage{Network: "logged", Host: "not_logged", Application: "active_in_application"}
+		cfg.Context.Traceability, cfg.Context.DataSubjects = ptr("per_request"), subjects
+		vulns := testVulns(40)
+		for i := range vulns {
+			vulns[i].CVSS = []cvss.Vector{v31("nvd", fmt.Sprintf("AV:N/AC:L/PR:N/UI:N/S:U/C:%s/I:%s/A:%s",
+				[]string{"N", "L", "H"}[i%3], []string{"N", "H"}[i%2], []string{"H", "N", "L", "N"}[i%4]))}
+		}
+		g := newGen(t, Opts{LLM: testutil.NewMockLLM(), Config: cfg})
 
-	var emitted []outputhandler.VulnRating
-	require.NoError(t, g.GenerateRiskScore(context.Background(), vulns, collect(&emitted)))
-	require.Len(t, emitted, 40)
-	severities := map[string]bool{}
-	for _, r := range emitted {
-		severity, score := recompute(t, r.Rating.Vector)
-		require.Equal(t, severity, string(r.Rating.Severity), r.Rating.Vector)
-		require.Equal(t, score, *r.Rating.Score, r.Rating.Vector)
-		require.NotEqual(t, "info", severity)
-		severities[severity] = true
+		var emitted []outputhandler.VulnRating
+		require.NoError(t, g.GenerateRiskScore(context.Background(), vulns, collect(&emitted)))
+		require.Len(t, emitted, 40)
+		severities := map[string]bool{}
+		for _, r := range emitted {
+			require.Equal(t, basis, string(r.ImpactBasis), r.VulnID)
+			severity, score := recompute(t, r.Rating.Vector, basis)
+			require.Equal(t, severity, string(r.Rating.Severity), r.Rating.Vector)
+			require.Equal(t, score, *r.Rating.Score, r.Rating.Vector)
+			require.NotEqual(t, "info", severity)
+			severities[severity] = true
+		}
+		require.Greater(t, len(severities), 1, "%s: the mock's answers rate CVEs apart", basis)
 	}
-	require.Greater(t, len(severities), 1, "the mock's answers rate CVEs apart")
 }
 
-// recompute rates a written vector by OWASP's method, impact the larger of
-// the technical and business impacts.
-func recompute(t *testing.T, vector string) (string, float64) {
+// recompute rates a written vector by OWASP's method on the impact basis
+// names, technical or business.
+func recompute(t *testing.T, vector, basis string) (string, float64) {
 	t.Helper()
 	parts := strings.Split(vector, "/")
 	require.Len(t, parts, 16)
@@ -401,7 +404,9 @@ func recompute(t *testing.T, vector string) (string, float64) {
 			business += float64(level)
 		}
 	}
-	likelihood, impact := likelihood/8, max(technical, business)/4
+	impact, ok := map[string]float64{"technical": technical / 4, "business": business / 4}[basis]
+	require.True(t, ok, "basis %q is not technical or business", basis)
+	likelihood /= 8
 	band := func(x float64) int {
 		switch {
 		case x < 3:

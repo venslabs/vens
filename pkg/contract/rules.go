@@ -258,12 +258,14 @@ func Compute(d Deployment, c CVE, a Answers, adjusted *Adjusted) (Levels, error)
 		adjusted = &Adjusted{}
 	}
 	var v owasp.Vector
-	// Every finding is a published CVE a scanner matched: OWASP's worst case
-	// holds for the skill of the group, its discovery and awareness.
-	v.SL = from(s, SL, SourceConstant, owasp.SkillLevelSecurityPenetrationSkills)
+	// No field declares the attacking group's skill: OWASP's worst-case
+	// threat agent.
+	v.SL = from(s, SL, SourceWorstCase, owasp.SkillLevelSecurityPenetrationSkills)
 	v.M = likelihood(s, motive, a.M)
 	v.O = s.opportunity(a.O, adjusted.Opportunity)
 	v.S = from(s, S, SourceConfig, exposures[d.Exposure.Value].size)
+	// Every finding is a published CVE a scanner matched: OWASP's worst case
+	// holds for its discovery and awareness.
 	v.ED = from(s, ED, SourceConstant, owasp.EaseOfDiscoveryAutomatedToolsAvailable)
 	v.EE = likelihood(s, easeOfExploit, a.EE)
 	v.A = from(s, A, SourceConstant, owasp.AwarenessPublicKnowledge)

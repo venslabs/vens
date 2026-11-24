@@ -111,13 +111,15 @@ For true reachability signals, use a dedicated tool (Semgrep Code, Snyk Reachabi
 
 ## 10. Likelihood is never LOW, and the severity never `info`
 
-vens sets Skill level, Ease of discovery and Awareness to 9 for every finding: each is a published CVE that a scanner matched. With those three at 9, the likelihood never falls below 4.25, which is MEDIUM. So `info`, OWASP's Note, never occurs, and a `low` severity needs a LOW impact. With `detection` left out, Intrusion detection is 9 and the floor is 5.25.
+vens sets Skill level to 9 for every finding, OWASP's worst-case threat agent, since no field declares the attackers' skill, and Ease of discovery and Awareness to 9: each finding is a published CVE that a scanner matched. With those three at 9, the likelihood never falls below 4.25, which is MEDIUM. So `info`, OWASP's Note, never occurs, and a `low` severity needs a LOW impact. With `detection` left out, Intrusion detection is 9 and the floor is 5.25.
 
 ---
 
-## 11. Impact is the larger of the technical and the business impact
+## 11. The impact basis follows your declared context
 
-OWASP rates impact on the business impact when the assessor holds good business impact information, and on the technical impact otherwise. vens cannot establish per finding that its business answers are such information: they are a model's reading of your deployment's description. So vens takes the larger of the two, extending to this choice the caution OWASP advises when several attacker groups or business impacts are possible. A business impact lower than the technical impact never lowers a vens severity. On OWASP's own worked example, vens says High where OWASP says Low. If you hold the business information OWASP asks for, re-rate the four business factors of the vector and apply OWASP's choice.
+OWASP rates on the business impact when the assessor has good business impact information, and on the technical impact otherwise. vens takes your declared context as true: with `data_subjects` declared, `config.yaml` holds the business information OWASP asks for, and vens rates every finding on its business impact; without it, on its technical impact. Nothing checks that declaration, and the four business levels are the model's answers on the context you declared, Privacy violation capped by `data_subjects`. On the business basis, a business impact lower than the technical impact lowers the severity, as on OWASP's own worked example, High on the technical impact and Low on the business impact; and the 9s the missing-input rule sets for a CVE with no usable CVSS v3 vector do not reach it.
+
+Each VEX vulnerability names its basis in the `vens:impact-basis` property. The vector does not say which impact the severity and the score were read on, so a tool that recomputes them from the vector alone must read that property, or it can disagree with vens. Dependency-Track 5.1 does not read it.
 
 ---
 

@@ -135,11 +135,16 @@ const (
 	// for Loss of confidentiality; with no usable v3 vector, the worst
 	// level, counted.
 	SourceCVSS
+	// SourceWorstCase: OWASP's worst case for what no config field
+	// declares, the attacking group's skill: Skill level
+	// (OWASP_Risk_Rating_Methodology.md:87-89, :111).
+	SourceWorstCase
 )
 
 var sourceNames = [...]string{
 	SourceAnswer: "answer", SourceConstant: "constant", SourceConfig: "config",
 	SourceFloor: "floor", SourceAdjustment: "adjustment", SourceCVSS: "cvss",
+	SourceWorstCase: "worst_case",
 }
 
 func (s Source) String() string {

@@ -80,7 +80,7 @@ CVE-2026-0915: GDPR and the people whose data it can expose weigh on its impact
     {
       "id": "CVE-XXXX-YYYY",
       "ratings": [{
-        "score": 43.3125,
+        "score": 37.125,
         "severity": "high",
         "method": "OWASP",
         "vector": "SL:9/M:4/O:9/S:9/ED:9/EE:9/A:9/ID:8/LC:2/LI:9/LAV:1/LAC:9/FD:3/RD:5/NC:7/PV:3"

@@ -97,7 +97,7 @@ You will see progress logs as Vens asks the LLM its questions, batch by batch. W
 ```
 INFO Config loaded schema_version=2 project=my-python-api exposure=internet ... undeclared=""
 INFO Processing vulnerabilities count=107
-INFO Scored vulnerability vuln=CVE-... score=43.3125 severity=high vector=SL:9/M:4/O:9/S:9/...
+INFO Scored vulnerability vuln=CVE-... score=37.125 severity=high vector=SL:9/M:4/O:9/S:9/...
 ...
 INFO Scoring run finished rows=107 cves=45 llm_calls=51 asked_again=0 splits=0 calls.M=5 ... calls.adjustment=6 ... failed=false
 ```
@@ -124,7 +124,7 @@ Open `output.vex.json`. It is a CycloneDX 1.6 BOM (1.6 is the default; pass `--c
       "ratings": [
         {
           "method": "OWASP",
-          "score": 43.3125,
+          "score": 37.125,
           "severity": "high",
           "vector": "SL:9/M:4/O:9/S:9/ED:9/EE:9/A:9/ID:8/LC:2/LI:9/LAV:1/LAC:9/FD:3/RD:5/NC:7/PV:3"
         }
@@ -139,7 +139,7 @@ Open `output.vex.json`. It is a CycloneDX 1.6 BOM (1.6 is the default; pass `--c
 
 1. `ratings[0].severity` — `low` / `medium` / `high` / `critical`, from OWASP's matrix of the likelihood and the impact (never `info`: the likelihood is never LOW)
 2. `ratings[0].score` — likelihood × impact on a 0–81 scale, a vens number to sort CVEs within a severity
-3. `ratings[0].vector` — the 16 OWASP factor levels the severity and the score are computed from; see [How vens rates a CVE](../concepts/cvss-vs-owasp.md#how-vens-rates-a-cve)
+3. `ratings[0].vector` — the 16 OWASP factor levels the severity and the score are computed from, on the impact the vulnerability's `vens:impact-basis` property names: `business` here, since this `config.yaml` declares `data_subjects`; see [How vens rates a CVE](../concepts/cvss-vs-owasp.md#how-vens-rates-a-cve)
 
 !!! note "Reasoning"
     The model's answers and reasoning are not written into the VEX file — the VEX stays strictly CycloneDX-compliant. Pass `--attest` for a sidecar whose claims hold one line per question answered, or `--debug-dir` to capture every prompt and response, with `answers.json`; see [`vens generate --debug-dir`](../reference/generate.md#-debug-dir-path).

@@ -11,7 +11,7 @@
 vens enrich --vex VEX_FILE [--output PATH] REPORT_FILE
 ```
 
-`vens enrich` takes a Trivy JSON report and annotates every vulnerability the VEX document scored, adding `Custom.owasp_score`, `Custom.owasp_severity`, `Custom.owasp_vector` and, when the VEX vulnerability carries the `vens:impact-provenance` property, `Custom.owasp_impact_provenance` with its value (`cvss-v3` or `missing-cvss-v3-fallback`, see **[The VEX document](generate.md#the-vex-document)**). Matching is on the vulnerability ID alone, and only ratings whose method is OWASP are read. Trivy's own `Severity` and CVSS fields stay as they are, and nothing else in the report changes.
+`vens enrich` takes a Trivy JSON report and annotates every vulnerability the VEX document scored, adding `Custom.owasp_score`, `Custom.owasp_severity`, `Custom.owasp_vector` and, when the VEX vulnerability carries the `vens:impact-provenance` property, `Custom.owasp_impact_provenance` with its value (`cvss-v3` or `missing-cvss-v3-fallback`), and when it carries `vens:impact-basis`, `Custom.owasp_impact_basis` with its value (`technical` or `business`, the impact the severity and the score are read on); see **[The VEX document](generate.md#the-vex-document)**. Matching is on the vulnerability ID alone, and only ratings whose method is OWASP are read. Trivy's own `Severity` and CVSS fields stay as they are, and nothing else in the report changes.
 
 !!! note "From v0.6.0"
     `owasp_severity` is written from v0.6.0 on. v0.5.0 and earlier don't emit it.
@@ -21,6 +21,7 @@ vens enrich --vex VEX_FILE [--output PATH] REPORT_FILE
   "VulnerabilityID": "CVE-XXXX-YYYY",
   "Severity": "HIGH",
   "Custom": {
+    "owasp_impact_basis": "technical",
     "owasp_impact_provenance": "cvss-v3",
     "owasp_score": 39.1875,
     "owasp_severity": "high",
@@ -29,7 +30,7 @@ vens enrich --vex VEX_FILE [--output PATH] REPORT_FILE
 }
 ```
 
-`Severity` still holds Trivy's value. Gate on `Custom.owasp_severity`, and sort by band rank then `Custom.owasp_score` — sorting on the band sorts strings alphabetically, so order the bands yourself and break ties by the score, likelihood × impact on a 0–81 scale. The band comes from OWASP's matrix, not from the score, so a `high` can score below a `medium`. Keep the rows whose `Custom.owasp_impact_provenance` is `missing-cvss-v3-fallback` in a separate "impact unknown" list, with no order across the two lists: see **[Get your top 10](../guides/prioritize-cves.md#step-4-get-your-top-10)**. If a CVE appears more than once in the VEX, the last OWASP rating wins.
+`Severity` still holds Trivy's value. Gate on `Custom.owasp_severity`, and sort by band rank then `Custom.owasp_score` — sorting on the band sorts strings alphabetically, so order the bands yourself and break ties by the score, likelihood × impact on a 0–81 scale. The band comes from OWASP's matrix, not from the score, so a `high` can score below a `medium`. To recompute the band or the score from `Custom.owasp_vector`, take the impact `Custom.owasp_impact_basis` names: the vector alone does not say which. Keep the rows whose `Custom.owasp_impact_provenance` is `missing-cvss-v3-fallback` in a separate "impact unknown" list, with no order across the two lists: see **[Get your top 10](../guides/prioritize-cves.md#step-4-get-your-top-10)**. If a CVE appears more than once in the VEX, the last OWASP rating wins.
 
 Use it when your downstream tooling reads Trivy JSON directly and does not know how to parse a separate CycloneDX VEX.
 

@@ -21,10 +21,15 @@ import (
 )
 
 func TestVector_Rate(t *testing.T) {
+	type rated struct {
+		severity string
+		score    float64
+	}
 	tests := []struct {
-		name     string
-		vector   Vector
-		expected Rating
+		name                string
+		vector              Vector
+		written             string
+		technical, business rated
 	}{
 		{
 			name: "lowest_levels",
@@ -38,12 +43,11 @@ func TestVector_Rate(t *testing.T) {
 				FD: FinancialDamageLessThanTheCostToFixTheVulnerability, RD: ReputationDamageMinimalDamage,
 				NC: NonComplianceMinorViolation, PV: PrivacyViolationOneIndividual,
 			},
-			// Likelihood 1, impact 1.75: OWASP's Note, written info.
-			expected: Rating{
-				Vector:   "SL:1/M:1/O:0/S:2/ED:1/EE:1/A:1/ID:1/LC:2/LI:1/LAV:1/LAC:1/FD:1/RD:1/NC:2/PV:3",
-				Severity: "info",
-				Score:    1.75,
-			},
+			written: "SL:1/M:1/O:0/S:2/ED:1/EE:1/A:1/ID:1/LC:2/LI:1/LAV:1/LAC:1/FD:1/RD:1/NC:2/PV:3",
+			// Likelihood 1, technical 1.25, business 1.75: OWASP's Note,
+			// written info, on either basis.
+			technical: rated{"info", 1.25},
+			business:  rated{"info", 1.75},
 		},
 		{
 			name: "highest_levels",
@@ -57,11 +61,10 @@ func TestVector_Rate(t *testing.T) {
 				FD: FinancialDamageBankruptcy, RD: ReputationDamageBrandDamage,
 				NC: NonComplianceHighProfileViolation, PV: PrivacyViolationMillionsOfPeople,
 			},
-			expected: Rating{
-				Vector:   "SL:9/M:9/O:9/S:9/ED:9/EE:9/A:9/ID:9/LC:9/LI:9/LAV:9/LAC:9/FD:9/RD:9/NC:7/PV:9",
-				Severity: "critical",
-				Score:    81,
-			},
+			written: "SL:9/M:9/O:9/S:9/ED:9/EE:9/A:9/ID:9/LC:9/LI:9/LAV:9/LAC:9/FD:9/RD:9/NC:7/PV:9",
+			// Likelihood 9, technical 9, business 8.5.
+			technical: rated{"critical", 81},
+			business:  rated{"critical", 76.5},
 		},
 		{
 			name: "mixed_values",
@@ -75,25 +78,40 @@ func TestVector_Rate(t *testing.T) {
 				FD: FinancialDamageLessThanTheCostToFixTheVulnerability, RD: ReputationDamageMinimalDamage,
 				NC: NonComplianceMinorViolation, PV: PrivacyViolationOneIndividual,
 			},
-			// Likelihood 6, technical 4.25 over business 1.75.
-			expected: Rating{
-				Vector:   "SL:5/M:4/O:7/S:6/ED:7/EE:5/A:6/ID:8/LC:2/LI:3/LAV:5/LAC:7/FD:1/RD:1/NC:2/PV:3",
-				Severity: "high",
-				Score:    25.5,
-			},
+			written: "SL:5/M:4/O:7/S:6/ED:7/EE:5/A:6/ID:8/LC:2/LI:3/LAV:5/LAC:7/FD:1/RD:1/NC:2/PV:3",
+			// Likelihood 6, technical 4.25 MEDIUM, business 1.75 LOW.
+			technical: rated{"high", 25.5},
+			business:  rated{"medium", 10.5},
 		},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.vector.Rate()
-			if err != nil {
-				t.Fatalf("Rate() error = %v", err)
-			}
-			if got != tt.expected {
-				t.Errorf("Rate() = %+v, want %+v", got, tt.expected)
-			}
-		})
+		for basis, r := range map[Basis]rated{BasisTechnical: tt.technical, BasisBusiness: tt.business} {
+			t.Run(tt.name+"/"+string(basis), func(t *testing.T) {
+				got, err := tt.vector.Rate(basis)
+				if err != nil {
+					t.Fatalf("Rate(%s) error = %v", basis, err)
+				}
+				if want := (Rating{Vector: tt.written, Severity: r.severity, Score: r.score, Basis: basis}); got != want {
+					t.Errorf("Rate(%s) = %+v, want %+v", basis, got, want)
+				}
+			})
+		}
+	}
+}
+
+// A basis other than the two published gets no rating, not a default.
+func TestVector_RateRefusesAnUnknownBasis(t *testing.T) {
+	v := vectorOf(lowestLevels())
+	for _, basis := range []Basis{"", "max", "Business"} {
+		got, err := v.Rate(basis)
+		want := `owasp: impact basis "` + string(basis) + `" is not technical or business`
+		if err == nil || err.Error() != want {
+			t.Errorf("Rate(%q) error = %v, want %q", basis, err, want)
+		}
+		if got != (Rating{}) {
+			t.Errorf("Rate(%q) wrote %+v", basis, got)
+		}
 	}
 }
 
@@ -132,12 +150,14 @@ func TestVector_RateRefusesLevelsOffTheEnumerations(t *testing.T) {
 			if err := tt.vector.Check(); err == nil || err.Error() != want {
 				t.Errorf("Check() = %v, want %q", err, want)
 			}
-			got, err := tt.vector.Rate()
-			if err == nil || err.Error() != want {
-				t.Errorf("Rate() error = %v, want %q", err, want)
-			}
-			if got != (Rating{}) {
-				t.Errorf("Rate() wrote %+v for a vector it refused", got)
+			for _, basis := range bases {
+				got, err := tt.vector.Rate(basis)
+				if err == nil || err.Error() != want {
+					t.Errorf("Rate(%s) error = %v, want %q", basis, err, want)
+				}
+				if got != (Rating{}) {
+					t.Errorf("Rate(%s) wrote %+v for a vector it refused", basis, got)
+				}
 			}
 		})
 	}
@@ -151,30 +171,33 @@ func randomLevels(rng *rand.Rand) [16]int {
 	return levels
 }
 
-// A consumer can derive the rating from the vector alone: the written vector,
-// read and averaged as the calculator does, then max(T, B) (#340) and OWASP's
-// matrix, gives the published severity and score back.
-func TestVector_RateRecomputesFromTheWrittenVector(t *testing.T) {
+// A consumer can derive the rating from the vector and its basis: the written
+// vector, read and averaged as the calculator does, then the impact the basis
+// names and OWASP's matrix, gives the published severity and score back.
+func TestVector_RateRecomputesFromTheWrittenVectorAndBasis(t *testing.T) {
 	rng := rand.New(rand.NewPCG(310, 340))
 	for range 20_000 {
 		levels := randomLevels(rng)
-		got, err := vectorOf(levels).Rate()
-		if err != nil {
-			t.Fatalf("%s: %v", mirrorVector(levels), err)
-		}
-		parsed, ok := mirrorParse(got.Vector)
-		if !ok || parsed != levels {
-			t.Fatalf("Rate().Vector = %q, the calculator reads %v (ok %t), want %v", got.Vector, parsed, ok, levels)
-		}
-		severity, score, _ := mirrorRate(got.Vector)
-		if got.Severity != severity || got.Score != score {
-			t.Fatalf("%s: Rate() = %s %v, recomputed %s %v", got.Vector, got.Severity, got.Score, severity, score)
+		for _, basis := range bases {
+			got, err := vectorOf(levels).Rate(basis)
+			if err != nil {
+				t.Fatalf("%s: %v", mirrorVector(levels), err)
+			}
+			parsed, ok := mirrorParse(got.Vector)
+			if !ok || parsed != levels {
+				t.Fatalf("Rate().Vector = %q, the calculator reads %v (ok %t), want %v", got.Vector, parsed, ok, levels)
+			}
+			severity, score, ok := mirrorRate(got.Vector, string(got.Basis))
+			if !ok || got.Basis != basis || got.Severity != severity || got.Score != score {
+				t.Fatalf("%s on %s: Rate() = %s %v on %s, recomputed %s %v (ok %t)",
+					got.Vector, basis, got.Severity, got.Score, got.Basis, severity, score, ok)
+			}
 		}
 	}
 }
 
-// Monotone through the vector: raising any one level never lowers the
-// severity or the score.
+// Monotone through the vector, on each basis: raising any one level never
+// lowers the severity or the score.
 func TestVector_RaisingALevelNeverLowersTheRating(t *testing.T) {
 	rng := rand.New(rand.NewPCG(340, 1))
 	for range 500 {
@@ -187,18 +210,20 @@ func TestVector_RaisingALevelNeverLowersTheRating(t *testing.T) {
 			slices.Sort(steps)
 			steps = slices.Compact(steps)
 
-			var prev Rating
-			for k, level := range steps {
-				levels := base
-				levels[i] = level
-				got, err := vectorOf(levels).Rate()
-				if err != nil {
-					t.Fatalf("%s: %v", mirrorVector(levels), err)
+			for _, basis := range bases {
+				var prev Rating
+				for k, level := range steps {
+					levels := base
+					levels[i] = level
+					got, err := vectorOf(levels).Rate(basis)
+					if err != nil {
+						t.Fatalf("%s: %v", mirrorVector(levels), err)
+					}
+					if k > 0 && (severityRank[got.Severity] < severityRank[prev.Severity] || got.Score < prev.Score) {
+						t.Fatalf("%s, %s up to %d lowers the rating: %+v after %+v", basis, f.abbr, level, got, prev)
+					}
+					prev = got
 				}
-				if k > 0 && (severityRank[got.Severity] < severityRank[prev.Severity] || got.Score < prev.Score) {
-					t.Fatalf("%s up to %d lowers the rating: %+v after %+v", f.abbr, level, got, prev)
-				}
-				prev = got
 			}
 		}
 	}

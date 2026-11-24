@@ -41,7 +41,7 @@ Your `config.yaml` fields work in two ways. A field **shown to the model** is co
 | `compliance_requirements` | the Non-compliance question names them | A GDPR violation raises the stakes. |
 | `traceability` | vens reads it alone, for Loss of accountability | An attacker who leaves no trace is worse. |
 | `detection` | vens reads it alone, for Intrusion detection | An attempt nobody records goes unseen. |
-| `data_subjects` | vens reads it alone, to cap Privacy violation | A leak of a hundred people's data is not a leak of millions. |
+| `data_subjects` | vens reads it alone, to cap Privacy violation; declared, every finding is rated on its business impact | A leak of a hundred people's data is not a leak of millions. |
 | `availability_requirement` | vens reads it alone, to pick Loss of availability's column | An outage of a 24/7 service is worse than one of a best-effort tool. |
 | `listener` | shown in every call when `present` or `absent` | A batch job accepts no connection. |
 | `controls.*` | the Ease of exploit question shows five of them | A WAF makes some exploits harder. |
@@ -89,7 +89,7 @@ The meanings in these tables are the words the model is shown with each value.
 
 ## What is in place: traceability, detection, data_subjects
 
-These three fields are optional, but each one left out has a fallback: without `traceability`, Loss of accountability takes its `none` column on every finding; without `detection`, Intrusion detection is 9 on every finding; without `data_subjects`, nothing caps Privacy violation wherever it is asked. vens warns at load, counts each use in the run summary, and `--strict` refuses the run. vens reads them alone and never shows them to the model, so declare what is true across the whole service today, not what a policy requires.
+These three fields are optional, but each one left out has a fallback: without `traceability`, Loss of accountability takes its `none` column on every finding; without `detection`, Intrusion detection is 9 on every finding; without `data_subjects`, nothing caps Privacy violation wherever it is asked, and every finding is rated on its technical impact. vens warns at load, counts each use in the run summary, and `--strict` refuses the run. vens reads them alone and never shows them to the model, so declare what is true across the whole service today, not what a policy requires.
 
 ### `traceability` — does the service record who did what?
 
@@ -123,6 +123,8 @@ Declare the three channels, or leave the key out. `logged` means recorded and no
 | `millions` | 1,000,000 or more |
 
 Count what the service stores, what passes through it, and what it can fetch with its own access. The band caps Privacy violation: the model's answer stands up to it. Nothing is inferred from `data_sensitivity`.
+
+vens takes what you declare as true. With `data_subjects` declared, `config.yaml` holds the business information OWASP asks for, and vens rates every finding on its business impact, as OWASP does when the business is known; left out, on its technical impact. See **[How vens rates a CVE](../concepts/cvss-vs-owasp.md#how-vens-rates-a-cve)**.
 
 ### `listener` — does it accept connections?
 
@@ -246,7 +248,7 @@ context:
 
 ❌ **Declaring what is required instead of what is in place.** `traceability` and `detection` describe what records an attack today. A policy that requires per-user audit logs, or a SIEM bought last quarter, does not make this service's attempts recorded and reviewed. vens applies these fields exactly as declared, and the model never sees them to object.
 
-❌ **Leaving `traceability`, `detection` and `data_subjects` out.** Each one left out takes its fallback ([above](#what-is-in-place-traceability-detection-data_subjects)). Declare the worst case explicitly if that is the truth (`traceability: none`, every channel `not_logged`, `data_subjects: millions`): the levels are the same, without the warning.
+❌ **Leaving `traceability`, `detection` and `data_subjects` out.** Each one left out takes its fallback ([above](#what-is-in-place-traceability-detection-data_subjects)). Declare the worst case explicitly if that is the truth (`traceability: none`, every channel `not_logged`, `data_subjects: millions`): the levels are the same, without the warning, and with `data_subjects` declared every finding is rated on its business impact.
 
 ❌ **Leaving `notes` empty on complex systems.** Every call shows `notes`; empty, the model judges your architecture from the other fields alone.
 

@@ -32,6 +32,7 @@ import (
 	"github.com/venslabs/vens/pkg/contract"
 	"github.com/venslabs/vens/pkg/cvss"
 	"github.com/venslabs/vens/pkg/outputhandler"
+	"github.com/venslabs/vens/pkg/owasp"
 	"github.com/venslabs/vens/pkg/riskconfig"
 )
 
@@ -223,6 +224,27 @@ func TestGenerator_ImpactProvenance(t *testing.T) {
 			want = outputhandler.ImpactFromFallback
 		}
 		assert.Equal(t, want, r.ImpactProvenance, "%s on %s", r.VulnID, r.BOMRef)
+	}
+}
+
+// Every row's rating says the impact it is read on, the same for every CVE of
+// the run: business when the config declares data_subjects, none included,
+// technical when it does not, whatever the CVE's impact provenance.
+func TestGenerator_ImpactBasis(t *testing.T) {
+	vulns := []Vulnerability{
+		{VulnID: "CVE-2024-0001", PkgName: "a", Description: "d", BOMRef: "a1", CVSS: []cvss.Vector{v31("nvd", noImpact)}},
+		{VulnID: "CVE-2024-0001", PkgName: "b", Description: "d", BOMRef: "a2", CVSS: []cvss.Vector{v31("nvd", noImpact)}},
+		{VulnID: "CVE-2024-0002", PkgName: "a", Description: "d", BOMRef: "b1"},
+	}
+	for want, subjects := range map[owasp.Basis]*string{owasp.BasisBusiness: ptr("none"), owasp.BasisTechnical: nil} {
+		cfg := testConfig()
+		cfg.Context.DataSubjects = subjects
+		var emitted []outputhandler.VulnRating
+		require.NoError(t, newGen(t, Opts{LLM: &fakeLLM{}, Config: cfg}).GenerateRiskScore(context.Background(), vulns, collect(&emitted)))
+		require.Len(t, emitted, len(vulns))
+		for _, r := range emitted {
+			assert.Equal(t, want, r.ImpactBasis, "%s on %s", r.VulnID, r.BOMRef)
+		}
 	}
 }
 

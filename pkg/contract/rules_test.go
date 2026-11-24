@@ -139,7 +139,7 @@ func walk(t *testing.T) (reached map[string]map[int]bool, inputs map[string]int)
 	sets := owaspLevelSets(t)
 	add := func(factor string, d Deployment, c CVE, a Answers, adjusted *Adjusted) {
 		l := computeFor(t, d, c, a, adjusted)
-		rating, err := l.Vector.Rate()
+		rating, err := l.Vector.Rate(d.ImpactBasis())
 		if err != nil {
 			t.Fatalf("the calculator refuses %+v: %v", l.Vector, err)
 		}

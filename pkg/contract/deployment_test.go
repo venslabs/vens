@@ -17,7 +17,29 @@ package contract
 import (
 	"strings"
 	"testing"
+
+	"github.com/venslabs/vens/pkg/owasp"
 )
+
+// data_subjects alone sets the basis: any declared band, none included, is
+// business; undeclared is technical, whatever else is declared, frameworks
+// included.
+func TestImpactBasisFollowsDataSubjects(t *testing.T) {
+	for _, band := range ids(privacyViolation)[:5] {
+		d := base()
+		d.DataSubjects = ptr(band)
+		if got := d.ImpactBasis(); got != owasp.BasisBusiness {
+			t.Errorf("data_subjects %s: basis %s, want business", band, got)
+		}
+	}
+	undeclared := declared()
+	undeclared.DataSubjects = nil
+	for _, d := range []Deployment{base(), undeclared} {
+		if got := d.ImpactBasis(); got != owasp.BasisTechnical {
+			t.Errorf("%+v: basis %s, want technical", d, got)
+		}
+	}
+}
 
 func TestDeploymentCheckAcceptsWhatTheConfigAllows(t *testing.T) {
 	for _, d := range []Deployment{base(), declared()} {

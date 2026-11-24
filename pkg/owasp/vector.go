@@ -53,6 +53,9 @@ type Rating struct {
 	// Score is likelihood × impact, a vens extension: OWASP's method stops at
 	// the severity.
 	Score float64
+	// Basis is the impact Severity and Score are read on: the vector alone
+	// does not say which.
+	Basis Basis
 }
 
 // Check returns an error naming every level of v that is not one of its
@@ -90,20 +93,25 @@ func offLevel[L ~int](abbr string, level L, levels []L) []string {
 }
 
 // Rate checks v and, once every level has passed, writes the vector and rates
-// it: likelihood, technical and business impact are the calculator's averages
-// of their levels. A vector that fails the check gets no rating.
-func (v Vector) Rate() (Rating, error) {
+// it on the impact basis names: likelihood, technical and business impact are
+// the calculator's averages of their levels. A vector that fails the check,
+// or a basis other than BasisTechnical and BasisBusiness, gets no rating.
+func (v Vector) Rate(basis Basis) (Rating, error) {
 	if err := v.Check(); err != nil {
 		return Rating{}, err
+	}
+	if basis != BasisTechnical && basis != BasisBusiness {
+		return Rating{}, fmt.Errorf("owasp: impact basis %q is not %s or %s", basis, BasisTechnical, BasisBusiness)
 	}
 	likelihood := int(v.SL) + int(v.M) + int(v.O) + int(v.S) + int(v.ED) + int(v.EE) + int(v.A) + int(v.ID)
 	technical := int(v.LC) + int(v.LI) + int(v.LAV) + int(v.LAC)
 	business := int(v.FD) + int(v.RD) + int(v.NC) + int(v.PV)
-	severity, score := rate(float64(likelihood)/8, float64(technical)/4, float64(business)/4)
+	severity, score := rate(float64(likelihood)/8, float64(technical)/4, float64(business)/4, basis)
 	return Rating{
 		Vector: fmt.Sprintf("SL:%d/M:%d/O:%d/S:%d/ED:%d/EE:%d/A:%d/ID:%d/LC:%d/LI:%d/LAV:%d/LAC:%d/FD:%d/RD:%d/NC:%d/PV:%d",
 			v.SL, v.M, v.O, v.S, v.ED, v.EE, v.A, v.ID, v.LC, v.LI, v.LAV, v.LAC, v.FD, v.RD, v.NC, v.PV),
 		Severity: severity,
 		Score:    score,
+		Basis:    basis,
 	}, nil
 }

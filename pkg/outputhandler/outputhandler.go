@@ -18,6 +18,7 @@ package outputhandler
 
 import (
 	"github.com/CycloneDX/cyclonedx-go"
+	"github.com/venslabs/vens/pkg/owasp"
 )
 
 type OutputHandler interface {
@@ -38,6 +39,11 @@ const (
 	ImpactFromFallback = "missing-cvss-v3-fallback"
 )
 
+// ImpactBasisProperty names the property each VEX vulnerability carries once:
+// the impact its severity and score are read on, owasp.BasisTechnical or
+// owasp.BasisBusiness. The vector alone does not say which.
+const ImpactBasisProperty = "vens:impact-basis"
+
 // VulnRating carries a single CycloneDX rating for one vulnerability ID.
 type VulnRating struct {
 	VulnID string
@@ -47,4 +53,7 @@ type VulnRating struct {
 	// ImpactProvenance is ImpactFromCVSSv3 or ImpactFromFallback, the same on
 	// every row of a vulnerability ID.
 	ImpactProvenance string
+	// ImpactBasis is the impact Rating is read on, the same on every row of a
+	// vulnerability ID.
+	ImpactBasis owasp.Basis
 }

@@ -170,7 +170,9 @@ New in v0.7.0. How many distinct people's personal data this service can read: w
 
 vens reads this field alone; no call sends it. The Privacy violation question asks the model for the band of people whose data an exploit could disclose, and the declared band caps that answer. With `none` or `one_individual`, Privacy violation is 3 and the question is not asked; so it is for a CVE whose usable CVSS v3 vectors give `C:N` (see [`data_sensitivity`](#contextdata_sensitivity)). A flagged CVE's adjustment asks confidentiality again from the flag's evidence, and `not_affected` lowers Privacy violation to 3.
 
-Left out, nothing caps the model's answer: each CVE asked Privacy violation adds one to the `data_subjects_missing` counter, vens warns at load (W5), and `--strict` refuses the run.
+It also sets the impact every finding is rated on. vens takes the declared context as true: with `data_subjects` declared, `config.yaml` holds the business information OWASP asks for, since `business_criticality` is required and `compliance_requirements` left out means no framework applies, so vens rates every finding on its business impact, whatever band is declared. Each VEX vulnerability names the basis in its `vens:impact-basis` property (see **[The VEX document](generate.md#the-vex-document)**).
+
+Left out, nothing caps the model's answer and every finding is rated on its technical impact: each CVE asked Privacy violation adds one to the `data_subjects_missing` counter, vens warns at load (W5), and `--strict` refuses the run.
 
 ### `context.detection`
 
@@ -401,7 +403,7 @@ context.detection is not declared: every channel counts as not logged, so Intrus
 **W5**: `data_subjects` left out.
 
 ```text
-context.data_subjects is not declared: Privacy violation has no cap, so the model's band stands wherever Privacy violation is asked.
+context.data_subjects is not declared: Privacy violation has no cap, so the model's band stands wherever Privacy violation is asked, and every finding is rated on its technical impact. Declared, it completes the business information OWASP asks for, and every finding is rated on its business impact.
 ```
 
 Nothing warns when `listener` is left out.
@@ -486,11 +488,11 @@ What each schema-1 key does once `schema_version: 2` is added and nothing else:
 | `controls.waf`, `ddos_protection`, `segmentation`, `zero_trust`, `antivirus` | shown with their scope to the Ease of exploit question | nothing |
 | `controls.ids`, `siem`, `edr` | move no score; W2 while `detection` is left out | declare `detection`, channel by channel |
 | `listener` (new) | left out, reads `unknown` and is not shown | `present` or `absent` |
-| `data_subjects` (new) | left out, nothing caps Privacy violation; W5 | declare the band |
+| `data_subjects` (new) | left out, nothing caps Privacy violation and every finding is rated on its technical impact; W5 | declare the band |
 | `detection` (new) | left out, Intrusion detection is 9 on every finding; W2 or W4 | declare the three channels |
 | `traceability` (new) | left out, Loss of accountability takes the `none` column, 7 or 9; W1 or W3 | declare it |
 
-Declaring the worst case (`traceability: none`, every channel `not_logged`, `data_subjects: millions`) gives the same levels as leaving the field out, without the warning or the counter, and passes the config check of `--strict`.
+Declaring the worst case (`traceability: none`, every channel `not_logged`, `data_subjects: millions`) gives the same levels as leaving the field out, without the warning or the counter, and passes the config check of `--strict`. Declaring `data_subjects` also moves every rating from the technical to the business impact.
 
 Expect ratings to change with v0.7.0, whatever the file declares: see **[CVSS vs OWASP contextual](../concepts/cvss-vs-owasp.md#what-changed-in-v070)**.
 

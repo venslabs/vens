@@ -94,7 +94,7 @@ Output is a [CycloneDX VEX](https://cyclonedx.org/capabilities/vex/) document; e
 }
 ```
 
-The vector holds the 16 OWASP levels; the severity and the score follow from it. The model's answers and reasoning are captured with the prompts and replies when you pass `--debug-dir <path>`, with `answers.json` giving each answer and the level vens read from it. They are intentionally not embedded in the VEX file to keep the document strictly CycloneDX-compliant. For a durable, auditable record of how each CVE was scored, pass `--attest` to also write a CycloneDX attestation next to the VEX.
+The vector holds the 16 OWASP levels; the severity and the score follow from it, on the impact each vulnerability's `vens:impact-basis` property names: `business` when `config.yaml` declares `data_subjects`, `technical` when it does not. The model's answers and reasoning are captured with the prompts and replies when you pass `--debug-dir <path>`, with `answers.json` giving each answer and the level vens read from it. They are intentionally not embedded in the VEX file to keep the document strictly CycloneDX-compliant. For a durable, auditable record of how each CVE was scored, pass `--attest` to also write a CycloneDX attestation next to the VEX.
 
 ## Configuration
 

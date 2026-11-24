@@ -111,6 +111,7 @@ func TestScript(t *testing.T) {
 			"vex-vectors":   vexVectorsCmd,
 			"cvss-impacts":  cvssImpactsCmd,
 			"impact-marker": impactMarkerCmd,
+			"impact-basis":  impactBasisCmd,
 			"gen-ec-key":    genECKeyCmd,
 			"jsf-verify":    jsfVerifyCmd,
 		},
@@ -280,11 +281,8 @@ func impactMarkerCmd(ts *testscript.TestScript, neg bool, args []string) {
 func checkImpactMarker(vexData, answersData, enrichedData []byte) error {
 	var vex struct {
 		Vulnerabilities []struct {
-			ID         string `json:"id"`
-			Properties []struct {
-				Name  string `json:"name"`
-				Value string `json:"value"`
-			} `json:"properties"`
+			ID         string        `json:"id"`
+			Properties []vexProperty `json:"properties"`
 		} `json:"vulnerabilities"`
 	}
 	var answers struct {
@@ -313,7 +311,7 @@ func checkImpactMarker(vexData, answersData, enrichedData []byte) error {
 		if counted {
 			want = "missing-cvss-v3-fallback"
 		}
-		if len(v.Properties) != 1 || v.Properties[0].Name != "vens:impact-provenance" || v.Properties[0].Value != want {
+		if got, ok := oneProperty(v.Properties, "vens:impact-provenance"); !ok || got != want {
 			return fmt.Errorf("%s: properties %+v, want one vens:impact-provenance %s", v.ID, v.Properties, want)
 		}
 		marked[v.ID] = want
@@ -322,7 +320,70 @@ func checkImpactMarker(vexData, answersData, enrichedData []byte) error {
 	if len(marked) != len(fallback) || !seen[true] || !seen[false] {
 		return fmt.Errorf("%d CVEs marked of %d in answers.json, values seen %v: want every CVE, both values", len(marked), len(fallback), seen)
 	}
-	if len(enrichedData) == 0 {
+	return checkEnriched(enrichedData, "owasp_impact_provenance", func(id string) string { return marked[id] })
+}
+
+// impactBasisCmd checks the VEX's vens:impact-basis: every vulnerability
+// carries two properties, its impact provenance and its impact basis, the
+// basis the second argument names, and each row of the enriched report, if
+// given, carries it.
+func impactBasisCmd(ts *testscript.TestScript, neg bool, args []string) {
+	if neg || (len(args) != 2 && len(args) != 3) || (args[1] != "technical" && args[1] != "business") {
+		ts.Fatalf("usage: impact-basis vex.json technical|business [enriched.json]")
+	}
+	enriched := ""
+	if len(args) == 3 {
+		enriched = ts.ReadFile(args[2])
+	}
+	ts.Check(checkImpactBasis([]byte(ts.ReadFile(args[0])), args[1], []byte(enriched)))
+}
+
+func checkImpactBasis(vexData []byte, basis string, enrichedData []byte) error {
+	var vex struct {
+		Vulnerabilities []struct {
+			ID         string        `json:"id"`
+			Properties []vexProperty `json:"properties"`
+		} `json:"vulnerabilities"`
+	}
+	if err := json.Unmarshal(vexData, &vex); err != nil {
+		return err
+	}
+	if len(vex.Vulnerabilities) == 0 {
+		return fmt.Errorf("the VEX holds no vulnerability")
+	}
+	for _, v := range vex.Vulnerabilities {
+		_, provenance := oneProperty(v.Properties, "vens:impact-provenance")
+		if got, ok := oneProperty(v.Properties, "vens:impact-basis"); !ok || got != basis || !provenance || len(v.Properties) != 2 {
+			return fmt.Errorf("%s: properties %+v, want vens:impact-provenance and vens:impact-basis %s", v.ID, v.Properties, basis)
+		}
+	}
+	return checkEnriched(enrichedData, "owasp_impact_basis", func(string) string { return basis })
+}
+
+type vexProperty struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
+// oneProperty is the value of the one property named name; false when there
+// is none, or more than one.
+func oneProperty(properties []vexProperty, name string) (string, bool) {
+	var values []string
+	for _, p := range properties {
+		if p.Name == name {
+			values = append(values, p.Value)
+		}
+	}
+	if len(values) != 1 {
+		return "", false
+	}
+	return values[0], true
+}
+
+// checkEnriched checks that each row of an enriched report, if given, carries
+// under Custom's key the value want gives its CVE.
+func checkEnriched(data []byte, key string, want func(id string) string) error {
+	if len(data) == 0 {
 		return nil
 	}
 	var report struct {
@@ -333,13 +394,13 @@ func checkImpactMarker(vexData, answersData, enrichedData []byte) error {
 			} `json:"Vulnerabilities"`
 		} `json:"Results"`
 	}
-	if err := json.Unmarshal(enrichedData, &report); err != nil {
+	if err := json.Unmarshal(data, &report); err != nil {
 		return err
 	}
 	for _, r := range report.Results {
 		for _, row := range r.Vulnerabilities {
-			if got := row.Custom["owasp_impact_provenance"]; got != marked[row.VulnerabilityID] {
-				return fmt.Errorf("enriched %s: owasp_impact_provenance %v, want %s", row.VulnerabilityID, got, marked[row.VulnerabilityID])
+			if got := row.Custom[key]; got != want(row.VulnerabilityID) {
+				return fmt.Errorf("enriched %s: %s %v, want %s", row.VulnerabilityID, key, got, want(row.VulnerabilityID))
 			}
 		}
 	}
@@ -352,7 +413,8 @@ var owaspVector = regexp.MustCompile(`^SL:\d/M:\d/O:\d/S:\d/ED:\d/EE:\d/A:\d/ID:
 // vexVectorsCmd checks a VEX's every vulnerability: one OWASP rating, its
 // vector on the calculator's pattern with each level one the rules can give,
 // every one of which the calculator's JAR scored, and its severity and score
-// recomputed from the vector alone by OWASP's matrix on the larger impact.
+// recomputed from the vector by OWASP's matrix on the impact its
+// vens:impact-basis names.
 func vexVectorsCmd(ts *testscript.TestScript, neg bool, args []string) {
 	if len(args) != 2 {
 		ts.Fatalf("usage: vex-vectors vex.json count")
@@ -380,6 +442,7 @@ func checkVEXVectors(data []byte, count int, sets [16][]int) error {
 				Severity string  `json:"severity"`
 				Score    float64 `json:"score"`
 			} `json:"ratings"`
+			Properties []vexProperty `json:"properties"`
 		} `json:"vulnerabilities"`
 	}
 	if err := json.Unmarshal(data, &vex); err != nil {
@@ -411,7 +474,12 @@ func checkVEXVectors(data []byte, count int, sets [16][]int) error {
 				sums[2] += float64(level)
 			}
 		}
-		severity, score := owaspRate(sums[0]/8, max(sums[1], sums[2])/4)
+		basis, _ := oneProperty(v.Properties, "vens:impact-basis")
+		impact, ok := map[string]float64{"technical": sums[1] / 4, "business": sums[2] / 4}[basis]
+		if !ok {
+			return fmt.Errorf("%s: properties %+v, want one vens:impact-basis, technical or business", v.ID, v.Properties)
+		}
+		severity, score := owaspRate(sums[0]/8, impact)
 		if r.Severity != severity || r.Score != score {
 			return fmt.Errorf("%s: %s rated %s %v, its vector rates %s %v", v.ID, r.Vector, r.Severity, r.Score, severity, score)
 		}

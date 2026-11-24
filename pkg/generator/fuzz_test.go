@@ -227,7 +227,7 @@ func (h fuzzRun) levels(t *testing.T, c *cve, answers contract.Answers, adjusted
 	t.Helper()
 	l, err := contract.Compute(h.d, c.in, answers, adjusted)
 	require.NoError(t, err)
-	_, err = l.Vector.Rate()
+	_, err = l.Vector.Rate(h.d.ImpactBasis())
 	require.NoError(t, err)
 	return l
 }

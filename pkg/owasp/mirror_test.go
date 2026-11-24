@@ -172,14 +172,23 @@ var owaspMatrix = [3][3]string{
 	{"Medium", "High", "Critical"},
 }
 
-// The published severity and score recomputed from a written vector alone.
-func mirrorRate(vector string) (severity string, score float64, ok bool) {
+// The published severity and score recomputed from a written vector and the
+// impact basis published beside it, technical or business.
+func mirrorRate(vector, basis string) (severity string, score float64, ok bool) {
 	levels, ok := mirrorParse(vector)
 	if !ok {
 		return "", 0, false
 	}
 	likelihood, technical, business := mirrorScores(levels)
-	impact := max(technical, business)
+	var impact float64
+	switch basis {
+	case "technical":
+		impact = technical
+	case "business":
+		impact = business
+	default:
+		return "", 0, false
+	}
 	severity = strings.ToLower(owaspMatrix[mirrorBand(likelihood)][mirrorBand(impact)])
 	if severity == "note" {
 		severity = "info"
@@ -390,6 +399,10 @@ func addConst(t *testing.T, fset *token.FileSet, consts map[string]map[string]in
 		t.Fatalf("%s: declare each level as `Name Type = digit`", fset.Position(vs.Pos()))
 	}
 	lit, ok := vs.Values[0].(*ast.BasicLit)
+	if ok && lit.Kind == token.STRING {
+		// A Basis: every factor's type is an int, so no string is a level.
+		return
+	}
 	if !ok || lit.Kind != token.INT {
 		t.Fatalf("%s: a level is an integer literal", fset.Position(vs.Pos()))
 	}

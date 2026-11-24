@@ -427,10 +427,10 @@ func TestEnrichReport_SeverityDeleteBranch(t *testing.T) {
 	assert.Equal(t, score, customMap["owasp_score"])
 }
 
-// The VEX's vens:impact-provenance property is copied, as written, next to
-// the rating it qualifies; a VEX without it leaves no key, a stale one
-// cleared.
-func TestEnrichReport_ImpactProvenance(t *testing.T) {
+// The VEX's vens:impact-provenance and vens:impact-basis properties are
+// copied, as written, next to the rating they qualify; a VEX without one
+// leaves no key, a stale one cleared.
+func TestEnrichReport_ImpactMarkers(t *testing.T) {
 	score := 12.0
 	rated := func(id string, props ...cdx.Property) cdx.Vulnerability {
 		v := cdx.Vulnerability{ID: id, Ratings: &[]cdx.VulnerabilityRating{{Method: cdx.ScoringMethodOWASP, Score: &score}}}
@@ -440,15 +440,17 @@ func TestEnrichReport_ImpactProvenance(t *testing.T) {
 		return v
 	}
 	vexData, _ := json.Marshal(cdx.BOM{SpecVersion: cdx.SpecVersion1_6, Vulnerabilities: &[]cdx.Vulnerability{
-		rated("CVE-1", cdx.Property{Name: "vens:impact-provenance", Value: "cvss-v3"}),
-		rated("CVE-2", cdx.Property{Name: "other", Value: "x"}, cdx.Property{Name: "vens:impact-provenance", Value: "missing-cvss-v3-fallback"}),
+		rated("CVE-1", cdx.Property{Name: "vens:impact-provenance", Value: "cvss-v3"}, cdx.Property{Name: "vens:impact-basis", Value: "technical"}),
+		rated("CVE-2", cdx.Property{Name: "other", Value: "x"}, cdx.Property{Name: "vens:impact-provenance", Value: "missing-cvss-v3-fallback"},
+			cdx.Property{Name: "vens:impact-basis", Value: "business"}),
 		rated("CVE-3"),
 	}})
 	row := func(id string, custom map[string]interface{}) trivytypes.DetectedVulnerability {
 		return trivytypes.DetectedVulnerability{VulnerabilityID: id, PkgName: "lib", Custom: custom}
 	}
 	reportData, _ := json.Marshal(trivytypes.Report{Results: trivytypes.Results{{Target: "t", Vulnerabilities: []trivytypes.DetectedVulnerability{
-		row("CVE-1", nil), row("CVE-2", nil), row("CVE-3", map[string]interface{}{"owasp_impact_provenance": "cvss-v3"}),
+		row("CVE-1", nil), row("CVE-2", nil),
+		row("CVE-3", map[string]interface{}{"owasp_impact_provenance": "cvss-v3", "owasp_impact_basis": "technical"}),
 	}}}})
 
 	enricher, err := New(vexData)
@@ -460,6 +462,9 @@ func TestEnrichReport_ImpactProvenance(t *testing.T) {
 		return enrichedReport.Results[0].Vulnerabilities[i].Custom.(map[string]interface{})
 	}
 	assert.Equal(t, "cvss-v3", custom(0)["owasp_impact_provenance"])
+	assert.Equal(t, "technical", custom(0)["owasp_impact_basis"])
 	assert.Equal(t, "missing-cvss-v3-fallback", custom(1)["owasp_impact_provenance"])
+	assert.Equal(t, "business", custom(1)["owasp_impact_basis"])
 	assert.NotContains(t, custom(2), "owasp_impact_provenance")
+	assert.NotContains(t, custom(2), "owasp_impact_basis")
 }

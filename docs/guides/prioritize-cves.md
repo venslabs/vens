@@ -122,9 +122,11 @@ jq '[.vulnerabilities[] | {
 
 A VEX from an older vens carries no marker; the filter fails on it instead of dropping the finding.
 
-A consumer implementing vens prioritisation must present separate lists: impact-assessed findings, and "impact unknown — manual triage required." Findings marked `missing-cvss-v3-fallback` belong in the latter. The lists have no cross-list urgency order. Unknown-impact findings retain their numerical ratings, worst-case severity, gate contributions and totals; their identifiers order presentation only. Legitimately vector-derived maximum-impact values remain impact-assessed.
+A consumer implementing vens prioritisation must present separate lists: impact-assessed findings, and "impact unknown — manual triage required." Findings marked `missing-cvss-v3-fallback` belong in the latter. The lists have no cross-list urgency order. Unknown-impact findings retain their numerical ratings, severity (the worst case on the technical impact basis), gate contributions and totals; their identifiers order presentation only. Legitimately vector-derived maximum-impact values remain impact-assessed.
 
 Among impact-assessed findings, priority is matrix severity descending, then L×I descending, then published vulnerability identifier ascending by UTF-8 bytes; equal severity and product mean equal assessed urgency, and the identifier orders presentation only. The severity comes from OWASP's matrix, not from the score, so a `high` can score below a `medium`. The impact levels the missing-input rule supplies are fail-safe gate values, not evidence of relative impact or urgency: a fallback CVE's `critical` says its impact is unknown, not that it outranks an assessed one.
+
+Each vulnerability also names, in its `vens:impact-basis` property, the impact its severity and score are read on, the same for the whole run: `business` here, the `config.yaml` above declaring `data_subjects`, and `technical` for a config that does not (see **[How vens rates a CVE](../concepts/cvss-vs-owasp.md#how-vens-rates-a-cve)**). On the business basis, the 9s the missing-input rule sets do not reach the severity.
 
 Example output (illustrative):
 
@@ -150,8 +152,8 @@ Example output (illustrative):
     {
       "id": "CVE-XXXX-WWWW",
       "impact": "missing-cvss-v3-fallback",
-      "score": 74.25,
-      "severity": "critical",
+      "score": 35.0625,
+      "severity": "high",
       "vector": "SL:9/M:4/O:9/S:9/ED:9/EE:9/A:9/ID:8/LC:9/LI:9/LAV:9/LAC:9/FD:3/RD:5/NC:2/PV:7"
     }
   ]
@@ -184,7 +186,7 @@ jq '.Results[]?.Vulnerabilities[]? | {VulnerabilityID, Severity, owasp_severity:
 !!! note "From v0.6.0"
     `owasp_severity` is written from v0.6.0 on. v0.5.0 and earlier don't emit it.
 
-**Dependency-Track 5.1+.** It picks up the OWASP rating from the VEX and shows it on each finding. It reads neither the `vens:impact-provenance` property nor the order above, so it cannot keep the two lists apart. See [Send the scores to Dependency-Track](dependency-track.md).
+**Dependency-Track 5.1+.** It picks up the OWASP rating from the VEX and shows it on each finding. It reads neither the `vens:impact-provenance` and `vens:impact-basis` properties nor the order above, so it cannot keep the two lists apart. See [Send the scores to Dependency-Track](dependency-track.md).
 
 !!! note
     Vens writes ratings only, never a `not_affected` state, so there is nothing for a scanner to suppress. To hide CVEs below a contextual threshold, filter the VEX with `jq` as shown in [Put it in CI](#put-it-in-ci), or drop low-score entries in your dashboard.

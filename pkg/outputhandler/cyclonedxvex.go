@@ -24,6 +24,7 @@ import (
 	"github.com/CycloneDX/cyclonedx-go"
 	"github.com/google/uuid"
 	"github.com/venslabs/vens/cmd/vens/version"
+	"github.com/venslabs/vens/pkg/owasp"
 )
 
 // DefaultSpecVersion is the CycloneDX spec version emitted when the caller does
@@ -154,11 +155,14 @@ func (c *cycloneDxVexWriter) Close() error {
 		}
 
 		vulnMap[g.VulnID] = &cyclonedx.Vulnerability{
-			ID:         g.VulnID,
-			Source:     g.Source,
-			Ratings:    &[]cyclonedx.VulnerabilityRating{g.Rating},
-			Affects:    &[]cyclonedx.Affects{{Ref: bomLink}},
-			Properties: &[]cyclonedx.Property{{Name: ImpactProvenanceProperty, Value: g.ImpactProvenance}},
+			ID:      g.VulnID,
+			Source:  g.Source,
+			Ratings: &[]cyclonedx.VulnerabilityRating{g.Rating},
+			Affects: &[]cyclonedx.Affects{{Ref: bomLink}},
+			Properties: &[]cyclonedx.Property{
+				{Name: ImpactProvenanceProperty, Value: g.ImpactProvenance},
+				{Name: ImpactBasisProperty, Value: string(g.ImpactBasis)},
+			},
 		}
 		affectsSet[g.VulnID] = map[string]bool{bomLink: true}
 	}
@@ -166,7 +170,7 @@ func (c *cycloneDxVexWriter) Close() error {
 	if err := UnreferencedError("cannot emit VEX", unreferenced); err != nil {
 		return err
 	}
-	if err := provenanceError("cannot emit VEX", c.r); err != nil {
+	if err := markerError("cannot emit VEX", c.r); err != nil {
 		return err
 	}
 
@@ -213,25 +217,41 @@ func jsonSchemaFor(v cyclonedx.SpecVersion) string {
 	}
 }
 
-// provenanceError names, after prefix, each vulnerability a rating gives no
-// impact provenance vens writes, or whose rows give two; nil when each one
-// has exactly one. Without it a consumer cannot tell an impact read from the
-// CVSS v3 vectors from the missing-input rule's worst case, so Close writes
-// no VEX, as for a missing component.
-func provenanceError(prefix string, ratings []VulnRating) error {
-	first := map[string]string{}
+// markers are the properties each VEX vulnerability carries once: the values
+// vens writes for each, and the rating field it is read from.
+var markers = []struct {
+	name   string
+	values []string
+	of     func(VulnRating) string
+}{
+	{"impact provenance", []string{ImpactFromCVSSv3, ImpactFromFallback},
+		func(g VulnRating) string { return g.ImpactProvenance }},
+	{"impact basis", []string{string(owasp.BasisTechnical), string(owasp.BasisBusiness)},
+		func(g VulnRating) string { return string(g.ImpactBasis) }},
+}
+
+// markerError names, after prefix, each vulnerability a rating gives no value
+// vens writes for a marker, or whose rows give two; nil when each one has
+// exactly one of each. Without the provenance a consumer cannot tell an
+// impact read from the CVSS v3 vectors from the missing-input rule's worst
+// case, and without the basis it cannot recompute the severity from the
+// vector, so Close writes no VEX, as for a missing component.
+func markerError(prefix string, ratings []VulnRating) error {
 	var problems []string
-	for _, g := range ratings {
-		p, seen := first[g.VulnID]
-		switch {
-		case g.ImpactProvenance != ImpactFromCVSSv3 && g.ImpactProvenance != ImpactFromFallback:
-			problems = append(problems, fmt.Sprintf("%s: impact provenance %q is not %s or %s",
-				g.VulnID, g.ImpactProvenance, ImpactFromCVSSv3, ImpactFromFallback))
-		case !seen:
-			first[g.VulnID] = g.ImpactProvenance
-		case p != g.ImpactProvenance:
-			problems = append(problems, fmt.Sprintf("%s: rows rated with impact provenance %s and %s",
-				g.VulnID, p, g.ImpactProvenance))
+	for _, m := range markers {
+		first := map[string]string{}
+		for _, g := range ratings {
+			v := m.of(g)
+			p, seen := first[g.VulnID]
+			switch {
+			case !slices.Contains(m.values, v):
+				problems = append(problems, fmt.Sprintf("%s: %s %q is not %s",
+					g.VulnID, m.name, v, strings.Join(m.values, " or ")))
+			case !seen:
+				first[g.VulnID] = v
+			case p != v:
+				problems = append(problems, fmt.Sprintf("%s: rows rated with %s %s and %s", g.VulnID, m.name, p, v))
+			}
 		}
 	}
 	if len(problems) == 0 {

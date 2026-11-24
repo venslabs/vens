@@ -29,9 +29,10 @@ import (
 // technical impact state, description state and adjustment: whatever the
 // replies hold, the vector is one the calculator takes, each level in the set
 // its JAR ran, each with its source; its severity and score are OWASP's
-// matrix and likelihood × impact recomputed from the vector alone; Motive,
-// Opportunity and Ease of exploit are asked only of a CVE a row describes,
-// and no adjustment lowers the Opportunity of one no row describes; Loss of
+// matrix and likelihood × impact recomputed from the vector and the impact
+// basis the deployment gives; Motive, Opportunity and Ease of exploit are
+// asked only of a CVE a row describes, and no adjustment lowers the
+// Opportunity of one no row describes; Loss of
 // confidentiality, integrity and availability are the vectors' whatever the
 // answers and the adjustment; Privacy violation sits at its floor, not asked,
 // where the vectors give C:N; and the readings are the questions asked, and
@@ -102,7 +103,7 @@ func FuzzCompute(f *testing.F) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		rating, err := l.Vector.Rate()
+		rating, err := l.Vector.Rate(d.ImpactBasis())
 		if err != nil {
 			t.Fatalf("the calculator refuses %+v: %v", l.Vector, err)
 		}
@@ -153,8 +154,9 @@ func deref(s *string) string {
 }
 
 // checkRating reads the levels back from the written vector, each in the set
-// the JAR ran, rates them again through owasp, and recomputes the severity
-// and the score by OWASP's bands and matrix on the larger impact.
+// the JAR ran, rates them again through owasp on the rating's basis, and
+// recomputes the severity and the score by OWASP's bands and matrix on the
+// impact that basis names.
 func checkRating(t *testing.T, rating owasp.Rating, want map[string]int, sets map[string][]int) {
 	t.Helper()
 	var read [16]int
@@ -174,12 +176,15 @@ func checkRating(t *testing.T, rating owasp.Rating, want map[string]int, sets ma
 		ID: owasp.IntrusionDetection(read[7]), LC: owasp.LossOfConfidentiality(read[8]), LI: owasp.LossOfIntegrity(read[9]),
 		LAV: owasp.LossOfAvailability(read[10]), LAC: owasp.LossOfAccountability(read[11]), FD: owasp.FinancialDamage(read[12]),
 		RD: owasp.ReputationDamage(read[13]), NC: owasp.NonCompliance(read[14]), PV: owasp.PrivacyViolation(read[15]),
-	}.Rate()
+	}.Rate(rating.Basis)
 	if err != nil || again != rating {
 		t.Errorf("the vector read back rates %+v (%v), want %+v", again, err, rating)
 	}
 	likelihood := float64(sums[0]) / 8
-	impact := max(float64(sums[1]), float64(sums[2])) / 4
+	impact := float64(sums[1]) / 4
+	if rating.Basis == "business" {
+		impact = float64(sums[2]) / 4
+	}
 	band := func(x float64) int {
 		switch {
 		case x < 3:

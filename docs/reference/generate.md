@@ -194,7 +194,7 @@ The JSON Schema of each reply is sent to the provider with the call, not written
 
 Numbers count LLM calls, not `--llm-batch-size` batches: each batch makes one call per question, a call the provider truncates is retried in two halves, and the CVEs a reply leaves out or leaves without a readable answer are asked again in one more call, each with its own number.
 
-Each run also writes **`answers.json`**: for each CVE, each of the 16 factors in the vector's order with the answer as the reply wrote it (when the question was asked), how vens read it (`answered`, `cannot_tell`, `invalid` for an answer off its list, `no_description`), the level, and where the level came from (`answer`, `constant`, `config`, `cvss` for the three technical impacts, `floor` for a Privacy violation the vectors floor, `adjustment`), with `cvss`, the value the usable CVSS v3 vectors give the axis, on the three technical impacts and on a floored Privacy violation; the adjustment's answer on `O` and, for its confidentiality question, on `PV`; whether the adjustment was made and how it read; the CVE's counters; the run's counters summed; and the run's `defects`: each kind the [run summary](#the-run-summary)'s `defects.*` counts, under the same name and with the same total, only those found (`{}` when the replies held none). For a CVE with no description, `M`, `O` and `EE`, which are not asked, carry the source `answer` with no `answer` key and the reading `no_description`. A run that fails also lists, marked `unrated` and without levels, the CVEs of the batch it failed in that already had answers, and its `defects` are those counted before it stopped. It holds no reasoning and no CVE text, but keeps each answer verbatim. From a mock run (`--llm=mock`) on `examples/quickstart`'s Trivy report with `data_subjects`, `detection` and `traceability` removed from its `config.yaml`, so their fallbacks are counted:
+Each run also writes **`answers.json`**: for each CVE, each of the 16 factors in the vector's order with the answer as the reply wrote it (when the question was asked), how vens read it (`answered`, `cannot_tell`, `invalid` for an answer off its list, `no_description`), the level, and where the level came from (`answer`, `worst_case` for Skill level, no field declaring the attackers' skill, `constant` for Ease of discovery and Awareness, `config`, `cvss` for the three technical impacts, `floor` for a Privacy violation the vectors floor, `adjustment`), with `cvss`, the value the usable CVSS v3 vectors give the axis, on the three technical impacts and on a floored Privacy violation; the adjustment's answer on `O` and, for its confidentiality question, on `PV`; whether the adjustment was made and how it read; the CVE's counters; the run's counters summed; and the run's `defects`: each kind the [run summary](#the-run-summary)'s `defects.*` counts, under the same name and with the same total, only those found (`{}` when the replies held none). For a CVE with no description, `M`, `O` and `EE`, which are not asked, carry the source `answer` with no `answer` key and the reading `no_description`. A run that fails also lists, marked `unrated` and without levels, the CVEs of the batch it failed in that already had answers, and its `defects` are those counted before it stopped. It holds no reasoning and no CVE text, but keeps each answer verbatim. From a mock run (`--llm=mock`) on `examples/quickstart`'s Trivy report with `data_subjects`, `detection` and `traceability` removed from its `config.yaml`, so their fallbacks are counted:
 
 ```json
 {
@@ -203,7 +203,7 @@ Each run also writes **`answers.json`**: for each CVE, each of the 16 factors in
       "vulnId": "CVE-2011-3374",
       "adjustment": "not_asked",
       "factors": [
-        { "factor": "SL", "level": 9, "source": "constant" },
+        { "factor": "SL", "level": 9, "source": "worst_case" },
         { "factor": "M", "answer": "possible_reward", "reading": "answered", "level": 4, "source": "answer" },
         ...
         { "factor": "LC", "level": 2, "source": "cvss", "cvss": "N" },
@@ -373,13 +373,20 @@ BOM-Link `version` number used alongside `--sbom-serial-number`. Default: `1`.
 
 ## The VEX document
 
-Each vulnerability holds one OWASP rating (vector, severity and score), the BOM-Link `affects` of every package the CVE was found in, and exactly one property:
+Each vulnerability holds one OWASP rating (vector, severity and score), the BOM-Link `affects` of every package the CVE was found in, and exactly two properties:
 
 ```json
-"properties": [{ "name": "vens:impact-provenance", "value": "cvss-v3" }]
+"properties": [
+  { "name": "vens:impact-provenance", "value": "cvss-v3" },
+  { "name": "vens:impact-basis", "value": "business" }
+]
 ```
 
-`cvss-v3` means Loss of confidentiality, integrity and availability were read from the CVE's usable CVSS v3 vectors. `missing-cvss-v3-fallback` means the CVE has none, so the missing-input rule set the three to 9: the same CVEs the run summary counts in `cvss_v3_missing`, which `--strict` refuses. The value follows that rule, never the levels. Keep the second kind in a separate "impact unknown" list and order the first by severity, then score, then identifier: see **[Get your top 10](../guides/prioritize-cves.md#step-4-get-your-top-10)**. A run that would write a vulnerability without the property, or with two values for one CVE, fails and writes no VEX.
+`vens:impact-provenance`: `cvss-v3` means Loss of confidentiality, integrity and availability were read from the CVE's usable CVSS v3 vectors. `missing-cvss-v3-fallback` means the CVE has none, so the missing-input rule set the three to 9: the same CVEs the run summary counts in `cvss_v3_missing`, which `--strict` refuses. The value follows that rule, never the levels. Keep the second kind in a separate "impact unknown" list and order the first by severity, then score, then identifier: see **[Get your top 10](../guides/prioritize-cves.md#step-4-get-your-top-10)**.
+
+`vens:impact-basis` is the impact the severity and the score are read on, the same for every vulnerability of a run: `business` when `config.yaml` declares `data_subjects`, `technical` when it does not (see **[How vens rates a CVE](../concepts/cvss-vs-owasp.md#how-vens-rates-a-cve)**). On the business basis, the 9s the missing-input rule sets do not reach the severity. The vector does not say which impact was read: a tool that recomputes the severity or the score from the vector must read this property, or it can disagree with vens.
+
+A run that would write a vulnerability without one of the two properties, or with two values of one for a CVE, fails and writes no VEX.
 
 ---
 

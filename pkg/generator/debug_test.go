@@ -364,7 +364,7 @@ func TestDebugDir_AnswersJSON(t *testing.T) {
 	}
 	assert.Equal(t, []string{"SL", "M", "O", "S", "ED", "EE", "A", "ID", "LC", "LI", "LAV", "LAC", "FD", "RD", "NC", "PV"}, order)
 	assert.Equal(t, map[string]string{
-		"SL":  "<nil>|||9|constant|",
+		"SL":  "<nil>|||9|worst_case|",
 		"M":   "low_or_no_reward|answered||1|answer|",
 		"O":   "some_access_or_resources_required|answered|special_access_or_resources_required|4|adjustment|",
 		"S":   "<nil>|||9|config|",

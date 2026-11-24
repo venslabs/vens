@@ -96,7 +96,9 @@ type ContextHints struct {
 	Listener string `yaml:"listener,omitempty"`
 
 	// DataSubjects is the band of people whose personal data the service can
-	// read: Privacy violation's cap, in Go, never sent. nil: no cap.
+	// read: Privacy violation's cap, in Go, never sent. Declared, every
+	// finding is rated on its business impact. nil: no cap, and the technical
+	// impact.
 	DataSubjects *string `yaml:"data_subjects,omitempty"`
 
 	// Detection is what records an attempt on each channel: Intrusion

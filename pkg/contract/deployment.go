@@ -53,13 +53,27 @@ type Deployment struct {
 	// undeclared.
 	Traceability *string
 	// DataSubjects is one of Privacy violation's bands, none to millions;
-	// nil when undeclared.
+	// nil when undeclared. Declared, it sets the impact basis to business.
 	DataSubjects *string
 	// Detection is each channel's declared level; nil when undeclared.
 	Detection *Detection
 	// AvailabilityRequirement is low, medium, high or critical, which picks
 	// Loss of availability's column; nil when undeclared.
 	AvailabilityRequirement *string
+}
+
+// ImpactBasis is the impact every finding is rated on. The config is taken as
+// the deployment owner's truth: business_criticality is required and no
+// compliance framework declared reads as none applying, so data_subjects is
+// the one business input whose absence leaves the business unknown. Declared,
+// the config holds the business information OWASP asks for and the basis is
+// business; undeclared, technical (OWASP_Risk_Rating_Methodology.md:142-145,
+// :305-307).
+func (d Deployment) ImpactBasis() owasp.Basis {
+	if d.DataSubjects != nil {
+		return owasp.BasisBusiness
+	}
+	return owasp.BasisTechnical
 }
 
 // Setting is a config value the model is shown, with its documented meaning.
