@@ -589,6 +589,23 @@ func checkControlScopes(t *testing.T, rows [][]string) {
 	}
 }
 
+// TestReferenceQuotesTheMessages checks that the reference quotes, word for
+// word, the errors a schema-1 file gets and every load warning.
+func TestReferenceQuotesTheMessages(t *testing.T) {
+	var quoted []string
+	for _, b := range fencedBlocks(reference, readText(t, filepath.Join(repoRoot(t), reference))) {
+		if b.lang == "text" {
+			quoted = append(quoted, strings.TrimSuffix(b.text, "\n"))
+		}
+	}
+	for _, msg := range []string{errNoSchemaVersion.msg, errSchemaVersion1.msg, warnAuditNoTraceability,
+		warnControlsNoDetection, warnNoTraceability, warnNoDetection, warnNoDataSubjects} {
+		if !slices.Contains(quoted, msg) {
+			t.Errorf("%s does not quote %q", reference, msg)
+		}
+	}
+}
+
 // TestReferenceDocumentsEveryKey checks that the reference documents every
 // YAML key of the structs, found by reflection over their tags, and no other.
 func TestReferenceDocumentsEveryKey(t *testing.T) {
