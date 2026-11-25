@@ -199,7 +199,7 @@ For a turnkey Action, see [GitHub Actions integration](github-actions.md). The m
 
 ```yaml
 - name: Install Vens
-  run: go install github.com/venslabs/vens/cmd/vens@v0.6.0
+  run: go install github.com/venslabs/vens/cmd/vens@v0.7.0
 
 - name: Scan image
   run: trivy image $IMAGE --format json --output report.json

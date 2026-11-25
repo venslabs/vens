@@ -16,7 +16,7 @@ If you scan with Trivy or Grype in GitHub Actions, drop [`venslabs/vens-action`]
 - name: Prioritize with vens
   uses: venslabs/vens-action@v0.2.0   # check the marketplace for the latest tag; pin by SHA in production
   with:
-    version: v0.6.0                   # vens binary version
+    version: v0.7.0                   # vens binary version
     config-file: .vens/config.yaml    # see ../guides/configuration.md to author this file
     input-report: report.json
     sbom-serial-number: ${{ vars.SBOM_SERIAL }}
@@ -61,7 +61,7 @@ vens --version
     Make sure `$(go env GOPATH)/bin` is in your `$PATH`.
 
 !!! note
-    Pinning a specific version: `go install github.com/venslabs/vens/cmd/vens@v0.6.0`.
+    Pinning a specific version: `go install github.com/venslabs/vens/cmd/vens@v0.7.0`.
 
 ---
 
@@ -90,7 +90,7 @@ Download the latest release for your OS/architecture from the [releases page](ht
 === "Linux (amd64)"
 
     ```bash
-    # Replace VERSION with the release tag, e.g. v0.6.0
+    # Replace VERSION with the release tag, e.g. v0.7.0
     curl -L https://github.com/venslabs/vens/releases/download/VERSION/vens-VERSION-linux-amd64.tar.gz \
       | tar -xz
     sudo mv vens /usr/local/bin/
