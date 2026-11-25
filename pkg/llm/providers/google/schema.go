@@ -42,7 +42,7 @@ func orderSchema(raw json.RawMessage) (any, error) {
 	if !ok {
 		return decode(raw)
 	}
-	out := make(map[string]any, len(obj.names)+1)
+	out := make(map[string]any, len(obj.names))
 	for _, name := range obj.names {
 		var v any
 		switch name {
