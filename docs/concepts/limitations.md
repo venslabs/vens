@@ -137,6 +137,13 @@ vens does not ask the model what an exploit would cost the business. `business_c
 - A CVE with no usable CVSS v3 vector counts as a high worst technical loss, so on the business basis it takes the declared worst case.
 - Motive is shown `business_criticality` with its meaning, and `critical` no longer says compliance-required. On a `critical` service the Motive request differs from the one earlier builds sent, so answers recorded with them replay exactly for the impact, not for Motive.
 
+Some declarations keep every finding in one business impact band, whatever the CVE, its CVSS vectors and the model's answers:
+
+- `business_criticality: low`, with no framework in `compliance_requirements` and `data_subjects` of `none`, `one_individual`, `hundreds` or `thousands`: always LOW, and exactly 1.75, (1 + 1 + 2 + 3) / 4, with `none` or `one_individual`.
+- `business_criticality: critical`, with no framework in `compliance_requirements` and `data_subjects` of `none` or `one_individual`: always MEDIUM, from 3 to 5.75.
+
+With these declarations a finding's severity moves with its likelihood alone; the likelihood, which the model's answers on each CVE move, still separates the findings of the deployment. This is v0.7.0's "less spread within a deployment" trade-off ([#340](https://github.com/venslabs/vens/issues/340)).
+
 ---
 
 ## 13. Pre-1.0 — API surface may change
