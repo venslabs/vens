@@ -1,0 +1,46 @@
+# Under schema 2 a detection written with no value, a listener written empty
+# and an unknown key each fail at load, with an error naming the key rather
+# than a Go type.
+
+! exec vens generate --llm=mock --config-file=detection-null.yaml --sbom-serial-number=urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79 report.json out.cdx.json
+stderr 'context.detection has no channels: declare network, host and application, or remove the key'
+! stderr 'cannot unmarshal'
+
+! exec vens generate --llm=mock --config-file=listener-empty.yaml --sbom-serial-number=urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79 report.json out.cdx.json
+stderr 'context.listener has no value: write one of \[present absent unknown\] or remove the key'
+
+! exec vens generate --llm=mock --config-file=unknown-key.yaml --sbom-serial-number=urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79 report.json out.cdx.json
+stderr 'config.yaml line 8: unknown key `tracability` under context'
+! stderr 'riskconfig'
+
+! exists out.cdx.json
+
+-- detection-null.yaml --
+schema_version: 2
+project:
+  name: "schema-errors"
+context:
+  exposure: "internet"
+  data_sensitivity: "high"
+  business_criticality: "critical"
+  detection: null
+-- listener-empty.yaml --
+schema_version: 2
+project:
+  name: "schema-errors"
+context:
+  exposure: "internet"
+  data_sensitivity: "high"
+  business_criticality: "critical"
+  listener: ""
+-- unknown-key.yaml --
+schema_version: 2
+project:
+  name: "schema-errors"
+context:
+  exposure: "internet"
+  data_sensitivity: "high"
+  business_criticality: "critical"
+  tracability: per_request
+-- report.json --
+{"SchemaVersion": 2, "Results": []}

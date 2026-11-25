@@ -1,7 +1,7 @@
 # Troubleshooting
 
 **Who this is for:** anyone whose `vens generate` run didn't go the way the quickstart promised.
-**By the end of this page:** you know how to diagnose the most common failure modes.
+**By the end of this page:** you know how to diagnose the failure modes below.
 
 When in doubt, rerun with debug output:
 
@@ -13,7 +13,7 @@ DEBUG=1 vens generate \
   report.json vex.json
 ```
 
-`--debug-dir` writes the prompts and the raw LLM response of every LLM call to disk, in a `run-*` subdirectory of its own for each run. `DEBUG=1` raises the log level to `debug` and shows per-CVE component scores.
+`--debug-dir` writes the prompts and the raw LLM response of every LLM call to disk, with `answers.json` for the run, in a `run-*` subdirectory of its own for each run. `DEBUG=1` raises the log level to `debug` and shows the questions planned for each CVE and the CVEs of each batch.
 
 ---
 
@@ -49,6 +49,102 @@ Your `config.yaml` has a typo, an extra word, or a missing required field. Check
 
 ---
 
+## `config.yaml has no schema_version`
+
+The file was written for vens v0.6 or earlier. vens v0.7.0 reads schema 2 only and refuses the file before any LLM call. Add `schema_version: 2` at the top, then declare the new fields: see **[Migrating from vens v0.6](reference/config-schema.md#migrating)**.
+
+The same applies to `schema_version 1 is not supported`. `schema_version must be the integer 2, got ...` means the marker is there but written as something else, such as `"2"` (a string) or `2.0`: write `schema_version: 2`. `schema_version 3 is not supported` means the file was written for a newer vens.
+
+---
+
+## `unknown key` in `config.yaml`
+
+```text
+config.yaml line 10: unknown key `tracability` under context
+```
+
+A key schema 2 does not have, usually a typo. vens v0.6 and earlier ignored it, so a misspelled `compliance_requirement:` silently dropped your frameworks; schema 2 refuses the file and names the line. This one fails:
+
+<!-- docs-check: E3 -->
+```yaml
+schema_version: 2
+
+project:
+  name: "my-service"
+
+context:
+  exposure: "private"
+  data_sensitivity: "medium"
+  business_criticality: "medium"
+  tracability: "per_request"
+```
+
+Fix the key's spelling (`traceability`). Every key is in the **[config.yaml reference](reference/config-schema.md)**.
+
+---
+
+## `context.detection ...` or `context.traceability ...` is refused
+
+The new fields have strict shapes:
+
+- `context.detection has no channels` or `is required once context.detection is present`: once `detection` is written, declare all three channels, `network`, `host` and `application`. To leave detection undeclared, remove the key.
+- `context.detection.network: active_in_application applies to application only`: only the `application` channel takes `active_in_application`.
+- `must be a single value`: `listener`, `data_subjects`, `traceability` and each channel take one value, not a list.
+- `has no value`: the key is written with nothing after it. Write a value or remove the key.
+
+<!-- docs-check: E5 -->
+```yaml
+schema_version: 2
+
+project:
+  name: "my-service"
+
+context:
+  exposure: "private"
+  data_sensitivity: "medium"
+  business_criticality: "medium"
+  detection:
+    network: "logged"
+```
+
+Every message is in **[Load errors and warnings](reference/config-schema.md#load-errors)**.
+
+---
+
+## Warnings at load: `... is not declared`
+
+```text
+level=WARN msg="context.detection is not declared: every channel counts as not logged, so Intrusion detection is 9 on every finding."
+```
+
+The run goes on: vens uses the fallback the warning states and counts each use in the run summary. Declare `detection`, `traceability` and `data_subjects` for what is in place to remove the warning. `audit_requirement` and the `ids`, `siem` and `edr` controls do not stand in for them; the warning says so when they are set. Each warning is in **[Load errors and warnings](reference/config-schema.md#warnings)**.
+
+---
+
+## `strict: ...`
+
+A `--strict` run refused to use a worst-case fallback. It writes no VEX and no attestation, and leaves the files an earlier run wrote as they were. Three causes:
+
+- **`strict: context.data_subjects, context.detection, context.traceability not declared`** — at load, before any LLM call. Declare the fields it names.
+- **`strict: N vulnerabilities would fall back to a worst case, so no LLM call is made`** — the scan holds CVEs with no usable CVSS v3 vector (none in the scanner's report, or each one refused: it does not parse, states another version than 3.0 or 3.1, or lacks `C`, `I` or `A`), or no description. The error lists each CVE and its cause, each refused vector with why. This comes from the scanner's report, not from your config, and vens cannot fix it: such a scan cannot pass `--strict`. Run without `--strict` and watch the `cvss_v3_missing` counter, or use a scanner database that carries the vectors.
+- **`strict: the answer to ... reads as cannot_tell ... stopping the run`** — the model could not decide one question for one CVE, or answered off its list. Read that call's `.response` in `--debug-dir`: the model's reasoning says what was missing, often something `notes` can state.
+
+See **[`--strict`](reference/generate.md#-strict)**.
+
+---
+
+## What the counters in the run summary mean
+
+A run that reaches scoring ends with a `Scoring run finished` line, also when it fails during scoring. Its `counters.*` count, per CVE, each fallback the run used:
+
+- `<factor>_cannot_tell` (such as `privacy_cannot_tell`) — the model answered `cannot_tell`, or off its list, so the question's worst answer applied: the factor's worst level, unless `detection` or `data_subjects` limits it or a flagged CVE's adjustment lowers it. A CVE with no description is not asked Motive, Opportunity and Ease of exploit, nor Opportunity in its adjustment, a description being a prerequisite of their answers, and counts in `motive_cannot_tell`, `opportunity_cannot_tell` and `ease_of_exploit_cannot_tell`.
+- `detection_undeclared`, `traceability_missing`, `data_subjects_missing`, `availability_requirement_missing` — a field left out of `config.yaml`. Declare it.
+- `cvss_v3_missing` — the CVE has no usable CVSS v3 vector, so Loss of confidentiality, integrity and availability took 9.
+
+A counter that is high for one question across most CVEs points at missing context: read a few of that question's replies in `--debug-dir`. The full list, with `calls.*` and `defects.*`, is in **[The run summary](reference/generate.md#the-run-summary)**; `answers.json` gives the counters per CVE.
+
+---
+
 ## `no LLM backend detected`
 
 No LLM provider environment variable is set. Export one of:
@@ -66,25 +162,31 @@ Or force a provider explicitly: `--llm ollama`.
 
 ## `unable to parse LLM output`
 
-The LLM returned text that is not valid JSON matching the expected schema. Most common causes:
+A reply to a question was not the JSON its schema asks for: text that is not JSON, JSON cut short, or JSON of another shape. Vens reads such a reply as no answer for the CVEs it should have carried, and skips an answer of it that is not a JSON object, keeping the others. It logs a `WARN` quoting the start of the reply, counts the reply in the run summary under `defects.reply_unreadable`, and asks again for the CVEs left without an answer, once, as for CVEs a reply leaves out. A CVE still without an answer stops the run, no VEX is written, and the error ends with what Vens could not read:
 
-- **Small / local model with weak JSON compliance.** Vens asks for structured JSON with four component scores per CVE. Models under 7B parameters routinely fail this on batches of 10. Concrete recommendations for Ollama:
+```text
+failed to generate risk scores: model returned no answer to Motive (M) for CVE-2024-1234 after asking again; stopping the run: unable to parse LLM output: the reply is not JSON: unexpected end of JSON input: "{\"answers\":[{\"vulnId\":\"CVE-2024-1234\",\"reasoning\":\"The parser"
+```
+
+Possible causes:
+
+- **Small / local model with weak JSON compliance.** Vens asks for structured JSON: for each question, one named answer and one sentence of reasoning per CVE. On the scoring of earlier versions, which asked for four component scores per CVE, models under 7B parameters routinely failed on batches of 10. These recommendations for Ollama come from then and have not been rechecked on the v0.7.0 questions:
     - `llama3.1:70b` / `llama3.3:70b` — robust on the default batch size of 10.
     - `llama3.1:8b`, `mistral:7b` — work with `--llm-batch-size 3` to `5`.
     - Anything smaller (`phi3:mini`, `gemma:2b`, …) — expect frequent failures; use only for smoke tests.
 - **Prompt truncation on small context windows.** Reduce `--llm-batch-size`.
-- **Provider-side safety filter** trimmed the response. The reply that failed to parse is the last `batch-NNNNN.response` in the run's `vens-debug/run-*/` directory, next to the two prompts that produced it: inspect them and re-run the batch that failed.
+- **Provider-side safety filter** trimmed the response. Each reply Vens could not read is whole in its `batch-NNNNN.response`, in the run's `vens-debug/run-*/` directory, next to the two prompts that produced it: inspect them and re-run.
 
 ---
 
 ## My OWASP scores change between two runs with the same config
 
-This is expected within a small band. See the ["Reproducibility is best-effort"](reference/generate.md#-llm-seed-int) note in the `vens generate` reference: cloud LLM providers do not guarantee byte-deterministic decoding even at `temperature=0`. Vens mitigates drift by computing the final OWASP score in Go from the LLM's four 0-9 component scores — small component drift is averaged out — but you should expect **±1–3 points of variation on a minority of CVEs** between runs.
+This can happen. See the ["Reproducibility is best-effort"](reference/generate.md#-llm-seed-int) note in the `vens generate` reference: cloud LLM providers do not guarantee byte-deterministic decoding even at `temperature=0`. The model picks named answers and vens computes the rating in Go, so the same answers always give the same rating; a rating moves only when an answer changes.
 
 What to do:
 
 - If you need strict reproducibility for audit evidence at a fixed point in time, pin a local Ollama model version (model tags are immutable), pass `--llm-temperature 0 --llm-seed <n>`, **and** archive `--debug-dir` output. Together they give you a byte-exact record of what was sent and returned.
-- If a specific CVE is jumping across severity buckets between runs, it usually means the LLM is genuinely uncertain about that CVE in your context — check the `--debug-dir` reasoning for that batch.
+- If a specific CVE is jumping across severities between runs, compare the two runs' `answers.json`: it shows which answer changed. That usually means the LLM is genuinely uncertain about that question for that CVE in your context — read the reasoning in that question's `.response`, and state the missing fact in `notes` if you can.
 
 ---
 
@@ -122,13 +224,15 @@ A row in the scanner report gives Vens nothing to point the VEX at: no usable PU
 
 ## What happens if the LLM fails on one batch?
 
-Vens processes CVEs in batches (default 10, tunable via `--llm-batch-size`). Provider errors fail the whole run; a CVE the model leaves out or gives zero likelihood is handled CVE by CVE:
+Vens processes CVEs in batches (default 10, tunable via `--llm-batch-size`), one call per question per batch. Provider errors fail the whole run; a CVE the model leaves out or answers badly is handled CVE by CVE:
 
-- **Rate limit on a batch** → Vens retries that batch up to 10 times with a 10 s backoff (`pkg/llm`). If all retries fail, the whole `vens generate` run exits with a non-zero status and the output VEX file is not written. This is intentional — a partial VEX would be misleading.
-- **LLM returns malformed JSON that cannot be parsed** → Vens exits with `unable to parse LLM output: ...`. The failing batch is included in the error message; use `--debug-dir` to capture the exact prompt so you can reproduce or downgrade the batch size.
-- **Network error / provider outage mid-batch** → same behaviour: exit non-zero, no partial VEX.
-- **The LLM leaves a CVE out of its answer** → Vens asks for it again on its own. If it is still missing and no later batch has it through another package, the run stops there, names the missing CVEs and writes no VEX.
-- **The LLM gives a CVE zero likelihood** (usually "not reachable here") → Vens publishes it as-is, so it lands as `info`, and logs the model's reasoning at WARN. That passes a `fail-on-severity` gate set to `low` or above: read those lines before trusting it.
+- **Rate limit on a call** → Vens retries that call up to 10 times with a 10 s backoff (`pkg/llm`). If all retries fail, the whole `vens generate` run exits with a non-zero status and the output VEX file is not written. This is intentional — a partial VEX would be misleading.
+- **Network error / provider outage mid-run** → same behaviour: exit non-zero, no partial VEX.
+- **The provider truncates a call** → Vens asks each half of its CVEs on its own, down to a single CVE.
+- **The LLM leaves CVEs out of its answer** → Vens asks for them again, together, in one more call. If one is still missing, the run stops there, names the question and the missing CVEs and writes no VEX.
+- **The LLM returns a reply that cannot be read** (not JSON, cut short without the provider flagging it, or JSON of another shape) → Vens reads it as no answer for the CVEs it should have carried, keeping any answer of it that is a JSON object, logs a `WARN` quoting the start of the reply and counts it under `defects.reply_unreadable`. The CVEs it leaves without an answer are asked again with the ones left out; one still without an answer stops the run as above, and the error ends with `unable to parse LLM output: ...`, quoting the start of the reply. `--debug-dir` keeps each reply whole, beside its prompts, so you can reproduce it or lower the batch size.
+- **The LLM answers `cannot_tell`, or off the list** → Vens uses the question's worst answer and counts it in the run summary; under `--strict` the run stops instead.
+- **An adjustment reply cannot be read** → the CVE keeps the levels its questions gave; the run summary counts it under `defects`.
 
 For CI pipelines, this means you should either:
 
@@ -149,14 +253,13 @@ trivy image IMAGE --format json --severity LOW,MEDIUM,HIGH,CRITICAL --output rep
 
 ## All my CVEs cluster in the same score range
 
-Vens **does** score every CVE — that part is not broken. But if virtually every CVE lands in the same narrow band (typically 30–40), it usually means the LLM had nothing specific to differentiate them with and regressed to a generic interpretation of the CVSS severity. A healthy Vens run on a production context produces a wide spread: some CVEs lose 20+ points because a control neutralizes them, others gain 20+ because they hit your data or compliance boundary directly.
+Vens **does** score every CVE — that part is not broken. Some sameness is built in: Skill level, Ease of discovery and Awareness are 9 for every finding, and Size follows your `exposure`, so the likelihood never falls below MEDIUM. But if virtually every CVE gets the same severity and close scores, look for what the CVEs share:
 
-Re-check:
-
-1. Are the three required fields in `config.yaml` actually representative of the production deployment? (Don't leave `exposure: internal` when it's public-facing.)
-2. Did you enable the **real** controls in `context.controls`? Not wishful ones.
-3. Did you fill `context.notes` with 2–3 sentences of architecture? The LLM leans on it for tie-breaks.
-4. For local models: is your Ollama model large enough? (See [Ollama JSON compliance](#unable-to-parse-llm-output) above — small models sometimes produce flat, uniform scores even when they emit valid JSON.)
+1. Check the run summary's counters. A field left out (`detection_undeclared`, `traceability_missing`) gives every finding the same worst case, and a high `*_cannot_tell` counter means the model could not tell that question apart from CVE to CVE.
+2. Are the three required fields in `config.yaml` actually representative of the production deployment? (Don't leave `exposure: internal` when it's public-facing.)
+3. Did you enable the **real** controls in `context.controls`? Not wishful ones.
+4. Did you fill `context.notes` with 2–3 sentences of architecture? Every question shows it.
+5. For local models: is your Ollama model large enough? On the scoring of earlier versions, small models sometimes gave flat, uniform scores even when they emitted valid JSON (see [Ollama JSON compliance](#unable-to-parse-llm-output) above). Their answers to the v0.7.0 questions have not been measured, so read them in `--debug-dir`.
 
 See [Describe your system context](guides/configuration.md) for the checklist.
 
@@ -170,7 +273,7 @@ You passed `--sbom-serial-number` but forgot the prefix. The value must look lik
 
 ## Output VEX has no `analysis.detail` / no reasoning
 
-By design — Vens does not embed the LLM reasoning in the VEX to keep the document strictly CycloneDX-compliant and stable. Capture the reasoning separately with `--debug-dir`:
+By design — Vens does not embed the LLM reasoning in the VEX to keep the document strictly CycloneDX-compliant and stable. Pass `--attest` for a sidecar whose claims give, per CVE, one line per question answered, or capture the reasoning separately with `--debug-dir`:
 
 ```bash
 vens generate \
@@ -183,7 +286,7 @@ ls debug/run-*/
 # ...
 ```
 
-Each `batch-NNNNN.response` is the model's raw reply, reasoning included, for the CVEs in the `batch-NNNNN.human.prompt` beside it. Per-CVE component scores and reasoning are also logged to stderr at `INFO` / `DEBUG` level.
+Each `batch-NNNNN.response` is the model's raw reply to one question, answers and reasoning included, for the CVEs in the `batch-NNNNN.human.prompt` beside it. `answers.json` gives each CVE's answers and levels without the reasoning. Each CVE's score, severity and vector are also logged to stderr at `INFO`.
 
 ---
 

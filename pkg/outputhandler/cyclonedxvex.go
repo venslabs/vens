@@ -24,6 +24,7 @@ import (
 	"github.com/CycloneDX/cyclonedx-go"
 	"github.com/google/uuid"
 	"github.com/venslabs/vens/cmd/vens/version"
+	"github.com/venslabs/vens/pkg/owasp"
 )
 
 // DefaultSpecVersion is the CycloneDX spec version emitted when the caller does
@@ -127,6 +128,7 @@ func (c *cycloneDxVexWriter) Close() error {
 				},
 			},
 		},
+		Properties: &[]cyclonedx.Property{{Name: RatingPolicyProperty, Value: RatingPolicy}},
 	}
 
 	vulnMap := make(map[string]*cyclonedx.Vulnerability)
@@ -158,11 +160,18 @@ func (c *cycloneDxVexWriter) Close() error {
 			Source:  g.Source,
 			Ratings: &[]cyclonedx.VulnerabilityRating{g.Rating},
 			Affects: &[]cyclonedx.Affects{{Ref: bomLink}},
+			Properties: &[]cyclonedx.Property{
+				{Name: ImpactProvenanceProperty, Value: g.ImpactProvenance},
+				{Name: ImpactBasisProperty, Value: string(g.ImpactBasis)},
+			},
 		}
 		affectsSet[g.VulnID] = map[string]bool{bomLink: true}
 	}
 
 	if err := UnreferencedError("cannot emit VEX", unreferenced); err != nil {
+		return err
+	}
+	if err := markerError("cannot emit VEX", bom.Metadata, c.r); err != nil {
 		return err
 	}
 
@@ -207,4 +216,60 @@ func jsonSchemaFor(v cyclonedx.SpecVersion) string {
 	default:
 		return ""
 	}
+}
+
+// markers are the properties each VEX vulnerability carries once: the values
+// vens writes for each, and the rating field it is read from.
+var markers = []struct {
+	name   string
+	values []string
+	of     func(VulnRating) string
+}{
+	{"impact provenance", []string{ImpactFromCVSSv3, ImpactFromFallback},
+		func(g VulnRating) string { return g.ImpactProvenance }},
+	{"impact basis", []string{string(owasp.BasisTechnical), string(owasp.BasisBusiness)},
+		func(g VulnRating) string { return string(g.ImpactBasis) }},
+}
+
+// markerError names, after prefix, metadata that does not carry RatingPolicy
+// once, and each vulnerability a rating gives no value vens writes for a
+// marker, or whose rows give two; nil when there is none. Without the policy
+// a consumer cannot tell which rules the ratings follow, without the
+// provenance it cannot tell an impact read from the CVSS v3 vectors from the
+// missing-input rule's worst case, and without the basis it cannot recompute
+// the severity from the vector, so Close writes no VEX, as for a missing
+// component.
+func markerError(prefix string, metadata *cyclonedx.Metadata, ratings []VulnRating) error {
+	var policies, problems []string
+	if metadata != nil && metadata.Properties != nil {
+		for _, p := range *metadata.Properties {
+			if p.Name == RatingPolicyProperty {
+				policies = append(policies, p.Value)
+			}
+		}
+	}
+	if !slices.Equal(policies, []string{RatingPolicy}) {
+		problems = append(problems, fmt.Sprintf("rating policy %q is not %s", strings.Join(policies, ", "), RatingPolicy))
+	}
+	for _, m := range markers {
+		first := map[string]string{}
+		for _, g := range ratings {
+			v := m.of(g)
+			p, seen := first[g.VulnID]
+			switch {
+			case !slices.Contains(m.values, v):
+				problems = append(problems, fmt.Sprintf("%s: %s %q is not %s",
+					g.VulnID, m.name, v, strings.Join(m.values, " or ")))
+			case !seen:
+				first[g.VulnID] = v
+			case p != v:
+				problems = append(problems, fmt.Sprintf("%s: rows rated with %s %s and %s", g.VulnID, m.name, p, v))
+			}
+		}
+	}
+	if len(problems) == 0 {
+		return nil
+	}
+	slices.Sort(problems)
+	return fmt.Errorf("%s: %s", prefix, strings.Join(slices.Compact(problems), "; "))
 }

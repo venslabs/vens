@@ -29,6 +29,7 @@ json-contains out.cdx.json '"specVersion": "1.6"'
 json-contains out.cdx.json '"CVE-2024-1234"'
 
 -- config.yaml --
+schema_version: 2
 project:
   name: "test-project"
   description: "Test project for integration tests"

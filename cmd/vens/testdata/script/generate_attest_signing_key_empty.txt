@@ -6,6 +6,7 @@ stderr '--attest-signing-key is empty'
 ! exists output.attestation.cdx.json
 
 -- config.yaml --
+schema_version: 2
 project:
   name: "attest-empty-key"
   description: "Fail-closed empty signing key"

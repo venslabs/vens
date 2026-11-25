@@ -5,9 +5,9 @@
 [![GitHub Downloads][github-downloads-img]][release]
 [![Documentation][docs-img]][docs]
 
-# vens — Prioritize vulnerabilities by real risk, not just the generic CVSS score
+# vens — Prioritize vulnerabilities in your system's context, not just by the generic CVSS score
 
-**Your scanner found 300 CVEs. Which ones actually matter?** Vens takes a Trivy or Grype report, combines it with a description of _your_ system (exposure, data sensitivity, compliance, security controls), and scores every CVE based on its real risk to you — not just its generic severity.
+**Your scanner hands you a long list of CVEs. Which ones do you review first?** Vens takes a Trivy or Grype report, combines it with a description of _your_ system (exposure, data sensitivity, compliance, security controls), and rates every CVE with OWASP Risk Rating in your context — not just by its generic severity.
 
 The output is a [CycloneDX VEX](https://www.ntia.gov/files/ntia/publications/vex_one-page_summary.pdf) file with [OWASP Risk Rating](https://owasp.org/www-community/OWASP_Risk_Rating_Methodology) scores.
 Your CI gate fails the build on it, and [Dependency-Track 5.1+](https://venslabs.github.io/vens/guides/dependency-track/) puts it on every matching finding.
@@ -18,14 +18,14 @@ Your CI gate fails the build on it, and [Dependency-Track 5.1+](https://venslabs
 
 ## Why vens?
 
-OWASP scoring (`Risk = Likelihood × Impact`, 0-81) reflects your system's exposure, data sensitivity, and controls — not just generic CVE severity:
+OWASP Risk Rating reflects your system's exposure, data, records and controls — not just generic CVE severity. For each CVE, the LLM answers closed questions on up to 7 of the 16 OWASP factors in your context; vens reads the losses of confidentiality, integrity and availability from the CVE's CVSS v3 vectors, the financial and reputation damage from what your declared business criticality states at the CVE's worst technical loss, the highest of those three, computes every level, the severity from OWASP's likelihood × impact matrix, and a 0-81 score to sort CVEs within a severity:
 
 | Scenario | CVSS base | OWASP (Contextual) | Why? |
 |-----|----------------|-------------------|------|
-| Generic RCE in a library whose vulnerable path is not executed | 8.8 HIGH | **10.0 LOW** ⬇️ | Not reachable in your runtime |
-| Info leak in a PII handler running under GDPR | 5.3 MEDIUM | **52.0 HIGH** ⬆️ | PII leak + compliance impact |
+| Denial of service in a library function your internal service never calls | 7.5 HIGH | **low** (14.1) ⬇️ | Reaching it takes full access; the CVSS vectors rule out data loss |
+| Info leak in a PII handler running under GDPR | 5.3 MEDIUM | **critical** (54.4) ⬆️ | Thousands of people's data and a GDPR violation: the business impact is HIGH |
 
-*Scores above are illustrative — actual scores depend on your `config.yaml` and the LLM model.*
+*Ratings above are illustrative — actual ratings depend on your `config.yaml` and the LLM model. vens does not handle reachability: no question asks whether code runs, and an unreachable CVE keeps the rating its answers give; see [Limitations](https://venslabs.github.io/vens/concepts/limitations/).*
 
 ## Installation
 
@@ -86,21 +86,23 @@ Output is a [CycloneDX VEX](https://cyclonedx.org/capabilities/vex/) document; e
     "source": { "name": "NVD", "url": "https://nvd.nist.gov/vuln/detail/CVE-XXXX-YYYY" },
     "ratings": [{
       "method": "OWASP",
-      "score": 45.5,
+      "score": 32.9375,
       "severity": "high",
-      "vector": "SL:7/M:7/O:7/S:7/ED:6/EE:6/A:6/ID:6/LC:7/LI:7/LAV:7/LAC:7/FD:7/RD:7/NC:7/PV:7"
+      "vector": "SL:9/M:4/O:9/S:9/ED:9/EE:5/A:9/ID:8/LC:2/LI:1/LAV:7/LAC:7/FD:7/RD:5/NC:2/PV:3"
     }]
   }]
 }
 ```
 
-The per-CVE reasoning from the LLM is logged to stderr as the command runs, and is captured alongside prompts/responses when you pass `--debug-dir <path>`. It is intentionally not embedded in the VEX file to keep the document strictly CycloneDX-compliant. For a durable, auditable record of how each CVE was scored, pass `--attest` to also write a CycloneDX attestation next to the VEX.
+The vector holds the 16 OWASP levels; the severity and the score follow from it, on the impact each vulnerability's `vens:impact-basis` property names: `business` when `config.yaml` declares `data_subjects`, `technical` when it does not. The model's answers and reasoning are captured with the prompts and replies when you pass `--debug-dir <path>`, with `answers.json` giving each answer and the level vens read from it. They are intentionally not embedded in the VEX file to keep the document strictly CycloneDX-compliant. For a durable, auditable record of how each CVE was scored, pass `--attest` to also write a CycloneDX attestation next to the VEX.
 
 ## Configuration
 
 Create `config.yaml`:
 
 ```yaml
+schema_version: 2
+
 project:
   name: "my-api"
   description: "Customer-facing REST API"
@@ -110,9 +112,18 @@ context:
   data_sensitivity: "high"          # low | medium | high | critical
   business_criticality: "high"      # low | medium | high | critical
   compliance_requirements: ["GDPR", "SOC2"]
+  listener: "present"               # present | absent | unknown
+  data_subjects: "thousands"        # none | one_individual | hundreds | thousands | millions
+  detection:                        # not_logged | logged | logged_and_reviewed
+    network: "logged"
+    host: "not_logged"
+    application: "logged_and_reviewed"
+  traceability: "per_request"       # none | per_request | per_individual
   controls:
     waf: true
 ```
+
+Leave out `data_subjects`, `detection` or `traceability` and vens warns at load and uses that field's fallback: no cap on Privacy violation, Intrusion detection at 9 on every finding, or Loss of accountability from its `none` column. Every field is in the [config.yaml reference](https://venslabs.github.io/vens/reference/config-schema/); a file written for vens v0.6 needs the [migration](https://venslabs.github.io/vens/reference/config-schema/#migrating).
 
 **LLM Providers:**
 
@@ -142,8 +153,9 @@ vens generate --config-file config.yaml --sbom-serial-number urn:uuid:<uuid> INP
 - `--sbom-serial-number` (required) - serialNumber of the CycloneDX SBOM paired with this scan, in `urn:uuid:<uuid>` form (`jq -r .serialNumber sbom.cdx.json`)
 - `--input-format` - Scanner format: `auto` | `trivy` | `grype` (default: `auto`)
 - `--llm` - LLM provider: `openai` | `anthropic` | `ollama` | `googleai` (default: `auto`)
-- `--llm-batch-size` - CVEs per request (default: `10`)
-- `--debug-dir` - Save prompts/responses for debugging
+- `--llm-batch-size` - Distinct CVEs per batch; each batch makes one call per question (default: `10`)
+- `--strict` - Fail the run instead of using a worst-case fallback
+- `--debug-dir` - Save prompts, responses and `answers.json` for debugging
 - `--cyclonedx-spec-version` - CycloneDX spec version for the VEX output: `1.6` | `1.7` (default: `1.6`, which released Dependency-Track versions can ingest; opt up to `1.7` if your consumer supports it)
 - `--attest` - Emit a CycloneDX attestation sidecar recording how each CVE was scored (model, seed, prompt/input/config hashes, reasoning, raw response) for audit and reproduction
 - `--attest-signing-key` - Path to an unencrypted PKCS#8 PEM P-256 private key used to sign the attestation (requires `--attest`; `--attest-signing-key-id` sets the keyId label)
@@ -166,9 +178,9 @@ vens enrich --vex output.vex.json --output enriched-report.json report.json
 
 - **[📖 Full Documentation](https://venslabs.github.io/vens/)** — installation, guides, reference
 - **[5-minute Quickstart](https://venslabs.github.io/vens/getting-started/quickstart/)** — your first VEX
-- **[Prioritize a CVE backlog](https://venslabs.github.io/vens/guides/prioritize-cves/)** — the common use case
+- **[Prioritize a CVE backlog](https://venslabs.github.io/vens/guides/prioritize-cves/)** — the main use case
 - **[CVSS vs OWASP contextual](https://venslabs.github.io/vens/concepts/cvss-vs-owasp/)** — why the scores move
-- **[Choosing an LLM](https://venslabs.github.io/vens/concepts/choosing-a-model/)** — which model to run, backed by a [benchmark](https://venslabs.github.io/vens/assets/vens-benchmark.pdf)
+- **[Choosing an LLM](https://venslabs.github.io/vens/concepts/choosing-a-model/)** — which model to run, with a [benchmark](https://venslabs.github.io/vens/assets/vens-benchmark.pdf) run on the scoring up to v0.6
 - [Complete Example](examples/quickstart/) - 107 real CVEs comparison
 - [Trivy Plugin Guide](docs/TRIVY_PLUGIN.md) - Plugin usage
 
@@ -189,7 +201,7 @@ Apache License 2.0 - See [LICENSE](LICENSE)
 
 ---
 
-**Focus on what matters. Patch smarter, not harder.**
+**Rank CVEs in your context, not by CVSS alone.**
 
 [docs-img]: https://img.shields.io/badge/docs-venslabs.github.io%2Fvens-blue?logo=readthedocs&logoColor=white
 [docs]: https://venslabs.github.io/vens/

@@ -8,6 +8,7 @@ stderr '--attest-signing-key requires --attest'
 -- placeholder.key --
 vens fails before it reads this file
 -- config.yaml --
+schema_version: 2
 project:
   name: "attest-key-requires-attest"
   description: "Fail-closed signing key without --attest"

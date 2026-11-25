@@ -7,6 +7,7 @@ stderr 'pass a file path, not the key itself'
 ! exists output.attestation.cdx.json
 
 -- config.yaml --
+schema_version: 2
 project:
   name: "attest-key-value"
   description: "Key passed by value"

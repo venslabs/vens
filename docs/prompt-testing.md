@@ -1,49 +1,40 @@
 # Prompt Testing
 
-The LLM prompt is tested in `pkg/generator/prompt_test.go`. These tests ensure the prompt stays consistent with the OWASP Risk Rating Methodology.
+vens renders its requests in `pkg/contract` and sends them from `pkg/generator`: one system prompt per run, one request per question, and one adjustment request per flagged CVE. The tests hold these texts to the reviewed wording and the rules to the OWASP levels.
 
 ## What the tests check
 
-- **Structure**: Role definition, section ordering (Role → Context → Task → Output)
-- **OWASP factors**: All 4 factors present (Threat Agent, Vulnerability, Technical Impact, Business Impact)
-- **Score ranges**: 0-9 scale with anchoring values (1-3, 4-6, 7-9)
-- **Conditional sections**: Security controls, compliance, availability, audit requirements
-- **Output format**: JSON schema fields, example validity
+- **Golden frames** (`pkg/contract/golden_test.go`): the system prompt, each question's request and the adjustment's request, for four deployments, equal the files under `pkg/contract/testdata`, and `testdata/SHA256SUMS` pins the sha256 of each frame.
+- **Questions and rules** (`pkg/contract/questions_test.go`, `rules_test.go`): which questions a CVE gets, the level each answer maps to, `cannot_tell` and its counters, the adjustment never raising a level.
+- **Rendering** (`pkg/contract/render_test.go`): the CVSS lines and the controls a question shows.
+- **What reaches a request** (`pkg/generator/prompt_test.go`): the deployment block, the config fields each question shows, and the fields that reach no request, such as `audit_requirement`, `ids`, `siem`, `edr` and the fields vens reads alone.
+- **Schemas** (`TestOutputSchemaRequired`): every schema sent closes every object and requires each property, as OpenAI's strict mode needs.
+- **Length** (`pkg/generator/length_test.go`): no call sends more than the ceiling, over the committed reports and contexts.
 
 ## Before modifying the prompt
 
-1. Run the tests first: `go test ./pkg/generator/... -run TestPrompt`
-2. Understand which test will fail and why
-3. Update the test if your change is intentional
+1. Run the tests first: `go test ./pkg/contract/... ./pkg/generator/...`
+2. Understand which test will fail and why.
+3. Rewrite the golden frames with `go test ./pkg/contract/ -run TestGolden -update`, review the diff, and update `pkg/contract/testdata/SHA256SUMS` in the same change: `-update` leaves the sums alone on purpose.
 
 ## Common gotchas
 
 | Change | Test that will break |
 |--------|---------------------|
-| Remove "You are" at start | `TestPromptRoleDefinition` |
-| Change section order | `TestPromptStructureOrder` |
-| Remove a scoring range like "7-9" | `TestPromptAnchoringValues` |
-| Remove "Cap at 9" | `TestPromptScoreNormalization` |
-| Add conditional text without config check | `TestPromptSecurityControlsConditional` and friends |
-| Break the JSON example | `TestOutputExampleValidJSON` |
-
-## Adding new prompt features
-
-If you add a conditional section (like compliance requirements):
-
-1. Add a test that checks it's absent when the config field is empty
-2. Add a test that checks it's present when the config field is set
-3. See `TestPromptComplianceConditional` for the pattern
+| Any change to a question, an answer or the system prompt | `TestGoldenFrames`, then `TestGoldenFramesMatchPinnedSums` |
+| Show a config field to a question that should not see it | `TestPromptAuditRequirementConditional` and friends |
+| Add a field to a reply schema without requiring it | `TestOutputSchemaRequired` |
+| Make the longest call longer than the ceiling | `TestPromptLength` |
 
 ## Quick test commands
 
 ```bash
-# All prompt tests
-go test ./pkg/generator/... -run TestPrompt -v
+# The rendered texts
+go test ./pkg/contract/ -run TestGolden -v
 
-# Just structure tests
-go test ./pkg/generator/... -run "TestPromptCore|TestPromptStructure" -v
+# What reaches a request
+go test ./pkg/generator/ -run TestPrompt -v
 
-# Just conditional logic tests
-go test ./pkg/generator/... -run "Conditional" -v
+# The rules
+go test ./pkg/contract/ -run "TestQuestions|TestRules|TestCannotTell" -v
 ```

@@ -9,6 +9,7 @@ stderr 'no PEM block'
 -- bad.key --
 not-a-real-key
 -- config.yaml --
+schema_version: 2
 project:
   name: "attest-bad-key"
   description: "Fail-closed bad signing key"

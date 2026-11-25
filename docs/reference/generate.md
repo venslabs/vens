@@ -13,7 +13,7 @@ For a walkthrough, see **[Quickstart](../getting-started/quickstart.md)**.
 vens generate --config-file CONFIG --sbom-serial-number urn:uuid:<uuid> INPUT OUTPUT [flags]
 ```
 
-Generate a CycloneDX VEX document from a Trivy or Grype vulnerability report, with contextual OWASP risk scores computed by an LLM.
+Generate a CycloneDX VEX document from a Trivy or Grype vulnerability report, with an OWASP risk rating for each CVE in your deployment. The LLM answers closed questions about each CVE; vens reads the losses of confidentiality, integrity and availability from the CVE's CVSS v3 vectors and computes every level, the severity and the score. It publishes no VEX status. See **[How vens rates a CVE](../concepts/cvss-vs-owasp.md#how-vens-rates-a-cve)**.
 
 ---
 
@@ -30,7 +30,7 @@ Generate a CycloneDX VEX document from a Trivy or Grype vulnerability report, wi
 
 ### `--config-file <path>`
 
-Path to your [`config.yaml`](config-schema.md) file.
+Path to your [`config.yaml`](config-schema.md) file, in schema 2 (`schema_version: 2`). A file written for vens v0.6 or earlier is refused at load, before any LLM call: see **[Migrating from vens v0.6](config-schema.md#migrating)**. Warnings about fields left out are logged at load, before any LLM call.
 
 ### `--sbom-serial-number <urn:uuid:...>`
 
@@ -75,10 +75,14 @@ vens generate --llm openai --config-file c.yaml --sbom-serial-number "$SBOM_UUID
 
 ### `--llm-batch-size <int>`
 
-Number of CVEs sent to the LLM per request. Default: `10`.
+Number of distinct CVEs in a batch. Default: `10`. A CVE found in several packages counts once.
+
+Each batch gets one call per question, in a fixed order, about the batch's CVEs that get that question: up to 7 calls per batch. No call asks whether a CVE is reachable, nor its losses of confidentiality, integrity and availability, which come from its CVSS v3 vectors, nor its Financial damage and Reputation damage, which come from `business_criticality`. Each flagged CVE then gets one more call of its own, the adjustment, when it has a field left to ask: Opportunity, when a row describes the CVE, and whether confidentiality can be affected, when it was asked Privacy violation. So a CVE is sent once per question asked about it, and the batch size sets how many CVEs share each call, not how many calls a CVE gets.
 
 - Lower values (e.g. `5`) — fewer CVEs per call, more calls, safer for small context windows.
-- Higher values (e.g. `20`) — fewer calls, faster, uses more tokens per call.
+- Higher values (e.g. `20`) — fewer calls, more tokens per call.
+
+The run summary, logged for runs that reach scoring, gives the calls made, per question (see **[The run summary](#the-run-summary)**).
 
 ```bash
 vens generate --llm-batch-size 15 ...
@@ -95,10 +99,10 @@ Seed forwarded to the LLM when the provider supports it. Default: `0` (no explic
 !!! warning "Reproducibility is best-effort, not a guarantee"
     Even at `--llm-temperature 0.0` with a fixed `--llm-seed`, **byte-identical scores across runs are not guaranteed**. Cloud LLM providers periodically update server-side models without changing the API model name, and most of them do not expose true deterministic decoding. What Vens does do is:
 
-    - Compute the final OWASP score in Go from the LLM's four 0-9 component scores (`pkg/generator/generator.go`). Small drifts in the component scores are absorbed by the arithmetic.
-    - Keep the same prompt, schema and ordering across runs.
+    - Ask closed questions: the model picks a named answer from a fixed list, never a number, and vens computes every level, the severity and the score in Go. Given the same answers, the rating is the same.
+    - Keep the same prompts, schemas and question order across runs.
 
-    In practice, expect **score drift of ±1–3 points on a minority of CVEs** between runs with the same config and model. If you need strict reproducibility (for audit evidence at a fixed point in time), pin a local Ollama model version, pass `--llm-temperature 0 --llm-seed <n>`, **and** archive the `--debug-dir` output — together they give you a byte-exact record of what was sent and returned.
+    An answer that changes between runs moves its factor's level, and with it the score, and the severity when the likelihood or the impact crosses a band boundary. How often that happens depends on the model; vens does not promise a figure. If you need strict reproducibility (for audit evidence at a fixed point in time), pin a local Ollama model version, pass `--llm-temperature 0 --llm-seed <n>`, **and** archive the `--debug-dir` output — together they give you a byte-exact record of what was sent and returned, and `answers.json` gives each answer and the level vens read from it.
 
 ### `--input-format <auto|trivy|grype>`
 
@@ -148,35 +152,79 @@ Each run adds a new `run-*` directory, and nothing deletes the old ones. Remove 
 
 **What you get**, for each LLM call, numbered from `00001` in call order:
 
-- `batch-NNNNN.system.prompt` — the full system prompt sent to the LLM, including your `config.yaml` context formatted as text, the OWASP scoring instructions, and the JSON schema the LLM must return. Shape (truncated):
+- `batch-NNNNN.system.prompt` — the system prompt, the same for every call of a run: the role, your deployment (project name and description, exposure with its meaning and the attacker group, `listener` when `present` or `absent`, `notes`) and the rules for answering. Shape (truncated):
 
     ```
-    You are a talented security expert scoring vulnerabilities using OWASP Risk Rating Methodology.
+    You are a security expert. You answer questions of the OWASP Risk Rating Methodology about vulnerabilities found in one deployment, described below. ...
 
-    SYSTEM CONTEXT:
-    Project: my-python-api
-    Description: Customer-facing Python API handling user data
-    Exposure: internet
-    Data Sensitivity: high
-    Business Criticality: high
-    Compliance Requirements: GDPR
-    Security Controls: WAF
-    ...
+    DEPLOYMENT
+    Project: python-backend-api
+    Description: Python 3.11 backend API service handling customer data
+    Exposure: internet (Publicly accessible). The attacker group to consider is anonymous Internet users.
+    Listener: present (this deployment accepts connections that other parties open: it listens on a port or socket, as a server or as a peer others connect to).
+    Notes: Customer-facing REST API built with FastAPI/Flask ...
 
-    TASK: For EACH vulnerability, analyze its specific characteristics and score 4 factors (0-9):
-    1. THREAT_AGENT ...
-    ...
-    #### Output format: JSON Schema
-    {...}
+    Judge each vulnerability from its own entry and this deployment. Choose cannot_tell only when the facts given do not decide between the other answers. In reasoning, state in one sentence the fact that decides the answer, before giving it.
     ```
 
-- `batch-NNNNN.human.prompt` — the JSON array of CVEs sent in that call (vuln id, pkg, title, description, severity).
-- `batch-NNNNN.response` — the model's raw reply to that call, with its scores and reasoning for each CVE. It is written before Vens parses it, so a reply that fails to parse is on disk too. A call that failed, such as a batch the provider truncated, has no `.response`.
+- `batch-NNNNN.human.prompt` — the request: the CVE entries of that call as JSON (vuln id, title, description, severity, packages), then one question, the config fields that question shows, and its closed list of answers. An adjustment call holds one flagged CVE with the evidence of its flag. Shape (truncated):
 
-Numbers count LLM calls, not `--llm-batch-size` batches: a batch the provider truncates is retried in two halves, and a CVE the model leaves out is asked about again on its own, each in a call with its own number.
+    ```
+    VULNERABILITIES
+    [{"vulnId":"CVE-2011-3374","title":"...","description":"...","severity":"LOW","packages":[...]}, ...]
+
+    QUESTION
+    How motivated are anonymous Internet users to find and exploit this vulnerability in this service? ...
+
+    FOR THIS QUESTION
+    Business criticality: high (Customer-facing, important operations)
+    Data sensitivity: high (PII, financial data, customer info)
+
+    ANSWERS
+    - low_or_no_reward: Low or no reward: ...
+    - possible_reward: Possible reward: ...
+    - high_reward: High reward: ...
+    - cannot_tell: The facts given do not say.
+    ...
+    ```
+
+- `batch-NNNNN.response` — the model's raw reply to that call: for each CVE, its answer and one sentence of reasoning. It is written before Vens parses it, so a reply that fails to parse is on disk too. A call that failed, such as one the provider truncated, has no `.response`.
+
+The JSON Schema of each reply is sent to the provider with the call, not written to these files.
+
+Numbers count LLM calls, not `--llm-batch-size` batches: each batch makes one call per question, a call the provider truncates is retried in two halves, and the CVEs a reply leaves out or leaves without a readable answer are asked again in one more call, each with its own number.
+
+Each run also writes **`answers.json`**: for each CVE, each of the 16 factors in the vector's order with the answer as the reply wrote it (when the question was asked), how vens read it (`answered`, `cannot_tell`, `invalid` for an answer off its list, `no_description`), the level, and where the level came from (`answer`, `worst_case` for Skill level, no field declaring the attackers' skill, `constant` for Ease of discovery and Awareness, `config`, `cvss` for the three technical impacts, `criticality` for Financial damage and Reputation damage, what `business_criticality` declares at the band of the highest of the three, `floor` for a Privacy violation the vectors floor, `adjustment`), with `cvss`, the value the usable CVSS v3 vectors give the axis, on the three technical impacts and on a floored Privacy violation; the adjustment's answer on `O` and, for its confidentiality question, on `PV`; whether the adjustment was made and how it read; the CVE's counters; the run's counters summed; and the run's `defects`: each kind the [run summary](#the-run-summary)'s `defects.*` counts, under the same name and with the same total, only those found (`{}` when the replies held none). For a CVE with no description, `M`, `O` and `EE`, which are not asked, carry the source `answer` with no `answer` key and the reading `no_description`. A run that fails also lists, marked `unrated` and without levels, the CVEs of the batch it failed in that already had answers, and its `defects` are those counted before it stopped. It holds no reasoning and no CVE text, but keeps each answer verbatim. From a mock run (`--llm=mock`) on `examples/quickstart`'s Trivy report with `data_subjects`, `detection` and `traceability` removed from its `config.yaml`, so their fallbacks are counted:
+
+```json
+{
+  "vulnerabilities": [
+    {
+      "vulnId": "CVE-2011-3374",
+      "adjustment": "not_asked",
+      "factors": [
+        { "factor": "SL", "level": 9, "source": "worst_case" },
+        { "factor": "M", "answer": "possible_reward", "reading": "answered", "level": 4, "source": "answer" },
+        ...
+        { "factor": "LC", "level": 2, "source": "cvss", "cvss": "N" },
+        { "factor": "LI", "level": 3, "source": "cvss", "cvss": "L" },
+        ...
+        { "factor": "FD", "level": 3, "source": "criticality" },
+        { "factor": "RD", "level": 4, "source": "criticality" },
+        ...
+        { "factor": "PV", "level": 3, "source": "floor", "cvss": "N" }
+      ],
+      "counters": ["detection_undeclared", "traceability_missing"]
+    },
+    ...
+  ],
+  "counters": { "cvss_v3_missing": 8, "data_subjects_missing": 26, "detection_undeclared": 45, "ease_of_exploit_cannot_tell": 4, "motive_cannot_tell": 4, "opportunity_cannot_tell": 4, "severity_contested_unavailable": 27, "traceability_missing": 45 },
+  "defects": {}
+}
+```
 
 !!! note "Matching the files to the `--attest` evidence"
-    Match a call's files to its `evidence-batch-N` entry by `prompt_hash`, not by number: the attestation records only the calls that succeeded, so after a truncated batch, `batch-00002` can be `evidence-batch-1`. `prompt_hash` is the SHA-256 of the system prompt, two newlines, then the human prompt:
+    Match a call's files to its `evidence-batch-N` entry by `prompt_hash`, not by number: the attestation records only the calls that succeeded, so after a truncated call, `batch-00002` can be `evidence-batch-1`. `prompt_hash` is the SHA-256 of the system prompt, two newlines, then the human prompt:
 
     ```bash
     cd vens-debug/run-3787846641
@@ -184,16 +232,16 @@ Numbers count LLM calls, not `--llm-batch-size` batches: a batch the provider tr
     jq -r '.declarations.evidence[] | .["bom-ref"] + " " + (.data[] | select(.name == "prompt_hash") | .contents.attachment.content)' ../../out.attestation.cdx.json
     ```
 
-    An ask-again for a lone CVE repeats its prompt word for word, so two entries can share a hash. They come in the same order as the files, and each entry's `raw_response` is its call's `.response`, base64-encoded.
+    An ask-again that holds every CVE of the call it repeats sends the same prompt word for word, so two entries can share a hash. They come in the same order as the files, and each entry's `raw_response` is its call's `.response`, base64-encoded.
 
-Per-CVE component scores and the LLM's reasoning are also logged to stderr at `INFO`/`DEBUG` level (run with `DEBUG=1` to see them).
+Each CVE's score, severity and vector are also logged to stderr at `INFO`, once per affected package (`Scored vulnerability`), and the questions planned for each CVE at `DEBUG` (run with `DEBUG=1` to see them).
 
 !!! warning "Treat `--debug-dir` output as sensitive"
     These files contain the **full text** of what was sent to the LLM provider and of what it sent back:
 
-    - Your `config.yaml` context, including the `notes` field verbatim.
+    - The parts of your `config.yaml` the questions show, including the `notes` field verbatim. `data_subjects`, `detection`, `traceability`, `audit_requirement` and the `ids`, `siem` and `edr` controls are never sent, so they are not in these files.
     - Every CVE identifier from the scanned image, plus titles and descriptions.
-    - The model's reasoning about each CVE in your context.
+    - The model's answers and reasoning for each CVE in your context, and in `answers.json` each answer as the model wrote it.
 
     On Linux and macOS, Vens creates each run directory and its files readable by your user only (`0700` and `0600`). Do **not** commit them to a public repository. In CI, either delete the directory after inspection or upload it to an access-controlled artifact store.
 
@@ -214,9 +262,9 @@ vens generate --attest \
 
 **What it contains** (CDX BOM at the same spec version as the VEX — `1.6` by default, or whatever `--cyclonedx-spec-version` selects — everything under `declarations`):
 
-- `claims[]` — one per scored CVE/affected component: the assessment (`predicate` + `reasoning`), linked to its target component and to the evidence that backs it. When a claim's package and version were not in the prompt of the batch it cites (a later batch reusing the CVE's first score, or a held-back row filled in by a later batch), its predicate ends with "; this package was not in the cited batch's prompt".
+- `claims[]` — one per scored CVE/affected component, linked to its target component and to the evidence of every call that answered for the CVE. The `predicate` gives the score and the severity; the `reasoning` holds one line per question answered, `factor (answer): sentence`, and one for the adjustment when the CVE was flagged. For a CVE with no description, it starts with `M (not asked: no description)`, then the same line for `O` and for `EE`.
 - `targets.components[]` — the affected components the claims point at
-- `evidence[]` — one per LLM batch, recording how the scoring was produced:
+- `evidence[]` — one per LLM call that returned a reply, recording how the scoring was produced:
     - `generation_method` — `llm`
     - `provider` / `model` — backend and model used (e.g. `openai` / `gpt-5.4-mini`); when the provider's `*_MODEL` env var is unset, vens falls back to that provider's default and logs it
     - `seed` — the LLM seed (`0` if unset)
@@ -286,9 +334,98 @@ Without the `bom` link check, a signed sidecar left over from an earlier run sti
 
 Digest rule (for a custom verifier): keep only the signer you are checking in `signature.signers`, drop its `value`, then take the SHA-256 of the [JCS](https://www.rfc-editor.org/rfc/rfc8785) form of the whole document (JSF section 8). For the single signer vens writes, the `signature` member becomes `{"signers":[<signer without value>]}`, every other member stays as is, and it stays correct after a countersignature. Do not strip the whole `signature` member.
 
+### `--strict`
+
+New in v0.7.0. Fails a run that would use a worst-case fallback, and writes no VEX and no attestation; a VEX or an attestation an earlier run left at the output path stays as it was. Off by default: without it, vens uses each fallback and counts it in the [run summary](#the-run-summary).
+
+A strict run fails at the first of three checks that finds one, with exit code 1:
+
+1. **At load**, before the LLM provider is set up: `data_subjects`, `detection` or `traceability` left out.
+
+    ```text
+    strict: context.data_subjects, context.detection, context.traceability not declared, so each would fall back to its worst case
+    ```
+
+2. **Before any LLM call**: a CVE with no usable CVSS v3 vector (none in the scanner's report, or each one refused: it does not parse, states another version than 3.0 or 3.1, or lacks `C`, `I` or `A` on `H`, `L` or `N`), or a CVE with no description. One error lists every such CVE with its causes, each refused vector with why:
+
+    ```text
+    failed to generate risk scores: strict: 2 vulnerabilities would fall back to a worst case, so no LLM call is made:
+      CVE-2026-2673: cvss_v3_missing: no CVSS v3 vector in the scanner's report, so Loss of confidentiality, integrity and availability take their worst level
+      CVE-2026-3184: cvss_v3_missing: no CVSS v3 vector in the scanner's report, so Loss of confidentiality, integrity and availability take their worst level; no description in the scanner's report, so Motive, Opportunity and Ease of exploit are not asked and take their worst case
+    ```
+
+    Here the cause is the scan, not your config. A scan holding a CVE with no usable CVSS v3 vector cannot pass `--strict`, and nothing in vens fixes it: the vector has to come from the scanner. Without `--strict`, such a CVE has Loss of confidentiality, integrity and availability at 9, and counts in `cvss_v3_missing`.
+
+3. **During the run**: the first answer to a question that reads as `cannot_tell`, an answer off its list included. The run stops after that call:
+
+    ```text
+    failed to generate risk scores: strict: the answer to Privacy violation (PV) for CVE-2024-2222 reads as cannot_tell, counted as privacy_cannot_tell; stopping the run
+    ```
+
+The adjustment's `cannot_tell` keeps the answer the CVE already had: it is not counted and does not fail a strict run. To pass the first check, declare `data_subjects`, `detection` and `traceability`, as the **[fully declared file](config-schema.md#fully-declared-file)** does.
+
+```bash
+vens generate --strict --config-file c.yaml --sbom-serial-number "$SBOM_UUID" report.json out.json
+```
+
 ### `--sbom-version <int>`
 
 BOM-Link `version` number used alongside `--sbom-serial-number`. Default: `1`.
+
+---
+
+## The VEX document
+
+Each vulnerability holds one OWASP rating (vector, severity and score), the BOM-Link `affects` of every package the CVE was found in, and exactly two properties:
+
+```json
+"properties": [
+  { "name": "vens:impact-provenance", "value": "cvss-v3" },
+  { "name": "vens:impact-basis", "value": "business" }
+]
+```
+
+`vens:impact-provenance`: `cvss-v3` means Loss of confidentiality, integrity and availability were read from the CVE's usable CVSS v3 vectors. `missing-cvss-v3-fallback` means the CVE has none, so the missing-input rule set the three to 9: the same CVEs the run summary counts in `cvss_v3_missing`, which `--strict` refuses. The value follows that rule, never the levels. Keep the second kind in a separate "impact unknown" list and order the first by severity, then score, then identifier: see **[Get your top 10](../guides/prioritize-cves.md#step-4-get-your-top-10)**.
+
+`vens:impact-basis` is the impact the severity and the score are read on, the same for every vulnerability of a run: `business` when `config.yaml` declares `data_subjects`, `technical` when it does not (see **[How vens rates a CVE](../concepts/cvss-vs-owasp.md#how-vens-rates-a-cve)**). On the business basis, the 9s the missing-input rule sets reach the severity only as a high worst technical loss, at which Financial damage and Reputation damage take the worst case `business_criticality` declares. The vector does not say which impact was read: a tool that recomputes the severity or the score from the vector must read this property, or it can disagree with vens.
+
+A run that would write a vulnerability without one of the two properties, or with two values of one for a CVE, fails and writes no VEX.
+
+The VEX's `metadata` holds one property:
+
+```json
+"properties": [
+  { "name": "vens:rating-policy", "value": "2" }
+]
+```
+
+`vens:rating-policy` is the version of the rules the ratings follow. Version `2` reads the impact on `vens:impact-basis`, business when `config.yaml` declares `data_subjects` and technical otherwise, and sets Financial damage and Reputation damage from what `business_criticality` declares at the CVE's worst technical loss, the highest of its Loss of confidentiality, integrity and availability. A VEX without the property predates version 2: its ratings follow earlier rules.
+
+---
+
+## The run summary
+
+A run that reaches scoring ends with one `INFO` line, `Scoring run finished`, also when it fails during scoring. From a mock run (`--llm=mock`) on `examples/quickstart`'s Trivy report with `data_subjects`, `detection` and `traceability` removed from its `config.yaml`, so their fallbacks are counted:
+
+```text
+level=INFO msg="Scoring run finished" rows=107 cves=45 llm_calls=36 asked_again=0 splits=0 calls.M=5 calls.O=5 calls.EE=5 ... calls.adjustment=6 counters.cvss_v3_missing=8 counters.data_subjects_missing=26 counters.detection_undeclared=45 counters.ease_of_exploit_cannot_tell=4 counters.motive_cannot_tell=4 counters.opportunity_cannot_tell=4 counters.severity_contested_unavailable=27 counters.traceability_missing=45 failed=false
+```
+
+- `rows` and `cves` — the scanner's findings, and the distinct CVEs among them.
+- `llm_calls`, `asked_again`, `splits` — every call made, the calls that asked again for CVEs a reply left without an answer, out of it or unreadable, and the calls split in half after the provider truncated them.
+- `calls.<factor>` — the calls of each question (`M`, `O`, `EE`, `ID`, `LAC`, `NC`, `PV`), and `calls.adjustment`. A question no CVE needs makes no call.
+- `counters.*` — one per CVE that used a fallback, shown when not zero:
+    - `<factor>_cannot_tell` (`motive_cannot_tell`, `opportunity_cannot_tell`, `ease_of_exploit_cannot_tell`, `intrusion_detection_cannot_tell`, `accountability_cannot_tell`, `non_compliance_cannot_tell`, `privacy_cannot_tell`) — the answer read as `cannot_tell`, or an answer off its list, so the question's worst answer applied. That is the factor's worst level, except where a rule still limits it: Intrusion detection takes the worst channel `detection` declares, `data_subjects` caps Privacy violation, and a flagged CVE's adjustment can lower Opportunity or Privacy violation. A CVE with no description is not asked Motive, Opportunity and Ease of exploit, nor Opportunity in its adjustment, a description being a prerequisite of their answers, and counts in `motive_cannot_tell`, `opportunity_cannot_tell` and `ease_of_exploit_cannot_tell`.
+    - `detection_undeclared`, `traceability_missing`, `data_subjects_missing`, `availability_requirement_missing` — the fallback of a field left out of `config.yaml`; `availability_requirement_missing` counts the CVEs whose Loss of availability is read from a usable CVSS v3 vector, in the primary column.
+    - `cvss_v3_missing` — the CVE has no usable CVSS v3 vector, so Loss of confidentiality, integrity and availability took 9.
+    - `severity_contested_unavailable` — no record in the report to check the CVE's severity against NVD's, so a contested severity could not be flagged, on every row of the CVE; where the severity is NVD's own: not counted. Trivy and Grype count it the same way.
+    - `reasoning_missing` — a reply gave no reasoning for one of the CVE's answers; the answer is kept.
+- `defects.*` — replies that break the schema or the instructions, counted by kind: `answer_off_list`, `answer_key_written_twice`, `answer_without_reasoning`, `answer_cve_not_asked`, `answer_cve_repeated`, `reply_unreadable` (a reply that is not the JSON asked for, or holds an answer that is not a JSON object, counted once per reply: the CVEs it leaves without an answer are asked again), and for the adjustment `adjustment_unreadable`, `adjustment_key_written_twice`, `adjustment_off_list`, `adjustment_field_not_asked`, `adjustment_without_reasoning`. A provider that honours the schema and the prompt writes none.
+- `failed` — whether the run failed.
+
+A run that fails `--strict`'s check before any LLM call (a CVE without a usable CVSS v3 vector or without a description) logs it too, with `llm_calls=0`, no counters and `failed=true`. A run that stops earlier logs no summary, such as one whose config fails to load or fails `--strict`'s config check (`data_subjects`, `detection` or `traceability` left out); a report with no vulnerabilities logs none either.
+
+`--debug-dir` writes the same counters, per CVE, and the same defects to `answers.json`.
 
 ---
 
@@ -312,7 +449,7 @@ BOM-Link `version` number used alongside `--sbom-serial-number`. Default: `1`.
 | Code | Meaning |
 |---|---|
 | `0` | Success — VEX written to `OUTPUT` |
-| `1` | Generic failure (I/O, config validation, LLM call) |
+| `1` | Failure: I/O, a config that does not load, an LLM call, or a `--strict` check |
 | `2` | Invalid CLI usage (bad flags or arguments) |
 
 !!! note
@@ -386,4 +523,4 @@ trivy vens generate --config-file vens.yaml --sbom-serial-number "$SBOM_UUID" re
 
 - **[config.yaml reference](config-schema.md)** — every field of the context file
 - **[Quickstart](../getting-started/quickstart.md)** — end-to-end walkthrough
-- **[Prioritize a CVE backlog](../guides/prioritize-cves.md)** — the common use case
+- **[Prioritize a CVE backlog](../guides/prioritize-cves.md)** — the main use case

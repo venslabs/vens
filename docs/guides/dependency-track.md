@@ -8,7 +8,7 @@
 
     **Its Trivy analyzer, enabled.** Both sides then share one vulnerability database, and the CVE sets line up by construction. Dependency-Track has no Grype analyzer, so this is the only supported pairing today.
 
-![The VEX feeds the CI gate and Dependency-Track: the same CVE scores 2.0 in the internal context and 22.5 in the internet-facing one](../assets/vex-consumers.svg)
+![The VEX feeds the CI gate and Dependency-Track: the same CVE rates medium in the internal context and high in the internet-facing one](../assets/vex-consumers.svg)
 
 ---
 
@@ -130,12 +130,16 @@ OWASP Vector: (None) → SL:5/M:5/O:5/S:5/ED:4/EE:4/A:4/ID:4/LC:5/LI:5/LAV:5/LAC
 OWASP Score:  (None) → 22.5
 ```
 
-Over the API, `GET /api/v1/finding/project/$PROJECT` returns the vector and the score on every finding at once. Vens emits a single score, so the likelihood, technical and business fields all carry the same number.
+This trail comes from a vens v0.6 run, whose vectors repeat four numbers over the 16 factors. Since v0.7.0 each factor has its own level; see [How vens rates a CVE](../concepts/cvss-vs-owasp.md#how-vens-rates-a-cve).
+
+Over the API, `GET /api/v1/finding/project/$PROJECT` returns the vector and the score on every finding at once. Dependency-Track keeps one OWASP score per analysis, so the likelihood, technical impact and business impact fields all carry that score; the 16 levels are in the vector.
 
 ---
 
 ## Known limits
 
 - **Ranking still follows CVSS.** Dependency-Track stores and displays the OWASP score, but severity, the findings list and the dashboards are still driven by CVSS. Two projects with very different contextual scores show the same severity breakdown.
+- **No "impact unknown" list.** Dependency-Track 5.1 reads neither the VEX's `vens:impact-provenance` property nor vens's order (severity, then score, then identifier among impact-assessed findings). A CVE whose impacts the missing-input rule set to 9 shows as an ordinary finding, critical or high on the technical impact basis; keep those apart yourself, as **[Get your top 10](prioritize-cves.md#step-4-get-your-top-10)** shows.
+- **No impact basis.** Dependency-Track 5.1 does not read the VEX's `vens:impact-basis` property either. The vector it stores does not say whether vens read the severity and the score on the technical or the business impact, so a severity recomputed from that vector alone, by the OWASP calculator or a script over the API, can disagree with vens's: take the basis from the VEX.
 - **The 16-factor panel is not on the finding.** Dependency-Track's OWASP Risk Rating panel lives on the global vulnerability page and reads that vulnerability's own vector, which a VEX import does not touch.
 - **The scores come from an LLM.** They are a ranking aid, not a verdict. See [Limitations](../concepts/limitations.md), and pass [`--attest`](../reference/generate.md#-attest) to keep the per-CVE reasoning as audit evidence.

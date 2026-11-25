@@ -1,0 +1,156 @@
+# A strict run refuses a config that leaves data_subjects, detection or
+# traceability undeclared while loading it, before it reads the report: the
+# error comes even when the report does not exist, after the warnings any run
+# prints at load.
+! exec vens generate --strict --llm=mock --config-file=undeclared.yaml --sbom-serial-number=urn:uuid:22222222-2222-2222-2222-222222222222 missing-report.json out.cdx.json
+stderr 'level=WARN msg="context.traceability is not declared: Loss of accountability uses its `none` column, 7 or 9 on every finding."'
+stderr 'level=WARN msg="context.detection is not declared: every channel counts as not logged, so Intrusion detection is 9 on every finding."'
+stderr 'level=WARN msg="context.data_subjects is not declared: '
+stderr 'strict: context.data_subjects, context.detection, context.traceability not declared, so each would fall back to its worst case'
+! stderr 'missing-report'
+! exists out.cdx.json
+
+# The refusal also comes before the provider is set up: with no API key, a
+# strict run still names the undeclared fields, where a run that is not
+# strict stops at the missing key.
+env OPENAI_API_KEY=
+! exec vens generate --strict --llm=openai --config-file=undeclared.yaml --sbom-serial-number=urn:uuid:22222222-2222-2222-2222-222222222222 missing-report.json out.cdx.json
+stderr 'strict: context.data_subjects, context.detection, context.traceability not declared'
+! stderr 'OPENAI_API_KEY'
+! exec vens generate --llm=openai --config-file=undeclared.yaml --sbom-serial-number=urn:uuid:22222222-2222-2222-2222-222222222222 missing-report.json out.cdx.json
+stderr 'openai: OPENAI_API_KEY is not set'
+! stderr 'strict:'
+
+# Before any LLM call, a strict run refuses every CVE with no usable CVSS v3
+# vector, whatever the cause, a v4 vector alone included, and every CVE no
+# row describes. One error names each; CVE-2024-0007, complete, is not named.
+! exec vens generate --strict --llm=mock --attest --config-file=declared.yaml --sbom-serial-number=urn:uuid:22222222-2222-2222-2222-222222222222 report.json out.cdx.json
+stderr 'strict: 6 vulnerabilities would fall back to a worst case, so no LLM call is made:'
+stderr 'CVE-2024-0001: cvss_v3_missing: no CVSS v3 vector in the scanner''s report, so Loss of confidentiality, integrity and availability take their worst level'
+stderr 'CVE-2024-0002: cvss_v3_missing: no usable CVSS v3 vector, so Loss of confidentiality, integrity and availability take their worst level: nvd CVSS 3.1 vector \\"CVSS:3.1/AV:N/garbage\\": \\"garbage\\" is not a metric:value pair'
+stderr 'CVE-2024-0003: cvss_v3_missing: .*nvd CVSS 3.1 vector \\"CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N\\": A is absent or off H, L and N'
+stderr 'CVE-2024-0004: cvss_v3_missing: .*redhat CVSS 3.1 vector \\"CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:X/A:N\\": I is absent or off H, L and N'
+stderr 'CVE-2024-0005: cvss_v3_missing: no CVSS v3 vector in the scanner''s report'
+stderr 'CVE-2024-0006: no description in the scanner''s report, so Motive, Opportunity and Ease of exploit are not asked and take their worst case'
+! stderr 'CVE-2024-0007:'
+stderr 'Scoring run finished.* llm_calls=0 .*failed=true'
+! exists out.cdx.json
+! exists out.attestation.cdx.json
+! exec sh -c 'ls $VENS_TEMP_GLOB'
+
+# Without --strict the same report is rated, each fallback counted.
+exec vens generate --llm=mock --attest --config-file=declared.yaml --sbom-serial-number=urn:uuid:22222222-2222-2222-2222-222222222222 report.json out.cdx.json
+stderr 'Scoring run finished.* counters.cvss_v3_missing=5 .*failed=false'
+exists out.cdx.json
+exists out.attestation.cdx.json
+
+# A strict run refused before any call leaves the VEX and the attestation a
+# previous run wrote byte for byte.
+cp out.cdx.json prev.cdx.json
+cp out.attestation.cdx.json prev.attestation.cdx.json
+! exec vens generate --strict --llm=mock --attest --config-file=declared.yaml --sbom-serial-number=urn:uuid:22222222-2222-2222-2222-222222222222 report.json out.cdx.json
+stderr 'strict: 6 vulnerabilities would fall back to a worst case, so no LLM call is made:'
+cmp out.cdx.json prev.cdx.json
+cmp out.attestation.cdx.json prev.attestation.cdx.json
+! exec sh -c 'ls $VENS_TEMP_GLOB'
+
+-- undeclared.yaml --
+schema_version: 2
+project:
+  name: "strict-preflight"
+context:
+  exposure: "internet"
+  data_sensitivity: "high"
+  business_criticality: "critical"
+-- declared.yaml --
+schema_version: 2
+project:
+  name: "strict-preflight"
+context:
+  exposure: "internet"
+  data_sensitivity: "high"
+  business_criticality: "critical"
+  listener: present
+  data_subjects: millions
+  detection:
+    network: logged
+    host: not_logged
+    application: logged_and_reviewed
+  traceability: per_request
+-- report.json --
+{
+  "SchemaVersion": 2,
+  "CreatedAt": "2026-06-11T10:00:00Z",
+  "ArtifactName": "demo",
+  "ArtifactType": "container_image",
+  "Results": [
+    {
+      "Target": "demo (debian 12)",
+      "Class": "os-pkgs",
+      "Type": "debian",
+      "Vulnerabilities": [
+        {
+          "VulnerabilityID": "CVE-2024-0001",
+          "PkgName": "pkg1",
+          "InstalledVersion": "1.0",
+          "Severity": "HIGH",
+          "Description": "No vector at all.",
+          "PkgIdentifier": { "PURL": "pkg:deb/debian/pkg1@1.0" }
+        },
+        {
+          "VulnerabilityID": "CVE-2024-0002",
+          "PkgName": "pkg2",
+          "InstalledVersion": "1.0",
+          "Severity": "HIGH",
+          "Description": "A vector that does not parse.",
+          "CVSS": { "nvd": { "V3Vector": "CVSS:3.1/AV:N/garbage" } },
+          "PkgIdentifier": { "PURL": "pkg:deb/debian/pkg2@1.0" }
+        },
+        {
+          "VulnerabilityID": "CVE-2024-0003",
+          "PkgName": "pkg3",
+          "InstalledVersion": "1.0",
+          "Severity": "HIGH",
+          "Description": "A vector without A.",
+          "CVSS": { "nvd": { "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N" } },
+          "PkgIdentifier": { "PURL": "pkg:deb/debian/pkg3@1.0" }
+        },
+        {
+          "VulnerabilityID": "CVE-2024-0004",
+          "PkgName": "pkg4",
+          "InstalledVersion": "1.0",
+          "Severity": "HIGH",
+          "Description": "A vector off its version's scale.",
+          "CVSS": { "redhat": { "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:X/A:N" } },
+          "PkgIdentifier": { "PURL": "pkg:deb/debian/pkg4@1.0" }
+        },
+        {
+          "VulnerabilityID": "CVE-2024-0005",
+          "PkgName": "pkg5",
+          "InstalledVersion": "1.0",
+          "Severity": "HIGH",
+          "Description": "A v4 vector without SA, the other half of the A pair.",
+          "CVSS": { "nvd": { "V40Vector": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:N/VI:N/VA:N/SC:N/SI:N" } },
+          "PkgIdentifier": { "PURL": "pkg:deb/debian/pkg5@1.0" }
+        },
+        {
+          "VulnerabilityID": "CVE-2024-0006",
+          "PkgName": "pkg6",
+          "InstalledVersion": "1.0",
+          "Severity": "HIGH",
+          "CVSS": { "nvd": { "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:L/A:N" } },
+          "PkgIdentifier": { "PURL": "pkg:deb/debian/pkg6@1.0" }
+        },
+        {
+          "VulnerabilityID": "CVE-2024-0007",
+          "PkgName": "pkg7",
+          "InstalledVersion": "1.0",
+          "Severity": "HIGH",
+          "Description": "Described, every axis read.",
+          "CVSS": { "nvd": { "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:L/A:N" } },
+          "PkgIdentifier": { "PURL": "pkg:deb/debian/pkg7@1.0" }
+        }
+      ]
+    }
+  ]
+}

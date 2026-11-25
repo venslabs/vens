@@ -1,14 +1,20 @@
-# A CVE the model never scores, even when asked again, stops the run at its
-# batch: the next CVE is never scored, and no VEX or attestation is written.
+# A CVE the model never answers, even when asked again, stops the run at its
+# batch's first question: the next CVE is never scored, and no VEX or
+# attestation is written. No row describes CVE-2024-5678, a title alone, so
+# it is not asked Motive, Opportunity or Ease of exploit; its first question
+# is Loss of accountability.
 env VENS_MOCK_LLM_SKIP=CVE-2024-5678
 ! exec vens generate --llm=mock --llm-batch-size=1 --attest --config-file=config.yaml --sbom-serial-number=urn:uuid:22222222-2222-2222-2222-222222222222 report.json out.cdx.json
-stderr 'model returned no score for CVE-2024-5678 after asking again; stopping the run'
+stderr 'No description in the scanner''s report; Motive, Opportunity and Ease of exploit are not asked, each at its worst level.* vulns=CVE-2024-5678,CVE-2024-1234'
+stderr 'model returned no answer to Loss of accountability \(LAC\) for CVE-2024-5678 after asking again; stopping the run'
+! stderr 'calls.M='
 ! stderr 'Scored vulnerability.*CVE-2024-1234'
 ! exists out.cdx.json
 ! exists out.attestation.cdx.json
 ! exec sh -c 'ls .vens-*.tmp'
 
 -- config.yaml --
+schema_version: 2
 project:
   name: "unscored-cve-test"
   description: "A CVE the model never scores"

@@ -6,6 +6,7 @@ stderr '--attest-signing-key-id requires --attest-signing-key'
 ! exists output.attestation.cdx.json
 
 -- config.yaml --
+schema_version: 2
 project:
   name: "attest-id-without-key"
   description: "Fail-closed key id without a key"

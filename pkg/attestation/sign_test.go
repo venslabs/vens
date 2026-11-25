@@ -182,7 +182,7 @@ func signedAttestation(t *testing.T, key *ecdsa.PrivateKey, keyID string) []byte
 		o.Signer = &Signer{Key: key, KeyID: keyID}
 	})
 	ref := b.AddBatch("sys", "hum", []byte(`{"ok":true}`))
-	b.AddClaim(ref, ClaimInput{
+	b.AddClaim([]string{ref}, ClaimInput{
 		VulnID: "CVE-2024-1234", CompRef: "pkg:deb/debian/openssl@3.0.11?arch=amd64&distro=debian-12.4",
 		CompName: "openssl", CompVersion: "3.0.11", PURL: "pkg:deb/debian/openssl@3.0.11?arch=amd64&distro=debian-12.4",
 		Score: 56, Severity: "high", Reasoning: "RCE <script> & friends",

@@ -31,6 +31,7 @@ json-contains output.attestation.cdx.json '"name": "prompt_hash"'
 json-contains output.attestation.cdx.json '"claims"'
 
 -- config.yaml --
+schema_version: 2
 project:
   name: "attest-signed-test"
   description: "Test project for signed attestation"

@@ -1,0 +1,21 @@
+VULNERABILITIES
+[entries]
+
+QUESTION
+How easy is it for anonymous Internet users, from where they already are, to actually exploit this vulnerability in this deployment, as it is deployed and with the controls in front of it? Any access control the exposure itself requires, such as the corporate network or the VPN or authenticated tunnel, is not one of those controls: anonymous Internet users are already past it. Choose the one answer that holds here.
+
+FOR THIS QUESTION
+Controls in front of this deployment: waf (Web Application Firewall; scope: SQL injection, XSS, path traversal); ddos_protection (DDoS mitigation (CloudFlare, AWS Shield…); scope: Availability / DoS CVEs); segmentation (Network micro-segmentation; scope: Lateral movement)
+CVSS metrics AC, AT, PR, UI of the newest CVSS version published for each vulnerability, one line per source that published a vector; the sources can disagree. A vulnerability with no line has no published vector.
+- CVE-A: CVSS 3.1, nvd: AC:H PR:N UI:N
+- CVE-B: CVSS 3.1, redhat: AC:L PR:L UI:N
+
+ANSWERS
+- theoretical: Theoretical: no practical way to exploit it in this deployment is known.
+- difficult: Difficult: a practical way exists, but here it needs expert work, rare conditions, chaining with another flaw, or getting through a control in front of this deployment that they have not already passed, even where a public exploit exists elsewhere.
+- easy: Easy: a practical way exists here that needs none of that, and no public exploit or tool performs it.
+- automated_tools_available: Automated tools available: none of that is needed here, and a public exploit or tool performs it.
+- cannot_tell: The facts given do not say.
+
+Answer every vulnerability listed above once, by its vulnId, with one answer id from ANSWERS.
+Reply with {"answers": [{"vulnId": "...", "reasoning": "...", "answer": "..."}]}.

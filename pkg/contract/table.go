@@ -1,0 +1,174 @@
+// Copyright 2025 venslabs
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package contract
+
+import (
+	"github.com/venslabs/vens/pkg/owasp"
+	"github.com/venslabs/vens/pkg/riskconfig"
+)
+
+// The seven questions and their answers. A question names the attacker group
+// as {group}; Non-compliance's names the declared frameworks as {frameworks}.
+// cannot_tell means only that the facts given do not decide: a model answer
+// has no documented default, so it maps to the factor's worst legal level.
+
+const cannotTellText = "The facts given do not say."
+
+// impactCannotTellText is cannot_tell's text on Loss of accountability,
+// whose list holds its no accountability loss: that answer is not
+// cannot_tell.
+const impactCannotTellText = "The facts given do not decide between the answers above."
+
+var motive = contract[owasp.Motive]{
+	factor:   M,
+	question: "How motivated are {group} to find and exploit this vulnerability in this service? Judge by the reward that exploiting it here would bring them: what a successful exploit gives an attacker, and what this service is and holds.",
+	answers: []answer[owasp.Motive]{
+		{"low_or_no_reward", "Low or no reward: exploiting it here brings them nothing they could use, sell or leverage.", owasp.MotiveLowOrNoReward},
+		{"possible_reward", "Possible reward: it brings them something of some value here.", owasp.MotivePossibleReward},
+		{"high_reward", "High reward: it brings them something of high value here, such as control of the service, its data or its users.", owasp.MotiveHighReward},
+		{cannotTell, cannotTellText, owasp.MotiveHighReward},
+	},
+	counter: "motive_cannot_tell",
+}
+
+var opportunity = contract[owasp.Opportunity]{
+	factor:   O,
+	question: "What access or resources do {group} need, beyond what they already have in this deployment, to find and exploit this vulnerability here?",
+	answers: []answer[owasp.Opportunity]{
+		{"no_access_or_resources_required", "No access or resources required: from where they already are, they can reach and trigger the vulnerable code in this deployment.", owasp.OpportunityNoAccessOrResourcesRequired},
+		{"some_access_or_resources_required", "Some access or resources required: something most of them can obtain, such as an ordinary account, an action by a user of the service, or a common setting.", owasp.OpportunitySomeAccessOrResourcesRequired},
+		{"special_access_or_resources_required", "Special access or resources required: something few of them have, such as a privileged account, a foothold on the host, or a feature or role this deployment does not have by default.", owasp.OpportunitySpecialAccessOrResourcesRequired},
+		{"full_access_or_expensive_resources_required", "Full access or expensive resources required: full control of the host, physical access, or resources few attackers have.", owasp.OpportunityFullAccessOrExpensiveResourcesRequired},
+		{cannotTell, cannotTellText, owasp.OpportunityNoAccessOrResourcesRequired},
+	},
+	counter: "opportunity_cannot_tell",
+}
+
+var easeOfExploit = contract[owasp.EaseOfExploit]{
+	factor:   EE,
+	question: "How easy is it for {group}, from where they already are, to actually exploit this vulnerability in this deployment, as it is deployed and with the controls in front of it? Any access control the exposure itself requires, such as the corporate network or the VPN or authenticated tunnel, is not one of those controls: {group} are already past it. Choose the one answer that holds here.",
+	answers: []answer[owasp.EaseOfExploit]{
+		{"theoretical", "Theoretical: no practical way to exploit it in this deployment is known.", owasp.EaseOfExploitTheoretical},
+		{"difficult", "Difficult: a practical way exists, but here it needs expert work, rare conditions, chaining with another flaw, or getting through a control in front of this deployment that they have not already passed, even where a public exploit exists elsewhere.", owasp.EaseOfExploitDifficult},
+		{"easy", "Easy: a practical way exists here that needs none of that, and no public exploit or tool performs it.", owasp.EaseOfExploitEasy},
+		{"automated_tools_available", "Automated tools available: none of that is needed here, and a public exploit or tool performs it.", owasp.EaseOfExploitAutomatedToolsAvailable},
+		{cannotTell, cannotTellText, owasp.EaseOfExploitAutomatedToolsAvailable},
+	},
+	counter: "ease_of_exploit_cannot_tell",
+}
+
+// channel is where Intrusion detection's answer says an attempt would show.
+type channel int
+
+const (
+	channelNetwork channel = iota
+	channelHost
+	channelApplication
+	// noChannel is cannot_tell's, which names none.
+	noChannel
+)
+
+// The one question whose answer is a set: the model chooses every channel
+// that applies, and cannot_tell alone.
+var intrusionDetection = contract[channel]{
+	factor:   ID,
+	question: "Where would an attempt to exploit this vulnerability in this deployment show? Choose every place that applies.",
+	answers: []answer[channel]{
+		{"network", "Network: the attempt crosses the network to or from this deployment.", channelNetwork},
+		{"host", "Host: the attempt runs code, starts processes, or changes files or privileges on the host.", channelHost},
+		{"application", "Application: the attempt passes through this service's own request handling or logic, where the application itself could log or detect it.", channelApplication},
+		{cannotTell, "The facts given do not say. Chosen alone.", noChannel},
+	},
+	counter: "intrusion_detection_cannot_tell",
+}
+
+// actor is what Loss of accountability's answer says of the attacker's
+// traces, which Go crosses with traceability. actorNoLoss is identified's: no
+// accountability loss.
+type actor int
+
+const (
+	actorNoLoss actor = iota
+	actorUnidentified
+	actorDefeatsAttribution
+)
+
+// Authentication and attribution are asked apart, and not having to
+// authenticate never counts as no accountability loss.
+var accountability = contract[actor]{
+	factor:   LAC,
+	question: "To exploit this vulnerability in this deployment, must {group} authenticate to this service under an identity of their own? Apart from that, could the exploit let them act as someone else, or erase, forge or bypass the records of who did what? Answer the two facts separately; whether records exist is not asked.",
+	answers: []answer[actor]{
+		{"identified", "Identified, no accountability loss: they must authenticate to this service under an identity of their own, and the exploit does not let them act as someone else or tamper with the records of who did what.", actorNoLoss},
+		{"unidentified", "Unidentified: they need not authenticate to this service, or there is no service to authenticate to, and the exploit does not let them act as someone else or tamper with the records of who did what.", actorUnidentified},
+		{"defeats_attribution", "Defeats attribution: whether or not they authenticate, the exploit lets them act as someone else, or erase, forge or bypass the records of who did what.", actorDefeatsAttribution},
+		{cannotTell, impactCannotTellText, actorDefeatsAttribution},
+	},
+	counter: "accountability_cannot_tell",
+}
+
+var nonCompliance = contract[owasp.NonCompliance]{
+	factor:   NC,
+	question: "This service must comply with {frameworks}. If {group} exploited this vulnerability here, how serious a violation of those frameworks would it cause?",
+	answers: []answer[owasp.NonCompliance]{
+		{"minor_violation", "Minor violation: at most a minor or technical breach of a requirement.", owasp.NonComplianceMinorViolation},
+		{"clear_violation", "Clear violation: a clear breach of a requirement, such as exposure or alteration of the data or controls a framework protects.", owasp.NonComplianceClearViolation},
+		{"high_profile_violation", "High profile violation: a breach that would have to be reported or would draw a regulator's attention.", owasp.NonComplianceHighProfileViolation},
+		{cannotTell, cannotTellText, owasp.NonComplianceHighProfileViolation},
+	},
+	counter: "non_compliance_cannot_tell",
+}
+
+// Privacy violation's answers are data_subjects' bands, ids and levels read
+// from the config's one table: Go caps the answer's level with the declared
+// band's, so the two cannot drift apart. Only the text each band is shown
+// with is the question's. none takes OWASP's lowest level, a floor for a
+// service holding no personal data.
+var privacyViolation = contract[owasp.PrivacyViolation]{
+	factor:   PV,
+	question: "If {group} exploited this vulnerability in this deployment, how many distinct people's personal data could be disclosed, at most? Choose the band that holds that count.",
+	answers: bandAnswers(riskconfig.DataSubjectsBands(), map[string]string{
+		"none":           "None: no personal data could be disclosed (0 people).",
+		"one_individual": "One individual: 1 person.",
+		"hundreds":       "Hundreds: 2 to 999 people; a count under 100 belongs here.",
+		"thousands":      "Thousands: 1,000 to 999,999 people.",
+		"millions":       "Millions: 1,000,000 people or more.",
+	}),
+	counter: "privacy_cannot_tell",
+}
+
+// bandAnswers lists the bands in their order, each with its text, then
+// cannot_tell at the largest band's level.
+func bandAnswers(bands []riskconfig.Band, texts map[string]string) []answer[owasp.PrivacyViolation] {
+	answers := make([]answer[owasp.PrivacyViolation], 0, len(bands)+1)
+	var worst owasp.PrivacyViolation
+	for _, b := range bands {
+		answers = append(answers, answer[owasp.PrivacyViolation]{b.Name, texts[b.Name], b.Level})
+		worst = max(worst, b.Level)
+	}
+	return append(answers, answer[owasp.PrivacyViolation]{cannotTell, cannotTellText, worst})
+}
+
+// table is the one table the request, the schema and the rules read, so the
+// text shown, the enum and the map cannot drift apart.
+var table = map[Factor]shown{
+	M:   motive.shown(),
+	O:   opportunity.shown(),
+	EE:  easeOfExploit.shown(),
+	ID:  intrusionDetection.shown(),
+	LAC: accountability.shown(),
+	NC:  nonCompliance.shown(),
+	PV:  privacyViolation.shown(),
+}

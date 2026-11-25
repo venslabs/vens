@@ -1,0 +1,20 @@
+VULNERABILITIES
+[entries]
+
+QUESTION
+What access or resources do intranet users need, beyond what they already have in this deployment, to find and exploit this vulnerability here?
+
+FOR THIS QUESTION
+CVSS metrics AV, AT, PR, UI of the newest CVSS version published for each vulnerability, one line per source that published a vector; the sources can disagree. A vulnerability with no line has no published vector.
+- CVE-A: CVSS 3.1, nvd: AV:N PR:N UI:N
+- CVE-B: CVSS 3.1, redhat: AV:L PR:L UI:N
+
+ANSWERS
+- no_access_or_resources_required: No access or resources required: from where they already are, they can reach and trigger the vulnerable code in this deployment.
+- some_access_or_resources_required: Some access or resources required: something most of them can obtain, such as an ordinary account, an action by a user of the service, or a common setting.
+- special_access_or_resources_required: Special access or resources required: something few of them have, such as a privileged account, a foothold on the host, or a feature or role this deployment does not have by default.
+- full_access_or_expensive_resources_required: Full access or expensive resources required: full control of the host, physical access, or resources few attackers have.
+- cannot_tell: The facts given do not say.
+
+Answer every vulnerability listed above once, by its vulnId, with one answer id from ANSWERS.
+Reply with {"answers": [{"vulnId": "...", "reasoning": "...", "answer": "..."}]}.

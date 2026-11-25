@@ -1,6 +1,6 @@
 # Vens as a Trivy Plugin
 
-Use vens as a [Trivy plugin](https://trivy.dev/docs/latest/plugin/) to prioritize vulnerabilities by real risk, not just the generic CVSS score.
+Use vens as a [Trivy plugin](https://trivy.dev/docs/latest/plugin/) to prioritize vulnerabilities in your system's context, not just by the generic CVSS score.
 
 ## Installation
 
@@ -31,9 +31,9 @@ trivy vens generate --config-file config.yaml --sbom-serial-number "$SBOM_UUID" 
     "id": "CVE-XXXX-YYYY",
     "ratings": [{
       "method": "OWASP",
-      "score": 10.0,
-      "severity": "low",
-      "vector": "SL:3/M:3/O:3/S:3/ED:2/EE:2/A:2/ID:2/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
+      "score": 32.9375,
+      "severity": "high",
+      "vector": "SL:9/M:4/O:9/S:9/ED:9/EE:5/A:9/ID:8/LC:2/LI:1/LAV:7/LAC:7/FD:7/RD:5/NC:2/PV:3"
     }]
   }]
 }
@@ -58,6 +58,8 @@ trivy vens enrich --vex vex.json --output enriched-report.json report.json
 Create `config.yaml`:
 
 ```yaml
+schema_version: 2
+
 project:
   name: "my-api"
   description: "Production web application"
@@ -67,10 +69,18 @@ context:
   data_sensitivity: "high"          # low | medium | high | critical
   business_criticality: "critical"  # low | medium | high | critical
   compliance_requirements: ["PCI-DSS", "SOC2"]
+  listener: "present"               # present | absent | unknown
+  data_subjects: "thousands"        # none | one_individual | hundreds | thousands | millions
+  detection:                        # not_logged | logged | logged_and_reviewed
+    network: "logged"
+    host: "not_logged"
+    application: "logged_and_reviewed"
+  traceability: "per_request"       # none | per_request | per_individual
   controls:
     waf: true
-    ids: true
 ```
+
+Leave out `data_subjects`, `detection` or `traceability` and vens warns at load and uses that field's fallback, which the warning states. See the [config.yaml reference](https://venslabs.github.io/vens/reference/config-schema/).
 
 ## LLM Providers
 

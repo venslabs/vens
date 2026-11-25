@@ -5,7 +5,7 @@ This example demonstrates how **vens** transforms generic CVSS scores into conte
 ## Why vens?
 
 **CVSS asks**: "How severe is this vulnerability technically?"
-**OWASP asks**: "What's the real risk **for MY system**?"
+**OWASP asks**: "What's the risk **for MY system**?"
 
 ## Quick Start
 
@@ -33,7 +33,7 @@ vens generate \
   output_vex.cdx.json
 ```
 
-**Context**: See `config.yaml` for the risk profile (exposure, data sensitivity, compliance, security controls)
+**Context**: See `config.yaml` for the risk profile (exposure, data sensitivity, business criticality, whether it accepts connections, how many people's personal data it can read, what records an attack attempt and who did what, compliance, security controls)
 
 **Audit trail**: add `--attest` to the command to also write `output_vex.attestation.cdx.json`, a [CycloneDX attestation](../../docs/reference/generate.md#--attest) recording how each CVE was scored (model, seed, prompt/input/config hashes, raw response) so a run can be audited and reproduced.
 
@@ -42,56 +42,48 @@ vens generate \
 ```
 Trivy/Grype Scan → CVEs with CVSS scores
      ↓
-vens + LLM → Analyzes each CVE with your context
+vens + LLM → The LLM answers closed questions about each CVE in your context
      ↓
-OWASP Scores → Risk = Likelihood × Impact
+OWASP rating → vens computes the 16 factor levels, the severity (OWASP's
+               likelihood × impact matrix) and a 0-81 score
      ↓
-Prioritized List → Fix what matters for YOU
+Prioritized List → Sort by severity, then score: the order to review them in
 ```
 
 **Supported Scanners:**
 - ✅ Trivy (auto-detected)
 - ✅ Grype (auto-detected)
 
-## Value Comparison: Before vs After
+## Before and after
 
 ### Before (CVSS only)
 ```
-107 findings → Sort by CVSS score → Patch top 20
-❌ Waste time on CVE-2019-1010023 (CVSS 8.8, not exploitable)
-❌ Miss CVE-2026-0915 (CVSS 5.3, but leaks PII under GDPR)
+107 findings → Sort by CVSS score → Review in that order
+CVE-2019-1010023: CVSS 8.8, the same wherever the package runs
+CVE-2026-0915: CVSS 5.3, whatever data this service holds
 ```
 
 ### After (OWASP contextual)
 ```
-107 findings → Sort by OWASP score → Patch real risks
-✅ Skip CVE-2019-1010023 (OWASP 10/81 - not applicable)
-✅ Prioritize CVE-2026-0915 (OWASP 52/81 - GDPR risk)
+107 findings → Sort by OWASP severity, then score → Review in that order
+CVE-2019-1010023: its likelihood and impact are computed from model answers, CVSS vectors and your declared context
+CVE-2026-0915: GDPR and the people whose data it can expose weigh on its impact
 ```
 
 ## Output Example
 
-`output_vex.cdx.json` contains CycloneDX VEX with OWASP scores:
+`output_vex.cdx.json` contains CycloneDX VEX with one OWASP rating per vulnerability. The committed file was generated with vens v0.6.0, whose vectors repeat four numbers over the 16 factors; a run of vens v0.7.0 or later writes vectors of 16 levels, as below (levels illustrative):
 
 ```json
 {
   "vulnerabilities": [
     {
-      "id": "CVE-2026-0915",
+      "id": "CVE-XXXX-YYYY",
       "ratings": [{
-        "score": 45.5,
+        "score": 35.0625,
         "severity": "high",
         "method": "OWASP",
-        "vector": "SL:7/M:7/O:7/S:7/ED:6/EE:6/A:6/ID:6/LC:7/LI:7/LAV:7/LAC:7/FD:7/RD:7/NC:7/PV:7"
-      }]
-    },
-    {
-      "id": "CVE-2019-1010023",
-      "ratings": [{
-        "score": 10.0,
-        "severity": "low",
-        "method": "OWASP",
-        "vector": "SL:3/M:3/O:3/S:3/ED:2/EE:2/A:2/ID:2/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
+        "vector": "SL:9/M:4/O:9/S:9/ED:9/EE:9/A:9/ID:8/LC:2/LI:3/LAV:1/LAC:9/FD:3/RD:4/NC:7/PV:3"
       }]
     }
   ]

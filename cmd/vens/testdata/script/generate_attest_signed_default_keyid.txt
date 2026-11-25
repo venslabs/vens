@@ -10,6 +10,7 @@ stderr 'Attestation written'
 jsf-verify output.attestation.cdx.json attest.pub.pem default
 
 -- config.yaml --
+schema_version: 2
 project:
   name: "attest-default-keyid"
   description: "Default signing key id"
