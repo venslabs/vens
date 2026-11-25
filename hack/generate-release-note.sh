@@ -47,6 +47,7 @@ A GitHub build-provenance attestation is also published; see the docs for verifi
 ## Quick start
 \`\`\`bash
 export OPENAI_API_KEY="your-key"
+vens init
 vens generate \\
   --config-file config.yaml \\
   --sbom-serial-number "urn:uuid:..." \\
