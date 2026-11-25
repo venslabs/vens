@@ -161,6 +161,12 @@ type fieldDoc struct {
 	choices []Choice
 }
 
+// basisShift is what rating on the business impact does to severities. The
+// data_subjects prompt and W5 end with it: declaring that field switches every
+// rating to the business impact.
+const basisShift = "which can move a severity up or down; with no framework in compliance_requirements, " +
+	"no finding rates critical unless business_criticality is critical."
+
 // fieldDocs lists each field's values in their documented order: from the
 // smallest population to the largest for data_subjects, from nothing
 // recorded to active detection for detection, from no record to records per
@@ -205,7 +211,8 @@ var fieldDocs = map[Field]fieldDoc{
 		},
 	},
 	DataSubjects: {
-		about:   "How many distinct people's personal data this service can read: what it stores, what passes through it, and what it can fetch with its own access. A count belongs to the band whose interval holds it, and a count of 2 to 99 belongs to hundreds. Nothing is inferred from data_sensitivity.",
+		about: "How many distinct people's personal data this service can read: what it stores, what passes through it, and what it can fetch with its own access. A count belongs to the band whose interval holds it, and a count of 2 to 99 belongs to hundreds. Nothing is inferred from data_sensitivity. " +
+			"Declaring any band makes vens rate every finding on its business impact instead of its technical impact, " + basisShift,
 		choices: bandChoices(),
 	},
 	Detection: {

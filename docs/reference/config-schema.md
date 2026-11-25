@@ -162,7 +162,7 @@ New in v0.7.0. Does this deployment accept connections others open? Omitted, it 
 
 ### `context.data_subjects`
 
-New in v0.7.0. How many distinct people's personal data this service can read: what it stores, what passes through it, and what it can fetch with its own access. A count belongs to the band whose interval holds it, and a count of 2 to 99 belongs to `hundreds`. Nothing is inferred from `data_sensitivity`.
+New in v0.7.0. How many distinct people's personal data this service can read: what it stores, what passes through it, and what it can fetch with its own access. A count belongs to the band whose interval holds it, and a count of 2 to 99 belongs to `hundreds`. Nothing is inferred from `data_sensitivity`. Declaring any band makes vens rate every finding on its business impact instead of its technical impact, which can move a severity up or down; with no framework in `compliance_requirements`, no finding rates critical unless `business_criticality` is `critical`.
 
 | Value | People | Privacy violation at most |
 |---|---|---|
@@ -174,7 +174,7 @@ New in v0.7.0. How many distinct people's personal data this service can read: w
 
 vens reads this field alone; no call sends it. The Privacy violation question asks the model for the band of people whose data an exploit could disclose, and the declared band caps that answer. With `none` or `one_individual`, Privacy violation is 3 and the question is not asked; so it is for a CVE whose usable CVSS v3 vectors give `C:N` (see [`data_sensitivity`](#contextdata_sensitivity)). A flagged CVE's adjustment asks confidentiality again from the flag's evidence, and `not_affected` lowers Privacy violation to 3.
 
-It also sets the impact every finding is rated on. vens takes the declared context as true, so a declared `data_subjects` is taken as the business information OWASP's rule asks for (`business_criticality` is required, and `compliance_requirements` left out means no framework applies), and vens rates every finding on its business impact, whatever band is declared. Each VEX vulnerability names the basis in its `vens:impact-basis` property (see **[The VEX document](generate.md#the-vex-document)**).
+vens takes the declared context as true, so a declared `data_subjects` is taken as the business information OWASP's rule asks for (`business_criticality` is required, and `compliance_requirements` left out means no framework applies), and vens rates every finding on its business impact, whatever band is declared. Each VEX vulnerability names the basis in its `vens:impact-basis` property (see **[The VEX document](generate.md#the-vex-document)**).
 
 Left out, nothing caps the model's answer and every finding is rated on its technical impact: each CVE asked Privacy violation adds one to the `data_subjects_missing` counter, vens warns at load (W5), and `--strict` refuses the run.
 
@@ -407,7 +407,7 @@ context.detection is not declared: every channel counts as not logged, so Intrus
 **W5**: `data_subjects` left out.
 
 ```text
-context.data_subjects is not declared: Privacy violation has no cap, so the model's band stands wherever Privacy violation is asked, and every finding is rated on its technical impact. Declared, it is taken as the business information OWASP's rule asks for, and every finding is rated on its business impact.
+context.data_subjects is not declared: Privacy violation has no cap, so the model's band stands wherever Privacy violation is asked, and every finding is rated on its technical impact. Declared, it is taken as the business information OWASP's rule asks for, and every finding is rated on its business impact instead, which can move a severity up or down; with no framework in compliance_requirements, no finding rates critical unless business_criticality is critical.
 ```
 
 Nothing warns when `listener` is left out.

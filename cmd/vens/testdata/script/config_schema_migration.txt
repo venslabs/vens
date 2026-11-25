@@ -19,7 +19,7 @@ stderr 'schema_version 1 is not supported: this vens reads schema 2 only. Read h
 exec vens generate --llm=mock --config-file=marked.yaml --sbom-serial-number=urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79 report.json out.cdx.json
 stderr 'level=WARN msg="context.audit_requirement no longer moves any score, and context.traceability is not declared: Loss of accountability uses its `none` column, 7 when the attacker must authenticate and cannot act as someone else or tamper with the records, 9 otherwise."'
 stderr 'level=WARN msg="controls ids/siem/edr give no detection credit, and context.detection is not declared: every channel counts as not logged, so Intrusion detection is 9 on every finding."'
-stderr 'level=WARN msg="context.data_subjects is not declared: Privacy violation has no cap, so the model''s band stands wherever Privacy violation is asked, and every finding is rated on its technical impact. Declared, it is taken as the business information OWASP''s rule asks for, and every finding is rated on its business impact."'
+stderr 'level=WARN msg="context.data_subjects is not declared: Privacy violation has no cap, so the model''s band stands wherever Privacy violation is asked, and every finding is rated on its technical impact. Declared, it is taken as the business information OWASP''s rule asks for, and every finding is rated on its business impact instead, which can move a severity up or down; with no framework in compliance_requirements, no finding rates critical unless business_criticality is critical."'
 ! stderr '(?s)(level=WARN.*){4}msg="Config loaded"'
 stderr 'msg="Config loaded" schema_version=2 .* listener=unknown undeclared=context.data_subjects,context.detection,context.traceability$'
 exists out.cdx.json

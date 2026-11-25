@@ -24,7 +24,7 @@ const (
 	warnNoDetection    = "context.detection is not declared: every channel counts as not logged, so Intrusion detection is 9 on every finding."
 	warnNoDataSubjects = "context.data_subjects is not declared: Privacy violation has no cap, so the model's band stands " +
 		"wherever Privacy violation is asked, and every finding is rated on its technical impact. Declared, it is taken as " +
-		"the business information OWASP's rule asks for, and every finding is rated on its business impact."
+		"the business information OWASP's rule asks for, and every finding is rated on its business impact instead, " + basisShift
 )
 
 // Undeclared returns the YAML paths of data_subjects, detection and

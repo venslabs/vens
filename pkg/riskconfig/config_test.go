@@ -612,7 +612,7 @@ func TestWarnings(t *testing.T) {
 		w2 = "controls ids/siem/edr give no detection credit, and context.detection is not declared: every channel counts as not logged, so Intrusion detection is 9 on every finding."
 		w3 = "context.traceability is not declared: Loss of accountability uses its `none` column, 7 or 9 on every finding."
 		w4 = "context.detection is not declared: every channel counts as not logged, so Intrusion detection is 9 on every finding."
-		w5 = "context.data_subjects is not declared: Privacy violation has no cap, so the model's band stands wherever Privacy violation is asked, and every finding is rated on its technical impact. Declared, it is taken as the business information OWASP's rule asks for, and every finding is rated on its business impact."
+		w5 = "context.data_subjects is not declared: Privacy violation has no cap, so the model's band stands wherever Privacy violation is asked, and every finding is rated on its technical impact. Declared, it is taken as the business information OWASP's rule asks for, and every finding is rated on its business impact instead, which can move a severity up or down; with no framework in compliance_requirements, no finding rates critical unless business_criticality is critical."
 	)
 	for _, tc := range []struct {
 		name  string

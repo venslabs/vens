@@ -189,6 +189,30 @@ func promptTexts() []string {
 	return texts
 }
 
+// Declaring data_subjects moves every rating to the business impact, so the
+// wizard says so, with what that does to severities, before it asks for it.
+func TestInitSaysDataSubjectsMovesTheBasis(t *testing.T) {
+	out := filepath.Join(t.TempDir(), "config.yaml")
+	shown, err := runInit(t, strings.NewReader(requiredThenSkip("svc")), out)
+	if err != nil {
+		t.Fatalf("init: %v", err)
+	}
+	question := strings.Index(shown, "Data subjects (optional)")
+	explained := strings.LastIndex(shown[:max(question, 0)], "\nData subjects: ")
+	if question < 0 || explained < 0 {
+		t.Fatalf("the wizard does not explain data subjects before asking it:\n%s", shown)
+	}
+	for _, text := range []string{
+		"Declaring any band makes vens rate every finding on its business impact instead of its technical impact",
+		"which can move a severity up or down",
+		"with no framework in compliance_requirements, no finding rates critical unless business_criticality is critical",
+	} {
+		if !strings.Contains(shown[explained:question], text) {
+			t.Errorf("the data subjects prompt does not say %q", text)
+		}
+	}
+}
+
 func TestInitDoesNotAskWhatMovesNoScore(t *testing.T) {
 	out := filepath.Join(t.TempDir(), "config.yaml")
 	shown, err := runInit(t, strings.NewReader(requiredThenSkip("svc")), out)
