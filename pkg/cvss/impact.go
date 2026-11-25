@@ -61,11 +61,12 @@ func (i Impact) Vectorless() bool {
 // another 3.x, as a Trivy V3Vector whose prefix states one gets; vectors are
 // distinct once trimmed. One is usable when its version is 3.0 or 3.1, or 3
 // alone, it parses as Parse reads it, any CVSS: prefix stating 3.0 or 3.1,
-// and it gives C, I and A each on H, L or N; any other is refused whole. v2
-// vectors are not read, and v4 vectors are counted.
+// and it gives C, I and A each on H, L or N; any other is refused whole. The
+// same vector refused under one version and usable under another is both,
+// whichever comes first. v2 vectors are not read, and v4 vectors are counted.
 func ImpactOf(vectors []Vector) Impact {
 	var i Impact
-	var seen, seen4 []string
+	var usable, refused, seen4 []string
 	for _, v := range vectors {
 		text := strings.TrimSpace(v.Vector)
 		switch {
@@ -78,15 +79,18 @@ func ImpactOf(vectors []Vector) Impact {
 		case v.Tier() != 3 && !strings.HasPrefix(v.Version, "3."):
 			continue
 		}
-		if slices.Contains(seen, text) {
-			continue
-		}
-		seen = append(seen, text)
 		values, err := impactValues(v)
 		if err != nil {
-			i.Rejected = append(i.Rejected, Rejected{Vector: v, Err: err})
+			if !slices.Contains(refused, text) {
+				refused = append(refused, text)
+				i.Rejected = append(i.Rejected, Rejected{Vector: v, Err: err})
+			}
 			continue
 		}
+		if slices.Contains(usable, text) {
+			continue
+		}
+		usable = append(usable, text)
 		i.Usable++
 		for axis, value := range values {
 			if i.Values[axis] == "" || worse[value] > worse[i.Values[axis]] {

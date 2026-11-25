@@ -137,3 +137,34 @@ func TestImpactOf_CountsAnother3xVersion(t *testing.T) {
 		t.Errorf("ImpactOf = %+v, want L, N, N from the 3.1 vector and the 3.2 one refused", got)
 	}
 }
+
+// The same vector refused under one version and usable under another is
+// both, whichever the sources give first.
+func TestImpactOf_SameVectorRefusedAndUsable(t *testing.T) {
+	usable := v31("AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:L/A:N")
+	refused := Vector{Source: "ghsa", Version: "3.2", Vector: usable.Vector}
+	for name, vectors := range map[string][]Vector{
+		"refused first": {refused, usable},
+		"usable first":  {usable, refused},
+	} {
+		t.Run(name, func(t *testing.T) {
+			got := ImpactOf(vectors)
+			if got.Values != cia("H", "L", "N") || got.Usable != 1 || len(got.Rejected) != 1 || got.Rejected[0].Vector != refused {
+				t.Errorf("ImpactOf = %+v, want H, L, N from the 3.1 vector and the 3.2 one refused", got)
+			}
+		})
+	}
+}
+
+// A usable vector is counted once and a refused one listed once, however
+// many sources give it, with or without another vector between them.
+func TestImpactOf_CountsEachVectorOnce(t *testing.T) {
+	usable := v31("AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:H")
+	usableAgain := Vector{Source: "redhat", Version: "3.1", Vector: " " + usable.Vector + "\n"}
+	refused := Vector{Source: "ghsa", Version: "3.2", Vector: "CVSS:3.2/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"}
+	refusedAgain := Vector{Source: "osv", Version: "3.2", Vector: refused.Vector + " "}
+	got := ImpactOf([]Vector{usable, refused, usableAgain, refusedAgain})
+	if got.Values != cia("L", "N", "H") || got.Usable != 1 || len(got.Rejected) != 1 || got.Rejected[0].Vector != refused {
+		t.Errorf("ImpactOf = %+v, want L, N, H from one usable vector and one refused", got)
+	}
+}
