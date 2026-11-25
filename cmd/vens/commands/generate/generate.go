@@ -53,7 +53,8 @@ For each CVE, the LLM answers one question per OWASP factor it is asked, up to 7
 a closed list of named answers. vens sets the others from the scan report, the config or a fixed
 level, Loss of confidentiality, integrity and availability from the worst C, I and A of the CVE's
 CVSS v3 vectors, Financial damage and Reputation damage from what business_criticality declares at
-that technical impact, then computes every level, the OWASP vector and the rating:
+the CVE's worst technical loss, the highest of those three, then computes every level, the OWASP
+vector and the rating:
   Likelihood = the average of the 8 threat agent and vulnerability factors
   Impact     = the business impact when data_subjects is declared, the technical impact otherwise,
                each the average of its 4 factors; each VEX vulnerability names it in vens:impact-basis

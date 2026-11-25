@@ -25,7 +25,7 @@ import (
 
 // wantDamage is the table the decision of 24/11/2026 gives, written apart
 // from riskconfig's: Financial damage, then Reputation damage, by
-// business_criticality at a low, a medium and a high technical impact.
+// business_criticality at a low, a medium and a high worst technical loss.
 var wantDamage = map[string][2][3]int{
 	"low":      {{1, 1, 1}, {1, 1, 1}},
 	"medium":   {{1, 1, 3}, {1, 1, 4}},
@@ -131,9 +131,9 @@ func damageTable(t *testing.T) map[cell][2]int {
 }
 
 // Over every cell, Financial damage and Reputation damage are on OWASP's
-// options and equal to the decision's table at the band of the highest
-// technical impact; they come from business_criticality, and no question
-// reads or counts them.
+// options and equal to the decision's table at the worst technical loss,
+// the band of the highest of LC, LI and LAV; they come from
+// business_criticality, and no question reads or counts them.
 func TestDamagesOverEveryCell(t *testing.T) {
 	all := cells()
 	if len(all) != 1792 {
@@ -227,7 +227,7 @@ func TestBusinessBandNeverFallsAsCriticalityRises(t *testing.T) {
 
 // What the decision discloses with the rule, held over every cell: with no
 // framework, Non-compliance 2, the business impact is HIGH only for critical
-// at a high technical impact with Privacy violation at 5 or more; a high
+// at a high worst technical loss with Privacy violation at 5 or more; a high
 // service with no framework tops out at 5.75, MEDIUM; low never reaches HIGH;
 // and a C:H CVE on public data in a critical service gets FD 9 and RD 9, its
 // extensive non-sensitive data disclosed being 6 (:155).
@@ -260,7 +260,7 @@ func TestDamageDisclosures(t *testing.T) {
 // OWASP's worked example is High on the technical impact and Low on the
 // business impact (OWASP_Risk_Rating_Methodology.md:344-347), its business
 // average 2.25 (:297). The rule keeps it reachable: a low declaration at a
-// high technical impact, with no framework and hundreds of people, gives
+// high worst technical loss, with no framework and hundreds of people, gives
 // that 2.25, (1+1+2+5)/4, beside a HIGH technical impact at a MEDIUM
 // likelihood.
 func TestOWASPExampleUnderTheDeclaration(t *testing.T) {
