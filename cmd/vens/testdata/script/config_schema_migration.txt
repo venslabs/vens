@@ -4,13 +4,13 @@
 
 ! exec vens generate --llm=mock --config-file=old.yaml --sbom-serial-number=urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79 missing-report.json out.cdx.json
 stderr 'config.yaml has no schema_version: it was written for vens v0.6 or earlier \(schema 1\)'
-stderr 'Read https://venslabs.github.io/vens/reference/config-schema/#migrating, then add `schema_version: 2` at the top of the file.'
+stderr 'business_criticality keeps its values with a new meaning, the worst Financial damage and Reputation damage an exploit could cost: reconfirm yours. Read https://venslabs.github.io/vens/reference/config-schema/#migrating, then add `schema_version: 2` at the top of the file.'
 ! stderr 'missing-report'
 ! exists out.cdx.json
 
 # schema_version 1 gets the same pointer.
 ! exec vens generate --llm=mock --config-file=v1.yaml --sbom-serial-number=urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79 report.json out.cdx.json
-stderr 'schema_version 1 is not supported: this vens reads schema 2 only. Read https://venslabs.github.io/vens/reference/config-schema/#migrating, then set `schema_version: 2`.'
+stderr 'schema_version 1 is not supported: this vens reads schema 2 only, in which business_criticality keeps its values with a new meaning, the worst Financial damage and Reputation damage an exploit could cost: reconfirm yours. Read https://venslabs.github.io/vens/reference/config-schema/#migrating, then set `schema_version: 2`.'
 ! exists out.cdx.json
 
 # The old config with only the marker added loads, with one warning per field

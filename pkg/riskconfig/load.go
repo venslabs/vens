@@ -34,6 +34,11 @@ import (
 // notes.
 const migrating = "https://venslabs.github.io/vens/reference/config-schema/#migrating"
 
+// reconfirm is what the schema-1 errors say of business_criticality: a file
+// that only gains the marker keeps a value whose meaning has changed.
+const reconfirm = "business_criticality keeps its values with a new meaning, " +
+	"the worst Financial damage and Reputation damage an exploit could cost: reconfirm yours"
+
 // loadError is a load error with its number, the one a docs block's
 // `<!-- docs-check: E<n> -->` marker names: 1 no schema_version, 2 another
 // version, 3 an unknown key, 4 a listener, data_subjects or traceability that
@@ -49,9 +54,9 @@ var (
 	errEmpty           = errors.New("config.yaml is empty")
 	errNoSchemaVersion = &loadError{1, "config.yaml has no schema_version: it was written for vens v0.6 or earlier (schema 1). " +
 		"This vens reads schema 2, which scores each OWASP factor on its own: audit_requirement and controls ids/siem/edr " +
-		"no longer move any score, and listener, data_subjects, detection and traceability are new. " +
+		"no longer move any score, listener, data_subjects, detection and traceability are new, and " + reconfirm + ". " +
 		"Read " + migrating + ", then add `schema_version: 2` at the top of the file."}
-	errSchemaVersion1 = &loadError{2, "schema_version 1 is not supported: this vens reads schema 2 only. " +
+	errSchemaVersion1 = &loadError{2, "schema_version 1 is not supported: this vens reads schema 2 only, in which " + reconfirm + ". " +
 		"Read " + migrating + ", then set `schema_version: 2`."}
 	errNoChannels  = &loadError{5, "context.detection has no channels: declare network, host and application, or remove the key"}
 	errNotChannels = &loadError{5, "context.detection must be a mapping of network, host and application"}

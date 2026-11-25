@@ -51,7 +51,7 @@ Your `config.yaml` has a typo, an extra word, or a missing required field. Check
 
 ## `config.yaml has no schema_version`
 
-The file was written for vens v0.6 or earlier. vens v0.7.0 reads schema 2 only and refuses the file before any LLM call. Add `schema_version: 2` at the top, then declare the new fields: see **[Migrating from vens v0.6](reference/config-schema.md#migrating)**.
+The file was written for vens v0.6 or earlier. vens v0.7.0 reads schema 2 only and refuses the file before any LLM call. Add `schema_version: 2` at the top and reconfirm `business_criticality`: it keeps its values with a new meaning, the worst Financial damage and Reputation damage an exploit of the service could cost, and vens rates on it. Then declare the new fields: see **[Migrating from vens v0.6](reference/config-schema.md#migrating)**.
 
 The same applies to `schema_version 1 is not supported`. `schema_version must be the integer 2, got ...` means the marker is there but written as something else, such as `"2"` (a string) or `2.0`: write `schema_version: 2`. `schema_version 3 is not supported` means the file was written for a newer vens.
 

@@ -295,7 +295,7 @@ E1 to E5 and W1 to W5 are labels on this page; the messages do not print them.
 ### E1: no schema_version
 
 ```text
-config.yaml has no schema_version: it was written for vens v0.6 or earlier (schema 1). This vens reads schema 2, which scores each OWASP factor on its own: audit_requirement and controls ids/siem/edr no longer move any score, and listener, data_subjects, detection and traceability are new. Read https://venslabs.github.io/vens/reference/config-schema/#migrating, then add `schema_version: 2` at the top of the file.
+config.yaml has no schema_version: it was written for vens v0.6 or earlier (schema 1). This vens reads schema 2, which scores each OWASP factor on its own: audit_requirement and controls ids/siem/edr no longer move any score, listener, data_subjects, detection and traceability are new, and business_criticality keeps its values with a new meaning, the worst Financial damage and Reputation damage an exploit could cost: reconfirm yours. Read https://venslabs.github.io/vens/reference/config-schema/#migrating, then add `schema_version: 2` at the top of the file.
 ```
 
 ### E2: schema_version other than 2
@@ -303,7 +303,7 @@ config.yaml has no schema_version: it was written for vens v0.6 or earlier (sche
 For `1`:
 
 ```text
-schema_version 1 is not supported: this vens reads schema 2 only. Read https://venslabs.github.io/vens/reference/config-schema/#migrating, then set `schema_version: 2`.
+schema_version 1 is not supported: this vens reads schema 2 only, in which business_criticality keeps its values with a new meaning, the worst Financial damage and Reputation damage an exploit could cost: reconfirm yours. Read https://venslabs.github.io/vens/reference/config-schema/#migrating, then set `schema_version: 2`.
 ```
 
 For a plain integer above 2, such as `3`:
