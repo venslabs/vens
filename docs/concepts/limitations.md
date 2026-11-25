@@ -142,7 +142,7 @@ Some declarations keep every finding in one business impact band, whatever the C
 - `business_criticality: low`, with no framework in `compliance_requirements` and `data_subjects` of `none`, `one_individual`, `hundreds` or `thousands`: always LOW, and exactly 1.75, (1 + 1 + 2 + 3) / 4, with `none` or `one_individual`.
 - `business_criticality: critical`, with no framework in `compliance_requirements` and `data_subjects` of `none` or `one_individual`: always MEDIUM, from 3 to 5.75.
 
-With these declarations a finding's severity moves with its likelihood alone; the likelihood, which the model's answers on each CVE move, still separates the findings of the deployment. This is v0.7.0's "less spread within a deployment" trade-off ([#340](https://github.com/venslabs/vens/issues/340)).
+With these declarations a finding's severity moves with its likelihood alone; the likelihood, which the model's answers on each CVE move, still separates the findings of the deployment. This is v0.7.0's "less spread inside one deployment" trade-off ([#340](https://github.com/venslabs/vens/issues/340)).
 
 ---
 
