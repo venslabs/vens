@@ -10,7 +10,7 @@ require (
 	github.com/aquasecurity/trivy-db v0.0.0-20261012084708-cbebf2ecd6df
 	github.com/google/uuid v1.6.0
 	github.com/gowebpki/jcs v1.0.2
-	github.com/ollama/ollama v0.40.16
+	github.com/ollama/ollama v0.40.18
 	github.com/openai/openai-go/v3 v3.98.0
 	github.com/package-url/packageurl-go v0.1.7
 	github.com/rogpeppe/go-internal v1.16.0
