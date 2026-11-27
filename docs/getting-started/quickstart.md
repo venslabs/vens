@@ -146,17 +146,31 @@ Open `output.vex.json`. It is a CycloneDX 1.6 BOM (1.6 is the default; pass `--c
 
 ---
 
-## Step 5 — Sort by severity, then score
+## Step 5 — Split by impact provenance, then rank
 
-Get your top 10 most critical CVEs with `jq`, by severity first, then by score:
+Each vulnerability carries one `vens:impact-provenance` property: `cvss-v3` when Loss of confidentiality, integrity and availability came from the CVE's usable CVSS v3 vectors, and `missing-cvss-v3-fallback` when the CVE has none, so the missing-input rule set all three to 9. That marker is provenance, not a claim of human review. A single sort mixes the two: on the quickstart Trivy report with `--llm mock`, five of the top ten by severity then score are fallback. Split first and keep every finding visible:
 
 ```bash
-jq '[.vulnerabilities[] | {id, score: .ratings[0].score, severity: .ratings[0].severity}]
-    | sort_by({"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}[.severity], -.score)
-    | .[0:10]' output.vex.json
+jq '[.vulnerabilities[] | {
+       id,
+       impact: ([.properties[]? | select(.name == "vens:impact-provenance") | .value][0] // null),
+       score: .ratings[0].score,
+       severity: .ratings[0].severity
+     }]
+    | {
+        cvss_v3: [.[] | select(.impact == "cvss-v3")]
+          | sort_by({"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}[.severity], -.score, .id)
+          | .[0:10],
+        missing_cvss_v3_fallback: [.[] | select(.impact == "missing-cvss-v3-fallback")]
+          | sort_by(.id),
+        provenance_missing_or_unsupported: [.[] | select(.impact != "cvss-v3" and .impact != "missing-cvss-v3-fallback")]
+          | sort_by(.id)
+      }' output.vex.json
 ```
 
-You now have CVEs ranked by vens's computed rating, ready for review.
+`cvss_v3` is the ranked top ten (severity, then score, then identifier). `missing_cvss_v3_fallback` needs manual triage: its levels are fail-safe gate values, not evidence of relative urgency, so the list has no cross-list order with `cvss_v3` and is ordered by identifier only. `provenance_missing_or_unsupported` holds anything else (no marker, or a value this filter does not recognise), so an older VEX still shows every finding. For the full prioritisation rules, see **[Prioritize a CVE backlog](../guides/prioritize-cves.md#step-4-get-your-top-10)**.
+
+You now have three lists ready for review.
 
 ---
 

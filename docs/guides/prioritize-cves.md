@@ -113,18 +113,18 @@ jq '[.vulnerabilities[] | {
        vector: .ratings[0].vector
      }]
     | {
-        assessed: [.[] | select(.impact == "cvss-v3")]
+        cvss_v3: [.[] | select(.impact == "cvss-v3")]
           | sort_by({"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}[.severity], -.score, .id)
           | .[0:10],
         impact_unknown: [.[] | select(.impact == "missing-cvss-v3-fallback")] | sort_by(.id)
       }' output.vex.json
 ```
 
-A VEX from an older vens carries no marker; the filter fails on it instead of dropping the finding.
+A VEX from an older vens carries no marker; the filter fails on it instead of dropping the finding. The marker is provenance, not a claim of human review, so the CVSS-v3 list is named `cvss_v3`, not `assessed`.
 
-A consumer implementing vens prioritisation must present separate lists: impact-assessed findings, and "impact unknown — manual triage required." Findings marked `missing-cvss-v3-fallback` belong in the latter. The lists have no cross-list urgency order. Unknown-impact findings retain their numerical ratings, severity (the worst case on the technical impact basis, and on the business basis Financial damage and Reputation damage at the worst case `business_criticality` declares), gate contributions and totals; their identifiers order presentation only. Legitimately vector-derived maximum-impact values remain impact-assessed.
+A consumer implementing vens prioritisation must present separate lists: findings marked `cvss-v3`, and "impact unknown — manual triage required." Findings marked `missing-cvss-v3-fallback` belong in the latter. The lists have no cross-list urgency order. Unknown-impact findings retain their numerical ratings, severity (the worst case on the technical impact basis, and on the business basis Financial damage and Reputation damage at the worst case `business_criticality` declares), gate contributions and totals; their identifiers order presentation only. Legitimately vector-derived maximum-impact values stay in the `cvss_v3` list.
 
-Among impact-assessed findings, priority is matrix severity descending, then L×I descending, then published vulnerability identifier ascending by UTF-8 bytes; equal severity and product mean equal assessed urgency, and the identifier orders presentation only. The severity comes from OWASP's matrix, not from the score, so a `high` can score below a `medium`. The impact levels the missing-input rule supplies are fail-safe gate values, not evidence of relative impact or urgency: a fallback CVE's `critical` says its impact is unknown, not that it outranks an assessed one.
+Among findings marked `cvss-v3`, priority is matrix severity descending, then L×I descending, then published vulnerability identifier ascending by UTF-8 bytes; equal severity and product mean equal urgency, and the identifier orders presentation only. The severity comes from OWASP's matrix, not from the score, so a `high` can score below a `medium`. The impact levels the missing-input rule supplies are fail-safe gate values, not evidence of relative impact or urgency: a fallback CVE's `critical` says its impact is unknown, not that it outranks a CVSS-v3-derived one.
 
 Each vulnerability also names, in its `vens:impact-basis` property, the impact its severity and score are read on, the same for the whole run: `business` here, the `config.yaml` above declaring `data_subjects`, and `technical` for a config that does not (see **[How vens rates a CVE](../concepts/cvss-vs-owasp.md#how-vens-rates-a-cve)**). On the business basis, the 9s the missing-input rule sets reach the severity only as a high worst technical loss, at which Financial damage and Reputation damage take the worst case `business_criticality` declares.
 
@@ -132,7 +132,7 @@ Example output (illustrative):
 
 ```json
 {
-  "assessed": [
+  "cvss_v3": [
     {
       "id": "CVE-XXXX-YYYY",
       "impact": "cvss-v3",

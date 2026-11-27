@@ -48,7 +48,7 @@ Vens does **not** set a CycloneDX `analysis` block (`state`, `justification`, `d
 - **Trivy** — `trivy image ... --vex vex.json`
 - **Grype** — `grype ... --vex vex.json`
 - **Dependency-Track** — ingests the file directly.
-- **Your own scripts / dashboards** — via `jq` on `ratings[0].severity`, then `ratings[0].score` (see the [quickstart](../getting-started/quickstart.md#step-5-sort-by-severity-then-score)).
+- **Your own scripts / dashboards** — via `jq`, split on `vens:impact-provenance` first, then `ratings[0].severity`, then `ratings[0].score` (see the [quickstart](../getting-started/quickstart.md#step-5-split-by-impact-provenance-then-rank)).
 - **Any CI pipeline** — apply your CI policy to vens's computed ratings, for example by filtering the VEX on `ratings[0].severity`.
 
 ---
