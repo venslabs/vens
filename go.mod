@@ -18,7 +18,7 @@ require (
 	github.com/spf13/pflag v1.1.0
 	github.com/stretchr/testify v1.12.1
 	go.yaml.in/yaml/v3 v3.0.6
-	google.golang.org/genai v1.77.0
+	google.golang.org/genai v1.79.1
 )
 
 require (
