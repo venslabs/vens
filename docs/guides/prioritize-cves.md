@@ -186,7 +186,7 @@ jq '.Results[]?.Vulnerabilities[]? | {VulnerabilityID, Severity, owasp_severity:
 !!! note "From v0.6.0"
     `owasp_severity` is written from v0.6.0 on. v0.5.0 and earlier don't emit it.
 
-**Dependency-Track 5.1+.** It picks up the OWASP rating from the VEX and shows it on each finding. It reads neither the `vens:impact-provenance` and `vens:impact-basis` properties nor the order above, so it cannot keep the two lists apart. See [Send the scores to Dependency-Track](dependency-track.md).
+**Dependency-Track 5.1+.** It picks up the OWASP vector and score from the VEX and shows them on each finding, but not vens's severity: a finding keeps the one it had. It reads neither the `vens:impact-provenance` and `vens:impact-basis` properties nor the order above, so it cannot keep the two lists apart. See [Send the scores to Dependency-Track](dependency-track.md).
 
 !!! note
     Vens writes ratings only, never a `not_affected` state, so there is nothing for a scanner to suppress. To hide CVEs below a contextual threshold, filter the VEX with `jq` as shown in [Put it in CI](#put-it-in-ci), or drop low-score entries in your dashboard.
@@ -199,7 +199,7 @@ For a turnkey Action, see [GitHub Actions integration](github-actions.md). The m
 
 ```yaml
 - name: Install Vens
-  run: go install github.com/venslabs/vens/cmd/vens@v0.6.0
+  run: go install github.com/venslabs/vens/cmd/vens@v0.7.0
 
 - name: Scan image
   run: trivy image $IMAGE --format json --output report.json

@@ -2,1006 +2,1557 @@
   "$schema": "http://cyclonedx.org/schema/bom-1.6.schema.json",
   "bomFormat": "CycloneDX",
   "specVersion": "1.6",
+  "serialNumber": "urn:uuid:99f016ff-23b0-40b4-9b5d-b4fa8ce8d2ae",
   "version": 1,
+  "metadata": {
+    "timestamp": "2026-11-25T16:37:57Z",
+    "tools": {
+      "components": [
+        {
+          "type": "application",
+          "name": "vens",
+          "version": "v0.7.0"
+        }
+      ]
+    },
+    "properties": [
+      {
+        "name": "vens:rating-policy",
+        "value": "2"
+      }
+    ]
+  },
   "vulnerabilities": [
     {
+      "id": "CVE-2005-2541",
+      "source": {
+        "name": "NVD",
+        "url": "https://salsa.debian.org/security-tracker-team/security-tracker"
+      },
+      "ratings": [
+        {
+          "score": 57.6875,
+          "severity": "critical",
+          "method": "OWASP",
+          "vector": "SL:9/M:9/O:9/S:9/ED:9/EE:9/A:9/ID:8/LC:7/LI:7/LAV:7/LAC:7/FD:7/RD:5/NC:7/PV:7"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/tar@1.35%2Bdfsg-3.1?arch=amd64\u0026distro=debian-13.3"
+        }
+      ],
+      "properties": [
+        {
+          "name": "vens:impact-provenance",
+          "value": "cvss-v3"
+        },
+        {
+          "name": "vens:impact-basis",
+          "value": "business"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2007-5686",
+      "source": {
+        "name": "NVD",
+        "url": "https://salsa.debian.org/security-tracker-team/security-tracker"
+      },
+      "ratings": [
+        {
+          "score": 36.75,
+          "severity": "critical",
+          "method": "OWASP",
+          "vector": "SL:9/M:4/O:0/S:9/ED:9/EE:1/A:9/ID:8/LC:9/LI:9/LAV:9/LAC:7/FD:7/RD:5/NC:5/PV:7"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/login.defs@4.17.4-2?arch=all\u0026distro=debian-13.3\u0026epoch=1"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/passwd@4.17.4-2?arch=amd64\u0026distro=debian-13.3\u0026epoch=1"
+        }
+      ],
+      "properties": [
+        {
+          "name": "vens:impact-provenance",
+          "value": "missing-cvss-v3-fallback"
+        },
+        {
+          "name": "vens:impact-basis",
+          "value": "business"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2010-4756",
+      "source": {
+        "name": "NVD",
+        "url": "https://salsa.debian.org/security-tracker-team/security-tracker"
+      },
+      "ratings": [
+        {
+          "score": 31.875,
+          "severity": "high",
+          "method": "OWASP",
+          "vector": "SL:9/M:9/O:4/S:9/ED:9/EE:3/A:9/ID:8/LC:9/LI:9/LAV:9/LAC:7/FD:7/RD:5/NC:2/PV:3"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/libc-bin@2.41-12%2Bdeb13u1?arch=amd64\u0026distro=debian-13.3"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/libc6@2.41-12%2Bdeb13u1?arch=amd64\u0026distro=debian-13.3"
+        }
+      ],
+      "properties": [
+        {
+          "name": "vens:impact-provenance",
+          "value": "missing-cvss-v3-fallback"
+        },
+        {
+          "name": "vens:impact-basis",
+          "value": "business"
+        }
+      ]
+    },
+    {
       "id": "CVE-2011-3374",
+      "source": {
+        "name": "NVD",
+        "url": "https://salsa.debian.org/security-tracker-team/security-tracker"
+      },
       "ratings": [
         {
-          "score": 27.5,
-          "severity": "medium",
-          "method": "OWASP",
-          "vector": "SL:7/M:7/O:7/S:7/ED:4/EE:4/A:4/ID:4/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
-        }
-      ]
-    },
-    {
-      "id": "TEMP-0841856-B18BAF",
-      "ratings": [
-        {
-          "score": 12,
-          "severity": "low",
-          "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:3/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2025-14104",
-      "ratings": [
-        {
-          "score": 38.5,
-          "severity": "medium",
-          "method": "OWASP",
-          "vector": "SL:5/M:5/O:5/S:5/ED:6/EE:6/A:6/ID:6/LC:7/LI:7/LAV:7/LAC:7/FD:7/RD:7/NC:7/PV:7"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2022-0563",
-      "ratings": [
-        {
-          "score": 20,
-          "severity": "medium",
-          "method": "OWASP",
-          "vector": "SL:4/M:4/O:4/S:4/ED:4/EE:4/A:4/ID:4/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2017-18018",
-      "ratings": [
-        {
-          "score": 12,
-          "severity": "low",
-          "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:3/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2025-5278",
-      "ratings": [
-        {
-          "score": 20,
-          "severity": "medium",
-          "method": "OWASP",
-          "vector": "SL:4/M:4/O:4/S:4/ED:4/EE:4/A:4/ID:4/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2026-0861",
-      "ratings": [
-        {
-          "score": 42.5,
+          "score": 35.0625,
           "severity": "high",
           "method": "OWASP",
-          "vector": "SL:5/M:5/O:5/S:5/ED:5/EE:5/A:5/ID:5/LC:8/LI:8/LAV:8/LAC:8/FD:9/RD:9/NC:9/PV:9"
+          "vector": "SL:9/M:4/O:9/S:9/ED:9/EE:9/A:9/ID:8/LC:2/LI:3/LAV:1/LAC:9/FD:3/RD:4/NC:7/PV:3"
         }
-      ]
-    },
-    {
-      "id": "CVE-2025-15281",
-      "ratings": [
+      ],
+      "affects": [
         {
-          "score": 27,
-          "severity": "medium",
-          "method": "OWASP",
-          "vector": "SL:5/M:5/O:5/S:5/ED:4/EE:4/A:4/ID:4/LC:6/LI:6/LAV:6/LAC:6/FD:6/RD:6/NC:6/PV:6"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2026-0915",
-      "ratings": [
-        {
-          "score": 45.5,
-          "severity": "high",
-          "method": "OWASP",
-          "vector": "SL:7/M:7/O:7/S:7/ED:6/EE:6/A:6/ID:6/LC:7/LI:7/LAV:7/LAC:7/FD:7/RD:7/NC:7/PV:7"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2010-4756",
-      "ratings": [
-        {
-          "score": 12,
-          "severity": "low",
-          "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:3/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2018-20796",
-      "ratings": [
-        {
-          "score": 7.5,
-          "severity": "low",
-          "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:2/EE:2/A:2/ID:2/LC:3/LI:3/LAV:3/LAC:3/FD:3/RD:3/NC:3/PV:3"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2019-1010022",
-      "ratings": [
-        {
-          "score": 6,
-          "severity": "low",
-          "method": "OWASP",
-          "vector": "SL:2/M:2/O:2/S:2/ED:2/EE:2/A:2/ID:2/LC:3/LI:3/LAV:3/LAC:3/FD:3/RD:3/NC:3/PV:3"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2019-1010023",
-      "ratings": [
-        {
-          "score": 6,
-          "severity": "low",
-          "method": "OWASP",
-          "vector": "SL:2/M:2/O:2/S:2/ED:2/EE:2/A:2/ID:2/LC:3/LI:3/LAV:3/LAC:3/FD:3/RD:3/NC:3/PV:3"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2019-1010024",
-      "ratings": [
-        {
-          "score": 6,
-          "severity": "low",
-          "method": "OWASP",
-          "vector": "SL:2/M:2/O:2/S:2/ED:2/EE:2/A:2/ID:2/LC:3/LI:3/LAV:3/LAC:3/FD:3/RD:3/NC:3/PV:3"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2019-1010025",
-      "ratings": [
-        {
-          "score": 6,
-          "severity": "low",
-          "method": "OWASP",
-          "vector": "SL:2/M:2/O:2/S:2/ED:2/EE:2/A:2/ID:2/LC:3/LI:3/LAV:3/LAC:3/FD:3/RD:3/NC:3/PV:3"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2019-9192",
-      "ratings": [
-        {
-          "score": 6,
-          "severity": "low",
-          "method": "OWASP",
-          "vector": "SL:2/M:2/O:2/S:2/ED:2/EE:2/A:2/ID:2/LC:3/LI:3/LAV:3/LAC:3/FD:3/RD:3/NC:3/PV:3"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2026-0861",
-      "ratings": [
-        {
-          "score": 44,
-          "severity": "high",
-          "method": "OWASP",
-          "vector": "SL:5/M:5/O:5/S:5/ED:6/EE:6/A:6/ID:6/LC:8/LI:8/LAV:8/LAC:8/FD:8/RD:8/NC:8/PV:8"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2025-15281",
-      "ratings": [
-        {
-          "score": 15.75,
-          "severity": "low",
-          "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:4/EE:4/A:4/ID:4/LC:4/LI:4/LAV:4/LAC:4/FD:5/RD:5/NC:5/PV:5"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2026-0915",
-      "ratings": [
-        {
-          "score": 45.5,
-          "severity": "high",
-          "method": "OWASP",
-          "vector": "SL:7/M:7/O:7/S:7/ED:6/EE:6/A:6/ID:6/LC:7/LI:7/LAV:7/LAC:7/FD:7/RD:7/NC:7/PV:7"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2010-4756",
-      "ratings": [
-        {
-          "score": 12,
-          "severity": "low",
-          "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:3/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2018-20796",
-      "ratings": [
-        {
-          "score": 12,
-          "severity": "low",
-          "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:3/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2019-1010022",
-      "ratings": [
-        {
-          "score": 10,
-          "severity": "low",
-          "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:2/EE:2/A:2/ID:2/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2019-1010023",
-      "ratings": [
-        {
-          "score": 10,
-          "severity": "low",
-          "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:2/EE:2/A:2/ID:2/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2019-1010024",
-      "ratings": [
-        {
-          "score": 10,
-          "severity": "low",
-          "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:2/EE:2/A:2/ID:2/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2019-1010025",
-      "ratings": [
-        {
-          "score": 10,
-          "severity": "low",
-          "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:2/EE:2/A:2/ID:2/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2019-9192",
-      "ratings": [
-        {
-          "score": 10,
-          "severity": "low",
-          "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:2/EE:2/A:2/ID:2/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2025-14104",
-      "ratings": [
-        {
-          "score": 15.75,
-          "severity": "low",
-          "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:4/EE:4/A:4/ID:4/LC:4/LI:4/LAV:4/LAC:4/FD:5/RD:5/NC:5/PV:5"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2022-0563",
-      "ratings": [
-        {
-          "score": 17.5,
-          "severity": "low",
-          "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:4/EE:4/A:4/ID:4/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2025-14104",
-      "ratings": [
-        {
-          "score": 31.5,
-          "severity": "medium",
-          "method": "OWASP",
-          "vector": "SL:4/M:4/O:4/S:4/ED:5/EE:5/A:5/ID:5/LC:7/LI:7/LAV:7/LAC:7/FD:7/RD:7/NC:7/PV:7"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2025-6141",
-      "ratings": [
-        {
-          "score": 12,
-          "severity": "low",
-          "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:3/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2025-7709",
-      "ratings": [
-        {
-          "score": 27,
-          "severity": "medium",
-          "method": "OWASP",
-          "vector": "SL:4/M:4/O:4/S:4/ED:5/EE:5/A:5/ID:5/LC:6/LI:6/LAV:6/LAC:6/FD:6/RD:6/NC:6/PV:6"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2021-45346",
-      "ratings": [
-        {
-          "score": 13.5,
-          "severity": "low",
-          "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:3/LC:4/LI:4/LAV:4/LAC:4/FD:5/RD:5/NC:5/PV:5"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2025-15467",
-      "ratings": [
-        {
-          "score": 76.5,
-          "severity": "critical",
-          "method": "OWASP",
-          "vector": "SL:9/M:9/O:9/S:9/ED:8/EE:8/A:8/ID:8/LC:9/LI:9/LAV:9/LAC:9/FD:9/RD:9/NC:9/PV:9"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2025-69419",
-      "ratings": [
-        {
-          "score": 60,
-          "severity": "critical",
-          "method": "OWASP",
-          "vector": "SL:8/M:8/O:8/S:8/ED:7/EE:7/A:7/ID:7/LC:8/LI:8/LAV:8/LAC:8/FD:8/RD:8/NC:8/PV:8"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2025-11187",
-      "ratings": [
-        {
-          "score": 38.5,
-          "severity": "medium",
-          "method": "OWASP",
-          "vector": "SL:6/M:6/O:6/S:6/ED:5/EE:5/A:5/ID:5/LC:7/LI:7/LAV:7/LAC:7/FD:7/RD:7/NC:7/PV:7"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2025-15468",
-      "ratings": [
-        {
-          "score": 27,
-          "severity": "medium",
-          "method": "OWASP",
-          "vector": "SL:5/M:5/O:5/S:5/ED:4/EE:4/A:4/ID:4/LC:6/LI:6/LAV:6/LAC:6/FD:6/RD:6/NC:6/PV:6"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2025-15469",
-      "ratings": [
-        {
-          "score": 27,
-          "severity": "medium",
-          "method": "OWASP",
-          "vector": "SL:4/M:4/O:4/S:4/ED:5/EE:5/A:5/ID:5/LC:6/LI:6/LAV:6/LAC:6/FD:6/RD:6/NC:6/PV:6"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2025-66199",
-      "ratings": [
-        {
-          "score": 30,
-          "severity": "medium",
-          "method": "OWASP",
-          "vector": "SL:5/M:5/O:5/S:5/ED:5/EE:5/A:5/ID:5/LC:6/LI:6/LAV:6/LAC:6/FD:6/RD:6/NC:6/PV:6"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2025-68160",
-      "ratings": [
-        {
-          "score": 20,
-          "severity": "medium",
-          "method": "OWASP",
-          "vector": "SL:4/M:4/O:4/S:4/ED:4/EE:4/A:4/ID:4/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2025-69418",
-      "ratings": [
-        {
-          "score": 20,
-          "severity": "medium",
-          "method": "OWASP",
-          "vector": "SL:4/M:4/O:4/S:4/ED:4/EE:4/A:4/ID:4/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2025-69420",
-      "ratings": [
-        {
-          "score": 20,
-          "severity": "medium",
-          "method": "OWASP",
-          "vector": "SL:4/M:4/O:4/S:4/ED:4/EE:4/A:4/ID:4/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2025-69421",
-      "ratings": [
-        {
-          "score": 20,
-          "severity": "medium",
-          "method": "OWASP",
-          "vector": "SL:4/M:4/O:4/S:4/ED:4/EE:4/A:4/ID:4/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2026-22795",
-      "ratings": [
-        {
-          "score": 20,
-          "severity": "medium",
-          "method": "OWASP",
-          "vector": "SL:4/M:4/O:4/S:4/ED:4/EE:4/A:4/ID:4/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2026-22796",
-      "ratings": [
-        {
-          "score": 20,
-          "severity": "medium",
-          "method": "OWASP",
-          "vector": "SL:4/M:4/O:4/S:4/ED:4/EE:4/A:4/ID:4/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2013-4392",
-      "ratings": [
-        {
-          "score": 17.5,
-          "severity": "low",
-          "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:4/EE:4/A:4/ID:4/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2023-31437",
-      "ratings": [
-        {
-          "score": 12,
-          "severity": "low",
-          "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:3/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2023-31438",
-      "ratings": [
-        {
-          "score": 12,
-          "severity": "low",
-          "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:3/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2023-31439",
-      "ratings": [
-        {
-          "score": 12,
-          "severity": "low",
-          "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:3/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2025-6141",
-      "ratings": [
-        {
-          "score": 20,
-          "severity": "medium",
-          "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:5/EE:5/A:5/ID:5/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2025-14104",
-      "ratings": [
-        {
-          "score": 20,
-          "severity": "medium",
-          "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:5/EE:5/A:5/ID:5/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2022-0563",
-      "ratings": [
-        {
-          "score": 17.5,
-          "severity": "low",
-          "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:4/EE:4/A:4/ID:4/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2025-14104",
-      "ratings": [
-        {
-          "score": 29.25,
-          "severity": "medium",
-          "method": "OWASP",
-          "vector": "SL:4/M:4/O:4/S:4/ED:5/EE:5/A:5/ID:5/LC:6/LI:6/LAV:6/LAC:6/FD:7/RD:7/NC:7/PV:7"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2007-5686",
-      "ratings": [
-        {
-          "score": 12,
-          "severity": "low",
-          "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:3/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2024-56433",
-      "ratings": [
-        {
-          "score": 17.5,
-          "severity": "low",
-          "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:4/EE:4/A:4/ID:4/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2025-6141",
-      "ratings": [
-        {
-          "score": 12,
-          "severity": "low",
-          "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:3/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2025-15467",
-      "ratings": [
-        {
-          "score": 72.25,
-          "severity": "critical",
-          "method": "OWASP",
-          "vector": "SL:9/M:9/O:9/S:9/ED:8/EE:8/A:8/ID:8/LC:8/LI:8/LAV:8/LAC:8/FD:9/RD:9/NC:9/PV:9"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2025-69419",
-      "ratings": [
-        {
-          "score": 45.5,
-          "severity": "high",
-          "method": "OWASP",
-          "vector": "SL:7/M:7/O:7/S:7/ED:6/EE:6/A:6/ID:6/LC:7/LI:7/LAV:7/LAC:7/FD:7/RD:7/NC:7/PV:7"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2025-11187",
-      "ratings": [
-        {
-          "score": 30,
-          "severity": "medium",
-          "method": "OWASP",
-          "vector": "SL:5/M:5/O:5/S:5/ED:5/EE:5/A:5/ID:5/LC:6/LI:6/LAV:6/LAC:6/FD:6/RD:6/NC:6/PV:6"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2025-15468",
-      "ratings": [
-        {
-          "score": 20,
-          "severity": "medium",
-          "method": "OWASP",
-          "vector": "SL:4/M:4/O:4/S:4/ED:4/EE:4/A:4/ID:4/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2025-15469",
-      "ratings": [
-        {
-          "score": 20,
-          "severity": "medium",
-          "method": "OWASP",
-          "vector": "SL:4/M:4/O:4/S:4/ED:4/EE:4/A:4/ID:4/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2025-66199",
-      "ratings": [
-        {
-          "score": 25,
-          "severity": "medium",
-          "method": "OWASP",
-          "vector": "SL:5/M:5/O:5/S:5/ED:5/EE:5/A:5/ID:5/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2025-68160",
-      "ratings": [
-        {
-          "score": 12,
-          "severity": "low",
-          "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:3/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2025-69418",
-      "ratings": [
-        {
-          "score": 12,
-          "severity": "low",
-          "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:3/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2025-69420",
-      "ratings": [
-        {
-          "score": 12,
-          "severity": "low",
-          "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:3/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2025-69421",
-      "ratings": [
-        {
-          "score": 12,
-          "severity": "low",
-          "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:3/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2026-22795",
-      "ratings": [
-        {
-          "score": 15,
-          "severity": "low",
-          "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:3/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2026-22796",
-      "ratings": [
-        {
-          "score": 15,
-          "severity": "low",
-          "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:3/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2025-15467",
-      "ratings": [
-        {
-          "score": 68,
-          "severity": "critical",
-          "method": "OWASP",
-          "vector": "SL:8/M:8/O:8/S:8/ED:8/EE:8/A:8/ID:8/LC:8/LI:8/LAV:8/LAC:8/FD:9/RD:9/NC:9/PV:9"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2025-69419",
-      "ratings": [
-        {
-          "score": 55.25,
-          "severity": "high",
-          "method": "OWASP",
-          "vector": "SL:7/M:7/O:7/S:7/ED:6/EE:6/A:6/ID:6/LC:8/LI:8/LAV:8/LAC:8/FD:9/RD:9/NC:9/PV:9"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2025-11187",
-      "ratings": [
-        {
-          "score": 24,
-          "severity": "medium",
-          "method": "OWASP",
-          "vector": "SL:4/M:4/O:4/S:4/ED:4/EE:4/A:4/ID:4/LC:5/LI:5/LAV:5/LAC:5/FD:7/RD:7/NC:7/PV:7"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2025-15468",
-      "ratings": [
-        {
-          "score": 15,
-          "severity": "low",
-          "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:3/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2025-15469",
-      "ratings": [
-        {
-          "score": 15,
-          "severity": "low",
-          "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:3/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2025-66199",
-      "ratings": [
-        {
-          "score": 20,
-          "severity": "medium",
-          "method": "OWASP",
-          "vector": "SL:4/M:4/O:4/S:4/ED:4/EE:4/A:4/ID:4/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2025-68160",
-      "ratings": [
-        {
-          "score": 15,
-          "severity": "low",
-          "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:3/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2025-69418",
-      "ratings": [
-        {
-          "score": 15,
-          "severity": "low",
-          "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:3/LC:5/LI:5/LAV:5/LAC:5/FD:5/RD:5/NC:5/PV:5"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2025-69420",
-      "ratings": [
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/apt@3.0.3?arch=amd64\u0026distro=debian-13.3"
+        },
         {
-          "score": 15.75,
-          "severity": "low",
-          "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:4/EE:4/A:4/ID:4/LC:4/LI:4/LAV:4/LAC:4/FD:5/RD:5/NC:5/PV:5"
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/libapt-pkg7.0@3.0.3?arch=amd64\u0026distro=debian-13.3"
         }
-      ]
-    },
-    {
-      "id": "CVE-2025-69421",
-      "ratings": [
+      ],
+      "properties": [
         {
-          "score": 15.75,
-          "severity": "low",
-          "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:4/EE:4/A:4/ID:4/LC:4/LI:4/LAV:4/LAC:4/FD:5/RD:5/NC:5/PV:5"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2026-22795",
-      "ratings": [
-        {
-          "score": 15.75,
-          "severity": "low",
-          "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:4/EE:4/A:4/ID:4/LC:4/LI:4/LAV:4/LAC:4/FD:5/RD:5/NC:5/PV:5"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2026-22796",
-      "ratings": [
-        {
-          "score": 15.75,
-          "severity": "low",
-          "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:4/EE:4/A:4/ID:4/LC:4/LI:4/LAV:4/LAC:4/FD:5/RD:5/NC:5/PV:5"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2007-5686",
-      "ratings": [
-        {
-          "score": 8.75,
-          "severity": "low",
-          "method": "OWASP",
-          "vector": "SL:2/M:2/O:2/S:2/ED:3/EE:3/A:3/ID:3/LC:3/LI:3/LAV:3/LAC:3/FD:4/RD:4/NC:4/PV:4"
-        }
-      ]
-    },
-    {
-      "id": "CVE-2024-56433",
-      "ratings": [
-        {
-          "score": 8.75,
-          "severity": "low",
-          "method": "OWASP",
-          "vector": "SL:2/M:2/O:2/S:2/ED:3/EE:3/A:3/ID:3/LC:3/LI:3/LAV:3/LAC:3/FD:4/RD:4/NC:4/PV:4"
-        }
-      ]
-    },
-    {
-      "id": "TEMP-0628843-DBAD28",
-      "ratings": [
+          "name": "vens:impact-provenance",
+          "value": "cvss-v3"
+        },
         {
-          "score": 8.75,
-          "severity": "low",
-          "method": "OWASP",
-          "vector": "SL:2/M:2/O:2/S:2/ED:3/EE:3/A:3/ID:3/LC:3/LI:3/LAV:3/LAC:3/FD:4/RD:4/NC:4/PV:4"
+          "name": "vens:impact-basis",
+          "value": "business"
         }
       ]
     },
     {
       "id": "CVE-2011-4116",
+      "source": {
+        "name": "NVD",
+        "url": "https://salsa.debian.org/security-tracker-team/security-tracker"
+      },
       "ratings": [
         {
-          "score": 8.75,
-          "severity": "low",
+          "score": 18.375,
+          "severity": "high",
           "method": "OWASP",
-          "vector": "SL:2/M:2/O:2/S:2/ED:3/EE:3/A:3/ID:3/LC:3/LI:3/LAV:3/LAC:3/FD:4/RD:4/NC:4/PV:4"
+          "vector": "SL:9/M:4/O:0/S:9/ED:9/EE:1/A:9/ID:8/LC:2/LI:3/LAV:1/LAC:7/FD:3/RD:4/NC:2/PV:3"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/perl-base@5.40.1-6?arch=amd64\u0026distro=debian-13.3"
+        }
+      ],
+      "properties": [
+        {
+          "name": "vens:impact-provenance",
+          "value": "cvss-v3"
+        },
+        {
+          "name": "vens:impact-basis",
+          "value": "business"
         }
       ]
     },
     {
-      "id": "TEMP-0517018-A83CE6",
+      "id": "CVE-2013-4392",
+      "source": {
+        "name": "NVD",
+        "url": "https://salsa.debian.org/security-tracker-team/security-tracker"
+      },
       "ratings": [
         {
-          "score": 8.75,
-          "severity": "low",
+          "score": 36.75,
+          "severity": "critical",
           "method": "OWASP",
-          "vector": "SL:2/M:2/O:2/S:2/ED:3/EE:3/A:3/ID:3/LC:3/LI:3/LAV:3/LAC:3/FD:4/RD:4/NC:4/PV:4"
+          "vector": "SL:9/M:4/O:0/S:9/ED:9/EE:1/A:9/ID:8/LC:9/LI:9/LAV:9/LAC:7/FD:7/RD:5/NC:5/PV:7"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/libsystemd0@257.9-1~deb13u1?arch=amd64\u0026distro=debian-13.3"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/libudev1@257.9-1~deb13u1?arch=amd64\u0026distro=debian-13.3"
+        }
+      ],
+      "properties": [
+        {
+          "name": "vens:impact-provenance",
+          "value": "missing-cvss-v3-fallback"
+        },
+        {
+          "name": "vens:impact-basis",
+          "value": "business"
         }
       ]
     },
     {
-      "id": "CVE-2005-2541",
+      "id": "CVE-2017-18018",
+      "source": {
+        "name": "NVD",
+        "url": "https://salsa.debian.org/security-tracker-team/security-tracker"
+      },
       "ratings": [
         {
-          "score": 8.75,
-          "severity": "low",
+          "score": 33.84375,
+          "severity": "high",
           "method": "OWASP",
-          "vector": "SL:2/M:2/O:2/S:2/ED:3/EE:3/A:3/ID:3/LC:3/LI:3/LAV:3/LAC:3/FD:4/RD:4/NC:4/PV:4"
+          "vector": "SL:9/M:1/O:7/S:9/ED:9/EE:5/A:9/ID:8/LC:6/LI:7/LAV:5/LAC:7/FD:7/RD:5/NC:2/PV:5"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/coreutils@9.7-3?arch=amd64\u0026distro=debian-13.3"
+        }
+      ],
+      "properties": [
+        {
+          "name": "vens:impact-provenance",
+          "value": "cvss-v3"
+        },
+        {
+          "name": "vens:impact-basis",
+          "value": "business"
         }
       ]
     },
     {
-      "id": "TEMP-0290435-0B57B5",
+      "id": "CVE-2018-20796",
+      "source": {
+        "name": "NVD",
+        "url": "https://salsa.debian.org/security-tracker-team/security-tracker"
+      },
       "ratings": [
         {
-          "score": 5,
-          "severity": "low",
+          "score": 35.625,
+          "severity": "high",
           "method": "OWASP",
-          "vector": "SL:2/M:2/O:2/S:2/ED:2/EE:2/A:2/ID:2/LC:2/LI:2/LAV:2/LAC:2/FD:3/RD:3/NC:3/PV:3"
+          "vector": "SL:9/M:4/O:0/S:9/ED:9/EE:9/A:9/ID:8/LC:2/LI:1/LAV:7/LAC:7/FD:7/RD:5/NC:5/PV:3"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/libc-bin@2.41-12%2Bdeb13u1?arch=amd64\u0026distro=debian-13.3"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/libc6@2.41-12%2Bdeb13u1?arch=amd64\u0026distro=debian-13.3"
+        }
+      ],
+      "properties": [
+        {
+          "name": "vens:impact-provenance",
+          "value": "cvss-v3"
+        },
+        {
+          "name": "vens:impact-basis",
+          "value": "business"
         }
       ]
     },
     {
-      "id": "CVE-2025-14104",
+      "id": "CVE-2019-1010022",
+      "source": {
+        "name": "NVD",
+        "url": "https://salsa.debian.org/security-tracker-team/security-tracker"
+      },
       "ratings": [
         {
-          "score": 31.5,
-          "severity": "medium",
+          "score": 34.4375,
+          "severity": "high",
           "method": "OWASP",
-          "vector": "SL:4/M:4/O:4/S:4/ED:5/EE:5/A:5/ID:5/LC:7/LI:7/LAV:7/LAC:7/FD:7/RD:7/NC:7/PV:7"
+          "vector": "SL:9/M:9/O:0/S:9/ED:9/EE:5/A:9/ID:8/LC:7/LI:7/LAV:7/LAC:9/FD:7/RD:5/NC:2/PV:5"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/libc-bin@2.41-12%2Bdeb13u1?arch=amd64\u0026distro=debian-13.3"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/libc6@2.41-12%2Bdeb13u1?arch=amd64\u0026distro=debian-13.3"
+        }
+      ],
+      "properties": [
+        {
+          "name": "vens:impact-provenance",
+          "value": "cvss-v3"
+        },
+        {
+          "name": "vens:impact-basis",
+          "value": "business"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2019-1010023",
+      "source": {
+        "name": "NVD",
+        "url": "https://salsa.debian.org/security-tracker-team/security-tracker"
+      },
+      "ratings": [
+        {
+          "score": 40.6875,
+          "severity": "high",
+          "method": "OWASP",
+          "vector": "SL:9/M:9/O:0/S:9/ED:9/EE:9/A:9/ID:8/LC:7/LI:7/LAV:7/LAC:7/FD:7/RD:5/NC:2/PV:7"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/libc-bin@2.41-12%2Bdeb13u1?arch=amd64\u0026distro=debian-13.3"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/libc6@2.41-12%2Bdeb13u1?arch=amd64\u0026distro=debian-13.3"
+        }
+      ],
+      "properties": [
+        {
+          "name": "vens:impact-provenance",
+          "value": "cvss-v3"
+        },
+        {
+          "name": "vens:impact-basis",
+          "value": "business"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2019-1010024",
+      "source": {
+        "name": "NVD",
+        "url": "https://salsa.debian.org/security-tracker-team/security-tracker"
+      },
+      "ratings": [
+        {
+          "score": 37.375,
+          "severity": "high",
+          "method": "OWASP",
+          "vector": "SL:9/M:1/O:0/S:9/ED:9/EE:1/A:9/ID:8/LC:6/LI:1/LAV:1/LAC:9/FD:7/RD:5/NC:7/PV:7"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/libc-bin@2.41-12%2Bdeb13u1?arch=amd64\u0026distro=debian-13.3"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/libc6@2.41-12%2Bdeb13u1?arch=amd64\u0026distro=debian-13.3"
+        }
+      ],
+      "properties": [
+        {
+          "name": "vens:impact-provenance",
+          "value": "cvss-v3"
+        },
+        {
+          "name": "vens:impact-basis",
+          "value": "business"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2019-1010025",
+      "source": {
+        "name": "NVD",
+        "url": "https://salsa.debian.org/security-tracker-team/security-tracker"
+      },
+      "ratings": [
+        {
+          "score": 38.5,
+          "severity": "high",
+          "method": "OWASP",
+          "vector": "SL:9/M:4/O:4/S:9/ED:9/EE:3/A:9/ID:9/LC:6/LI:1/LAV:1/LAC:7/FD:7/RD:5/NC:5/PV:5"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/libc-bin@2.41-12%2Bdeb13u1?arch=amd64\u0026distro=debian-13.3"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/libc6@2.41-12%2Bdeb13u1?arch=amd64\u0026distro=debian-13.3"
+        }
+      ],
+      "properties": [
+        {
+          "name": "vens:impact-provenance",
+          "value": "cvss-v3"
+        },
+        {
+          "name": "vens:impact-basis",
+          "value": "business"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2019-9192",
+      "source": {
+        "name": "NVD",
+        "url": "https://salsa.debian.org/security-tracker-team/security-tracker"
+      },
+      "ratings": [
+        {
+          "score": 30.8125,
+          "severity": "high",
+          "method": "OWASP",
+          "vector": "SL:9/M:1/O:4/S:9/ED:9/EE:9/A:9/ID:8/LC:2/LI:1/LAV:7/LAC:7/FD:7/RD:5/NC:2/PV:3"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/libc-bin@2.41-12%2Bdeb13u1?arch=amd64\u0026distro=debian-13.3"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/libc6@2.41-12%2Bdeb13u1?arch=amd64\u0026distro=debian-13.3"
+        }
+      ],
+      "properties": [
+        {
+          "name": "vens:impact-provenance",
+          "value": "cvss-v3"
+        },
+        {
+          "name": "vens:impact-basis",
+          "value": "business"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2021-45346",
+      "source": {
+        "name": "NVD",
+        "url": "https://salsa.debian.org/security-tracker-team/security-tracker"
+      },
+      "ratings": [
+        {
+          "score": 33,
+          "severity": "high",
+          "method": "OWASP",
+          "vector": "SL:9/M:1/O:0/S:9/ED:9/EE:3/A:9/ID:8/LC:6/LI:1/LAV:1/LAC:7/FD:7/RD:5/NC:7/PV:3"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/libsqlite3-0@3.46.1-7?arch=amd64\u0026distro=debian-13.3"
+        }
+      ],
+      "properties": [
+        {
+          "name": "vens:impact-provenance",
+          "value": "cvss-v3"
+        },
+        {
+          "name": "vens:impact-basis",
+          "value": "business"
         }
       ]
     },
     {
       "id": "CVE-2022-0563",
+      "source": {
+        "name": "NVD",
+        "url": "https://salsa.debian.org/security-tracker-team/security-tracker"
+      },
       "ratings": [
         {
-          "score": 13.5,
-          "severity": "low",
+          "score": 42.65625,
+          "severity": "high",
           "method": "OWASP",
-          "vector": "SL:3/M:3/O:3/S:3/ED:3/EE:3/A:3/ID:3/LC:4/LI:4/LAV:4/LAC:4/FD:5/RD:5/NC:5/PV:5"
+          "vector": "SL:9/M:9/O:7/S:9/ED:9/EE:5/A:9/ID:8/LC:7/LI:1/LAV:1/LAC:7/FD:7/RD:5/NC:2/PV:7"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/bsdutils@2.41-5?arch=amd64\u0026distro=debian-13.3\u0026epoch=1"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/libblkid1@2.41-5?arch=amd64\u0026distro=debian-13.3"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/liblastlog2-2@2.41-5?arch=amd64\u0026distro=debian-13.3"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/libmount1@2.41-5?arch=amd64\u0026distro=debian-13.3"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/libsmartcols1@2.41-5?arch=amd64\u0026distro=debian-13.3"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/libuuid1@2.41-5?arch=amd64\u0026distro=debian-13.3"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/login@4.16.0-2%2Breally2.41-5?arch=amd64\u0026distro=debian-13.3\u0026epoch=1"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/mount@2.41-5?arch=amd64\u0026distro=debian-13.3"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/util-linux@2.41-5?arch=amd64\u0026distro=debian-13.3"
+        }
+      ],
+      "properties": [
+        {
+          "name": "vens:impact-provenance",
+          "value": "cvss-v3"
+        },
+        {
+          "name": "vens:impact-basis",
+          "value": "business"
         }
       ]
     },
     {
-      "id": "CVE-2026-23949",
+      "id": "CVE-2023-31437",
+      "source": {
+        "name": "NVD",
+        "url": "https://salsa.debian.org/security-tracker-team/security-tracker"
+      },
       "ratings": [
         {
-          "score": 68,
+          "score": 34,
+          "severity": "high",
+          "method": "OWASP",
+          "vector": "SL:9/M:1/O:9/S:9/ED:9/EE:9/A:9/ID:9/LC:2/LI:3/LAV:1/LAC:9/FD:3/RD:4/NC:7/PV:3"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/libsystemd0@257.9-1~deb13u1?arch=amd64\u0026distro=debian-13.3"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/libudev1@257.9-1~deb13u1?arch=amd64\u0026distro=debian-13.3"
+        }
+      ],
+      "properties": [
+        {
+          "name": "vens:impact-provenance",
+          "value": "cvss-v3"
+        },
+        {
+          "name": "vens:impact-basis",
+          "value": "business"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2023-31438",
+      "source": {
+        "name": "NVD",
+        "url": "https://salsa.debian.org/security-tracker-team/security-tracker"
+      },
+      "ratings": [
+        {
+          "score": 20.625,
+          "severity": "high",
+          "method": "OWASP",
+          "vector": "SL:9/M:9/O:0/S:9/ED:9/EE:1/A:9/ID:9/LC:2/LI:3/LAV:1/LAC:7/FD:3/RD:4/NC:2/PV:3"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/libsystemd0@257.9-1~deb13u1?arch=amd64\u0026distro=debian-13.3"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/libudev1@257.9-1~deb13u1?arch=amd64\u0026distro=debian-13.3"
+        }
+      ],
+      "properties": [
+        {
+          "name": "vens:impact-provenance",
+          "value": "cvss-v3"
+        },
+        {
+          "name": "vens:impact-basis",
+          "value": "business"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2023-31439",
+      "source": {
+        "name": "NVD",
+        "url": "https://salsa.debian.org/security-tracker-team/security-tracker"
+      },
+      "ratings": [
+        {
+          "score": 28.125,
+          "severity": "high",
+          "method": "OWASP",
+          "vector": "SL:9/M:9/O:4/S:9/ED:9/EE:3/A:9/ID:8/LC:2/LI:3/LAV:1/LAC:7/FD:3/RD:4/NC:5/PV:3"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/libsystemd0@257.9-1~deb13u1?arch=amd64\u0026distro=debian-13.3"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/libudev1@257.9-1~deb13u1?arch=amd64\u0026distro=debian-13.3"
+        }
+      ],
+      "properties": [
+        {
+          "name": "vens:impact-provenance",
+          "value": "cvss-v3"
+        },
+        {
+          "name": "vens:impact-basis",
+          "value": "business"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2024-56433",
+      "source": {
+        "name": "NVD",
+        "url": "https://salsa.debian.org/security-tracker-team/security-tracker"
+      },
+      "ratings": [
+        {
+          "score": 41.34375,
+          "severity": "high",
+          "method": "OWASP",
+          "vector": "SL:9/M:1/O:9/S:9/ED:9/EE:9/A:9/ID:8/LC:6/LI:3/LAV:1/LAC:7/FD:7/RD:5/NC:2/PV:7"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/login.defs@4.17.4-2?arch=all\u0026distro=debian-13.3\u0026epoch=1"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/passwd@4.17.4-2?arch=amd64\u0026distro=debian-13.3\u0026epoch=1"
+        }
+      ],
+      "properties": [
+        {
+          "name": "vens:impact-provenance",
+          "value": "cvss-v3"
+        },
+        {
+          "name": "vens:impact-basis",
+          "value": "business"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-11187",
+      "source": {
+        "name": "NVD",
+        "url": "https://salsa.debian.org/security-tracker-team/security-tracker"
+      },
+      "ratings": [
+        {
+          "score": 47.25,
           "severity": "critical",
           "method": "OWASP",
-          "vector": "SL:8/M:8/O:8/S:8/ED:8/EE:8/A:8/ID:8/LC:8/LI:8/LAV:8/LAC:8/FD:9/RD:9/NC:9/PV:9"
+          "vector": "SL:9/M:1/O:9/S:9/ED:9/EE:9/A:9/ID:8/LC:6/LI:3/LAV:7/LAC:7/FD:7/RD:5/NC:5/PV:7"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/libssl3t64@3.5.4-1~deb13u1?arch=amd64\u0026distro=debian-13.3"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/openssl@3.5.4-1~deb13u1?arch=amd64\u0026distro=debian-13.3"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/openssl-provider-legacy@3.5.4-1~deb13u1?arch=amd64\u0026distro=debian-13.3"
+        }
+      ],
+      "properties": [
+        {
+          "name": "vens:impact-provenance",
+          "value": "cvss-v3"
+        },
+        {
+          "name": "vens:impact-basis",
+          "value": "business"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-14104",
+      "source": {
+        "name": "NVD",
+        "url": "https://salsa.debian.org/security-tracker-team/security-tracker"
+      },
+      "ratings": [
+        {
+          "score": 39.375,
+          "severity": "high",
+          "method": "OWASP",
+          "vector": "SL:9/M:1/O:9/S:9/ED:9/EE:9/A:9/ID:8/LC:6/LI:1/LAV:7/LAC:7/FD:7/RD:5/NC:5/PV:3"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/bsdutils@2.41-5?arch=amd64\u0026distro=debian-13.3\u0026epoch=1"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/libblkid1@2.41-5?arch=amd64\u0026distro=debian-13.3"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/liblastlog2-2@2.41-5?arch=amd64\u0026distro=debian-13.3"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/libmount1@2.41-5?arch=amd64\u0026distro=debian-13.3"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/libsmartcols1@2.41-5?arch=amd64\u0026distro=debian-13.3"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/libuuid1@2.41-5?arch=amd64\u0026distro=debian-13.3"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/login@4.16.0-2%2Breally2.41-5?arch=amd64\u0026distro=debian-13.3\u0026epoch=1"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/mount@2.41-5?arch=amd64\u0026distro=debian-13.3"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/util-linux@2.41-5?arch=amd64\u0026distro=debian-13.3"
+        }
+      ],
+      "properties": [
+        {
+          "name": "vens:impact-provenance",
+          "value": "cvss-v3"
+        },
+        {
+          "name": "vens:impact-basis",
+          "value": "business"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-15281",
+      "source": {
+        "name": "NVD",
+        "url": "https://salsa.debian.org/security-tracker-team/security-tracker"
+      },
+      "ratings": [
+        {
+          "score": 31.875,
+          "severity": "high",
+          "method": "OWASP",
+          "vector": "SL:9/M:4/O:7/S:9/ED:9/EE:5/A:9/ID:8/LC:2/LI:1/LAV:7/LAC:9/FD:7/RD:5/NC:2/PV:3"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/libc-bin@2.41-12%2Bdeb13u1?arch=amd64\u0026distro=debian-13.3"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/libc6@2.41-12%2Bdeb13u1?arch=amd64\u0026distro=debian-13.3"
+        }
+      ],
+      "properties": [
+        {
+          "name": "vens:impact-provenance",
+          "value": "cvss-v3"
+        },
+        {
+          "name": "vens:impact-basis",
+          "value": "business"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-15467",
+      "source": {
+        "name": "NVD",
+        "url": "https://salsa.debian.org/security-tracker-team/security-tracker"
+      },
+      "ratings": [
+        {
+          "score": 40.625,
+          "severity": "critical",
+          "method": "OWASP",
+          "vector": "SL:9/M:4/O:0/S:9/ED:9/EE:1/A:9/ID:9/LC:7/LI:7/LAV:7/LAC:7/FD:7/RD:5/NC:7/PV:7"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/libssl3t64@3.5.4-1~deb13u1?arch=amd64\u0026distro=debian-13.3"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/openssl@3.5.4-1~deb13u1?arch=amd64\u0026distro=debian-13.3"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/openssl-provider-legacy@3.5.4-1~deb13u1?arch=amd64\u0026distro=debian-13.3"
+        }
+      ],
+      "properties": [
+        {
+          "name": "vens:impact-provenance",
+          "value": "cvss-v3"
+        },
+        {
+          "name": "vens:impact-basis",
+          "value": "business"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-15468",
+      "source": {
+        "name": "NVD",
+        "url": "https://salsa.debian.org/security-tracker-team/security-tracker"
+      },
+      "ratings": [
+        {
+          "score": 44.375,
+          "severity": "high",
+          "method": "OWASP",
+          "vector": "SL:9/M:9/O:9/S:9/ED:9/EE:9/A:9/ID:8/LC:2/LI:1/LAV:7/LAC:7/FD:7/RD:5/NC:5/PV:3"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/libssl3t64@3.5.4-1~deb13u1?arch=amd64\u0026distro=debian-13.3"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/openssl@3.5.4-1~deb13u1?arch=amd64\u0026distro=debian-13.3"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/openssl-provider-legacy@3.5.4-1~deb13u1?arch=amd64\u0026distro=debian-13.3"
+        }
+      ],
+      "properties": [
+        {
+          "name": "vens:impact-provenance",
+          "value": "cvss-v3"
+        },
+        {
+          "name": "vens:impact-basis",
+          "value": "business"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-15469",
+      "source": {
+        "name": "NVD",
+        "url": "https://salsa.debian.org/security-tracker-team/security-tracker"
+      },
+      "ratings": [
+        {
+          "score": 44.6875,
+          "severity": "high",
+          "method": "OWASP",
+          "vector": "SL:9/M:9/O:7/S:9/ED:9/EE:5/A:9/ID:8/LC:2/LI:7/LAV:1/LAC:7/FD:7/RD:5/NC:7/PV:3"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/libssl3t64@3.5.4-1~deb13u1?arch=amd64\u0026distro=debian-13.3"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/openssl@3.5.4-1~deb13u1?arch=amd64\u0026distro=debian-13.3"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/openssl-provider-legacy@3.5.4-1~deb13u1?arch=amd64\u0026distro=debian-13.3"
+        }
+      ],
+      "properties": [
+        {
+          "name": "vens:impact-provenance",
+          "value": "cvss-v3"
+        },
+        {
+          "name": "vens:impact-basis",
+          "value": "business"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-5278",
+      "source": {
+        "name": "NVD",
+        "url": "https://salsa.debian.org/security-tracker-team/security-tracker"
+      },
+      "ratings": [
+        {
+          "score": 53.625,
+          "severity": "critical",
+          "method": "OWASP",
+          "vector": "SL:9/M:4/O:9/S:9/ED:9/EE:9/A:9/ID:8/LC:6/LI:1/LAV:5/LAC:7/FD:7/RD:5/NC:7/PV:7"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/coreutils@9.7-3?arch=amd64\u0026distro=debian-13.3"
+        }
+      ],
+      "properties": [
+        {
+          "name": "vens:impact-provenance",
+          "value": "cvss-v3"
+        },
+        {
+          "name": "vens:impact-basis",
+          "value": "business"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-6141",
+      "source": {
+        "name": "NVD",
+        "url": "https://salsa.debian.org/security-tracker-team/security-tracker"
+      },
+      "ratings": [
+        {
+          "score": 24.375,
+          "severity": "high",
+          "method": "OWASP",
+          "vector": "SL:9/M:1/O:4/S:9/ED:9/EE:3/A:9/ID:8/LC:2/LI:1/LAV:5/LAC:9/FD:3/RD:4/NC:5/PV:3"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/libncursesw6@6.5%2B20250216-2?arch=amd64\u0026distro=debian-13.3"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/libtinfo6@6.5%2B20250216-2?arch=amd64\u0026distro=debian-13.3"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/ncurses-base@6.5%2B20250216-2?arch=all\u0026distro=debian-13.3"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/ncurses-bin@6.5%2B20250216-2?arch=amd64\u0026distro=debian-13.3"
+        }
+      ],
+      "properties": [
+        {
+          "name": "vens:impact-provenance",
+          "value": "cvss-v3"
+        },
+        {
+          "name": "vens:impact-basis",
+          "value": "business"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-66199",
+      "source": {
+        "name": "NVD",
+        "url": "https://salsa.debian.org/security-tracker-team/security-tracker"
+      },
+      "ratings": [
+        {
+          "score": 30.625,
+          "severity": "high",
+          "method": "OWASP",
+          "vector": "SL:9/M:4/O:0/S:9/ED:9/EE:1/A:9/ID:8/LC:2/LI:1/LAV:7/LAC:7/FD:7/RD:5/NC:5/PV:3"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/libssl3t64@3.5.4-1~deb13u1?arch=amd64\u0026distro=debian-13.3"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/openssl@3.5.4-1~deb13u1?arch=amd64\u0026distro=debian-13.3"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/openssl-provider-legacy@3.5.4-1~deb13u1?arch=amd64\u0026distro=debian-13.3"
+        }
+      ],
+      "properties": [
+        {
+          "name": "vens:impact-provenance",
+          "value": "cvss-v3"
+        },
+        {
+          "name": "vens:impact-basis",
+          "value": "business"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-68160",
+      "source": {
+        "name": "NVD",
+        "url": "https://salsa.debian.org/security-tracker-team/security-tracker"
+      },
+      "ratings": [
+        {
+          "score": 30.28125,
+          "severity": "high",
+          "method": "OWASP",
+          "vector": "SL:9/M:1/O:7/S:9/ED:9/EE:5/A:9/ID:8/LC:2/LI:1/LAV:7/LAC:7/FD:7/RD:5/NC:2/PV:3"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/libssl3t64@3.5.4-1~deb13u1?arch=amd64\u0026distro=debian-13.3"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/openssl@3.5.4-1~deb13u1?arch=amd64\u0026distro=debian-13.3"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/openssl-provider-legacy@3.5.4-1~deb13u1?arch=amd64\u0026distro=debian-13.3"
+        }
+      ],
+      "properties": [
+        {
+          "name": "vens:impact-provenance",
+          "value": "cvss-v3"
+        },
+        {
+          "name": "vens:impact-basis",
+          "value": "business"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-69418",
+      "source": {
+        "name": "NVD",
+        "url": "https://salsa.debian.org/security-tracker-team/security-tracker"
+      },
+      "ratings": [
+        {
+          "score": 37.8125,
+          "severity": "high",
+          "method": "OWASP",
+          "vector": "SL:9/M:4/O:4/S:9/ED:9/EE:3/A:9/ID:8/LC:6/LI:3/LAV:1/LAC:7/FD:7/RD:5/NC:7/PV:3"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/libssl3t64@3.5.4-1~deb13u1?arch=amd64\u0026distro=debian-13.3"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/openssl@3.5.4-1~deb13u1?arch=amd64\u0026distro=debian-13.3"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/openssl-provider-legacy@3.5.4-1~deb13u1?arch=amd64\u0026distro=debian-13.3"
+        }
+      ],
+      "properties": [
+        {
+          "name": "vens:impact-provenance",
+          "value": "cvss-v3"
+        },
+        {
+          "name": "vens:impact-basis",
+          "value": "business"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-69419",
+      "source": {
+        "name": "NVD",
+        "url": "https://salsa.debian.org/security-tracker-team/security-tracker"
+      },
+      "ratings": [
+        {
+          "score": 28.6875,
+          "severity": "high",
+          "method": "OWASP",
+          "vector": "SL:9/M:9/O:0/S:9/ED:9/EE:1/A:9/ID:8/LC:7/LI:7/LAV:1/LAC:7/FD:7/RD:5/NC:2/PV:3"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/libssl3t64@3.5.4-1~deb13u1?arch=amd64\u0026distro=debian-13.3"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/openssl@3.5.4-1~deb13u1?arch=amd64\u0026distro=debian-13.3"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/openssl-provider-legacy@3.5.4-1~deb13u1?arch=amd64\u0026distro=debian-13.3"
+        }
+      ],
+      "properties": [
+        {
+          "name": "vens:impact-provenance",
+          "value": "cvss-v3"
+        },
+        {
+          "name": "vens:impact-basis",
+          "value": "business"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-69420",
+      "source": {
+        "name": "NVD",
+        "url": "https://salsa.debian.org/security-tracker-team/security-tracker"
+      },
+      "ratings": [
+        {
+          "score": 24.4375,
+          "severity": "medium",
+          "method": "OWASP",
+          "vector": "SL:9/M:1/O:0/S:9/ED:9/EE:1/A:9/ID:8/LC:2/LI:1/LAV:7/LAC:7/FD:7/RD:5/NC:2/PV:3"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/libssl3t64@3.5.4-1~deb13u1?arch=amd64\u0026distro=debian-13.3"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/openssl@3.5.4-1~deb13u1?arch=amd64\u0026distro=debian-13.3"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/openssl-provider-legacy@3.5.4-1~deb13u1?arch=amd64\u0026distro=debian-13.3"
+        }
+      ],
+      "properties": [
+        {
+          "name": "vens:impact-provenance",
+          "value": "cvss-v3"
+        },
+        {
+          "name": "vens:impact-basis",
+          "value": "business"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-69421",
+      "source": {
+        "name": "NVD",
+        "url": "https://salsa.debian.org/security-tracker-team/security-tracker"
+      },
+      "ratings": [
+        {
+          "score": 32.5,
+          "severity": "high",
+          "method": "OWASP",
+          "vector": "SL:9/M:1/O:4/S:9/ED:9/EE:3/A:9/ID:8/LC:2/LI:1/LAV:7/LAC:9/FD:7/RD:5/NC:5/PV:3"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/libssl3t64@3.5.4-1~deb13u1?arch=amd64\u0026distro=debian-13.3"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/openssl@3.5.4-1~deb13u1?arch=amd64\u0026distro=debian-13.3"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/openssl-provider-legacy@3.5.4-1~deb13u1?arch=amd64\u0026distro=debian-13.3"
+        }
+      ],
+      "properties": [
+        {
+          "name": "vens:impact-provenance",
+          "value": "cvss-v3"
+        },
+        {
+          "name": "vens:impact-basis",
+          "value": "business"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2025-7709",
+      "source": {
+        "name": "NVD",
+        "url": "https://salsa.debian.org/security-tracker-team/security-tracker"
+      },
+      "ratings": [
+        {
+          "score": 34.5,
+          "severity": "high",
+          "method": "OWASP",
+          "vector": "SL:9/M:1/O:0/S:9/ED:9/EE:1/A:9/ID:8/LC:9/LI:9/LAV:9/LAC:7/FD:7/RD:5/NC:5/PV:7"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/libsqlite3-0@3.46.1-7?arch=amd64\u0026distro=debian-13.3"
+        }
+      ],
+      "properties": [
+        {
+          "name": "vens:impact-provenance",
+          "value": "missing-cvss-v3-fallback"
+        },
+        {
+          "name": "vens:impact-basis",
+          "value": "business"
         }
       ]
     },
     {
       "id": "CVE-2025-8869",
+      "source": {
+        "name": "NVD",
+        "url": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Apip"
+      },
+      "ratings": [
+        {
+          "score": 31.625,
+          "severity": "medium",
+          "method": "OWASP",
+          "vector": "SL:9/M:1/O:0/S:9/ED:9/EE:1/A:9/ID:8/LC:2/LI:7/LAV:1/LAC:7/FD:7/RD:5/NC:7/PV:3"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:pypi/pip@24.0"
+        }
+      ],
+      "properties": [
+        {
+          "name": "vens:impact-provenance",
+          "value": "cvss-v3"
+        },
+        {
+          "name": "vens:impact-basis",
+          "value": "business"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2026-0861",
+      "source": {
+        "name": "NVD",
+        "url": "https://salsa.debian.org/security-tracker-team/security-tracker"
+      },
+      "ratings": [
+        {
+          "score": 36.09375,
+          "severity": "high",
+          "method": "OWASP",
+          "vector": "SL:9/M:4/O:4/S:9/ED:9/EE:3/A:9/ID:8/LC:7/LI:7/LAV:7/LAC:9/FD:7/RD:5/NC:2/PV:7"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/libc-bin@2.41-12%2Bdeb13u1?arch=amd64\u0026distro=debian-13.3"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/libc6@2.41-12%2Bdeb13u1?arch=amd64\u0026distro=debian-13.3"
+        }
+      ],
+      "properties": [
+        {
+          "name": "vens:impact-provenance",
+          "value": "cvss-v3"
+        },
+        {
+          "name": "vens:impact-basis",
+          "value": "business"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2026-0915",
+      "source": {
+        "name": "NVD",
+        "url": "https://salsa.debian.org/security-tracker-team/security-tracker"
+      },
       "ratings": [
         {
           "score": 32.5,
-          "severity": "medium",
+          "severity": "high",
           "method": "OWASP",
-          "vector": "SL:5/M:5/O:5/S:5/ED:5/EE:5/A:5/ID:5/LC:6/LI:6/LAV:6/LAC:6/FD:7/RD:7/NC:7/PV:7"
+          "vector": "SL:9/M:1/O:4/S:9/ED:9/EE:3/A:9/ID:8/LC:6/LI:1/LAV:1/LAC:9/FD:7/RD:5/NC:5/PV:3"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/libc-bin@2.41-12%2Bdeb13u1?arch=amd64\u0026distro=debian-13.3"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/libc6@2.41-12%2Bdeb13u1?arch=amd64\u0026distro=debian-13.3"
+        }
+      ],
+      "properties": [
+        {
+          "name": "vens:impact-provenance",
+          "value": "cvss-v3"
+        },
+        {
+          "name": "vens:impact-basis",
+          "value": "business"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2026-22795",
+      "source": {
+        "name": "NVD",
+        "url": "https://salsa.debian.org/security-tracker-team/security-tracker"
+      },
+      "ratings": [
+        {
+          "score": 34.375,
+          "severity": "high",
+          "method": "OWASP",
+          "vector": "SL:9/M:4/O:4/S:9/ED:9/EE:3/A:9/ID:8/LC:2/LI:1/LAV:7/LAC:7/FD:7/RD:5/NC:5/PV:3"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/libssl3t64@3.5.4-1~deb13u1?arch=amd64\u0026distro=debian-13.3"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/openssl@3.5.4-1~deb13u1?arch=amd64\u0026distro=debian-13.3"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/openssl-provider-legacy@3.5.4-1~deb13u1?arch=amd64\u0026distro=debian-13.3"
+        }
+      ],
+      "properties": [
+        {
+          "name": "vens:impact-provenance",
+          "value": "cvss-v3"
+        },
+        {
+          "name": "vens:impact-basis",
+          "value": "business"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2026-22796",
+      "source": {
+        "name": "NVD",
+        "url": "https://salsa.debian.org/security-tracker-team/security-tracker"
+      },
+      "ratings": [
+        {
+          "score": 35.625,
+          "severity": "high",
+          "method": "OWASP",
+          "vector": "SL:9/M:1/O:7/S:9/ED:9/EE:5/A:9/ID:8/LC:2/LI:1/LAV:7/LAC:9/FD:7/RD:5/NC:5/PV:3"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/libssl3t64@3.5.4-1~deb13u1?arch=amd64\u0026distro=debian-13.3"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/openssl@3.5.4-1~deb13u1?arch=amd64\u0026distro=debian-13.3"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/openssl-provider-legacy@3.5.4-1~deb13u1?arch=amd64\u0026distro=debian-13.3"
+        }
+      ],
+      "properties": [
+        {
+          "name": "vens:impact-provenance",
+          "value": "cvss-v3"
+        },
+        {
+          "name": "vens:impact-basis",
+          "value": "business"
+        }
+      ]
+    },
+    {
+      "id": "CVE-2026-23949",
+      "source": {
+        "name": "NVD",
+        "url": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Apip"
+      },
+      "ratings": [
+        {
+          "score": 33.46875,
+          "severity": "high",
+          "method": "OWASP",
+          "vector": "SL:9/M:1/O:9/S:9/ED:9/EE:9/A:9/ID:8/LC:7/LI:1/LAV:1/LAC:9/FD:7/RD:5/NC:2/PV:3"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:pypi/jaraco.context@5.3.0"
+        }
+      ],
+      "properties": [
+        {
+          "name": "vens:impact-provenance",
+          "value": "cvss-v3"
+        },
+        {
+          "name": "vens:impact-basis",
+          "value": "business"
         }
       ]
     },
     {
       "id": "CVE-2026-24049",
+      "source": {
+        "name": "NVD",
+        "url": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Apip"
+      },
       "ratings": [
         {
-          "score": 68,
-          "severity": "critical",
+          "score": 41.25,
+          "severity": "high",
           "method": "OWASP",
-          "vector": "SL:8/M:8/O:8/S:8/ED:8/EE:8/A:8/ID:8/LC:8/LI:8/LAV:8/LAC:8/FD:9/RD:9/NC:9/PV:9"
+          "vector": "SL:9/M:4/O:9/S:9/ED:9/EE:9/A:9/ID:8/LC:2/LI:7/LAV:7/LAC:7/FD:7/RD:5/NC:5/PV:3"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:pypi/wheel@0.45.1"
+        }
+      ],
+      "properties": [
+        {
+          "name": "vens:impact-provenance",
+          "value": "cvss-v3"
+        },
+        {
+          "name": "vens:impact-basis",
+          "value": "business"
+        }
+      ]
+    },
+    {
+      "id": "TEMP-0290435-0B57B5",
+      "source": {
+        "name": "UNKNOWN",
+        "url": "https://salsa.debian.org/security-tracker-team/security-tracker"
+      },
+      "ratings": [
+        {
+          "score": 49.5,
+          "severity": "high",
+          "method": "OWASP",
+          "vector": "SL:9/M:9/O:9/S:9/ED:9/EE:9/A:9/ID:9/LC:9/LI:9/LAV:9/LAC:9/FD:7/RD:5/NC:7/PV:3"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/tar@1.35%2Bdfsg-3.1?arch=amd64\u0026distro=debian-13.3"
+        }
+      ],
+      "properties": [
+        {
+          "name": "vens:impact-provenance",
+          "value": "missing-cvss-v3-fallback"
+        },
+        {
+          "name": "vens:impact-basis",
+          "value": "business"
+        }
+      ]
+    },
+    {
+      "id": "TEMP-0517018-A83CE6",
+      "source": {
+        "name": "UNKNOWN",
+        "url": "https://salsa.debian.org/security-tracker-team/security-tracker"
+      },
+      "ratings": [
+        {
+          "score": 46.59375,
+          "severity": "high",
+          "method": "OWASP",
+          "vector": "SL:9/M:9/O:9/S:9/ED:9/EE:9/A:9/ID:8/LC:9/LI:9/LAV:9/LAC:9/FD:7/RD:5/NC:2/PV:7"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/sysvinit-utils@3.14-4?arch=amd64\u0026distro=debian-13.3"
+        }
+      ],
+      "properties": [
+        {
+          "name": "vens:impact-provenance",
+          "value": "missing-cvss-v3-fallback"
+        },
+        {
+          "name": "vens:impact-basis",
+          "value": "business"
+        }
+      ]
+    },
+    {
+      "id": "TEMP-0628843-DBAD28",
+      "source": {
+        "name": "UNKNOWN",
+        "url": "https://salsa.debian.org/security-tracker-team/security-tracker"
+      },
+      "ratings": [
+        {
+          "score": 44.375,
+          "severity": "high",
+          "method": "OWASP",
+          "vector": "SL:9/M:9/O:9/S:9/ED:9/EE:9/A:9/ID:8/LC:9/LI:9/LAV:9/LAC:7/FD:7/RD:5/NC:5/PV:3"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/login.defs@4.17.4-2?arch=all\u0026distro=debian-13.3\u0026epoch=1"
+        },
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/passwd@4.17.4-2?arch=amd64\u0026distro=debian-13.3\u0026epoch=1"
+        }
+      ],
+      "properties": [
+        {
+          "name": "vens:impact-provenance",
+          "value": "missing-cvss-v3-fallback"
+        },
+        {
+          "name": "vens:impact-basis",
+          "value": "business"
+        }
+      ]
+    },
+    {
+      "id": "TEMP-0841856-B18BAF",
+      "source": {
+        "name": "UNKNOWN",
+        "url": "https://salsa.debian.org/security-tracker-team/security-tracker"
+      },
+      "ratings": [
+        {
+          "score": 46.59375,
+          "severity": "high",
+          "method": "OWASP",
+          "vector": "SL:9/M:9/O:9/S:9/ED:9/EE:9/A:9/ID:8/LC:9/LI:9/LAV:9/LAC:7/FD:7/RD:5/NC:2/PV:7"
+        }
+      ],
+      "affects": [
+        {
+          "ref": "urn:cdx:3e671687-395b-41f5-a30f-a58921a69b79/1#pkg:deb/debian/bash@5.2.37-2%2Bb7?arch=amd64\u0026distro=debian-13.3"
+        }
+      ],
+      "properties": [
+        {
+          "name": "vens:impact-provenance",
+          "value": "missing-cvss-v3-fallback"
+        },
+        {
+          "name": "vens:impact-basis",
+          "value": "business"
         }
       ]
     }

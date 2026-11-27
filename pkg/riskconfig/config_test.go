@@ -310,10 +310,12 @@ func TestSchemaVersion(t *testing.T) {
 	body := strings.TrimPrefix(minimal, "schema_version: 2\n")
 	parseFails(t, body, 1, "config.yaml has no schema_version: it was written for vens v0.6 or earlier (schema 1). "+
 		"This vens reads schema 2, which scores each OWASP factor on its own: audit_requirement and controls ids/siem/edr "+
-		"no longer move any score, and listener, data_subjects, detection and traceability are new. "+
+		"no longer move any score, listener, data_subjects, detection and traceability are new, and business_criticality keeps "+
+		"its values with a new meaning, the worst Financial damage and Reputation damage an exploit could cost: reconfirm yours. "+
 		"Read https://venslabs.github.io/vens/reference/config-schema/#migrating, then add `schema_version: 2` at the top of the file.")
-	parseFails(t, "schema_version: 1\n"+body, 2, "schema_version 1 is not supported: this vens reads schema 2 only. "+
-		"Read https://venslabs.github.io/vens/reference/config-schema/#migrating, then set `schema_version: 2`.")
+	parseFails(t, "schema_version: 1\n"+body, 2, "schema_version 1 is not supported: this vens reads schema 2 only, in which "+
+		"business_criticality keeps its values with a new meaning, the worst Financial damage and Reputation damage an exploit "+
+		"could cost: reconfirm yours. Read https://venslabs.github.io/vens/reference/config-schema/#migrating, then set `schema_version: 2`.")
 	// 99999999999999999999 does not fit an int, so yaml.v3 resolves it as a
 	// float: it is still a plain decimal integer above 2.
 	for _, v := range []string{"3", "10", "99999999999999999999"} {
@@ -612,7 +614,7 @@ func TestWarnings(t *testing.T) {
 		w2 = "controls ids/siem/edr give no detection credit, and context.detection is not declared: every channel counts as not logged, so Intrusion detection is 9 on every finding."
 		w3 = "context.traceability is not declared: Loss of accountability uses its `none` column, 7 or 9 on every finding."
 		w4 = "context.detection is not declared: every channel counts as not logged, so Intrusion detection is 9 on every finding."
-		w5 = "context.data_subjects is not declared: Privacy violation has no cap, so the model's band stands wherever Privacy violation is asked, and every finding is rated on its technical impact. Declared, it is taken as the business information OWASP's rule asks for, and every finding is rated on its business impact."
+		w5 = "context.data_subjects is not declared: Privacy violation has no cap, so the model's band stands wherever Privacy violation is asked, and every finding is rated on its technical impact. Declared, it is taken as the business information OWASP's rule asks for, and every finding is rated on its business impact instead, which can move a severity up or down; with no framework in compliance_requirements, no finding rates critical unless business_criticality is critical."
 	)
 	for _, tc := range []struct {
 		name  string

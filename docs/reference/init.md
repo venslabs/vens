@@ -94,7 +94,7 @@ Listener: Does this deployment accept connections others open?
   unknown: not stated
 Listener (optional) [present/absent/unknown]: present
 
-Data subjects: How many distinct people's personal data this service can read: what it stores, what passes through it, and what it can fetch with its own access. A count belongs to the band whose interval holds it, and a count of 2 to 99 belongs to hundreds. Nothing is inferred from data_sensitivity.
+Data subjects: How many distinct people's personal data this service can read: what it stores, what passes through it, and what it can fetch with its own access. A count belongs to the band whose interval holds it, and a count of 2 to 99 belongs to hundreds. Nothing is inferred from data_sensitivity. Declaring any band makes vens rate every finding on its business impact instead of its technical impact, which can move a severity up or down; with no framework in compliance_requirements, no finding rates critical unless business_criticality is critical.
   none: 0
   one_individual: 1
   hundreds: 2 to 999
